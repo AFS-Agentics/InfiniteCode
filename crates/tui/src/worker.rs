@@ -1255,6 +1255,7 @@ async fn run_worker_inner(
                                                 let _ = event_tx.send(WorkerEvent::ToolCall {
                                                     tool_use_id: payload.tool_call_id,
                                                     summary: payload.command,
+                                                    preparing: false,
                                                     parsed_commands: Some(payload.command_actions),
                                                 });
                                             }
@@ -1269,6 +1270,7 @@ async fn run_worker_inner(
                                                 let _ = event_tx.send(WorkerEvent::ToolCall {
                                                     tool_use_id: payload.tool_call_id.clone(),
                                                     summary,
+                                                    preparing: payload.tool_name == "write",
                                                     parsed_commands: Some(payload.command_actions),
                                                 });
                                             }
@@ -2137,10 +2139,18 @@ fn patch_event_from_tool_result(payload: &ToolResultPayload) -> Option<WorkerEve
             .unwrap_or(0);
         let change = match kind {
             "add" => devo_protocol::protocol::FileChange::Add {
-                content: "\n".repeat(additions as usize),
+                content: file
+                    .get("content")
+                    .and_then(serde_json::Value::as_str)
+                    .map(ToOwned::to_owned)
+                    .unwrap_or_else(|| "\n".repeat(additions as usize)),
             },
             "delete" => devo_protocol::protocol::FileChange::Delete {
-                content: "\n".repeat(deletions as usize),
+                content: file
+                    .get("content")
+                    .and_then(serde_json::Value::as_str)
+                    .map(ToOwned::to_owned)
+                    .unwrap_or_else(|| "\n".repeat(deletions as usize)),
             },
             "update" | "move" => devo_protocol::protocol::FileChange::Update {
                 unified_diff: file
@@ -2731,11 +2741,13 @@ mod tests {
             WorkerEvent::ToolCall {
                 tool_use_id: payload.tool_call_id.clone(),
                 summary: payload.command.clone(),
+                preparing: false,
                 parsed_commands: Some(payload.command_actions.clone()),
             },
             WorkerEvent::ToolCall {
                 tool_use_id: payload.tool_call_id,
                 summary: payload.command,
+                preparing: false,
                 parsed_commands: Some(payload.command_actions),
             }
         );
