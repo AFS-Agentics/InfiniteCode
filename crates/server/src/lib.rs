@@ -13,6 +13,7 @@ mod provider_config;
 mod runtime;
 mod session;
 mod titles;
+mod tool_actions;
 mod transport;
 mod turn;
 

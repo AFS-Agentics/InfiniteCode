@@ -279,10 +279,6 @@ Overlay behavior      pager_overlay.rs, host_overlay.rs
 
 Most bugs become easier to reason about once the layer is clear.
 
-```
-
-One typo to fix in your intended wording: use **“fundamental knowledge”**, not “foundmental knowledge,” and **“familiar”**, not “familar.”
-
 ## Module Map
 
 ### Entry Points

@@ -1267,11 +1267,13 @@ async fn run_worker_inner(
                                                 )
                                             {
                                                 let summary = summarize_tool_call(&payload);
+                                                let parsed_commands =
+                                                    tool_call_started_actions(&payload);
                                                 let _ = event_tx.send(WorkerEvent::ToolCall {
                                                     tool_use_id: payload.tool_call_id.clone(),
                                                     summary,
                                                     preparing: payload.tool_name == "write",
-                                                    parsed_commands: Some(payload.command_actions),
+                                                    parsed_commands: Some(parsed_commands),
                                                 });
                                             }
                                         }
@@ -1691,9 +1693,18 @@ fn handle_completed_item(payload: ItemEventPayload, event_tx: &mpsc::UnboundedSe
             payload,
             ..
         } => {
-            // ToolCall is now handled via item/started; skip duplicate emission from
-            // item/completed since it arrives later (after the tool actually finishes).
-            let _ = payload;
+            let Ok(payload) = serde_json::from_value::<ToolCallPayload>(payload) else {
+                return;
+            };
+            let summary = summarize_tool_call_update(&payload);
+            let parsed_commands = tool_call_updated_actions(&payload, &summary);
+            if !parsed_commands.is_empty() {
+                let _ = event_tx.send(WorkerEvent::ToolCallUpdated {
+                    tool_use_id: payload.tool_call_id,
+                    summary,
+                    parsed_commands,
+                });
+            }
         }
         ItemEnvelope {
             item_kind: ItemKind::FileChange,
@@ -1945,6 +1956,133 @@ fn summarize_tool_call(payload: &ToolCallPayload) -> String {
         payload.tool_name.clone()
     } else {
         format!("{} {detail}", payload.tool_name)
+    }
+}
+
+fn summarize_tool_call_update(payload: &ToolCallPayload) -> String {
+    let summary = summarize_tool_call(payload);
+    if payload.tool_name == "read"
+        && summary == "read {}"
+        && let Some(cmd) = payload
+            .command_actions
+            .iter()
+            .find_map(|action| match action {
+                devo_protocol::parse_command::ParsedCommand::Read { cmd, .. }
+                    if !cmd.is_empty() =>
+                {
+                    Some(cmd.clone())
+                }
+                _ => None,
+            })
+    {
+        return cmd;
+    }
+    if payload.tool_name == "glob"
+        && summary == "glob {}"
+        && let Some(cmd) = payload
+            .command_actions
+            .iter()
+            .find_map(|action| match action {
+                devo_protocol::parse_command::ParsedCommand::ListFiles { cmd, .. }
+                    if !cmd.is_empty() =>
+                {
+                    Some(cmd.clone())
+                }
+                _ => None,
+            })
+    {
+        return cmd;
+    }
+    summary
+}
+
+fn read_command_action_from_parameters(
+    command: &str,
+    input: &serde_json::Value,
+) -> Option<devo_protocol::parse_command::ParsedCommand> {
+    let path = input
+        .get("filePath")
+        .or_else(|| input.get("path"))
+        .and_then(serde_json::Value::as_str)?
+        .trim();
+    if path.is_empty() {
+        return None;
+    }
+    let name = Path::new(path)
+        .file_name()
+        .map(|name| name.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.to_string());
+    Some(devo_protocol::parse_command::ParsedCommand::Read {
+        cmd: command.to_string(),
+        name,
+        path: PathBuf::from(path),
+    })
+}
+
+fn glob_command_action_from_parameters(
+    command: &str,
+    input: &serde_json::Value,
+) -> Option<devo_protocol::parse_command::ParsedCommand> {
+    let pattern = input
+        .get("pattern")
+        .and_then(serde_json::Value::as_str)
+        .filter(|pattern| !pattern.is_empty())?;
+    let path = input.get("path").and_then(serde_json::Value::as_str);
+    let display = match path.filter(|path| !path.is_empty()) {
+        Some(path) => format!("{pattern} in {path}"),
+        None => pattern.to_string(),
+    };
+    Some(devo_protocol::parse_command::ParsedCommand::ListFiles {
+        cmd: command.to_string(),
+        path: Some(display),
+    })
+}
+
+fn tool_call_started_actions(
+    payload: &ToolCallPayload,
+) -> Vec<devo_protocol::parse_command::ParsedCommand> {
+    if !payload.command_actions.is_empty() {
+        return payload.command_actions.clone();
+    }
+    if payload.tool_name == "read" {
+        return vec![
+            read_command_action_from_parameters("read", &payload.parameters).unwrap_or_else(|| {
+                devo_protocol::parse_command::ParsedCommand::Read {
+                    cmd: String::new(),
+                    name: String::new(),
+                    path: PathBuf::new(),
+                }
+            }),
+        ];
+    }
+    if payload.tool_name == "glob" {
+        return vec![
+            glob_command_action_from_parameters("glob", &payload.parameters).unwrap_or_else(|| {
+                devo_protocol::parse_command::ParsedCommand::ListFiles {
+                    cmd: "glob".to_string(),
+                    path: Some("glob".to_string()),
+                }
+            }),
+        ];
+    }
+    Vec::new()
+}
+
+fn tool_call_updated_actions(
+    payload: &ToolCallPayload,
+    summary: &str,
+) -> Vec<devo_protocol::parse_command::ParsedCommand> {
+    if !payload.command_actions.is_empty() {
+        return payload.command_actions.clone();
+    }
+    match payload.tool_name.as_str() {
+        "read" => read_command_action_from_parameters(summary, &payload.parameters)
+            .into_iter()
+            .collect(),
+        "glob" => glob_command_action_from_parameters(summary, &payload.parameters)
+            .into_iter()
+            .collect(),
+        _ => Vec::new(),
     }
 }
 
@@ -2344,6 +2482,7 @@ mod tests {
     use super::normalize_display_output;
     use super::project_history_items;
     use super::summarize_tool_call;
+    use super::tool_call_started_actions;
     use super::truncate_tool_output;
     use crate::events::PlanStep;
     use crate::events::PlanStepStatus;
@@ -2430,6 +2569,111 @@ mod tests {
                 preview: "canonical".to_string(),
                 is_error: false,
                 truncated: false,
+            }
+        );
+    }
+
+    #[test]
+    fn read_tool_call_start_with_empty_parameters_emits_placeholder_action() {
+        let payload = ToolCallPayload {
+            tool_call_id: "call-1".to_string(),
+            tool_name: "read".to_string(),
+            parameters: serde_json::json!({}),
+            command_actions: Vec::new(),
+        };
+
+        assert_eq!(
+            tool_call_started_actions(&payload),
+            vec![devo_protocol::parse_command::ParsedCommand::Read {
+                cmd: String::new(),
+                name: String::new(),
+                path: PathBuf::new(),
+            }]
+        );
+    }
+
+    #[test]
+    fn completed_read_tool_call_emits_update_event() {
+        let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
+        handle_completed_item(
+            ItemEventPayload {
+                context: devo_server::EventContext {
+                    session_id: SessionId::new(),
+                    turn_id: None,
+                    item_id: None,
+                    seq: 1,
+                },
+                item: ItemEnvelope {
+                    item_id: ItemId::new(),
+                    item_kind: ItemKind::ToolCall,
+                    payload: serde_json::to_value(ToolCallPayload {
+                        tool_call_id: "call-1".to_string(),
+                        tool_name: "read".to_string(),
+                        parameters: serde_json::json!({}),
+                        command_actions: vec![devo_protocol::parse_command::ParsedCommand::Read {
+                            cmd: "read crates/tui/src/mod.rs".to_string(),
+                            name: "mod.rs".to_string(),
+                            path: PathBuf::from("crates/tui/src/mod.rs"),
+                        }],
+                    })
+                    .expect("serialize tool call payload"),
+                },
+            },
+            &event_tx,
+        );
+
+        assert_eq!(
+            event_rx.try_recv().expect("worker event"),
+            WorkerEvent::ToolCallUpdated {
+                tool_use_id: "call-1".to_string(),
+                summary: "read crates/tui/src/mod.rs".to_string(),
+                parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::Read {
+                    cmd: "read crates/tui/src/mod.rs".to_string(),
+                    name: "mod.rs".to_string(),
+                    path: PathBuf::from("crates/tui/src/mod.rs"),
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn completed_glob_tool_call_emits_update_with_pattern_and_path() {
+        let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
+        handle_completed_item(
+            ItemEventPayload {
+                context: devo_server::EventContext {
+                    session_id: SessionId::new(),
+                    turn_id: None,
+                    item_id: None,
+                    seq: 1,
+                },
+                item: ItemEnvelope {
+                    item_id: ItemId::new(),
+                    item_kind: ItemKind::ToolCall,
+                    payload: serde_json::to_value(ToolCallPayload {
+                        tool_call_id: "call-1".to_string(),
+                        tool_name: "glob".to_string(),
+                        parameters: serde_json::json!({
+                            "pattern": "**/Cargo.toml",
+                            "path": "crates"
+                        }),
+                        command_actions: Vec::new(),
+                    })
+                    .expect("serialize tool call payload"),
+                },
+            },
+            &event_tx,
+        );
+
+        assert_eq!(
+            event_rx.try_recv().expect("worker event"),
+            WorkerEvent::ToolCallUpdated {
+                tool_use_id: "call-1".to_string(),
+                summary: "glob **/Cargo.toml in crates".to_string(),
+                parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::ListFiles {
+                    cmd: "glob **/Cargo.toml in crates".to_string(),
+                    path: Some("**/Cargo.toml in crates".to_string()),
+                }],
             }
         );
     }

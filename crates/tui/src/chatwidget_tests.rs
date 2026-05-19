@@ -3087,7 +3087,7 @@ fn status_summary_uses_last_turn_total_when_idle_and_live_estimate_while_busy() 
 
     let idle_summary = widget.status_summary_text();
     assert!(idle_summary.contains("↑12"));
-    assert!(idle_summary.contains("↺4 33%"));
+    assert!(idle_summary.contains("cached 4 33%"));
     assert!(idle_summary.contains("↓18"));
     assert!(idle_summary.contains("42/190k"));
 
@@ -3107,7 +3107,7 @@ fn status_summary_uses_last_turn_total_when_idle_and_live_estimate_while_busy() 
 
     let busy_summary = widget.status_summary_text();
     assert!(busy_summary.contains("↑7"));
-    assert!(busy_summary.contains("↺6 86%"));
+    assert!(busy_summary.contains("cached 6 86%"));
     assert!(busy_summary.contains("7/190k"));
 
     widget.handle_worker_event(crate::events::WorkerEvent::TurnFinished {
@@ -3123,7 +3123,7 @@ fn status_summary_uses_last_turn_total_when_idle_and_live_estimate_while_busy() 
 
     let finished_summary = widget.status_summary_text();
     assert!(finished_summary.contains("↑19"));
-    assert!(finished_summary.contains("↺6 32%"));
+    assert!(finished_summary.contains("cached 6 32%"));
     assert!(finished_summary.contains("7/190k"));
 }
 
@@ -3214,7 +3214,7 @@ fn new_session_prepared_appends_header_after_existing_history_and_resets_status(
 
     let summary = widget.status_summary_text();
     assert!(summary.contains("↑0"));
-    assert!(summary.contains("↺0 0%"));
+    assert!(summary.contains("cached 0 0%"));
     assert!(summary.contains("↓0"));
     assert!(summary.contains("0/190k"));
 
@@ -3256,7 +3256,7 @@ fn new_session_prepared_does_not_duplicate_startup_header_without_history() {
 
     let rows = rendered_rows(&widget, 80, 16);
     assert_eq!(rows.iter().filter(|row| row.contains("Devo")).count(), 1);
-    assert!(widget.status_summary_text().contains("↺0 0%"));
+    assert!(widget.status_summary_text().contains("cached 0 0%"));
 }
 
 #[test]
@@ -3782,6 +3782,214 @@ fn read_tool_call_renders_as_explored_group_in_viewport() {
         "expected read summary in explored viewport: {display}"
     );
     assert!(display.contains("▌ Explored") || display.contains("▌ Exploring"));
+}
+
+#[test]
+fn read_tool_call_falls_back_to_path_when_read_name_is_empty() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "read crates/tui/src/mod.rs".to_string(),
+        preparing: false,
+        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+            cmd: "read crates/tui/src/mod.rs".to_string(),
+            name: String::new(),
+            path: PathBuf::from("crates/tui/src/mod.rs"),
+        }]),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
+        tool_use_id: "tool-1".to_string(),
+        title: "read crates/tui/src/mod.rs".to_string(),
+        preview: "mod tui;".to_string(),
+        is_error: false,
+        truncated: false,
+    });
+
+    let display = widget
+        .active_cell_display_lines_for_test(80)
+        .into_iter()
+        .map(|line| {
+            line.spans
+                .into_iter()
+                .map(|span| span.content.to_string())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        display.contains("Read mod.rs"),
+        "expected read summary fallback in explored viewport: {display}"
+    );
+    assert!(
+        !display.contains("  └ Read\n"),
+        "read summary should not be bare Read: {display}"
+    );
+}
+
+#[test]
+fn read_tool_call_updates_placeholder_from_completed_tool_call_metadata() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "read {}".to_string(),
+        preparing: false,
+        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+            cmd: String::new(),
+            name: String::new(),
+            path: PathBuf::new(),
+        }]),
+    });
+
+    let initial_display = widget
+        .active_cell_display_lines_for_test(80)
+        .into_iter()
+        .map(|line| {
+            line.spans
+                .into_iter()
+                .map(|span| span.content.to_string())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        initial_display.contains("Explored") || initial_display.contains("Exploring"),
+        "expected read start to render as explored cell: {initial_display}"
+    );
+    assert!(
+        initial_display.contains("Read"),
+        "expected placeholder read line: {initial_display}"
+    );
+    assert!(
+        !initial_display.contains("Running read {}"),
+        "read placeholder should not render as a generic running tool: {initial_display}"
+    );
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCallUpdated {
+        tool_use_id: "tool-1".to_string(),
+        summary: "read crates/tui/src/mod.rs".to_string(),
+        parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::Read {
+            cmd: "read crates/tui/src/mod.rs".to_string(),
+            name: "mod.rs".to_string(),
+            path: PathBuf::from("crates/tui/src/mod.rs"),
+        }],
+    });
+
+    let updated_display = widget
+        .active_cell_display_lines_for_test(80)
+        .into_iter()
+        .map(|line| {
+            line.spans
+                .into_iter()
+                .map(|span| span.content.to_string())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        updated_display.contains("Read mod.rs"),
+        "expected read placeholder to update in place: {updated_display}"
+    );
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
+        tool_use_id: "tool-1".to_string(),
+        title: "read crates/tui/src/mod.rs".to_string(),
+        preview: "mod tui;".to_string(),
+        is_error: false,
+        truncated: false,
+    });
+
+    let completed_display = widget
+        .active_cell_display_lines_for_test(80)
+        .into_iter()
+        .map(|line| {
+            line.spans
+                .into_iter()
+                .map(|span| span.content.to_string())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        completed_display.contains("Read mod.rs"),
+        "expected completed read to remain explored: {completed_display}"
+    );
+    assert!(
+        !completed_display.contains("Ran read"),
+        "matching result should not create generic ran cell: {completed_display}"
+    );
+}
+
+#[test]
+fn consecutive_read_tool_calls_render_on_one_line_with_spaces() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+
+    for name in ["mod.rs", "lib.rs", "file1.rs", "file2.rs"] {
+        let tool_use_id = format!("tool-{name}");
+        widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+            tool_use_id: tool_use_id.clone(),
+            summary: "read {}".to_string(),
+            preparing: false,
+            parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+                cmd: String::new(),
+                name: String::new(),
+                path: PathBuf::new(),
+            }]),
+        });
+        widget.handle_worker_event(crate::events::WorkerEvent::ToolCallUpdated {
+            tool_use_id: tool_use_id.clone(),
+            summary: format!("read crates/tui/src/{name}"),
+            parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::Read {
+                cmd: format!("read crates/tui/src/{name}"),
+                name: name.to_string(),
+                path: PathBuf::from(format!("crates/tui/src/{name}")),
+            }],
+        });
+        widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
+            tool_use_id,
+            title: format!("read crates/tui/src/{name}"),
+            preview: String::new(),
+            is_error: false,
+            truncated: false,
+        });
+    }
+
+    let display = widget
+        .active_cell_display_lines_for_test(120)
+        .into_iter()
+        .map(|line| {
+            line.spans
+                .into_iter()
+                .map(|span| span.content.to_string())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        display.contains("Read mod.rs lib.rs file1.rs file2.rs"),
+        "expected consecutive reads to render space-separated: {display}"
+    );
 }
 
 #[test]

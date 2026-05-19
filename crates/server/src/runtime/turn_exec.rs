@@ -141,28 +141,12 @@ fn command_actions_from_tool_input(
     input: &serde_json::Value,
 ) -> Vec<devo_protocol::parse_command::ParsedCommand> {
     match tool_name {
-        "read" => {
-            let path = input
-                .get("filePath")
-                .or_else(|| input.get("path"))
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default();
-            let name = std::path::Path::new(path)
-                .file_name()
-                .map(|name| name.to_string_lossy().to_string())
-                .unwrap_or_else(|| path.to_string());
-            vec![devo_protocol::parse_command::ParsedCommand::Read {
-                cmd: command.to_string(),
-                name,
-                path: std::path::PathBuf::from(path),
-            }]
-        }
+        "read" => crate::tool_actions::read_action_from_tool_input(command, input)
+            .into_iter()
+            .collect(),
         "glob" => vec![devo_protocol::parse_command::ParsedCommand::ListFiles {
             cmd: command.to_string(),
-            path: input
-                .get("path")
-                .and_then(serde_json::Value::as_str)
-                .map(ToOwned::to_owned),
+            path: glob_display_from_input(input),
         }],
         "grep" => vec![devo_protocol::parse_command::ParsedCommand::Search {
             cmd: command.to_string(),
@@ -176,6 +160,36 @@ fn command_actions_from_tool_input(
                 .map(ToOwned::to_owned),
         }],
         _ => Vec::new(),
+    }
+}
+
+fn glob_display_from_input(input: &serde_json::Value) -> Option<String> {
+    let pattern = input
+        .get("pattern")
+        .and_then(serde_json::Value::as_str)
+        .filter(|pattern| !pattern.is_empty())?;
+    let path = input.get("path").and_then(serde_json::Value::as_str);
+    Some(match path.filter(|path| !path.is_empty()) {
+        Some(path) => format!("{pattern} in {path}"),
+        None => pattern.to_string(),
+    })
+}
+
+fn command_actions_from_tool_result(
+    tool_name: &str,
+    command: &str,
+    input: &serde_json::Value,
+    summary: &str,
+) -> Vec<devo_protocol::parse_command::ParsedCommand> {
+    let actions = command_actions_from_tool_input(tool_name, command, input);
+    if !actions.is_empty() {
+        return actions;
+    }
+    match tool_name {
+        "read" => crate::tool_actions::read_action_from_tool_summary(summary)
+            .into_iter()
+            .collect(),
+        _ => actions,
     }
 }
 
@@ -467,15 +481,30 @@ impl ServerRuntime {
                     }
                     QueryEvent::ToolResult {
                         tool_use_id,
+                        tool_name: final_tool_name,
+                        input: final_input,
                         content,
                         display_content,
                         is_error,
                         summary,
                     } => {
-                        let tool_name = tool_names_by_id.get(&tool_use_id).cloned();
+                        let tool_name = if final_tool_name.is_empty() {
+                            tool_names_by_id.get(&tool_use_id).cloned()
+                        } else {
+                            Some(final_tool_name)
+                        };
                         // First complete the pending ToolCall item so its item/completed
                         // arrives before the ToolResult item/completed.
                         if let Some(mut pending) = pending_tool_calls.remove(&tool_use_id) {
+                            if !final_input.is_null() {
+                                pending.command = tool_name
+                                    .as_deref()
+                                    .map(|tool_name| {
+                                        command_display_from_input(tool_name, &final_input)
+                                    })
+                                    .unwrap_or_default();
+                                pending.input = final_input;
+                            }
                             if pending.item_id.is_none() || pending.item_seq.is_none() {
                                 let started_payload = if let Some(tool_name) = tool_name.clone() {
                                     let item_kind =
@@ -500,10 +529,11 @@ impl ServerRuntime {
                                                 tool_call_id: tool_use_id.clone(),
                                                 tool_name: tool_name.clone(),
                                                 parameters: pending.input.clone(),
-                                                command_actions: command_actions_from_tool_input(
+                                                command_actions: command_actions_from_tool_result(
                                                     &tool_name,
                                                     &pending.command,
                                                     &pending.input,
+                                                    &summary,
                                                 ),
                                             })
                                             .expect("serialize tool call payload")
@@ -522,10 +552,11 @@ impl ServerRuntime {
                                             command: pending.command.clone(),
                                             source:
                                                 devo_protocol::protocol::ExecCommandSource::Agent,
-                                            command_actions: command_actions_from_tool_input(
+                                            command_actions: command_actions_from_tool_result(
                                                 &tool_name,
                                                 &pending.command,
                                                 &pending.input,
+                                                &summary,
                                             ),
                                             output: None,
                                             is_error: false,
@@ -541,10 +572,11 @@ impl ServerRuntime {
                                                 tool_call_id: tool_use_id.clone(),
                                                 tool_name: tool_name.clone(),
                                                 parameters: pending.input.clone(),
-                                                command_actions: command_actions_from_tool_input(
+                                                command_actions: command_actions_from_tool_result(
                                                     &tool_name,
                                                     &pending.command,
                                                     &pending.input,
+                                                    &summary,
                                                 ),
                                             })
                                             .expect("serialize tool call payload")
@@ -777,10 +809,11 @@ impl ServerRuntime {
                                         tool_name: tool_name.clone(),
                                         command: pending.command.clone(),
                                         source: devo_protocol::protocol::ExecCommandSource::Agent,
-                                        command_actions: command_actions_from_tool_input(
+                                        command_actions: command_actions_from_tool_result(
                                             &tool_name,
                                             &pending.command,
                                             &pending.input,
+                                            &summary,
                                         ),
                                         output: Some(output.clone()),
                                         is_error,
@@ -810,10 +843,11 @@ impl ServerRuntime {
                                 tool_call_id: tool_use_id.clone(),
                                 tool_name: tool_name.clone().unwrap_or_default(),
                                 parameters: pending.input.clone(),
-                                command_actions: command_actions_from_tool_input(
+                                command_actions: command_actions_from_tool_result(
                                     tool_name.clone().unwrap_or_default().as_str(),
                                     &pending.command,
                                     &pending.input,
+                                    &summary,
                                 ),
                             })
                             .expect("serialize tool call payload");
@@ -1544,17 +1578,42 @@ mod tests {
     fn command_actions_from_read_tool_input_builds_read_action() {
         let actions = command_actions_from_tool_input(
             "read",
-            "read crates/tui/src/chatwidget.rs",
+            "read crates/tui/src/mod.rs",
             &serde_json::json!({
-                "filePath": "crates/tui/src/chatwidget.rs"
+                "filePath": "crates/tui/src/mod.rs"
             }),
         );
         assert_eq!(
             actions,
             vec![devo_protocol::parse_command::ParsedCommand::Read {
-                cmd: "read crates/tui/src/chatwidget.rs".to_string(),
-                name: "chatwidget.rs".to_string(),
-                path: std::path::PathBuf::from("crates/tui/src/chatwidget.rs"),
+                cmd: "read crates/tui/src/mod.rs".to_string(),
+                name: "mod.rs".to_string(),
+                path: std::path::PathBuf::from("crates/tui/src/mod.rs"),
+            }]
+        );
+    }
+
+    #[test]
+    fn command_actions_from_read_tool_input_without_path_is_empty() {
+        let actions =
+            command_actions_from_tool_input("read", "read", &serde_json::json!({ "limit": 10 }));
+        assert_eq!(actions, Vec::new());
+    }
+
+    #[test]
+    fn command_actions_from_read_tool_result_summary_recovers_final_path() {
+        let actions = command_actions_from_tool_result(
+            "read",
+            "read ",
+            &serde_json::json!({}),
+            "read: crates/tui/src/mod.rs",
+        );
+        assert_eq!(
+            actions,
+            vec![devo_protocol::parse_command::ParsedCommand::Read {
+                cmd: "read crates/tui/src/mod.rs".to_string(),
+                name: "mod.rs".to_string(),
+                path: std::path::PathBuf::from("crates/tui/src/mod.rs"),
             }]
         );
     }
@@ -1576,5 +1635,24 @@ mod tests {
             if query.as_deref() == Some("rebuild_restored_session")
                 && path.as_deref() == Some("crates/tui/src")
         ));
+    }
+
+    #[test]
+    fn command_actions_from_glob_tool_input_include_pattern_and_path() {
+        let actions = command_actions_from_tool_input(
+            "glob",
+            "glob **/Cargo.toml in crates",
+            &serde_json::json!({
+                "pattern": "**/Cargo.toml",
+                "path": "crates"
+            }),
+        );
+        assert_eq!(
+            actions,
+            vec![devo_protocol::parse_command::ParsedCommand::ListFiles {
+                cmd: "glob **/Cargo.toml in crates".to_string(),
+                path: Some("**/Cargo.toml in crates".to_string()),
+            }]
+        );
     }
 }

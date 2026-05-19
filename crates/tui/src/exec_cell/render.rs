@@ -39,6 +39,20 @@ pub(crate) struct OutputLinesParams {
     pub(crate) include_prefix: bool,
 }
 
+fn read_display_name(name: &str, path: &std::path::Path, cmd: &str) -> String {
+    if !name.is_empty() {
+        return name.to_string();
+    }
+    if let Some(file_name) = path.file_name() {
+        return file_name.to_string_lossy().to_string();
+    }
+    let path = path.to_string_lossy();
+    if !path.is_empty() {
+        return path.to_string();
+    }
+    cmd.to_string()
+}
+
 pub(crate) fn new_active_exec_command(
     call_id: String,
     command: Vec<String>,
@@ -352,20 +366,22 @@ impl ExecCell {
                     .parsed
                     .iter()
                     .map(|parsed| match parsed {
-                        ParsedCommand::Read { name, .. } => name.clone(),
+                        ParsedCommand::Read { cmd, name, path } => {
+                            read_display_name(name, path, cmd)
+                        }
                         _ => unreachable!(),
                     })
                     .unique();
                 vec![(
                     "Read",
-                    Itertools::intersperse(names.into_iter().map(Into::into), ", ".dim()).collect(),
+                    Itertools::intersperse(names.into_iter().map(Into::into), " ".dim()).collect(),
                 )]
             } else {
                 let mut lines = Vec::new();
                 for parsed in &call.parsed {
                     match parsed {
-                        ParsedCommand::Read { name, .. } => {
-                            lines.push(("Read", vec![name.clone().into()]));
+                        ParsedCommand::Read { cmd, name, path } => {
+                            lines.push(("Read", vec![read_display_name(name, path, cmd).into()]));
                         }
                         ParsedCommand::ListFiles { cmd, path } => {
                             lines.push(("List", vec![path.clone().unwrap_or(cmd.clone()).into()]));

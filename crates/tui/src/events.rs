@@ -110,6 +110,15 @@ pub(crate) enum WorkerEvent {
         /// Optional parsed command semantics for command-like and exploration-like tools.
         parsed_commands: Option<Vec<ParsedCommand>>,
     },
+    /// Updated metadata for a previously started tool call.
+    ToolCallUpdated {
+        /// Stable identifier matching the original tool call.
+        tool_use_id: String,
+        /// Updated human-readable summary line.
+        summary: String,
+        /// Parsed command semantics derived from finalized tool metadata.
+        parsed_commands: Vec<ParsedCommand>,
+    },
     /// Incremental output delta from a running tool.
     ToolOutputDelta {
         /// Stable identifier matching the corresponding tool call.

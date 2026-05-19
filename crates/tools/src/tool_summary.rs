@@ -52,7 +52,11 @@ pub fn tool_summary(name: &str, input: &serde_json::Value, cwd: &Path) -> String
             format!("exec: {cmd}")
         }
         "read" => {
-            let path = input["filePath"].as_str().unwrap_or("");
+            let path = input
+                .get("filePath")
+                .or_else(|| input.get("path"))
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
             let rel = make_relative(cwd, path);
             let mut s = format!("read: {rel}");
             let offset = input["offset"].as_u64();

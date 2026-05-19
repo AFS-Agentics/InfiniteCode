@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -96,6 +97,8 @@ pub enum QueryEvent {
     /// A tool call completed.
     ToolResult {
         tool_use_id: String,
+        tool_name: String,
+        input: serde_json::Value,
         content: ToolContent,
         display_content: Option<String>,
         is_error: bool,
@@ -610,7 +613,8 @@ pub async fn query(
 
         let mut assistant_text = String::new();
         let mut reasoning_text = String::new();
-        let mut tool_uses: Vec<(String, String, serde_json::Value, String, bool)> = Vec::new();
+        let mut tool_uses: Vec<(usize, String, String, serde_json::Value, String, bool)> =
+            Vec::new();
         let mut emitted_tool_use_starts: HashSet<String> = HashSet::new();
         let mut final_response = None;
         let mut stop_reason = None;
@@ -631,7 +635,10 @@ pub async fn query(
                     emit(QueryEvent::ReasoningCompleted);
                 }
                 Ok(StreamEvent::ToolCallStart {
-                    id, name, input, ..
+                    index,
+                    id,
+                    name,
+                    input,
                 }) => {
                     if emitted_tool_use_starts.insert(id.clone()) {
                         emit(QueryEvent::ToolUseStart {
@@ -640,12 +647,19 @@ pub async fn query(
                             input: input.clone(),
                         });
                     }
-                    tool_uses.push((id, name, input, String::new(), false));
+                    tool_uses.push((index, id, name, input, String::new(), false));
                 }
-                Ok(StreamEvent::ToolCallInputDelta { partial_json, .. }) => {
-                    if let Some(last) = tool_uses.last_mut() {
-                        last.3.push_str(&partial_json);
-                        last.4 = true;
+                Ok(StreamEvent::ToolCallInputDelta {
+                    index,
+                    partial_json,
+                }) => {
+                    if let Some(tool_use) = tool_uses
+                        .iter_mut()
+                        .rev()
+                        .find(|(tool_index, ..)| *tool_index == index)
+                    {
+                        tool_use.4.push_str(&partial_json);
+                        tool_use.5 = true;
                     }
                 }
                 Ok(StreamEvent::MessageDone { response }) => {
@@ -741,8 +755,10 @@ pub async fn query(
                 tool_uses = response
                     .content
                     .iter()
-                    .filter_map(|block| match block {
+                    .enumerate()
+                    .filter_map(|(index, block)| match block {
                         ResponseContent::ToolUse { id, name, input } => Some((
+                            index,
                             id.clone(),
                             name.clone(),
                             input.clone(),
@@ -785,13 +801,31 @@ pub async fn query(
             });
         }
 
+        let final_tool_inputs: HashMap<String, serde_json::Value> = final_response
+            .as_ref()
+            .map(|response| {
+                response
+                    .content
+                    .iter()
+                    .filter_map(|block| match block {
+                        ResponseContent::ToolUse { id, input, .. } => {
+                            Some((id.clone(), input.clone()))
+                        }
+                        ResponseContent::Text(_) => None,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
         let tool_calls: Vec<ToolCall> = tool_uses
             .into_iter()
-            .map(|(id, name, initial_input, json_str, saw_delta)| {
+            .map(|(_index, id, name, initial_input, json_str, saw_delta)| {
                 let input = if saw_delta {
-                    serde_json::from_str(&json_str).unwrap_or(initial_input)
+                    serde_json::from_str(&json_str).unwrap_or_else(|_| {
+                        final_tool_inputs.get(&id).cloned().unwrap_or(initial_input)
+                    })
                 } else {
-                    initial_input
+                    final_tool_inputs.get(&id).cloned().unwrap_or(initial_input)
                 };
                 if emitted_tool_use_starts.insert(id.clone()) {
                     emit(QueryEvent::ToolUseStart {
@@ -831,12 +865,20 @@ pub async fn query(
             return Ok(());
         }
 
-        let tool_result_summaries: std::collections::HashMap<String, String> = tool_calls
+        let tool_result_metadata: HashMap<String, (String, serde_json::Value, String)> = tool_calls
             .iter()
             .map(|call| {
                 (
                     call.id.clone(),
-                    devo_tools::tool_summary::tool_summary(&call.name, &call.input, &session.cwd),
+                    (
+                        call.name.clone(),
+                        call.input.clone(),
+                        devo_tools::tool_summary::tool_summary(
+                            &call.name,
+                            &call.input,
+                            &session.cwd,
+                        ),
+                    ),
                 )
             })
             .collect();
@@ -846,7 +888,7 @@ pub async fn query(
         // long-running and parallel tools can render before the whole batch ends.
         let results = if let Some(progress_events) = on_event.clone() {
             let completion_events = Arc::clone(&progress_events);
-            let summaries = Arc::new(tool_result_summaries.clone());
+            let metadata = Arc::new(tool_result_metadata.clone());
             runtime
                 .execute_batch_streaming_with_completion(
                     &tool_calls,
@@ -859,12 +901,16 @@ pub async fn query(
                     move |result| {
                         let content = compact_tool_content(result.content.clone());
                         let display_content = result.display_content.clone().map(micro_compact);
-                        let summary = summaries
+                        let (tool_name, input, summary) = metadata
                             .get(result.tool_use_id.as_str())
                             .cloned()
-                            .unwrap_or_default();
+                            .unwrap_or_else(|| {
+                                (String::new(), serde_json::Value::Null, String::new())
+                            });
                         completion_events(QueryEvent::ToolResult {
                             tool_use_id: result.tool_use_id.clone(),
+                            tool_name,
+                            input,
                             content,
                             display_content,
                             is_error: result.is_error,
@@ -1025,6 +1071,10 @@ mod tests {
         requests: AtomicUsize,
     }
 
+    struct InterleavedToolUseProvider {
+        requests: AtomicUsize,
+    }
+
     struct ParallelToolUseProvider {
         requests: AtomicUsize,
     }
@@ -1090,6 +1140,87 @@ mod tests {
 
         fn name(&self) -> &str {
             "test-provider"
+        }
+    }
+
+    #[async_trait]
+    impl devo_provider::ModelProviderSDK for InterleavedToolUseProvider {
+        async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
+            unreachable!("tests stream responses only")
+        }
+
+        async fn completion_stream(
+            &self,
+            _request: ModelRequest,
+        ) -> Result<Pin<Box<dyn Stream<Item = Result<StreamEvent>> + Send>>> {
+            let request_number = self.requests.fetch_add(1, Ordering::SeqCst);
+
+            let events = if request_number == 0 {
+                vec![
+                    Ok(StreamEvent::ToolCallStart {
+                        index: 0,
+                        id: "tool-1".into(),
+                        name: "mutating_tool".into(),
+                        input: json!({}),
+                    }),
+                    Ok(StreamEvent::ToolCallStart {
+                        index: 1,
+                        id: "tool-2".into(),
+                        name: "mutating_tool".into(),
+                        input: json!({}),
+                    }),
+                    Ok(StreamEvent::ToolCallInputDelta {
+                        index: 0,
+                        partial_json: r#"{"value":1}"#.into(),
+                    }),
+                    Ok(StreamEvent::ToolCallInputDelta {
+                        index: 1,
+                        partial_json: r#"{"value":2}"#.into(),
+                    }),
+                    Ok(StreamEvent::MessageDone {
+                        response: ModelResponse {
+                            id: "resp-1".into(),
+                            content: vec![
+                                ResponseContent::ToolUse {
+                                    id: "tool-1".into(),
+                                    name: "mutating_tool".into(),
+                                    input: json!({}),
+                                },
+                                ResponseContent::ToolUse {
+                                    id: "tool-2".into(),
+                                    name: "mutating_tool".into(),
+                                    input: json!({}),
+                                },
+                            ],
+                            stop_reason: Some(StopReason::ToolUse),
+                            usage: Usage::default(),
+                            metadata: Default::default(),
+                        },
+                    }),
+                ]
+            } else {
+                vec![
+                    Ok(StreamEvent::TextDelta {
+                        index: 0,
+                        text: "done".into(),
+                    }),
+                    Ok(StreamEvent::MessageDone {
+                        response: ModelResponse {
+                            id: "resp-2".into(),
+                            content: vec![ResponseContent::Text("done".into())],
+                            stop_reason: Some(StopReason::EndTurn),
+                            usage: Usage::default(),
+                            metadata: Default::default(),
+                        },
+                    }),
+                ]
+            };
+
+            Ok(Box::pin(futures::stream::iter(events)))
+        }
+
+        fn name(&self) -> &str {
+            "interleaved-test-provider"
         }
     }
 
@@ -2010,6 +2141,115 @@ mod tests {
         for summary in summaries.iter() {
             assert!(!summary.is_empty(), "summary should not be empty");
         }
+    }
+
+    #[tokio::test]
+    async fn query_tool_result_event_includes_final_tool_input() {
+        let mut builder = ToolRegistryBuilder::new();
+        builder.register_handler("mutating_tool", Arc::new(DisplayContentTool));
+        builder.push_spec(ToolSpec {
+            name: "mutating_tool".into(),
+            description: String::new(),
+            input_schema: JsonSchema::object(Default::default(), None, None),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::None,
+        });
+        let registry = Arc::new(builder.build());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("run the tool"));
+
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let seen_clone = Arc::clone(&seen);
+        let callback = Arc::new(move |event: QueryEvent| {
+            if let QueryEvent::ToolResult {
+                tool_name, input, ..
+            } = event
+            {
+                seen_clone.lock().unwrap().push((tool_name, input));
+            }
+        });
+
+        query(
+            &mut session,
+            &TurnConfig {
+                model: Model::default(),
+                thinking_selection: None,
+            },
+            Arc::new(SingleToolUseProvider {
+                requests: AtomicUsize::new(0),
+            }),
+            registry,
+            &runtime,
+            Some(callback),
+        )
+        .await
+        .expect("query should complete");
+
+        assert_eq!(
+            seen.lock().unwrap().as_slice(),
+            &[(String::from("mutating_tool"), json!({ "value": 1 }))]
+        );
+    }
+
+    #[tokio::test]
+    async fn query_tool_result_event_matches_input_delta_by_tool_index() {
+        let mut builder = ToolRegistryBuilder::new();
+        builder.register_handler("mutating_tool", Arc::new(DisplayContentTool));
+        builder.push_spec(ToolSpec {
+            name: "mutating_tool".into(),
+            description: String::new(),
+            input_schema: JsonSchema::object(Default::default(), None, None),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::None,
+        });
+        let registry = Arc::new(builder.build());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("run the tools"));
+
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let seen_clone = Arc::clone(&seen);
+        let callback = Arc::new(move |event: QueryEvent| {
+            if let QueryEvent::ToolResult {
+                tool_use_id, input, ..
+            } = event
+            {
+                seen_clone.lock().unwrap().push((tool_use_id, input));
+            }
+        });
+
+        query(
+            &mut session,
+            &TurnConfig {
+                model: Model::default(),
+                thinking_selection: None,
+            },
+            Arc::new(InterleavedToolUseProvider {
+                requests: AtomicUsize::new(0),
+            }),
+            registry,
+            &runtime,
+            Some(callback),
+        )
+        .await
+        .expect("query should complete");
+
+        assert_eq!(
+            seen.lock().unwrap().as_slice(),
+            &[
+                (String::from("tool-1"), json!({ "value": 1 })),
+                (String::from("tool-2"), json!({ "value": 2 })),
+            ]
+        );
     }
 
     #[tokio::test]

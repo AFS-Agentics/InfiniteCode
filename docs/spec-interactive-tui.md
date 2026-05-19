@@ -529,12 +529,12 @@ PS C:\Users\lenovo\Desktop\devo>                                                
 - separated from content above by **three blank lines**
 - one blank line above the input line, one below
 - `┃` at the left edge of the input line in the theme's accent color
-- status line below shows: model name, effort, cumulative token usage for the session (`↑` total input / `↺` cached input / `↓` total output), a context-window bar, and the last completed query's input usage against the model's effective context window
+- status line below shows: model name, effort, cumulative token usage for the session (`↑` total input (cached input) / `↓` total output), a context-window bar, and the last completed query's input usage against the model's effective context window
 
 The status line token counters must obey these rules:
 
 - `↑` is the session's cumulative input token total across all completed queries in the current session
-- `↺` is the session's cumulative cached-input token total across all completed queries in the current session
+- cached input is the session's cumulative cached-input token total across all completed queries in the current session
 - `↓` is the session's cumulative output token total across all completed queries in the current session
 - the context-window bar is based on the last completed query's input token usage, not the cumulative session total
 - the context-window denominator must use the model's effective usable window, not the raw model context window

@@ -1,6 +1,8 @@
 use std::net::TcpListener as StdTcpListener;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use anyhow::Context;
@@ -24,7 +26,10 @@ use devo_core::PresetModelCatalog;
 use devo_core::SkillsConfig;
 use devo_protocol::ModelRequest;
 use devo_protocol::ModelResponse;
+use devo_protocol::ResponseContent;
+use devo_protocol::StopReason;
 use devo_protocol::StreamEvent;
+use devo_protocol::Usage;
 use devo_provider::ModelProviderSDK;
 use devo_server::ServerRuntime;
 use devo_server::ServerRuntimeDependencies;
@@ -81,6 +86,108 @@ impl ModelProviderSDK for PendingProvider {
 
     fn name(&self) -> &str {
         "pending-test-provider"
+    }
+}
+
+struct StreamingToolProvider {
+    requests: AtomicUsize,
+    workspace: PathBuf,
+}
+
+impl StreamingToolProvider {
+    fn new(workspace: PathBuf) -> Self {
+        Self {
+            requests: AtomicUsize::new(0),
+            workspace,
+        }
+    }
+}
+
+#[async_trait]
+impl ModelProviderSDK for StreamingToolProvider {
+    async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
+        anyhow::bail!("test provider does not support completion")
+    }
+
+    async fn completion_stream(
+        &self,
+        _request: ModelRequest,
+    ) -> Result<std::pin::Pin<Box<dyn futures::Stream<Item = Result<StreamEvent>> + Send>>> {
+        let request_number = self.requests.fetch_add(1, Ordering::SeqCst);
+        let read_input = serde_json::json!({
+            "filePath": self.workspace.join("README.md").to_string_lossy().to_string()
+        });
+        let glob_input = serde_json::json!({
+            "pattern": "**/Cargo.toml",
+            "path": "crates"
+        });
+
+        let events = if request_number == 0 {
+            vec![
+                Ok(StreamEvent::ToolCallStart {
+                    index: 0,
+                    id: "read-1".to_string(),
+                    name: "read".to_string(),
+                    input: serde_json::json!({}),
+                }),
+                Ok(StreamEvent::ToolCallStart {
+                    index: 1,
+                    id: "glob-1".to_string(),
+                    name: "glob".to_string(),
+                    input: serde_json::json!({}),
+                }),
+                Ok(StreamEvent::ToolCallInputDelta {
+                    index: 0,
+                    partial_json: read_input.to_string(),
+                }),
+                Ok(StreamEvent::ToolCallInputDelta {
+                    index: 1,
+                    partial_json: glob_input.to_string(),
+                }),
+                Ok(StreamEvent::MessageDone {
+                    response: ModelResponse {
+                        id: "resp-tools".to_string(),
+                        content: vec![
+                            ResponseContent::ToolUse {
+                                id: "read-1".to_string(),
+                                name: "read".to_string(),
+                                input: serde_json::json!({}),
+                            },
+                            ResponseContent::ToolUse {
+                                id: "glob-1".to_string(),
+                                name: "glob".to_string(),
+                                input: serde_json::json!({}),
+                            },
+                        ],
+                        stop_reason: Some(StopReason::ToolUse),
+                        usage: Usage::default(),
+                        metadata: Default::default(),
+                    },
+                }),
+            ]
+        } else {
+            vec![
+                Ok(StreamEvent::TextDelta {
+                    index: 0,
+                    text: "done".to_string(),
+                }),
+                Ok(StreamEvent::MessageDone {
+                    response: ModelResponse {
+                        id: "resp-done".to_string(),
+                        content: vec![ResponseContent::Text("done".to_string())],
+                        stop_reason: Some(StopReason::EndTurn),
+                        usage: Usage::default(),
+                        metadata: Default::default(),
+                    },
+                }),
+            ]
+        };
+
+        Ok(Box::pin(stream::iter(events)))
+    }
+
+    fn name(&self) -> &str {
+        "streaming-tool-test-provider"
     }
 }
 
@@ -386,6 +493,173 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
     assert_eq!(
         completed_event["params"]["turn"]["status"],
         serde_json::json!("Interrupted")
+    );
+
+    listener_task.abort();
+    let _ = listener_task.await;
+    Ok(())
+}
+
+#[tokio::test]
+async fn websocket_turn_streams_final_tool_metadata_for_read_and_glob() -> Result<()> {
+    let workspace = TempDir::new()?;
+    std::fs::write(workspace.path().join("README.md"), "# Test\n")?;
+    std::fs::create_dir_all(workspace.path().join("crates/tools"))?;
+    std::fs::write(
+        workspace.path().join("crates/tools/Cargo.toml"),
+        "[package]\nname = \"tools\"\n",
+    )?;
+
+    let port = {
+        let listener = StdTcpListener::bind("127.0.0.1:0")?;
+        let port = listener.local_addr()?.port();
+        drop(listener);
+        port
+    };
+    let bind_address = format!("127.0.0.1:{port}");
+    let db_dir = TempDir::new()?;
+    let db = Arc::new(devo_server::db::Database::open(
+        db_dir.path().join("e2e.db"),
+    )?);
+    let runtime = ServerRuntime::new(
+        workspace.path().to_path_buf(),
+        ServerRuntimeDependencies::new(
+            Arc::new(StreamingToolProvider::new(workspace.path().to_path_buf())),
+            Arc::new(devo_tools::create_default_tool_registry()),
+            "test-model".to_string(),
+            Arc::new(PresetModelCatalog::default()),
+            None,
+            Box::new(FileSystemSkillCatalog::new(SkillsConfig::default())),
+            devo_core::AgentsMdConfig::default(),
+            db,
+            workspace.path().join("config.toml"),
+        ),
+    );
+    let listen = vec![format!("ws://{bind_address}")];
+    let listener_task =
+        tokio::spawn(
+            async move { devo_server::run_listeners(Arc::clone(&runtime), &listen).await },
+        );
+
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let (mut socket, _) = connect_async(format!("ws://{bind_address}")).await?;
+    socket
+        .send(Message::Text(
+            serde_json::to_string(&initialize_request("web_socket"))?.into(),
+        ))
+        .await?;
+    let initialize_response = read_websocket_json(&mut socket).await?;
+    assert_eq!(initialize_response["id"], serde_json::json!(1));
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({ "method": "initialized" })
+                .to_string()
+                .into(),
+        ))
+        .await?;
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "id": 2,
+                "method": "session/start",
+                "params": {
+                    "cwd": workspace.path().to_string_lossy(),
+                    "ephemeral": false,
+                    "title": null,
+                    "model": "test-model"
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .await?;
+
+    let session_start_messages = read_n_websocket_json(&mut socket, 2).await?;
+    let session_response = session_start_messages
+        .iter()
+        .find(|value| value.get("id") == Some(&serde_json::json!(2)))
+        .context("find session/start response")?;
+    let session_id = session_response["result"]["session"]["session_id"]
+        .as_str()
+        .context("extract session id")?
+        .to_string();
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "id": 3,
+                "method": "turn/start",
+                "params": {
+                    "session_id": session_id,
+                    "input": [{ "type": "text", "text": "read and glob" }],
+                    "model": null,
+                    "sandbox": null,
+                    "approval_policy": null,
+                    "cwd": null
+                }
+            })
+            .to_string()
+            .into(),
+        ))
+        .await?;
+
+    let messages = read_until_websocket_json(
+        &mut socket,
+        |messages| {
+            messages
+                .iter()
+                .any(|value| value.get("method") == Some(&serde_json::json!("turn/completed")))
+        },
+        80,
+    )
+    .await
+    .context("read turn lifecycle messages")?;
+
+    let completed_tool_calls = messages
+        .iter()
+        .filter(|value| {
+            value.get("method") == Some(&serde_json::json!("item/completed"))
+                && value["params"]["item"]["item_kind"] == serde_json::json!("tool_call")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        completed_tool_calls.len(),
+        2,
+        "expected completed ToolCall items: {messages:#?}"
+    );
+
+    let read_call = completed_tool_calls
+        .iter()
+        .find(|value| value["params"]["item"]["payload"]["tool_name"] == serde_json::json!("read"))
+        .context("find read tool call")?;
+    assert_eq!(
+        read_call["params"]["item"]["payload"]["parameters"]["filePath"],
+        serde_json::json!(
+            workspace
+                .path()
+                .join("README.md")
+                .to_string_lossy()
+                .to_string()
+        )
+    );
+    assert_eq!(
+        read_call["params"]["item"]["payload"]["command_actions"][0]["name"],
+        serde_json::json!("README.md")
+    );
+
+    let glob_call = completed_tool_calls
+        .iter()
+        .find(|value| value["params"]["item"]["payload"]["tool_name"] == serde_json::json!("glob"))
+        .context("find glob tool call")?;
+    assert_eq!(
+        glob_call["params"]["item"]["payload"]["parameters"]["pattern"],
+        serde_json::json!("**/Cargo.toml")
+    );
+    assert_eq!(
+        glob_call["params"]["item"]["payload"]["command_actions"][0]["path"],
+        serde_json::json!("**/Cargo.toml in crates")
     );
 
     listener_task.abort();

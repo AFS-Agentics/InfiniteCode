@@ -683,7 +683,7 @@ impl ChatWidget {
             Self::format_compact_token_count(self.total_input_tokens)
         ));
         parts.push(format!(
-            "↺{} {}%",
+            "(cached {} {}%)",
             Self::format_compact_token_count(self.total_cache_read_tokens),
             cached_input_percent
         ));
@@ -1753,6 +1753,38 @@ impl ChatWidget {
                 self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
                 self.frame_requester.schedule_frame();
                 self.set_status_message("Tool started");
+            }
+            WorkerEvent::ToolCallUpdated {
+                tool_use_id,
+                summary,
+                parsed_commands,
+            } => {
+                if let Some(tool_call) = self.active_tool_calls.get_mut(&tool_use_id) {
+                    tool_call.title = summary.clone();
+                    tool_call.exec_like = true;
+                }
+                let command = crate::exec_command::split_command_string(&summary);
+                if let Some(cell) = self
+                    .active_cell
+                    .as_mut()
+                    .and_then(|cell| cell.as_any_mut().downcast_mut::<ExecCell>())
+                    && cell.update_call(&tool_use_id, command.clone(), parsed_commands.clone())
+                {
+                    self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
+                    self.frame_requester.schedule_frame();
+                    self.set_status_message("Tool updated");
+                    return;
+                }
+                if self.history.iter_mut().rev().any(|cell| {
+                    cell.as_any_mut()
+                        .downcast_mut::<ExecCell>()
+                        .is_some_and(|cell| {
+                            cell.update_call(&tool_use_id, command.clone(), parsed_commands.clone())
+                        })
+                }) {
+                    self.frame_requester.schedule_frame();
+                    self.set_status_message("Tool updated");
+                }
             }
             WorkerEvent::ToolOutputDelta { tool_use_id, delta } => {
                 if let Some(tool_call) = self.active_tool_calls.get_mut(&tool_use_id) {

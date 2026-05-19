@@ -94,6 +94,20 @@ impl ExecCell {
         true
     }
 
+    pub(crate) fn update_call(
+        &mut self,
+        call_id: &str,
+        command: Vec<String>,
+        parsed: Vec<ParsedCommand>,
+    ) -> bool {
+        let Some(call) = self.calls.iter_mut().rev().find(|c| c.call_id == call_id) else {
+            return false;
+        };
+        call.command = command;
+        call.parsed = parsed;
+        true
+    }
+
     pub(crate) fn should_flush(&self) -> bool {
         !self.is_exploring_cell() && self.calls.iter().all(|c| c.output.is_some())
     }

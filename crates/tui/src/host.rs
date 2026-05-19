@@ -661,6 +661,7 @@ fn handle_worker_event(
         | WorkerEvent::AssistantMessageCompleted(_)
         | WorkerEvent::ReasoningCompleted(_)
         | WorkerEvent::ToolCall { .. }
+        | WorkerEvent::ToolCallUpdated { .. }
         | WorkerEvent::ToolResult { .. }
         | WorkerEvent::PatchApplied { .. }
         | WorkerEvent::PlanUpdated { .. }

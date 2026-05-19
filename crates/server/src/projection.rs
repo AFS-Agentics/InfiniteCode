@@ -152,28 +152,12 @@ pub(crate) fn history_item_from_turn_item(item: &TurnItem) -> Option<SessionHist
             );
             if matches!(tool_name.as_str(), "read" | "glob" | "grep") {
                 let parsed = match tool_name.as_str() {
-                    "read" => {
-                        let path = input
-                            .get("filePath")
-                            .or_else(|| input.get("path"))
-                            .and_then(serde_json::Value::as_str)
-                            .unwrap_or_default();
-                        let name = std::path::Path::new(path)
-                            .file_name()
-                            .map(|name| name.to_string_lossy().to_string())
-                            .unwrap_or_else(|| path.to_string());
-                        vec![devo_protocol::parse_command::ParsedCommand::Read {
-                            cmd: title.clone(),
-                            name,
-                            path: std::path::PathBuf::from(path),
-                        }]
-                    }
+                    "read" => crate::tool_actions::read_action_from_tool_input(&title, input)
+                        .into_iter()
+                        .collect(),
                     "glob" => vec![devo_protocol::parse_command::ParsedCommand::ListFiles {
                         cmd: title.clone(),
-                        path: input
-                            .get("path")
-                            .and_then(serde_json::Value::as_str)
-                            .map(ToOwned::to_owned),
+                        path: glob_display_from_input(input),
                     }],
                     "grep" => vec![devo_protocol::parse_command::ParsedCommand::Search {
                         cmd: title.clone(),
@@ -188,7 +172,9 @@ pub(crate) fn history_item_from_turn_item(item: &TurnItem) -> Option<SessionHist
                     }],
                     _ => Vec::new(),
                 };
-                item = item.with_metadata(SessionHistoryMetadata::Explored { actions: parsed });
+                if !parsed.is_empty() {
+                    item = item.with_metadata(SessionHistoryMetadata::Explored { actions: parsed });
+                }
             }
             Some(item)
         }
@@ -439,6 +425,18 @@ fn summarize_tool_call(tool_name: &str, input: &serde_json::Value) -> String {
     devo_tools::tool_summary::tool_summary(tool_name, input, &cwd).replacen(": ", " ", 1)
 }
 
+fn glob_display_from_input(input: &serde_json::Value) -> Option<String> {
+    let pattern = input
+        .get("pattern")
+        .and_then(serde_json::Value::as_str)
+        .filter(|pattern| !pattern.is_empty())?;
+    let path = input.get("path").and_then(serde_json::Value::as_str);
+    Some(match path.filter(|path| !path.is_empty()) {
+        Some(path) => format!("{pattern} in {path}"),
+        None => pattern.to_string(),
+    })
+}
+
 fn summarize_tool_result(tool_name: Option<&str>, is_error: bool) -> String {
     match (tool_name, is_error) {
         (Some(tool_name), true) => format!("{tool_name} error"),
@@ -532,7 +530,7 @@ mod tests {
             tool_call_id: "call-1".to_string(),
             tool_name: "read".to_string(),
             input: serde_json::json!({
-                "filePath": "crates/tui/src/chatwidget.rs"
+                "filePath": "crates/tui/src/mod.rs"
             }),
         });
 
@@ -542,11 +540,23 @@ mod tests {
                 assert!(matches!(
                     &actions[0],
                     devo_protocol::parse_command::ParsedCommand::Read { name, .. }
-                    if name == "chatwidget.rs"
+                    if name == "mod.rs"
                 ));
             }
             other => panic!("unexpected metadata: {other:?}"),
         }
+    }
+
+    #[test]
+    fn read_tool_call_without_path_does_not_emit_empty_explored_metadata() {
+        let item = TurnItem::ToolCall(ToolCallItem {
+            tool_call_id: "call-1".to_string(),
+            tool_name: "read".to_string(),
+            input: serde_json::json!({ "limit": 20 }),
+        });
+
+        let history_item = history_item_from_turn_item(&item).expect("history item");
+        assert_eq!(history_item.metadata, None);
     }
 
     #[test]

@@ -45,6 +45,8 @@ mod terminal_palette;
 mod test_backend;
 mod text_formatting;
 mod theme;
+#[cfg(test)]
+mod tool_rendering_e2e_tests;
 mod tool_result_cell;
 mod tui;
 mod ui_consts;
