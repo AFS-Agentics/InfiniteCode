@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-21
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-TUI-005 — Terminal Lifecycle Safety
@@ -58,7 +58,8 @@ The TUI must enter, run, interrupt, and exit without corrupting terminal state o
 
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
-| refined-by | TBD | TBD | specs/L2/tui/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-TUI-005 | 1 | specs/L2/tui/L2-DES-TUI-005-terminal-lifecycle-safety.md | Defines startup, inline mode, alternate-screen mode, interrupt handling, cleanup, terminal restore, stale-region prevention, and shell prompt handoff. |
+| related-to | L2-DES-TUI-002 | 1 | specs/L2/tui/L2-DES-TUI-002-modern-tui-shell-layout.md | Defines the live TUI region that lifecycle cleanup must manage. |
 
 ## Revision Notes
 

@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-21
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-TUI-008 — Terminal Command Prefix
@@ -68,7 +68,7 @@ The TUI must recognize input beginning with `!` as a request to enter Shell Mode
 | related-to | L1-REQ-CLIENT-004 | 1 | specs/L1/L1-REQ-CLIENT-004-prefixed-input-actions.md | Separates TUI-only terminal command prefix behavior from general client fuzzy-search prefix behavior. |
 | related-to | L1-REQ-TUI-009 | 1 | specs/L1/L1-REQ-TUI-009-session-input-modes.md | Defines Shell Mode as a session-local TUI input mode and its status-line visibility. |
 | related-to | L1-REQ-TOOL-002 | 1 | specs/L1/L1-REQ-TOOL-002-tools.md | Built-in command execution provides the underlying terminal command capability. |
-| refined-by | TBD | TBD | specs/L2/tui/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-TUI-003 | 1 | specs/L2/tui/L2-DES-TUI-003-composer-and-input-modes.md | Defines leading `!` Shell Mode entry, escaping, one-shot command submission, result display, and safety boundaries. |
 
 ## Revision Notes
 

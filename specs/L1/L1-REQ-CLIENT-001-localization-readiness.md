@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-21
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-CLIENT-001 — Localization Readiness
@@ -65,7 +65,10 @@ The program must be locale-safe for user content and localization-ready for futu
 
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
-| refined-by | TBD | TBD | specs/L2/client/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-CLIENT-001 | 1 | specs/L2/client/L2-DES-CLIENT-001-localization-readiness.md | Defines Unicode-safe input, IME composition, display-width aware rendering, non-ASCII path handling, diagnostics, and future UI string translation structure. |
+| related-to | L2-DES-TUI-002 | 1 | specs/L2/tui/L2-DES-TUI-002-modern-tui-shell-layout.md | TUI layout must account for Unicode and localized display width. |
+| related-to | L2-DES-TUI-003 | 1 | specs/L2/tui/L2-DES-TUI-003-composer-and-input-modes.md | Composer and input mode handling must preserve Unicode and IME input. |
+| related-to | L2-DES-TUI-004 | 1 | specs/L2/tui/L2-DES-TUI-004-streaming-transcript-and-state.md | Transcript and streaming output must preserve localized and non-ASCII content. |
 
 ## Revision Notes
 

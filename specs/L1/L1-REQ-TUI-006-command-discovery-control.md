@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-22
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-TUI-006 — Command Discovery and Control
@@ -63,7 +63,7 @@ The TUI must provide a discoverable command interface for controlling product wo
 
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
-| refined-by | TBD | TBD | specs/L2/tui/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-TUI-003 | 1 | specs/L2/tui/L2-DES-TUI-003-composer-and-input-modes.md | Defines slash-command trigger behavior, list height, keyboard navigation, row styling, and the initial command list. |
 
 ## Revision Notes
 

@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-21
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-TUI-007 — Responsive Layout and Readability
@@ -58,7 +58,10 @@ The TUI must adapt to practical terminal sizes without overlapping, truncating c
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
 | related-to | L1-REQ-TUI-009 | 1 | specs/L1/L1-REQ-TUI-009-session-input-modes.md | Session input modes require a bottom status line below the composer. |
-| refined-by | TBD | TBD | specs/L2/tui/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-TUI-002 | 1 | specs/L2/tui/L2-DES-TUI-002-modern-tui-shell-layout.md | Defines responsive region priorities, narrow layout behavior, non-overlap rules, and graceful degradation. |
+| related-to | L2-DES-TUI-003 | 1 | specs/L2/tui/L2-DES-TUI-003-composer-and-input-modes.md | Defines composer and bottom status line layout behavior. |
+| related-to | L2-DES-TUI-004 | 1 | specs/L2/tui/L2-DES-TUI-004-streaming-transcript-and-state.md | Defines streaming and transcript rendering stability. |
+| related-to | L2-DES-CLIENT-001 | 1 | specs/L2/client/L2-DES-CLIENT-001-localization-readiness.md | Defines display-width aware rendering for Unicode and localized text. |
 
 ## Revision Notes
 

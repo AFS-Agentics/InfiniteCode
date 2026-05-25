@@ -35,6 +35,7 @@ If every client launches its own private server process over stdio, those client
 - `L1-REQ-AGENT-003` requires visible task planning with status updates.
 - `L1-REQ-CHANGE-001` requires rollback and recovery behavior for file changes.
 - `L1-REQ-EDIT-001` requires file edits to be reviewable and recoverable.
+- `L1-REQ-GOAL-001` requires user-owned Ralph Loop goal controls and visible bounded autonomous continuation state.
 - `L1-REQ-GIT-001` constrains git-oriented change management.
 - `L1-REQ-APP-010` requires effective configuration inspection and model/reasoning updates.
 - `L1-REQ-APP-011` requires actionable error recovery and provider error detail presentation.
@@ -44,6 +45,7 @@ If every client launches its own private server process over stdio, those client
 - `L1-REQ-TOOL-002` requires baseline built-in tools, including planning, approval, questions, search, command execution, web, and delegation tools.
 - `L1-REQ-MEM-001` defines persistent memory as core-maintained internal state outside the routine client-server protocol surface.
 - `L2-DES-TOOL-001` defines the built-in tool system and plan tool.
+- `L2-DES-GOAL-001` defines Ralph Loop goal state, continuation, and budget behavior.
 - `L2-DES-CONV-001` defines durable session JSONL events and distinguishes provider, server-client, and durable event planes.
 
 ## Protocol Requirement
@@ -144,6 +146,13 @@ Representative client-to-server JSON-RPC request methods and response results:
 | `execution.inspect` | Return active execution state so a client can show running work and let the user choose what to stop. | `session_id`, optional `include_background_processes`, optional `include_recent_output`, optional `redaction_level`. | `active_turn`, `running_tool_calls`, `pending_approvals`, `pending_questions`, `background_processes`, `latest_sequence`. |
 | `backgroundProcess.stop` | Request stop for a tracked background process started by the program. | `process_id`, optional `session_id`, optional `turn_id`, `reason`, optional `stop_mode`. | `process_id`, `stop_state`, `latest_sequence`. |
 | `queue.cancel` | Cancel a queued message before it starts execution. | `session_id`, `queue_item_id`, `reason`. | `queue_item_id`, `canceled`, `latest_sequence`. |
+| `goal.get` | Return the current Ralph Loop goal projection for a session. | `session_id`, optional `include_history`, optional `redaction_level`. | `goal`, `goal_history` where requested, `latest_sequence`. |
+| `goal.create` | Create the first goal for a session or explicitly replace a non-terminal goal. | `session_id`, `objective`, optional `token_budget`, optional `time_budget_seconds`, optional `turn_budget`, optional `replace_existing`, optional `expected_goal_id`. | `accepted`, `goal`, `replaced_goal_id` where applicable, `latest_sequence`. |
+| `goal.pause` | Pause autonomous continuation without discarding the goal. | `session_id`, `goal_id`, optional `expected_goal_id`, optional `reason`. | `accepted`, `goal`, `latest_sequence`. |
+| `goal.resume` | Resume a paused or blocked goal and allow continuation after eligibility checks. | `session_id`, `goal_id`, optional `expected_goal_id`, optional `resume_reason`. | `accepted`, `goal`, `continuation_eligible`, `latest_sequence`. |
+| `goal.complete` | Let the user mark the goal complete directly. | `session_id`, `goal_id`, optional `expected_goal_id`, `verification_summary`. | `accepted`, `goal`, `latest_sequence`. |
+| `goal.cancel` | End the goal without marking it complete. | `session_id`, `goal_id`, optional `expected_goal_id`, `reason`. | `accepted`, `goal`, `latest_sequence`. |
+| `goal.clear` | Remove the current goal from normal UI projections while preserving audit records. | `session_id`, `goal_id`, optional `expected_goal_id`. | `accepted`, `cleared_goal_id`, `latest_sequence`. |
 | `approval.respond` | Answer a pending tool or permission approval request. | `session_id`, `turn_id`, `approval_id`, `decision`, optional `note`. | `approval_id`, `accepted`, `latest_sequence`. |
 | `question.respond` | Answer a pending Plan Mode or question-tool prompt. | `session_id`, `turn_id`, `question_id`, `answers`, optional `freeform_text`. | `question_id`, `accepted`, `latest_sequence`. |
 | `model.list` | Return supported and configured model projections suitable for selection UI. | `include_supported`, `configured_only`, optional `capability_filter`. | `models`, `current_model`, credential status only. |
@@ -166,6 +175,9 @@ Representative server-to-client JSON-RPC notification methods:
 | `approval.requested` | Ask connected clients to present an approval decision to the user. | `sequence`, `session_id`, `turn_id`, `approval_id`, `approval_kind`, `summary`, `details`, `expires_at` where applicable. |
 | `question.requested` | Ask connected clients to present a question prompt to the user. | `sequence`, `session_id`, `turn_id`, `question_id`, `prompt`, `options`, `allows_freeform`, `expires_at` where applicable. |
 | `config.changed` | Tell clients that effective configuration changed and dependent displays may need refresh. | `sequence`, `changed_scopes`, `changed_keys`, `source`, `safe_summary`. |
+| `goal.updated` | Tell clients that the session goal was created, replaced, paused, resumed, blocked, completed, canceled, budget-limited, cleared, or updated with progress. | `sequence`, `session_id`, `goal`, `change_kind`, `source`, `source_turn_id` where applicable, `source_client_id` where applicable. |
+| `goal.continuationStarted` | Tell clients that an autonomous continuation turn has started for an active goal. | `sequence`, `session_id`, `goal_id`, `turn_id`, `reason`, `budget_state`. |
+| `goal.budgetLimited` | Tell clients that the goal stopped because a configured budget was reached. | `sequence`, `session_id`, `goal_id`, `budget_kind`, `budget_state`, `progress_summary`. |
 
 Notifications should include sequence numbers sufficient for clients to order events and request catch-up after reconnect.
 
@@ -190,9 +202,12 @@ Representative server-client event kinds:
 
 | Event Kind | Purpose | Payload Content |
 |---|---|---|
-| `session_loaded` | Provide a session projection after open, subscribe, or reconnect. | `session_id`, `metadata`, `visible_turns`, `pending_items`, `active_plan`, `latest_sequence`. |
+| `session_loaded` | Provide a session projection after open, subscribe, or reconnect. | `session_id`, `metadata`, `visible_turns`, `pending_items`, `active_plan`, `active_goal`, `latest_sequence`. |
 | `metadata_updated` | Report a change to session metadata such as model, reasoning, mode, persona, permission profile, workspace, or usage totals. | `session_id`, `metadata_patch`, `effective_metadata`, `source_client_id`, `sequence`. |
 | `plan_updated` | Report creation or update of visible plan/to-do state from the plan tool. | `session_id`, `plan_id`, `operation`, `plan_status`, `items`, `changed_item_ids`, `source_turn_id`, `timestamp`. |
+| `goal_updated` | Report creation, replacement, status transition, progress, blocker, verification, budget, or clear state for the current Ralph Loop goal. | `session_id`, `goal_id`, `operation`, `status`, `objective_preview`, `progress_summary`, `blocker_summary`, `verification_summary`, `budget_state`, `source`, `source_turn_id`, `timestamp`. |
+| `goal_continuation_started` | Report that the server started an autonomous continuation turn for an active goal. | `session_id`, `goal_id`, `turn_id`, `reason`, `budget_state`, `timestamp`. |
+| `goal_budget_limited` | Report that goal continuation stopped because a configured budget was reached. | `session_id`, `goal_id`, `budget_kind`, `budget_state`, `progress_summary`, `timestamp`. |
 | `turn_started` | Tell all subscribed clients that a new turn has begun. | `session_id`, `turn_id`, `status`, `submitted_by_client_id`, `user_item_id`, `started_at`. |
 | `turn_resumed` | Tell subscribed clients that an interrupted or recoverable turn has been resumed by a linked continuation turn. | `session_id`, `interrupted_turn_id`, `resume_turn_id`, `resume_mode`, `submitted_by_client_id`, `timestamp`. |
 | `turn_status_changed` | Report a turn moving between running, waiting, completed, failed, or interrupted states. | `session_id`, `turn_id`, `previous_status`, `status`, `reason`, `timestamp`. |
@@ -210,9 +225,9 @@ Representative server-client event kinds:
 | `queue_item_added` | Show that a queued message was accepted. | `session_id`, `queue_item_id`, `position`, `content_preview`, `created_at`. |
 | `queue_item_started` | Show that a queued message has become the next executing turn. | `session_id`, `queue_item_id`, `turn_id`, `started_at`. |
 | `queue_item_canceled` | Show that a queued message was canceled before execution. | `session_id`, `queue_item_id`, `reason`, `timestamp`. |
-| `tool_call_started` | Show that a tool call has begun or is awaiting approval. | `session_id`, `turn_id`, `item_id`, `tool_call_id`, `tool_name`, `arguments_preview`, `approval_state`, `safety_state`. |
+| `tool_call_started` | Show that a tool call has begun or is awaiting approval. | `session_id`, `turn_id`, `item_id`, `tool_call_id`, `tool_name`, `command_description` for command tools, `arguments_preview`, `approval_state`, `safety_state`. |
 | `tool_call_updated` | Update tool call progress, streaming output preview, or status. | `session_id`, `turn_id`, `tool_call_id`, `status`, `progress`, `output_preview`, `redaction_state`, `safety_notice`, `timestamp`. |
-| `tool_call_completed` | Show final tool result state. | `session_id`, `turn_id`, `tool_call_id`, `status`, `result_summary`, `output_ref`, `redaction_state`, `safety_notice`, `completed_at`. |
+| `tool_call_completed` | Show final tool result state. | `session_id`, `turn_id`, `tool_call_id`, `status`, `result_summary`, `structured_status`, `output_ref`, `redaction_state`, `safety_notice`, `completed_at`. |
 | `background_process_updated` | Show state for a tracked background process started by the program. | `process_id`, `session_id`, `turn_id`, `command_label`, `status`, `runtime`, `recent_output_ref`, `stop_state`, `timestamp`. |
 | `approval_resolved` | Report the final state of an approval request to all subscribed clients. | `session_id`, `turn_id`, `approval_id`, `decision`, `resolved_by_client_id`, `resolved_at`. |
 | `question_resolved` | Report the final state of a question request to all subscribed clients. | `session_id`, `turn_id`, `question_id`, `answer_summary`, `resolved_by_client_id`, `resolved_at`. |
@@ -236,6 +251,8 @@ Examples:
 - If the desktop client answers an approval request, the TUI and IDE clients receive the approval state update and any resumed turn events.
 - If the server streams assistant output, every subscribed client receives ordered `item_content_update` events for the same item.
 - If the agent updates the plan tool, every subscribed client receives `plan_updated` for the same active plan state.
+- If one client creates, pauses, resumes, completes, cancels, or clears a goal, every subscribed client receives the canonical `goal_updated` event.
+- If the server starts an autonomous goal continuation, every subscribed client receives `goal_continuation_started` and the normal turn lifecycle events for that continuation turn.
 - If a turn changes files through structured mutating tools, subscribed clients may receive `turn_diff_updated` events for review display.
 - If one client interrupts or resumes a turn, every subscribed client receives the canonical turn status and resume events.
 - If one client edits the immediately previous message, every subscribed client receives the edit event and any superseded or replacement turn events.
@@ -290,6 +307,22 @@ Rules:
 - Resume requests should be rejected or degraded with a warning when required context, workspace state, or permission state is unavailable.
 - Resumed turns must use the normal execution engine and normal safety policy.
 
+## Goal Protocol Rules
+
+The server is authoritative for Ralph Loop goal state. Clients request user-owned goal mutations, and clients render canonical `goal_updated` events.
+
+Rules:
+
+- Goal requests must return promptly after acceptance or rejection. They must not wait for an autonomous continuation turn to complete.
+- `goal.create` should reject accidental replacement of an existing non-terminal goal unless `replace_existing` or an equivalent confirmation is explicit.
+- Goal mutations should include `expected_goal_id` where the client has one. If the goal was replaced or reached a terminal state, stale mutations should fail safely or become no-ops with a structured stale-state result.
+- Model-originated goal updates must not use client-owned mutation methods. They should flow through the narrow model-facing goal tool defined by `L2-DES-GOAL-001` and then broadcast as `goal_updated`.
+- If a user pauses, cancels, clears, or replaces a goal while a turn is active, that mutation affects future continuation and future context assembly. It must not rewrite a model request that has already started.
+- If `goal.resume` makes a goal active, the server should report whether continuation is currently eligible. If it is not eligible, the reason should be visible in the response or later events.
+- If the server starts a continuation, it should emit `goal_continuation_started` before or alongside the normal `turn_started` event.
+- If budget is reached, the server should emit `goal_budget_limited` and `goal_updated` so clients can explain that the goal stopped without implying verified completion.
+- Plan Mode suppresses autonomous goal continuation. Goal state remains viewable and user-controllable while Plan Mode is active.
+
 ## Tool And Plan Protocol Rules
 
 Tool calls are requested by the model and executed by the server-owned tool supervisor. Clients observe canonical tool and plan events; they do not decide whether a model-requested tool call is valid except when an approval or question response is explicitly requested.
@@ -297,7 +330,9 @@ Tool calls are requested by the model and executed by the server-owned tool supe
 Rules:
 
 - Tool state should be reported through `tool_call_started`, `tool_call_updated`, and `tool_call_completed`.
+- `tool_call_started` should include `command_description` for shell or command execution tools.
 - A tool unavailable due to mode, permission, or missing configuration should complete with a structured blocked or unavailable result rather than disappearing.
+- Tool completion should include a factual natural-language `result_summary` alongside structured status fields such as exit code, HTTP status, process id, or changed-file counts.
 - Plan tool updates should be reported through `plan_updated`, not only as assistant text.
 - `plan_updated` should carry the complete current plan projection or enough patch data for clients to reconstruct it from prior canonical plan state.
 - The plan tool must not expose private model reasoning. Plan item text should be concise, user-visible task state.
@@ -388,6 +423,7 @@ If a client disconnects, the server continues owning active work subject to user
 | related-to | L1-REQ-CONV-004 | 1 | specs/L1/L1-REQ-CONV-004-session-forking.md | Defines fork, delete, and parent-unavailable behavior. |
 | related-to | L1-REQ-CONV-005 | 1 | specs/L1/L1-REQ-CONV-005-immediate-message-editing.md | Defines immediate previous message edit protocol behavior. |
 | related-to | L1-REQ-EDIT-001 | 1 | specs/L1/L1-REQ-EDIT-001-file-editing-workflow.md | Structured file-editing tools provide restoration data for superseded turns. |
+| related-to | L1-REQ-GOAL-001 | 1 | specs/L1/L1-REQ-GOAL-001-ralph-loop.md | Defines goal control requests, goal events, and autonomous continuation visibility. |
 | related-to | L1-REQ-GIT-001 | 1 | specs/L1/L1-REQ-GIT-001-change-management.md | Git checkpoints may support restoration without user-visible git history changes. |
 | related-to | L1-REQ-TOOL-001 | 1 | specs/L1/L1-REQ-TOOL-001-safety.md | Defines redaction and safety fields in tool events. |
 | related-to | L1-REQ-TOOL-002 | 1 | specs/L1/L1-REQ-TOOL-002-tools.md | Exposes built-in tool lifecycle and plan tool updates to clients. |
@@ -396,6 +432,7 @@ If a client disconnects, the server continues owning active work subject to user
 | related-to | L2-DES-AGENT-001 | 1 | specs/L2/agent/L2-DES-AGENT-001-execution-engine.md | The protocol exposes execution engine state to clients. |
 | related-to | L2-DES-AGENT-002 | 1 | specs/L2/agent/L2-DES-AGENT-002-interrupt-resume-control.md | The protocol exposes interrupt and resume control actions. |
 | related-to | L2-DES-TOOL-001 | 1 | specs/L2/tool/L2-DES-TOOL-001-built-in-tool-system.md | The protocol exposes tool and plan state from the built-in tool system. |
+| related-to | L2-DES-GOAL-001 | 1 | specs/L2/goal/L2-DES-GOAL-001-ralph-loop-goals.md | The protocol exposes user-owned goal controls and canonical goal notifications. |
 | related-to | L2-DES-CONV-001 | 1 | specs/L2/conv/L2-DES-CONV-001-session-jsonl-data-model.md | Durable session events are distinct from live server-client protocol events. |
 | specified-by | TBD | TBD | specs/L3/app/TBD.md | L3 behavior has not been authored yet. |
 
@@ -422,3 +459,5 @@ If a client disconnects, the server continues owning active work subject to user
 | 1 | 2026-05-22 | Human | Refinement | Clarified that turn diffs are client-display projections and workspace restoration remains server/core-owned. |
 | 1 | 2026-05-22 | Human | Refinement | Added execution inspection, interrupt, resume, and background-process stop protocol surfaces. |
 | 1 | 2026-05-22 | Human | Refinement | Added plan update events and tool protocol rules for the built-in tool system. |
+| 1 | 2026-05-22 | Human | Refinement | Added command descriptions and natural-language result summaries to tool protocol projections. |
+| 1 | 2026-05-23 | Human | Refinement | Added Ralph Loop goal requests, notifications, server-client events, and protocol rules. |

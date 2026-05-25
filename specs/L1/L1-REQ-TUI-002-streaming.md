@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-20
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-TUI-002 — Streaming Rendering
@@ -64,7 +64,7 @@ The TUI must render streaming model and tool progress in a timely, readable way.
 
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
-| refined-by | TBD | TBD | specs/L2/tui/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-TUI-004 | 1 | specs/L2/tui/L2-DES-TUI-004-streaming-transcript-and-state.md | Defines live assistant, reasoning, tool, approval, question, background process, and Markdown streaming behavior. |
 
 ## Revision Notes
 

@@ -40,6 +40,7 @@ Those designs do not define what actually happens inside the server after `turn.
 - `L1-REQ-MODEL-001` requires model configuration and capability metadata.
 - `L1-REQ-TOOL-002` requires baseline built-in tools for coding-agent workflows.
 - `L1-REQ-TOOL-001` requires tool safety and redaction.
+- `L1-REQ-GOAL-001` requires bounded autonomous Ralph Loop continuation around a durable objective.
 - `L1-REQ-APP-002` requires persistence and recovery behavior.
 - `L1-REQ-APP-011` requires actionable error recovery.
 - `L2-DES-APP-003` defines protocol requests and notifications around the engine.
@@ -174,6 +175,7 @@ Tool dispatch is owned by the execution engine through a tool supervisor.
 
 For each model-requested tool call, the engine should:
 
+- Capture the model-provided command description for shell or command execution tools.
 - Parse and validate structured tool arguments.
 - Resolve the tool definition and capability policy.
 - Apply permission, safety, approval, and redaction rules.
@@ -181,7 +183,7 @@ For each model-requested tool call, the engine should:
 - Execute allowed tool calls with bounded output capture.
 - Support explicit parallel tool groups where enabled.
 - Record started, updated, completed, failed, denied, or canceled tool states.
-- Return structured tool results to the model when execution continues.
+- Return structured tool results with natural-language status summaries to the model when execution continues.
 
 The plan tool is a normal server-owned tool from the execution engine's perspective, but its result updates visible plan state rather than external files or command output.
 
@@ -205,10 +207,24 @@ Client-visible progress may include:
 - `turn_diff_updated`
 - `usage_updated`
 - `context_updated`
+- `goal_updated`
+- `goal_continuation_started`
 - `error_reported`
 - terminal turn status
 
 Durable records should be written before or atomically with corresponding canonical events where practical, so reconnecting clients can recover state after interruption or crash.
+
+## Goal Integration
+
+Goal-driven continuation turns use the same execution engine as user-submitted turns. The goal system may create hidden continuation input when the session is idle and the active goal is eligible, but once admitted, the turn follows normal context assembly, model invocation, tool dispatch, persistence, and terminal status rules.
+
+Rules:
+
+- The engine should expose usage, tool, and terminal-turn signals needed by the goal system for incremental budget accounting.
+- Goal hidden context should be supplied by context assembly as metadata-derived model-visible context, not as a normal transcript item.
+- The narrow model-facing goal update tool should be dispatched through the normal tool supervisor.
+- If an active goal becomes paused, canceled, blocked, complete, or budget-limited during execution, the current turn may finish or interrupt according to runtime policy, but future autonomous continuation must stop.
+- Plan Mode turns must not be launched as autonomous goal continuations.
 
 ## Failure Handling
 
@@ -265,10 +281,12 @@ The final user-facing response should summarize the outcome, changed files where
 | related-to | L1-REQ-LLM-002 | 1 | specs/L1/L1-REQ-LLM-002-tools.md | Execution validates and dispatches model-requested tools. |
 | related-to | L1-REQ-TOOL-001 | 1 | specs/L1/L1-REQ-TOOL-001-safety.md | Tool dispatch applies safety and approval rules. |
 | related-to | L1-REQ-TOOL-002 | 1 | specs/L1/L1-REQ-TOOL-002-tools.md | Execution dispatches built-in tools through the tool supervisor. |
+| related-to | L1-REQ-GOAL-001 | 1 | specs/L1/L1-REQ-GOAL-001-ralph-loop.md | Goal-driven continuation turns execute through the normal engine and provide budget accounting signals. |
 | related-to | L2-DES-APP-003 | 1 | specs/L2/app/L2-DES-APP-003-client-server-protocol.md | Protocol requests and events expose execution state to clients. |
 | related-to | L2-DES-CONV-001 | 1 | specs/L2/conv/L2-DES-CONV-001-session-jsonl-data-model.md | Durable records persist execution state. |
 | related-to | L2-DES-MODEL-001 | 1 | specs/L2/model/L2-DES-MODEL-001-model-provider-binding.md | Model resolution provides runtime invocation profiles. |
 | related-to | L2-DES-TOOL-001 | 1 | specs/L2/tool/L2-DES-TOOL-001-built-in-tool-system.md | Defines tool registry, lifecycle, and plan tool behavior used by dispatch. |
+| related-to | L2-DES-GOAL-001 | 1 | specs/L2/goal/L2-DES-GOAL-001-ralph-loop-goals.md | Defines autonomous goal continuation and model-facing goal update behavior layered on the engine. |
 | specified-by | TBD | TBD | specs/L3/agent/TBD.md | L3 behavior has not been authored yet. |
 
 ## Revision Notes
@@ -277,3 +295,4 @@ The final user-facing response should summarize the outcome, changed files where
 |---:|---|---|---|---|
 | 1 | 2026-05-22 | Assistant | Initial | Initial server-side agent execution engine design. |
 | 1 | 2026-05-22 | Human | Refinement | Linked execution tool dispatch to the built-in tool system and plan tool. |
+| 1 | 2026-05-23 | Human | Refinement | Added goal-driven continuation integration and budget-accounting signal requirements. |

@@ -21,7 +21,7 @@ Most coding mistakes become expensive when the program works in the wrong direct
 
 ## Background / Context
 
-Coding tasks depend on current workspace, repository status, local instructions, ignored paths, generated outputs, and user-created changes. Local instructions may be stored in recognized project instruction files such as `AGENT.md`, `AGENTS.md`, `CLAUDE.md`, or `PROMPT.md`.
+Coding tasks depend on current workspace, repository status, local instructions, ignored paths, generated outputs, and user-created changes. Local instructions may be stored in recognized project instruction files discovered along the directory hierarchy from the project root to the current working directory.
 
 ## User / Business Requirement
 
@@ -61,7 +61,6 @@ The program must maintain and respect project context while performing coding wo
 ## Open Questions
 
 - Should one session support multiple workspaces?
-- Which recognized project instruction file should take precedence when multiple files apply?
 
 ## Traceability
 
@@ -75,3 +74,4 @@ The program must maintain and respect project context while performing coding wo
 |---:|---|---|---|---|
 | 1 | 2026-05-20 | Assistant | Initial | Initial draft with approved L1 refinement. |
 | 1 | 2026-05-21 | Human | Refinement | Added automatic discovery and reading of recognized project instruction files. |
+| 1 | 2026-05-22 | Human | Refinement | Removed hardcoded instruction-file list; discovery order is now defined by the project instruction file requirement. |

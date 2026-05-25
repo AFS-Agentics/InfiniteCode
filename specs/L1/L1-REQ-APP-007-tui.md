@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-20
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-APP-007 — Terminal User Interface
@@ -64,7 +64,11 @@ The program must provide a terminal user interface that supports interactive ses
 
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
-| refined-by | TBD | TBD | specs/L2/app/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-TUI-002 | 1 | specs/L2/tui/L2-DES-TUI-002-modern-tui-shell-layout.md | Defines the modern terminal shell, core regions, inline/fullscreen consistency, responsive layout, and visible active-work UX. |
+| related-to | L2-DES-TUI-003 | 1 | specs/L2/tui/L2-DES-TUI-003-composer-and-input-modes.md | Defines the composer, command discovery, and input-mode behavior used by the TUI shell. |
+| related-to | L2-DES-TUI-004 | 1 | specs/L2/tui/L2-DES-TUI-004-streaming-transcript-and-state.md | Defines streaming transcript and active state rendering. |
+| related-to | L2-DES-TUI-005 | 1 | specs/L2/tui/L2-DES-TUI-005-terminal-lifecycle-safety.md | Defines inline scrollback preservation and terminal-safe exit behavior. |
+| related-to | L2-DES-TUI-001 | 1 | specs/L2/tui/L2-DES-TUI-001-onboarding-ui-flow.md | Defines the onboarding flow required by the TUI. |
 
 ## Revision Notes
 

@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-20
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-TUI-003 — Transcript
@@ -63,7 +63,9 @@ The TUI must provide a transcript that supports review, audit, and recovery of s
 
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
-| refined-by | TBD | TBD | specs/L2/tui/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-TUI-004 | 1 | specs/L2/tui/L2-DES-TUI-004-streaming-transcript-and-state.md | Defines transcript cell types, durable/live reconciliation, scrolling review, folding, and failure display. |
+| related-to | L2-DES-TUI-002 | 1 | specs/L2/tui/L2-DES-TUI-002-modern-tui-shell-layout.md | Defines transcript viewport placement in the modern TUI shell. |
+| related-to | L2-DES-CLIENT-001 | 1 | specs/L2/client/L2-DES-CLIENT-001-localization-readiness.md | Defines Unicode and localized content preservation for transcript rendering. |
 
 ## Revision Notes
 

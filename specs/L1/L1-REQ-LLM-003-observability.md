@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-21
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-LLM-003 — Model Usage Observability
@@ -71,7 +71,8 @@ The program must expose model usage observability for user-facing and diagnostic
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
 | related-to | L1-REQ-APP-004 | 1 | specs/L1/L1-REQ-APP-004-observability.md | Application observability defines trace logging behavior and diagnostic logging constraints. |
-| refined-by | TBD | TBD | specs/L2/llm/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-LLM-003 | 1 | specs/L2/llm/L2-DES-LLM-003-model-usage-observability.md | Defines usage metrics, context pressure, measured versus estimated values, unavailable values, and trace-mode stream records. |
+| related-to | L2-DES-APP-004 | 1 | specs/L2/app/L2-DES-APP-004-observability-architecture.md | Defines the cross-system logging, diagnostics, trace-mode, privacy, and retention architecture used by model observability. |
 
 ## Revision Notes
 

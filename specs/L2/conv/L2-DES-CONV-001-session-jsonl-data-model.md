@@ -38,6 +38,7 @@ The full transcript can grow without bound from the user's perspective. The acti
 - `L1-REQ-AGENT-003` requires visible task planning with status updates.
 - `L1-REQ-CHANGE-001` requires rollback and recovery behavior for file changes.
 - `L1-REQ-EDIT-001` requires file edits to be reviewable and recoverable.
+- `L1-REQ-GOAL-001` requires durable Ralph Loop goal state across turns and recoverable session resumes.
 - `L1-REQ-GIT-001` constrains git-oriented change management.
 - `L1-REQ-APP-012` requires data ownership controls for user-visible stored data and model-visible context.
 - `L1-REQ-MEM-001` defines persistent memory as core-maintained internal state.
@@ -88,6 +89,13 @@ Conceptual JSONL record categories:
 - `session_deleted`
 - `plan_created`
 - `plan_updated`
+- `goal_created`
+- `goal_replaced`
+- `goal_status_changed`
+- `goal_budget_accounted`
+- `goal_progress_recorded`
+- `goal_context_snapshot_recorded`
+- `goal_cleared`
 - `turn_started`
 - `turn_interrupt_requested`
 - `turn_completed`
@@ -139,6 +147,7 @@ Conceptual fields:
 - `usage_totals`
 - `last_invocation_usage`
 - `active_plan`
+- `active_goal`
 - `created_at`
 - `updated_at`
 
@@ -197,6 +206,36 @@ Item kinds include:
 
 System instructions, base instructions, and initial metadata-derived instructions are not `user_input` items and are not their own turns.
 
+## Tool Items
+
+Tool call and tool result items should preserve both structured tool-domain data and natural-language summaries that help later model decisions and user review.
+
+Conceptual tool call fields:
+
+- `tool_call_id`
+- `tool_name`
+- `command_description`
+- `arguments`
+- `arguments_preview`
+- `approval_state`
+- `safety_state`
+- `created_at`
+
+Conceptual tool result fields:
+
+- `tool_call_id`
+- `status`
+- `result_summary`
+- `structured_status`
+- `canonical_content_ref`
+- `display_content_ref`
+- `redaction_state`
+- `completed_at`
+
+`command_description` is the model-provided natural-language purpose for a shell or command execution tool invocation. It should be recorded with the tool call for command-like tools and should not be treated as a required field for every tool category.
+
+`result_summary` is a factual natural-language summary derived from observed tool output or structured status. It should coexist with exact structured fields such as exit code, HTTP status, process id, or changed-file counts.
+
 ## Plan State
 
 Plan state is user-visible task state maintained by the plan tool. It is not private model reasoning and is not merely assistant prose.
@@ -230,6 +269,36 @@ Conceptual plan item fields:
 Replay should project at most one active plan by default unless a later requirement explicitly allows multiple concurrent plans. Historical, superseded, completed, and abandoned plans remain auditable.
 
 Plan state may be rendered by clients separately from transcript items. A plan update may also correspond to a tool call/result in the transcript, but the plan projection should come from durable plan records rather than parsing assistant text.
+
+## Goal State
+
+Goal state is durable session state for Ralph Loop autonomous work. It is not private model reasoning and is not merely assistant prose.
+
+Replay should project at most one current goal per session in the first milestone. Historical, replaced, completed, budget-limited, canceled, and cleared goals remain auditable.
+
+Conceptual goal fields:
+
+- `goal_id`
+- `session`
+- `objective`
+- `status`: active, paused, blocked, complete, budget_limited, or canceled.
+- `token_budget`
+- `time_budget_seconds`
+- `turn_budget`
+- `tokens_used`
+- `time_used_seconds`
+- `turns_used`
+- `progress_summary`
+- `blocker_summary`
+- `verification_summary`
+- `created_at`
+- `updated_at`
+
+Goal records should be append-only. Creating, replacing, pausing, resuming, blocking, completing, canceling, budget-limiting, clearing, or accounting usage for a goal should append a record rather than mutate earlier records.
+
+Hidden goal context used for a model invocation should be reconstructable through `goal_context_snapshot_recorded` or through a context snapshot that references the exact hidden goal context. This hidden context is model-visible but not rendered as a normal transcript turn.
+
+If SQLite or another indexed store is used to accelerate goal lookup, it is a projection of these durable records and must be rebuildable from the JSONL rollout.
 
 ## Interrupted And Resumed Turns
 
@@ -606,6 +675,7 @@ Client projections should receive only the data needed for display and interacti
 - Token usage summary.
 - Current model and reasoning display.
 - Active plan state.
+- Active goal state.
 - Plan Mode or permission state display.
 - Mention display and resolution status.
 
@@ -627,6 +697,7 @@ Clients also do not need persistent-memory internals. Persistent memory may affe
 | refines | L1-REQ-CONV-005 | 1 | specs/L1/L1-REQ-CONV-005-immediate-message-editing.md | Defines append-only message edit records and replacement turn references. |
 | related-to | L1-REQ-CHANGE-001 | 1 | specs/L1/L1-REQ-CHANGE-001-rollback-and-recovery.md | Defines core-owned workspace change-set and restoration records for superseded turns. |
 | related-to | L1-REQ-EDIT-001 | 1 | specs/L1/L1-REQ-EDIT-001-file-editing-workflow.md | Structured tool file changes provide restoration inputs. |
+| related-to | L1-REQ-GOAL-001 | 1 | specs/L1/L1-REQ-GOAL-001-ralph-loop.md | Durable goal records preserve objective, status, budget, progress, and hidden goal context snapshots for replay. |
 | related-to | L1-REQ-GIT-001 | 1 | specs/L1/L1-REQ-GIT-001-change-management.md | Hidden git checkpoints may support turn restoration. |
 | related-to | L1-REQ-TOOL-002 | 1 | specs/L1/L1-REQ-TOOL-002-tools.md | Durable records preserve built-in tool calls, results, and plan state. |
 | related-to | L1-REQ-APP-002 | 1 | specs/L1/L1-REQ-APP-002-persistence.md | Defines JSONL replay and recovery records for durable conversation history. |
@@ -639,6 +710,7 @@ Clients also do not need persistent-memory internals. Persistent memory may affe
 | related-to | L1-REQ-LLM-001 | 1 | specs/L1/L1-REQ-LLM-001-token-efficiency.md | Preserves immutable context prefixes through append-only storage and context references. |
 | related-to | L2-DES-MODEL-001 | 1 | specs/L2/model/L2-DES-MODEL-001-model-provider-binding.md | Session metadata references configured model bindings. |
 | related-to | L2-DES-TOOL-001 | 1 | specs/L2/tool/L2-DES-TOOL-001-built-in-tool-system.md | Defines tool and plan records persisted by the session data model. |
+| related-to | L2-DES-GOAL-001 | 1 | specs/L2/goal/L2-DES-GOAL-001-ralph-loop-goals.md | Defines the goal records and projection semantics persisted by the session data model. |
 | specified-by | TBD | TBD | specs/L3/conv/TBD.md | L3 behavior has not been authored yet. |
 
 ## Revision Notes
@@ -656,3 +728,5 @@ Clients also do not need persistent-memory internals. Persistent memory may affe
 | 1 | 2026-05-22 | Human | Refinement | Clarified that per-turn workspace change sets are core-owned restore data, while client-visible diffs are display projections. |
 | 1 | 2026-05-22 | Human | Refinement | Added durable interrupt and resume records for execution engine recovery. |
 | 1 | 2026-05-22 | Human | Refinement | Added durable plan records for plan-tool state and replay. |
+| 1 | 2026-05-22 | Human | Refinement | Added durable command descriptions and natural-language result summaries. |
+| 1 | 2026-05-23 | Human | Refinement | Added durable Ralph Loop goal records and active-goal projection fields. |

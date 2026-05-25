@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-21
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-APP-004 — Observability
@@ -69,7 +69,8 @@ The program must provide observability across the client, server, user interface
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
 | related-to | L1-REQ-LLM-003 | 1 | specs/L1/L1-REQ-LLM-003-observability.md | Model usage observability defines trace-mode recording of streaming response events. |
-| refined-by | TBD | TBD | specs/L2/app/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-APP-004 | 1 | specs/L2/app/L2-DES-APP-004-observability-architecture.md | Defines structured logs, user-facing diagnostics, trace-mode controls, correlation, redaction, retention, and telemetry boundaries. |
+| related-to | L2-DES-LLM-003 | 1 | specs/L2/llm/L2-DES-LLM-003-model-usage-observability.md | Defines the model-specific usage and streaming trace records used by application observability. |
 
 ## Revision Notes
 

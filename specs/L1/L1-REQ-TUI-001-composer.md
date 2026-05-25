@@ -6,7 +6,7 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Human
-last_updated: 2026-05-21
+last_updated: 2026-05-23
 ---
 
 # L1-REQ-TUI-001 — Composer
@@ -67,7 +67,8 @@ The TUI must provide a reliable and ergonomic composer for entering user input.
 | Relationship | Target ID | Target Revision | Target Path | Rationale |
 |---|---|---:|---|---|
 | related-to | L1-REQ-TUI-009 | 1 | specs/L1/L1-REQ-TUI-009-session-input-modes.md | Session input modes define how composer input interpretation changes during a session. |
-| refined-by | TBD | TBD | specs/L2/tui/TBD.md | L2 design has not been authored yet. |
+| refined-by | L2-DES-TUI-003 | 1 | specs/L2/tui/L2-DES-TUI-003-composer-and-input-modes.md | Defines composer layout, multi-line input, submission semantics, command discovery, Shell Mode, Plan Mode, and Unicode constraints. |
+| related-to | L2-DES-CLIENT-001 | 1 | specs/L2/client/L2-DES-CLIENT-001-localization-readiness.md | Defines Unicode, IME, grapheme, and display-width constraints used by composer input. |
 
 ## Revision Notes
 
