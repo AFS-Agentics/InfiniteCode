@@ -7,20 +7,14 @@
 🚧早期段階のプロジェクトで活発に開発中 — まだ本番環境の準備はできていません。
 ⭐ スターをつけてフォローしてください
 
-[![ステータス](https://img.shields.io/badge/status-designing-blue?style=flat-square)](https://github.com/)
-[![言語](https://img.shields.io/badge/language-Rust-E57324?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![由来](https://img.shields.io/badge/origin-Claude_Code_TS-8A2BE2?style=flat-square)](https://docs.anthropic.com/en/docs/claude-code)
-[![ライセンス](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/)
+[![Stars](https://img.shields.io/github/stars/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/stargazers)
+[![Language](https://img.shields.io/badge/language-Rust-E57324?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/7df-lab/devo/pulls)
+[![CI](https://img.shields.io/github/actions/workflow/status/7df-lab/devo/ci.yml?branch=main&style=flat-square)](https://github.com/7df-lab/devo/actions)
+[![Release](https://img.shields.io/github/v/release/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/releases)
 
-[English](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [Português do Brasil](./README.pt-BR.md) | [Deutsch](./README.de.md) | [Русский](./README.ru.md) | [Türkçe](./README.tr.md)
-
-<img 
-  src="./docs/assets/demo_20260421.gif" 
-  alt="プロジェクト概要" 
-  width="100%"
-  style="border-radius: 8px; box-shadow: 0 15px 40px rgba(0,0,0,0.25);object-fit:cover;"
-/>
+[English](./README.md) | [简体中文](./README.zh-Hans.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
 </div>
 
@@ -68,6 +62,48 @@ cargo build --release
 
 > [!TIP]
 > Rust がインストールされていることを確認してください。1.75+ を推奨します（https://rustup.rs/ から）。
+
+## ⚙️ 設定
+
+Devo は TOML ファイルから設定を読み込み、優先度の高いソースが低いものを上書きします：
+
+1. ビルトインデフォルト（バイナリにコンパイル）
+2. `DEVO_HOME/config.toml` — ユーザーレベル設定（デフォルト: macOS/linux では `~/.devo/config.toml`、Windows では `C:\Users\yourname\.devo\config.toml`）
+3. `<workspace>/.devo/config.toml` — プロジェクトレベル設定
+4. CLI フラグ — コマンドラインでの上書き
+
+両方の設定ファイルはオプションです。最小限の設定ファイルには、devo がどのモデルを使用するかを知らせる provider セクションのみが必要です。`devo onboard` を実行すると、インタラクティブなセットアップでこれが書き込まれます。
+
+### 最小設定例
+
+```toml
+# ~/.devo/config.toml
+model = "deepseek-v4-flash"
+model_provider = "api.deepseek.com"
+model_thinking_selection = "high"
+
+[model_providers."api.deepseek.com"]
+name = "api.deepseek.com"
+api_key = "sk-..."
+base_url = "https://api.deepseek.com"
+wire_api = "openai_chat_completions"
+
+[[model_providers."api.deepseek.com".models]]
+model = "deepseek-v4-pro"
+
+[[model_providers."api.deepseek.com".models]]
+model = "deepseek-v4-flash"
+```
+
+## Star us
+
+<a href="https://www.star-history.com/?repos=7df-lab%2Fdevo&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=7df-lab/devo&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=7df-lab/devo&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=7df-lab/devo&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## よくある質問
 

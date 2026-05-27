@@ -7,20 +7,14 @@
 🚧Проект на ранней стадии активной разработки — пока не готов к production.
 ⭐ Поставьте звезду, чтобы следить за проектом
 
-[![Статус](https://img.shields.io/badge/status-designing-blue?style=flat-square)](https://github.com/)
-[![Язык](https://img.shields.io/badge/language-Rust-E57324?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
-[![Источник](https://img.shields.io/badge/origin-Claude_Code_TS-8A2BE2?style=flat-square)](https://docs.anthropic.com/en/docs/claude-code)
-[![Лицензия](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/)
+[![Stars](https://img.shields.io/github/stars/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/stargazers)
+[![Language](https://img.shields.io/badge/language-Rust-E57324?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/7df-lab/devo/pulls)
+[![CI](https://img.shields.io/github/actions/workflow/status/7df-lab/devo/ci.yml?branch=main&style=flat-square)](https://github.com/7df-lab/devo/actions)
+[![Release](https://img.shields.io/github/v/release/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/releases)
 
-[English](./README.md) | [简体中文](./README.zh-CN.md) | [繁體中文](./README.zh-TW.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md) | [Español](./README.es.md) | [Français](./README.fr.md) | [Português do Brasil](./README.pt-BR.md) | [Deutsch](./README.de.md) | [Русский](./README.ru.md) | [Türkçe](./README.tr.md)
-
-<img 
-  src="./docs/assets/demo_20260421.gif" 
-  alt="Обзор проекта" 
-  width="100%"
-  style="border-radius: 8px; box-shadow: 0 15px 40px rgba(0,0,0,0.25);object-fit:cover;"
-/>
+[English](./README.md) | [简体中文](./README.zh-Hans.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
 </div>
 
@@ -68,6 +62,48 @@ cargo build --release
 
 > [!TIP]
 > Убедитесь, что Rust установлен; рекомендуется версия 1.75+ (через https://rustup.rs/).
+
+## ⚙️ Конфигурация
+
+Devo читает конфигурацию из TOML-файла, объединяя источники с более высоким приоритетом поверх низкоприоритетных:
+
+1. Встроенные значения по умолчанию (скомпилированы в бинарный файл)
+2. `DEVO_HOME/config.toml` — пользовательская конфигурация (по умолчанию `~/.devo/config.toml` на macOS/linux, `C:\Users\yourname\.devo\config.toml` на Windows)
+3. `<workspace>/.devo/config.toml` — конфигурация уровня проекта
+4. CLI флаги — переопределения из командной строки
+
+Оба конфигурационных файла необязательны. Минимальный файл конфигурации должен содержать только секцию провайдера, чтобы devo знал, какую модель использовать. Запустите `devo onboard` для интерактивной настройки.
+
+### Пример минимальной конфигурации
+
+```toml
+# ~/.devo/config.toml
+model = "deepseek-v4-flash"
+model_provider = "api.deepseek.com"
+model_thinking_selection = "high"
+
+[model_providers."api.deepseek.com"]
+name = "api.deepseek.com"
+api_key = "sk-..."
+base_url = "https://api.deepseek.com"
+wire_api = "openai_chat_completions"
+
+[[model_providers."api.deepseek.com".models]]
+model = "deepseek-v4-pro"
+
+[[model_providers."api.deepseek.com".models]]
+model = "deepseek-v4-flash"
+```
+
+## Star us
+
+<a href="https://www.star-history.com/?repos=7df-lab%2Fdevo&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=7df-lab/devo&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=7df-lab/devo&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=7df-lab/devo&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## Часто задаваемые вопросы
 
