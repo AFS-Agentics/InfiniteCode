@@ -4,15 +4,24 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::apply_patch::exec_apply_patch;
-use crate::contracts::{
-    ToolCallError, ToolContext, ToolProgressSender, ToolResult, ToolResultContent,
-};
+use crate::contracts::ToolCallError;
+use crate::contracts::ToolContext;
+use crate::contracts::ToolProgressSender;
+use crate::contracts::ToolResult;
+use crate::contracts::ToolResultContent;
 use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
-use crate::tool_spec::{ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, ToolSpec};
-use crate::unified_exec::process::{UnifiedExecProcess, collect_output};
+use crate::tool_spec::ToolCapabilityTag;
+use crate::tool_spec::ToolExecutionMode;
+use crate::tool_spec::ToolOutputMode;
+use crate::tool_spec::ToolSpec;
+use crate::unified_exec::ExecCommandArgs;
+use crate::unified_exec::ProcessOutput;
+use crate::unified_exec::WARNING_PROCESSES;
+use crate::unified_exec::WriteStdinArgs;
+use crate::unified_exec::process::UnifiedExecProcess;
+use crate::unified_exec::process::collect_output;
 use crate::unified_exec::store::ProcessStore;
-use crate::unified_exec::{ExecCommandArgs, ProcessOutput, WARNING_PROCESSES, WriteStdinArgs};
 
 const MAX_EXEC_OUTPUT_DELTAS_PER_CALL: usize = 10_000;
 const UNIFIED_EXEC_OUTPUT_DELTA_MAX_BYTES: usize = 8_192;
@@ -137,7 +146,7 @@ impl ToolHandler for ExecCommandHandler {
         if let Some((patch_cwd, patch_text)) = apply_patch_command(&args.cmd, &cwd) {
             let output = exec_apply_patch(
                 &patch_cwd,
-                &ctx.session_id.to_string(),
+                // &ctx.session_id.to_string(),
                 serde_json::json!({ "patchText": patch_text }),
             )
             .await
@@ -491,23 +500,28 @@ fn apply_patch_command(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use devo_tools::contracts::ToolBudgets;
     use pretty_assertions::assert_eq;
+    use tokio_util::sync::CancellationToken;
 
     fn test_ctx(cwd: std::path::PathBuf) -> crate::contracts::ToolContext {
         crate::contracts::ToolContext {
-            session_id: devo_protocol::SessionId::new(),
-            turn_id: devo_protocol::TurnId::new(),
+            // session_id: devo_protocol::SessionId::new(),
+            // turn_id: devo_protocol::TurnId::new(),
             tool_call_id: crate::invocation::ToolCallId("test".into()),
             workspace_root: cwd,
-            permission_profile: crate::contracts::ToolPermissionProfile {
-                can_read_workspace: true,
-                can_write_workspace: true,
-                can_execute_commands: true,
-                network_enabled: true,
+            // permission_profile: crate::contracts::ToolPermissionProfile {
+            //     can_read_workspace: true,
+            //     can_write_workspace: true,
+            //     can_execute_commands: true,
+            //     network_enabled: true,
+            // },
+            // tool_registry: std::sync::Arc::new(crate::contracts::NoopToolRegistry),
+            budgets: ToolBudgets {
+                wall_time_limit_ms: Some(6_000),
+                output_limit_bytes: 32 * 1024,
             },
-            tool_registry: std::sync::Arc::new(crate::contracts::NoopToolRegistry),
-            output_limit_bytes: 1024 * 1024,
-            cancel_token: false,
+            cancel_token: CancellationToken::new(),
         }
     }
 

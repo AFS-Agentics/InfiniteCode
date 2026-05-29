@@ -31,6 +31,7 @@ smol_str = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-appender = { workspace = true }
@@ -62,6 +63,6 @@ devo-safety = { workspace = true }
 futures = { workspace = true }
 pretty_assertions = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
 tempfile = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
 uuid = { workspace = true }

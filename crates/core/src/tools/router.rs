@@ -13,6 +13,7 @@ use tracing::warn;
 use crate::invocation::ToolContent;
 use crate::registry::ToolRegistry;
 use crate::tool_spec::ToolCapabilityTag;
+use tokio_util::sync::CancellationToken;
 
 type ProgressCallback = dyn Fn(&str, &str) + Send + Sync;
 type ProgressCallbackArc = Arc<ProgressCallback>;
@@ -207,11 +208,16 @@ impl ToolRuntime {
 
         info!(tool = %call.name, id = %call.id, "executing tool");
 
+        // TODO: BUG here, the cancel_token should take as a parameter, pass from outside of execute_single
+        // TODO: The budgets should take as a parameter, pass from outside of execute_single
         let ctx = crate::contracts::ToolContext {
             tool_call_id: crate::invocation::ToolCallId(call.id.clone()),
             workspace_root: self.context.cwd.clone(),
-            budgets: ToolBudgets(),
-            cancel_token: false,
+            budgets: ToolBudgets {
+                output_limit_bytes: 32 * 1024,
+                wall_time_limit_ms: Some(6_000),
+            },
+            cancel_token: CancellationToken::new(),
         };
 
         let result = tool.handle(ctx, call.input.clone(), None).await;

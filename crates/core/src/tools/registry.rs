@@ -117,14 +117,8 @@ impl ToolRegistry {
             .loaded_deferred_tools
             .lock()
             .map_err(|_| "loaded deferred tool state lock poisoned".to_string())?;
-        execute_tool_search(
-            query,
-            &self.tool_definitions(),
-            &mut loaded_tools,
-            session_id,
-            config,
-        )
-        .map(|result| result.summary())
+        execute_tool_search(query, &self.tool_definitions(), &mut loaded_tools, config)
+            .map(|result| result.summary())
     }
 
     pub fn loaded_deferred_tools(&self) -> Arc<Mutex<LoadedDeferredTools>> {
@@ -343,6 +337,8 @@ impl Default for ToolRegistryBuilder {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
     use crate::contracts::ToolCallError;
     use crate::contracts::ToolContext;
@@ -354,6 +350,8 @@ mod tests {
     use crate::tool_spec::ToolOutputMode;
     use crate::tool_spec::ToolSpec;
     use async_trait::async_trait;
+    use devo_tools::contracts::ToolBudgets;
+    use tokio_util::sync::CancellationToken;
 
     struct EchoHandler {
         spec: ToolSpec,
@@ -368,6 +366,18 @@ mod tests {
                     JsonSchema::object(Default::default(), None, None),
                 ),
             }
+        }
+    }
+
+    fn test_ctx() -> ToolContext {
+        ToolContext {
+            tool_call_id: devo_tools::ToolCallId("test-id".to_string()),
+            workspace_root: PathBuf::from("~/user/devo"),
+            budgets: ToolBudgets {
+                wall_time_limit_ms: Some(6_000),
+                output_limit_bytes: 32 * 1024,
+            },
+            cancel_token: CancellationToken::new(),
         }
     }
 

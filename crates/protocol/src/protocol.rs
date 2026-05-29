@@ -43,6 +43,95 @@ pub struct ServerRequestEnvelope<T> {
     pub params: T,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClientMethod {
+    SessionStart,
+    SessionList,
+    SessionMetadataUpdate,
+    SessionPermissionsUpdate,
+    SessionTitleUpdate,
+    SessionResume,
+    SessionFork,
+    SessionRollback,
+    SessionCompact,
+    SkillsList,
+    SkillsChanged,
+    ModelCatalog,
+    ModelSaved,
+    TurnStart,
+    TurnInterrupt,
+    TurnSteer,
+    ApprovalRespond,
+    EventsSubscribe,
+    GoalCreate,
+    GoalResume,
+    GoalCancel,
+    GoalStatus,
+    AgentList,
+    AgentStatus,
+}
+
+impl ClientMethod {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::SessionStart => "session/start",
+            Self::SessionList => "session/list",
+            Self::SessionMetadataUpdate => "session/metadata/update",
+            Self::SessionPermissionsUpdate => "session/permissions/update",
+            Self::SessionTitleUpdate => "session/title/update",
+            Self::SessionResume => "session/resume",
+            Self::SessionFork => "session/fork",
+            Self::SessionRollback => "session/rollback",
+            Self::SessionCompact => "session/compact",
+            Self::SkillsList => "skills/list",
+            Self::SkillsChanged => "skills/changed",
+            Self::ModelCatalog => "model/catalog",
+            Self::ModelSaved => "model/saved",
+            Self::TurnStart => "turn/start",
+            Self::TurnInterrupt => "turn/interrupt",
+            Self::TurnSteer => "turn/steer",
+            Self::ApprovalRespond => "approval/respond",
+            Self::EventsSubscribe => "events/subscribe",
+            Self::GoalCreate => "goal/create",
+            Self::GoalResume => "goal/resume",
+            Self::GoalCancel => "goal/cancel",
+            Self::GoalStatus => "goal/status",
+            Self::AgentList => "agent/list",
+            Self::AgentStatus => "agent/status",
+        }
+    }
+
+    pub fn parse(method: &str) -> Option<Self> {
+        Some(match method {
+            "session/start" => Self::SessionStart,
+            "session/list" => Self::SessionList,
+            "session/metadata/update" => Self::SessionMetadataUpdate,
+            "session/permissions/update" => Self::SessionPermissionsUpdate,
+            "session/title/update" => Self::SessionTitleUpdate,
+            "session/resume" => Self::SessionResume,
+            "session/fork" => Self::SessionFork,
+            "session/rollback" => Self::SessionRollback,
+            "session/compact" => Self::SessionCompact,
+            "skills/list" => Self::SkillsList,
+            "skills/changed" => Self::SkillsChanged,
+            "model/catalog" => Self::ModelCatalog,
+            "model/saved" => Self::ModelSaved,
+            "turn/start" => Self::TurnStart,
+            "turn/interrupt" => Self::TurnInterrupt,
+            "turn/steer" => Self::TurnSteer,
+            "approval/respond" => Self::ApprovalRespond,
+            "events/subscribe" => Self::EventsSubscribe,
+            "goal/create" => Self::GoalCreate,
+            "goal/resume" => Self::GoalResume,
+            "goal/cancel" => Self::GoalCancel,
+            "goal/status" => Self::GoalStatus,
+            "agent/list" => Self::AgentList,
+            "agent/status" => Self::AgentStatus,
+            _ => return None,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
 pub enum ProtocolErrorCode {
     #[error("NotInitialized")]

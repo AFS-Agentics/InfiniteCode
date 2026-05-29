@@ -271,12 +271,13 @@ pub fn execute_tool_search(
         match resolve_policy(&canonical_name, config) {
             PromptLoadingPolicy::Preloaded => result.already_available.push(canonical_name),
             PromptLoadingPolicy::Deferred => {
-                if loaded.is_loaded(session_id, &canonical_name) {
-                    result.already_loaded.push(canonical_name);
-                } else {
-                    loaded.mark_loaded(session_id, &canonical_name);
-                    result.loaded.push(canonical_name);
-                }
+                // TODO: Should solve the session id dependancy, should add session id at tool context.
+                // if loaded.is_loaded(session_id, &canonical_name) {
+                //     result.already_loaded.push(canonical_name);
+                // } else {
+                //     loaded.mark_loaded(session_id, &canonical_name);
+                //     result.loaded.push(canonical_name);
+                // }
             }
             PromptLoadingPolicy::Hidden => result.not_found.push(requested_name.to_string()),
         }

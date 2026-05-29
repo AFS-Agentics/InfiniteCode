@@ -1,15 +1,23 @@
 use std::sync::Arc;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
+use anyhow::anyhow;
 use async_trait::async_trait;
-use devo_protocol::{ErrorResponse, NotificationEnvelope, SuccessResponse};
-use futures::{SinkExt, StreamExt};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use devo_protocol::ErrorResponse;
+use devo_protocol::NotificationEnvelope;
+use devo_protocol::SuccessResponse;
+use futures::SinkExt;
+use futures::StreamExt;
+use tokio::io::AsyncBufReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::io::BufReader;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
-use tokio_tungstenite::{accept_async, tungstenite::Message};
+use tokio_tungstenite::accept_async;
+use tokio_tungstenite::tungstenite::Message;
 
-use crate::{ClientTransportKind, ServerRuntime};
+use crate::ClientTransportKind;
+use crate::ServerRuntime;
 
 /// Transport trait per L3-BEH-SERVER-001.
 ///
@@ -187,10 +195,6 @@ async fn run_stdio(runtime: Arc<ServerRuntime>) -> Result<()> {
     // Normal channel for event notifications (TextDelta, TurnStarted, …).
     let (sender, mut receiver) = mpsc::unbounded_channel();
     let sender_clone = sender.clone();
-    // High-priority channel for RPC responses that must not be blocked by
-    // a backlog of event notifications on the normal channel.
-    let (high_pri_sender, mut high_pri_receiver) = mpsc::unbounded_channel();
-    runtime.set_high_pri_sender(high_pri_sender).await;
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, sender)
         .await;
@@ -222,11 +226,7 @@ async fn run_stdio(runtime: Arc<ServerRuntime>) -> Result<()> {
         loop {
             let line: Vec<u8>;
             tokio::select! {
-                Some(message) = high_pri_receiver.recv() => {
-                    line = serde_json::to_vec(&message)
-                        .expect("serialize high-priority response");
-                }
-                Some(message) = receiver.recv(), if high_pri_receiver.is_empty() => {
+                Some(message) = receiver.recv() => {
                     line = serde_json::to_vec(&message)
                         .expect("serialize stdio response");
                 }
@@ -322,9 +322,10 @@ async fn handle_websocket_connection(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        DEFAULT_WEBSOCKET_BIND_ADDRESS, ListenTarget, parse_listen_target, resolve_listen_targets,
-    };
+    use super::DEFAULT_WEBSOCKET_BIND_ADDRESS;
+    use super::ListenTarget;
+    use super::parse_listen_target;
+    use super::resolve_listen_targets;
 
     #[test]
     fn parse_stdio_target() {

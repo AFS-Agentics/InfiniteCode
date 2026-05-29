@@ -110,18 +110,6 @@ impl ServerRuntime {
                         );
                     }
                 }
-                if let Some(tx) = self.high_pri_tx.lock().await.as_ref() {
-                    let response = serde_json::to_value(SuccessResponse {
-                        id: request_id,
-                        result: TurnStartResult {
-                            turn_id: active_turn_id,
-                            status: TurnStatus::Running,
-                            accepted_at: now,
-                        },
-                    })
-                    .expect("serialize turn/start response");
-                    let _ = tx.send(response);
-                }
                 let sid = params.session_id;
                 let runtime = Arc::clone(self);
                 tokio::spawn(async move {

@@ -39,14 +39,17 @@ use devo_core::history::compaction::compact_history;
 use devo_core::history::summarizer::DefaultHistorySummarizer;
 use devo_core::message_to_response_items;
 use devo_core::query;
+use devo_core::tools::PermissionChecker;
+use devo_core::tools::ToolPermissionRequest;
 use devo_core::tools::ToolRuntime;
-use devo_core::tools::{PermissionChecker, ToolPermissionRequest, ToolRuntimeContext};
+use devo_core::tools::ToolRuntimeContext;
 use devo_safety::PermissionMode;
 
 use crate::ApprovalDecisionValue;
 use crate::ApprovalRequestPayload;
 use crate::ApprovalRespondParams;
 use crate::ApprovalScopeValue;
+use crate::ClientMethod;
 use crate::ClientTransportKind;
 use crate::CommandExecutionPayload;
 use crate::ConnectionState;
@@ -108,13 +111,20 @@ use crate::db::SessionStats;
 use crate::execution::PendingApproval;
 use crate::execution::RuntimeSession;
 use crate::execution::ServerRuntimeDependencies;
-use crate::goal::{CreateGoalParams, GoalAction, GoalId, GoalMutation};
+use crate::goal::CreateGoalParams;
+use crate::goal::GoalAction;
+use crate::goal::GoalId;
+use crate::goal::GoalMutation;
 use crate::persistence::RolloutStore;
 use crate::persistence::build_item_record;
 use crate::persistence::build_turn_record;
 use crate::projection::history_item_from_turn_item;
-use crate::runtime::handlers::goal::{GoalProjection, GoalStore};
-use crate::subagent::{AgentRegistry, SpawnAgentParams, SubagentMetadata, SubagentStatus};
+use crate::runtime::handlers::goal::GoalProjection;
+use crate::runtime::handlers::goal::GoalStore;
+use crate::subagent::AgentRegistry;
+use crate::subagent::SpawnAgentParams;
+use crate::subagent::SubagentMetadata;
+use crate::subagent::SubagentStatus;
 use crate::titles::build_title_generation_request;
 use crate::titles::derive_provisional_title;
 use crate::titles::normalize_generated_title;
@@ -144,11 +154,6 @@ pub struct ServerRuntime {
     connections: Mutex<HashMap<u64, ConnectionRuntime>>,
     active_tasks: Mutex<HashMap<SessionId, tokio::task::AbortHandle>>,
     next_connection_id: AtomicU64,
-    /// High-priority channel for RPC responses that must not be blocked by
-    /// event notifications (TextDelta, etc.). Set by the stdio transport on
-    /// startup. When set, `handle_turn_start` sends busy-path responses here
-    /// so they bypass the shared event channel.
-    high_pri_tx: Mutex<Option<mpsc::UnboundedSender<serde_json::Value>>>,
     /// Per-session goal stores for goal lifecycle management.
     goal_stores: Mutex<HashMap<SessionId, GoalStore>>,
     /// Per-root-session agent registries for subagent coordination.
@@ -172,17 +177,9 @@ impl ServerRuntime {
             connections: Mutex::new(HashMap::new()),
             active_tasks: Mutex::new(HashMap::new()),
             next_connection_id: AtomicU64::new(1),
-            high_pri_tx: Mutex::new(None),
             goal_stores: Mutex::new(HashMap::new()),
             agent_registries: Mutex::new(HashMap::new()),
         })
-    }
-
-    /// Register a high-priority response channel. When set, RPC handlers that
-    /// need to bypass the shared event channel (e.g. turn/start during a busy
-    /// turn) can send their responses here instead.
-    pub async fn set_high_pri_sender(&self, tx: mpsc::UnboundedSender<serde_json::Value>) {
-        *self.high_pri_tx.lock().await = Some(tx);
     }
 
     /// Loads durable sessions from rollout files and installs them into the runtime map.
@@ -485,46 +482,84 @@ impl ServerRuntime {
             });
         }
 
-        let response = match method.as_str() {
-            "session/start" => Some(self.handle_session_start(connection_id, id?, params).await),
-            "session/list" => Some(self.handle_session_list(id?, params).await),
-            "session/metadata/update" => {
+        let response = match ClientMethod::parse(method.as_str()) {
+            // start a session
+            Some(ClientMethod::SessionStart) => {
+                Some(self.handle_session_start(connection_id, id?, params).await)
+            }
+            // list sessions
+            // TODO: Should add pagnation
+            Some(ClientMethod::SessionList) => Some(self.handle_session_list(id?, params).await),
+            // update session metadata, current including model and reason effort (thinking), the term 'thinking' should be changed to 'reasoning_effort'
+            Some(ClientMethod::SessionMetadataUpdate) => {
                 Some(self.handle_session_metadata_update(id?, params).await)
             }
-            "session/permissions/update" => {
+            // update session's permission mode, including auto-approve, default, full-access, readonly
+            Some(ClientMethod::SessionPermissionsUpdate) => {
                 Some(self.handle_session_permissions_update(id?, params).await)
             }
-            "session/title/update" => Some(self.handle_session_title_update(id?, params).await),
-            "session/resume" => Some(self.handle_session_resume(connection_id, id?, params).await),
-            "session/fork" => Some(self.handle_session_fork(connection_id, id?, params).await),
-            "session/rollback" => Some(
+            // update session title, user may customized session title from ui client
+            Some(ClientMethod::SessionTitleUpdate) => {
+                Some(self.handle_session_title_update(id?, params).await)
+            }
+            // resume a history session, server load the jsonl file then replay the events in jsonl
+            Some(ClientMethod::SessionResume) => {
+                Some(self.handle_session_resume(connection_id, id?, params).await)
+            }
+            // fork a given session at given user turn index
+            Some(ClientMethod::SessionFork) => {
+                Some(self.handle_session_fork(connection_id, id?, params).await)
+            }
+            // rollback session at given point
+            Some(ClientMethod::SessionRollback) => Some(
                 self.handle_session_rollback(connection_id, id?, params)
                     .await,
             ),
-            "session/compact" => Some(self.handle_session_compact(id?, params).await),
-            "skills/list" => Some(self.handle_skills_list(id?, params).await),
-            "skills/changed" => Some(self.handle_skills_changed(id?, params).await),
-            "model/catalog" => Some(self.handle_model_catalog(id?, params).await),
-            "model/saved" => Some(self.handle_model_saved(id?, params).await),
-            "turn/start" => Some(self.handle_turn_start(id?, params).await),
-            "turn/interrupt" => Some(self.handle_turn_interrupt(id?, params).await),
-            "turn/steer" => Some(self.handle_turn_steer(connection_id, id?, params).await),
-            "approval/respond" => Some(self.handle_approval_respond(id?, params).await),
-            "events/subscribe" => Some(
+            // compact session context history
+            Some(ClientMethod::SessionCompact) => {
+                Some(self.handle_session_compact(id?, params).await)
+            }
+            // list the current skills, including given cwd param
+            Some(ClientMethod::SkillsList) => Some(self.handle_skills_list(id?, params).await),
+            // TODO: not sure what is the endpoint
+            Some(ClientMethod::SkillsChanged) => {
+                Some(self.handle_skills_changed(id?, params).await)
+            }
+            // get the model catalog, aka the configured models list
+            Some(ClientMethod::ModelCatalog) => Some(self.handle_model_catalog(id?, params).await),
+            // TODO: not sure, config model from client should be deprecated
+            Some(ClientMethod::ModelSaved) => Some(self.handle_model_saved(id?, params).await),
+            // TODO: start a new user turn, maybe should change name to "turn/submit"
+            Some(ClientMethod::TurnStart) => Some(self.handle_turn_start(id?, params).await),
+            // interupt the current working turn
+            Some(ClientMethod::TurnInterrupt) => {
+                Some(self.handle_turn_interrupt(id?, params).await)
+            }
+            // TODO: move the functionality of 'turn/steer', keep the steer as a parameter of 'turn/start'
+            Some(ClientMethod::TurnSteer) => {
+                Some(self.handle_turn_steer(connection_id, id?, params).await)
+            }
+            // client approval result
+            Some(ClientMethod::ApprovalRespond) => {
+                Some(self.handle_approval_respond(id?, params).await)
+            }
+            Some(ClientMethod::EventsSubscribe) => Some(
                 self.handle_events_subscribe(connection_id, id?, params)
                     .await,
             ),
-            "goal/create" => Some(self.handle_goal_create(id?, params).await),
-            "goal/pause" => Some(self.handle_goal_pause(id?, params).await),
-            "goal/resume" => Some(self.handle_goal_resume(id?, params).await),
-            "goal/complete" => Some(self.handle_goal_complete(id?, params).await),
-            "goal/cancel" => Some(self.handle_goal_cancel(id?, params).await),
-            "goal/clear" => Some(self.handle_goal_clear(id?, params).await),
-            "goal/status" => Some(self.handle_goal_status(id?, params).await),
-            "agent/spawn" => Some(self.handle_agent_spawn(id?, params).await),
-            "agent/list" => Some(self.handle_agent_list(id?, params).await),
-            "agent/status" => Some(self.handle_agent_status(id?, params).await),
-            _ => Some(self.error_response(
+            // TODO: the goal design should be simplified
+            Some(ClientMethod::GoalCreate) => Some(self.handle_goal_create(id?, params).await),
+            Some(ClientMethod::GoalResume) => Some(self.handle_goal_resume(id?, params).await),
+            // cancel the current goal loop
+            Some(ClientMethod::GoalCancel) => Some(self.handle_goal_cancel(id?, params).await),
+            Some(ClientMethod::GoalStatus) => Some(self.handle_goal_status(id?, params).await),
+            // TODO: list the current sub agents, not sure whther the current agent is right.
+            Some(ClientMethod::AgentList) => Some(self.handle_agent_list(id?, params).await),
+            // TODO: get the agent status, it is the subagent session status, maybe the design is not right, wait for reviewing.
+            Some(ClientMethod::AgentStatus) => Some(self.handle_agent_status(id?, params).await),
+            // TODO: add endpoint to kill background process opened by unified exec command.
+            // TODO: add endpoint to list current background processes.
+            None => Some(self.error_response(
                 id?,
                 ProtocolErrorCode::InvalidParams,
                 format!("unknown method: {method}"),
