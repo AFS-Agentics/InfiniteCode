@@ -4,14 +4,18 @@ use std::sync::Mutex;
 
 use devo_protocol::ToolDefinition;
 
-use crate::contracts::{ToolContext, ToolResult};
-use crate::deferred_loading::{
-    DeferredLoadingConfig, DeferredToolPrompt, LoadedDeferredTools, assemble_deferred_tool_prompt,
-    execute_tool_search,
-};
+use crate::contracts::ToolContext;
+use crate::contracts::ToolResult;
+use crate::deferred_loading::DeferredLoadingConfig;
+use crate::deferred_loading::DeferredToolPrompt;
+use crate::deferred_loading::LoadedDeferredTools;
+use crate::deferred_loading::assemble_deferred_tool_prompt;
+use crate::deferred_loading::execute_tool_search;
 use crate::errors::ToolDispatchError;
 use crate::tool_handler::ToolHandler;
-use crate::tool_spec::{ToolExecutionMode, ToolPreparationFeedback, ToolSpec};
+use crate::tool_spec::ToolExecutionMode;
+use crate::tool_spec::ToolPreparationFeedback;
+use crate::tool_spec::ToolSpec;
 use crate::unified_exec::store::ProcessStore;
 
 #[derive(Clone)]
@@ -340,13 +344,16 @@ impl Default for ToolRegistryBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contracts::{
-        ToolCallError, ToolContext, ToolProgressSender, ToolResult, ToolResultContent,
-    };
+    use crate::contracts::ToolCallError;
+    use crate::contracts::ToolContext;
+    use crate::contracts::ToolProgressSender;
+    use crate::contracts::ToolResult;
+    use crate::contracts::ToolResultContent;
     use crate::json_schema::JsonSchema;
-    use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolSpec};
+    use crate::tool_spec::ToolExecutionMode;
+    use crate::tool_spec::ToolOutputMode;
+    use crate::tool_spec::ToolSpec;
     use async_trait::async_trait;
-    use devo_protocol::{SessionId, TurnId};
 
     struct EchoHandler {
         spec: ToolSpec,
@@ -380,24 +387,6 @@ mod tests {
                 ToolResultContent::Text("echo".into()),
                 "echo",
             ))
-        }
-    }
-
-    fn test_ctx() -> ToolContext {
-        ToolContext {
-            session_id: SessionId::new(),
-            turn_id: TurnId::new(),
-            tool_call_id: crate::invocation::ToolCallId("test".into()),
-            workspace_root: std::path::PathBuf::from("/tmp"),
-            permission_profile: crate::contracts::ToolPermissionProfile {
-                can_read_workspace: true,
-                can_write_workspace: true,
-                can_execute_commands: true,
-                network_enabled: true,
-            },
-            tool_registry: Arc::new(crate::contracts::NoopToolRegistry),
-            output_limit_bytes: 1024 * 1024,
-            cancel_token: false,
         }
     }
 

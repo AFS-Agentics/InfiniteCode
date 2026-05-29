@@ -10,14 +10,12 @@ use crate::invocation::FunctionToolOutput;
 
 pub(crate) async fn exec_apply_patch(
     cwd: &std::path::Path,
-    session_id: &str,
     input: serde_json::Value,
 ) -> anyhow::Result<FunctionToolOutput> {
     let patch_text = input["patchText"].as_str().unwrap_or("");
     debug!(
         tool = "apply_patch",
         cwd = %cwd.display(),
-        session_id = %session_id,
         input = %input,
         patch_text = patch_text,
         patch_text_len = patch_text.len(),
@@ -987,7 +985,6 @@ hello
 
         let output = exec_apply_patch(
             &cwd,
-            "test-session",
             json!({
             "patchText": "*** Begin Patch
 *** Add File: add.txt

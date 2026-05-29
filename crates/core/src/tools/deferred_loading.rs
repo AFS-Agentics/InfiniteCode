@@ -1,4 +1,6 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::collections::HashSet;
 
 use devo_protocol::ToolDefinition;
 
@@ -121,6 +123,8 @@ pub struct LoadedDeferredTools {
     by_session: HashMap<String, BTreeSet<String>>,
 }
 
+// TODO: should noted that the tool search tool is still a simple tool.
+
 impl LoadedDeferredTools {
     pub fn mark_loaded(&mut self, session_id: &str, tool_name: &str) {
         self.by_session
@@ -234,7 +238,6 @@ pub fn execute_tool_search(
     query: &str,
     all_tools: &[ToolDefinition],
     loaded: &mut LoadedDeferredTools,
-    session_id: &str,
     config: &DeferredLoadingConfig,
 ) -> Result<ToolSearchResult, String> {
     let Some(selection) = query
@@ -529,7 +532,6 @@ mod tests {
             "select:WebSearch,fetch-url,read",
             &tools(),
             &mut loaded,
-            "session-1",
             &config,
         )
         .expect("tool search should load deferred tools");
@@ -553,14 +555,9 @@ mod tests {
         let mut loaded = LoadedDeferredTools::default();
         loaded.mark_loaded("session-1", "web_search");
 
-        let result = execute_tool_search(
-            "select:web_search,missing",
-            &tools(),
-            &mut loaded,
-            "session-1",
-            &config,
-        )
-        .expect("partial success should return summary");
+        let result =
+            execute_tool_search("select:web_search,missing", &tools(), &mut loaded, &config)
+                .expect("partial success should return summary");
 
         assert_eq!(
             result,
@@ -586,7 +583,6 @@ mod tests {
             "select:imaginary",
             &tools(),
             &mut loaded,
-            "session-1",
             &DeferredLoadingConfig::default(),
         )
         .expect_err("all unknown tools should error");

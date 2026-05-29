@@ -11,35 +11,33 @@ use async_trait::async_trait;
 use serde::Deserialize;
 use serde::Serialize;
 
-use devo_protocol::SessionId;
-use devo_protocol::TurnId;
-
 use crate::invocation::ToolCallId;
 use crate::tool_spec::ToolSpec;
+use tokio_util::sync::CancellationToken;
+
+#[derive(Clone, Copy, Debug)]
+pub struct ToolBudgets {
+    pub output_limit_bytes: usize,
+    pub wall_time_limit_ms: Option<u64>,
+}
 
 // ── ToolContext ──────────────────────────────────────────────────────
 
 /// Full execution context passed to every tool handler invocation.
 #[derive(Clone)]
 pub struct ToolContext {
-    pub session_id: SessionId,
-    pub turn_id: TurnId,
     pub tool_call_id: ToolCallId,
     pub workspace_root: PathBuf,
-    pub permission_profile: ToolPermissionProfile,
-    pub tool_registry: Arc<dyn ToolRegistry>,
-    pub output_limit_bytes: usize,
-    pub cancel_token: bool,
+    pub budgets: ToolBudgets,
+    pub cancel_token: CancellationToken,
 }
 
 impl std::fmt::Debug for ToolContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ToolContext")
-            .field("session_id", &self.session_id)
-            .field("turn_id", &self.turn_id)
             .field("tool_call_id", &self.tool_call_id)
             .field("workspace_root", &self.workspace_root)
-            .field("output_limit_bytes", &self.output_limit_bytes)
+            .field("budgets", &self.budgets)
             .field("cancel_token", &self.cancel_token)
             .finish_non_exhaustive()
     }
@@ -125,6 +123,7 @@ pub enum ToolTerminalStatus {
     Interrupted,
 }
 
+/// TODO: Should we keep it? Better to change the name `redaction` to `sanitize`.
 /// Redaction state of tool output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

@@ -3,10 +3,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use devo_safety::ResourceKind;
+use devo_tools::contracts::ToolBudgets;
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
+use tracing::warn;
 
 use crate::invocation::ToolContent;
 use crate::registry::ToolRegistry;
@@ -206,24 +208,9 @@ impl ToolRuntime {
         info!(tool = %call.name, id = %call.id, "executing tool");
 
         let ctx = crate::contracts::ToolContext {
-            session_id: devo_protocol::SessionId::try_from(self.context.session_id.as_str())
-                .unwrap_or_else(|_| devo_protocol::SessionId::new()),
-            turn_id: self
-                .context
-                .turn_id
-                .as_deref()
-                .and_then(|s| devo_protocol::TurnId::try_from(s).ok())
-                .unwrap_or_else(devo_protocol::TurnId::new),
             tool_call_id: crate::invocation::ToolCallId(call.id.clone()),
             workspace_root: self.context.cwd.clone(),
-            permission_profile: crate::contracts::ToolPermissionProfile {
-                can_read_workspace: true,
-                can_write_workspace: true,
-                can_execute_commands: true,
-                network_enabled: true,
-            },
-            tool_registry: Arc::new(crate::contracts::NoopToolRegistry),
-            output_limit_bytes: 1024 * 1024,
+            budgets: ToolBudgets(),
             cancel_token: false,
         };
 
@@ -545,13 +532,18 @@ fn justification_for_tool_input(input: &serde_json::Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contracts::{
-        ToolCallError, ToolContext, ToolProgressSender, ToolResult, ToolResultContent,
-    };
+    use crate::contracts::ToolCallError;
+    use crate::contracts::ToolContext;
+    use crate::contracts::ToolProgressSender;
+    use crate::contracts::ToolResult;
+    use crate::contracts::ToolResultContent;
     use crate::json_schema::JsonSchema;
     use crate::registry::ToolRegistryBuilder;
     use crate::tool_handler::ToolHandler;
-    use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolPreparationFeedback, ToolSpec};
+    use crate::tool_spec::ToolExecutionMode;
+    use crate::tool_spec::ToolOutputMode;
+    use crate::tool_spec::ToolPreparationFeedback;
+    use crate::tool_spec::ToolSpec;
     use async_trait::async_trait;
     use pretty_assertions::assert_eq;
 

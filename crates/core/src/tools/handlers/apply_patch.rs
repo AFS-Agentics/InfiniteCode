@@ -1,12 +1,17 @@
 use async_trait::async_trait;
 
 use crate::apply_patch::exec_apply_patch;
-use crate::contracts::{
-    ToolCallError, ToolContext, ToolProgressSender, ToolResult, ToolResultContent,
-};
+use crate::contracts::ToolCallError;
+use crate::contracts::ToolContext;
+use crate::contracts::ToolProgressSender;
+use crate::contracts::ToolResult;
+use crate::contracts::ToolResultContent;
 use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
-use crate::tool_spec::{ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, ToolSpec};
+use crate::tool_spec::ToolCapabilityTag;
+use crate::tool_spec::ToolExecutionMode;
+use crate::tool_spec::ToolOutputMode;
+use crate::tool_spec::ToolSpec;
 
 pub struct ApplyPatchHandler {
     spec: ToolSpec,
@@ -51,7 +56,7 @@ impl ToolHandler for ApplyPatchHandler {
         input: serde_json::Value,
         _progress: Option<ToolProgressSender>,
     ) -> Result<ToolResult, ToolCallError> {
-        let output = exec_apply_patch(&ctx.workspace_root, &ctx.session_id.to_string(), input)
+        let output = exec_apply_patch(&ctx.workspace_root, input)
             .await
             .map_err(|e| ToolCallError::ExecutionFailed(e.to_string()))?;
 

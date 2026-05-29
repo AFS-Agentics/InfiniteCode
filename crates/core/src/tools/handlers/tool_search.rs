@@ -4,15 +4,19 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use devo_protocol::ToolDefinition;
 
-use crate::contracts::{
-    ToolCallError, ToolContext, ToolProgressSender, ToolResult, ToolResultContent,
-};
+use crate::contracts::ToolCallError;
+use crate::contracts::ToolContext;
+use crate::contracts::ToolProgressSender;
+use crate::contracts::ToolResult;
+use crate::contracts::ToolResultContent;
 use crate::deferred_loading::DeferredLoadingConfig;
 use crate::deferred_loading::LoadedDeferredTools;
 use crate::deferred_loading::execute_tool_search;
 use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
-use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolSpec};
+use crate::tool_spec::ToolExecutionMode;
+use crate::tool_spec::ToolOutputMode;
+use crate::tool_spec::ToolSpec;
 
 pub struct ToolSearchHandler {
     definitions: Vec<ToolDefinition>,
@@ -76,14 +80,8 @@ impl ToolHandler for ToolSearchHandler {
         let mut loaded_tools = self.loaded_tools.lock().map_err(|_| {
             ToolCallError::InternalError("loaded deferred tool state lock poisoned".into())
         })?;
-        let result = execute_tool_search(
-            query,
-            &self.definitions,
-            &mut loaded_tools,
-            &ctx.session_id.to_string(),
-            &self.config,
-        )
-        .map_err(|message| ToolCallError::ExecutionFailed(message))?;
+        let result = execute_tool_search(query, &self.definitions, &mut loaded_tools, &self.config)
+            .map_err(|message| ToolCallError::ExecutionFailed(message))?;
 
         Ok(ToolResult::success(
             ToolResultContent::Text(result.summary()),

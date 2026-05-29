@@ -98,6 +98,7 @@ enum OnboardingState {
         selected_idx: usize,
     },
     /// Steps 3-7: Inline setup with vertical rail.
+    /// TODO: Should be cleaned, not sure what is the purpose InlineSetup.
     InlineSetup {
         model: String,
         provider: ProviderWireApi,
@@ -110,6 +111,7 @@ enum OnboardingState {
         input: String,
         cursor_pos: usize,
     },
+    /// TODO: Move Invocation Method into provider item.
     /// Step 9: Select invocation method.
     InvocationMethod {
         model: String,
@@ -158,9 +160,6 @@ enum OnboardingState {
 struct ModelSelectionItem {
     slug: String,
     display_name: String,
-    description: String,
-    context_window: u32,
-    thinking_label: String,
     is_custom: bool,
 }
 
@@ -169,9 +168,12 @@ struct ProviderSelectionItem {
     label: String,
     description: String,
     /// None means "Add provider..." (create new).
+    /// TODO: Wrong Implemention here, should be endpoint (base url + api key) and wire api here.
+    /// TODO: Merge Invocation Method Item here
     provider: Option<ProviderWireApi>,
 }
 
+/// TODO: Remove the InvocationMethodItem, add it into ProviderSelectionItem
 #[derive(Debug)]
 struct InvocationMethodItem {
     label: String,
@@ -179,6 +181,7 @@ struct InvocationMethodItem {
     provider: ProviderWireApi,
 }
 
+/// TODO: It should be selected from model preset.
 #[derive(Debug)]
 struct ReasoningEffortItem {
     label: String,
@@ -228,38 +231,15 @@ impl OnboardingWidget {
     fn build_model_items(models: &[Model]) -> Vec<ModelSelectionItem> {
         let mut items: Vec<ModelSelectionItem> = models
             .iter()
-            .map(|m| {
-                let thinking_label = match &m.thinking_capability {
-                    devo_protocol::ThinkingCapability::Unsupported => String::new(),
-                    devo_protocol::ThinkingCapability::Toggle => "thinking".to_string(),
-                    devo_protocol::ThinkingCapability::Levels(levels) => {
-                        // TODO: What's this, why empty here?
-                        if levels.is_empty() {
-                            String::new()
-                        } else {
-                            format!("thinking: {}", levels.len())
-                        }
-                    }
-                    devo_protocol::ThinkingCapability::ToggleWithLevels(_) => {
-                        "thinking".to_string()
-                    }
-                };
-                ModelSelectionItem {
-                    slug: m.slug.clone(),
-                    display_name: m.display_name.clone(),
-                    description: m.description.clone().unwrap_or_default(),
-                    context_window: m.context_window,
-                    thinking_label,
-                    is_custom: false,
-                }
+            .map(|m| ModelSelectionItem {
+                slug: m.slug.clone(),
+                display_name: m.display_name.clone(),
+                is_custom: false,
             })
             .collect();
         items.push(ModelSelectionItem {
             slug: CUSTOM_MODEL_SENTINEL.to_string(),
             display_name: "Custom Model".to_string(),
-            description: "Enter a custom model slug".to_string(),
-            context_window: 0,
-            thinking_label: String::new(),
             is_custom: true,
         });
         items
@@ -488,7 +468,6 @@ impl OnboardingWidget {
                 .filter(|(_, item)| {
                     item.slug.to_lowercase().contains(&query_lower)
                         || item.display_name.to_lowercase().contains(&query_lower)
-                        || item.description.to_lowercase().contains(&query_lower)
                 })
                 .map(|(idx, _)| idx)
                 .collect();
@@ -850,7 +829,7 @@ impl OnboardingWidget {
 
                     // Check if model supports reasoning — if so, show reasoning effort picker.
                     let original = self.original_models.iter().find(|m| m.slug == model);
-                    let supports_reasoning = original.map_or(false, |m| {
+                    let supports_reasoning = original.is_some_and(|m| {
                         !matches!(
                             m.thinking_capability,
                             devo_protocol::ThinkingCapability::Unsupported
