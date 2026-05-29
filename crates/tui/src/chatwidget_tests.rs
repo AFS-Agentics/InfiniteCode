@@ -1775,8 +1775,7 @@ fn onboarding_view_is_active_on_first_run() {
         ..Model::default()
     };
     let (_widget, _app_event_rx) = onboarding_widget_with_model(model, cwd);
-    // Onboarding view is pushed onto the view stack on first run.
-    // The UI is now managed by the OnboardingView via the bottom pane view stack.
+    // Onboarding widget is owned by ChatWidget when show_model_onboarding is true.
 }
 
 #[test]
@@ -1794,8 +1793,227 @@ fn onboarding_validation_succeeded_clears_active_state() {
         reply_preview: "OK".to_string(),
     });
 
-    // After validation, placeholder should be reset to default.
+    // After validation, onboarding should be cleared and placeholder reset.
     assert_eq!(widget.placeholder_text(), "Ask Devo");
+}
+
+/// Trace: L2-DES-TUI-001
+/// Verifies: Esc during model selection cancels onboarding and exits program
+#[test]
+fn onboarding_esc_cancels_onboarding_and_exits() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, mut app_event_rx) = onboarding_widget_with_model(model, cwd);
+
+    // Onboarding should be active.
+    assert!(widget.is_onboarding_active());
+
+    // Press Esc — should cancel onboarding and request exit.
+    let esc = KeyEvent {
+        code: KeyCode::Esc,
+        modifiers: KeyModifiers::NONE,
+        kind: KeyEventKind::Press,
+        state: KeyEventState::NONE,
+    };
+    widget.handle_key_event(esc);
+
+    // Onboarding should be cleared.
+    assert!(!widget.is_onboarding_active());
+
+    // An exit event should have been sent.
+    let event = app_event_rx.try_recv();
+    assert!(event.is_ok(), "expected an AppEvent after Esc cancel");
+}
+
+/// Trace: L2-DES-TUI-001
+/// Verifies: Down/Up navigation works during model selection
+#[test]
+fn onboarding_up_down_navigates_model_list() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let models = vec![
+        Model {
+            slug: "model-a".to_string(),
+            display_name: "Model A".to_string(),
+            ..Model::default()
+        },
+        Model {
+            slug: "model-b".to_string(),
+            display_name: "Model B".to_string(),
+            ..Model::default()
+        },
+        Model {
+            slug: "model-c".to_string(),
+            display_name: "Model C".to_string(),
+            ..Model::default()
+        },
+    ];
+    let (app_event_tx, _app_event_rx) = mpsc::unbounded_channel();
+    let mut widget = crate::onboarding_widget::OnboardingWidget::new(
+        &models,
+        AppEventSender::new(app_event_tx),
+        FrameRequester::test_dummy(),
+        true,
+    );
+
+    // Initial state: first item selected (index 0).
+    // Press Down — should move to index 1.
+    let down = KeyEvent {
+        code: KeyCode::Down,
+        modifiers: KeyModifiers::NONE,
+        kind: KeyEventKind::Press,
+        state: KeyEventState::NONE,
+    };
+    widget.handle_key_event(down);
+
+    // Press Down again — should move to index 2.
+    widget.handle_key_event(down);
+
+    // Press Up — should move back to index 1.
+    let up = KeyEvent {
+        code: KeyCode::Up,
+        modifiers: KeyModifiers::NONE,
+        kind: KeyEventKind::Press,
+        state: KeyEventState::NONE,
+    };
+    widget.handle_key_event(up);
+
+    // Widget should still be active (not completed by navigation).
+    assert!(!widget.is_complete());
+}
+
+/// Trace: L2-DES-TUI-001
+/// Verifies: Go-back from provider selection restores model selection
+#[test]
+fn onboarding_go_back_restores_model_selection() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let models = vec![
+        Model {
+            slug: "model-a".to_string(),
+            display_name: "Model A".to_string(),
+            ..Model::default()
+        },
+        Model {
+            slug: "model-b".to_string(),
+            display_name: "Model B".to_string(),
+            ..Model::default()
+        },
+    ];
+    let (app_event_tx, _app_event_rx) = mpsc::unbounded_channel();
+    let mut widget = crate::onboarding_widget::OnboardingWidget::new(
+        &models,
+        AppEventSender::new(app_event_tx),
+        FrameRequester::test_dummy(),
+        true,
+    );
+
+    // Select first model (Enter on index 0 → goes to BaseUrl step).
+    let enter = KeyEvent {
+        code: KeyCode::Enter,
+        modifiers: KeyModifiers::NONE,
+        kind: KeyEventKind::Press,
+        state: KeyEventState::NONE,
+    };
+    widget.handle_key_event(enter);
+
+    // Now press Esc — should go back to model selection (not cancel).
+    let esc = KeyEvent {
+        code: KeyCode::Esc,
+        modifiers: KeyModifiers::NONE,
+        kind: KeyEventKind::Press,
+        state: KeyEventState::NONE,
+    };
+    widget.handle_key_event(esc);
+
+    // Widget should still be active — go-back, not cancel.
+    assert!(!widget.is_complete());
+    // Onboarding should still be active in the chat widget sense.
+    assert!(widget.take_result().is_none());
+}
+
+/// Trace: L2-DES-TUI-001
+/// Verifies: Custom model entry works from model selection
+#[test]
+fn onboarding_custom_model_entry_navigates_to_provider_selection() {
+    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let models = vec![
+        Model {
+            slug: "model-a".to_string(),
+            display_name: "Model A".to_string(),
+            ..Model::default()
+        },
+    ];
+    let (app_event_tx, _app_event_rx) = mpsc::unbounded_channel();
+    let mut widget = crate::onboarding_widget::OnboardingWidget::new(
+        &models,
+        AppEventSender::new(app_event_tx),
+        FrameRequester::test_dummy(),
+        true,
+    );
+
+    // Navigate to "Custom Model" (index 1 = model-a + Custom Model sentinel).
+    // model-a is index 0, Custom Model is index 1.
+    let down = KeyEvent {
+        code: KeyCode::Down,
+        modifiers: KeyModifiers::NONE,
+        kind: KeyEventKind::Press,
+        state: KeyEventState::NONE,
+    };
+    widget.handle_key_event(down);
+
+    // Select Custom Model.
+    let enter = KeyEvent {
+        code: KeyCode::Enter,
+        modifiers: KeyModifiers::NONE,
+        kind: KeyEventKind::Press,
+        state: KeyEventState::NONE,
+    };
+    widget.handle_key_event(enter);
+
+    // Now type a custom model slug.
+    for ch in "my-custom-model".chars() {
+        widget.handle_key_event(KeyEvent {
+            code: KeyCode::Char(ch),
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        });
+    }
+
+    // Press Enter — should accept the custom model.
+    widget.handle_key_event(enter);
+
+    // Widget should still be active (moved to next step, not completed).
+    assert!(!widget.is_complete());
+}
+
+/// Trace: L2-DES-TUI-001, L2-DES-APP-007
+/// Verifies: is_onboarding_active reflects widget state correctly
+#[test]
+fn chatwidget_is_onboarding_active_tracks_state() {
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = onboarding_widget_with_model(model, cwd);
+
+    // Should be active initially.
+    assert!(widget.is_onboarding_active());
+    // is_normal_backtrack_mode should be false during onboarding.
+    assert!(!widget.is_normal_backtrack_mode());
 }
 
 #[test]

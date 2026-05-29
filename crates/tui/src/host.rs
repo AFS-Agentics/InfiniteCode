@@ -185,9 +185,10 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
         .map(|entry| entry.model.clone())
         .collect();
 
-    let model = resolve_initial_model(&initial_session, &config.model_catalog);
     let cwd = initial_session.cwd.clone();
     let project_config_key = devo_core::project_config_key(&cwd);
+
+    let model = resolve_initial_model(&initial_session, &config.model_catalog);
     let initial_provider = model.provider_wire_api();
     let initial_reasoning_effort = model
         .resolve_thinking_selection(initial_session.thinking_selection.as_deref())
@@ -407,6 +408,10 @@ fn handle_tui_event(
             // Keep Ctrl-C available for terminal copy workflows while work is
             // active. Cancellation is owned by the bottom pane's Esc flow.
             if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                // During onboarding, Ctrl-C exits immediately.
+                if chat_widget.is_onboarding_active() {
+                    return Ok(LoopAction::ClearAndExit);
+                }
                 match handle_ctrl_c_key(loop_state, Instant::now()) {
                     CtrlCKeyAction::PromptInterruptWithEsc => {
                         chat_widget.set_status_message("Press Esc twice to interrupt");
@@ -418,6 +423,13 @@ fn handle_tui_event(
                         return Ok(LoopAction::ClearAndExit);
                     }
                 }
+                return Ok(LoopAction::Continue);
+            }
+
+            // During onboarding, bypass host-level key handling (Ctrl+T, esc-backtrack)
+            // and route directly to the chat widget which owns the onboarding flow.
+            if chat_widget.is_onboarding_active() {
+                chat_widget.handle_key_event(key);
                 return Ok(LoopAction::Continue);
             }
 
