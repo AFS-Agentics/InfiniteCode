@@ -1,0 +1,45 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"main": ".open-next/worker.js",
+	"name": "devo-website",
+	"compatibility_date": "2026-05-31",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			// Self-reference service binding, the service name must match the worker name
+			// see https://opennext.js.org/cloudflare/caching
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "devo-website"
+		}
+	],
+	"r2_buckets": [
+		// Use R2 incremental cache
+		// See https://opennext.js.org/cloudflare/caching
+		{
+			"binding": "NEXT_INC_CACHE_R2_BUCKET",
+			// Create the bucket before deploying
+			// You can change the bucket name if you want
+			// See https://developers.cloudflare.com/workers/wrangler/commands/#r2-bucket-create
+			"bucket_name": "devo"
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "devo-waitlist",
+			"database_id": "04326f60-d327-4848-9567-3e52cc0665a3"
+		}
+	],
+	"images": {
+		// Enable image optimization
+		// see https://opennext.js.org/cloudflare/howtos/image
+		"binding": "IMAGES"
+	}
+}

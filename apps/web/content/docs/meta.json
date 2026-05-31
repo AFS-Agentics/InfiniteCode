@@ -1,0 +1,12 @@
+{
+  "title": "Devo",
+  "pages": [
+    "index",
+    "coding-examples",
+    "install",
+    "configuration",
+    "supported-models",
+    "provider-wire-apis",
+    "model-resolution"
+  ]
+}

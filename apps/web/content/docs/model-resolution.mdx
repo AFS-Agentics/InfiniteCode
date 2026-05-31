@@ -1,0 +1,26 @@
+---
+title: Model Resolution
+description: How Devo chooses and validates the active model binding.
+---
+
+## Selection Order
+
+Devo chooses the active model binding in this order:
+
+1. `[defaults].model_binding`, when it points to an existing binding.
+2. The top-level `model`, when it matches a binding's `model_slug` or
+   `model_name`.
+3. The first enabled model binding.
+
+## Validation
+
+Resolution requires:
+
+- The selected binding is enabled.
+- The referenced provider exists and is enabled.
+- The binding invocation method is supported by the provider.
+- The provider credential reference exists in `auth.json`, when one is
+  configured.
+
+Routine model and provider views should show credential status rather than
+plaintext credential values.

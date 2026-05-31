@@ -1,0 +1,30 @@
+---
+title: Install
+description: Install Devo from a script or build it from source.
+---
+
+## macOS And Linux
+
+Install Devo on macOS or Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
+```
+
+## Windows
+
+Install Devo on Windows:
+
+```powershell
+curl.exe -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -Command -
+```
+
+## Build From Source
+
+Build the binary from the repository:
+
+```bash
+git clone https://github.com/7df-lab/devo.git
+cd devo
+cargo build --release
+```
