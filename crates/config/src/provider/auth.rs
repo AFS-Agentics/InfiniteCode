@@ -3,7 +3,7 @@ use std::path::Path;
 
 use devo_utils::current_user_config_file;
 
-use crate::config::ProviderConfigError;
+use crate::ProviderConfigError;
 
 use super::persistence::write_atomic;
 use super::schema::AUTH_CONFIG_VERSION;

@@ -184,14 +184,16 @@ impl ToolHandler for ExecCommandHandler {
             ));
         };
 
-        let (proc, _broadcast_rx) = match UnifiedExecProcess::spawn(
+        let spawned_process = UnifiedExecProcess::spawn(
             session_id,
             &args.cmd,
             &cwd,
             args.shell.as_deref(),
             args.login,
             args.tty,
-        ) {
+        )
+        .await;
+        let (proc, _broadcast_rx) = match spawned_process {
             Ok(spawned) => spawned,
             Err(error) => {
                 self.store.release_reserved(session_id).await;

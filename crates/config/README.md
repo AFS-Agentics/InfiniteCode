@@ -1,10 +1,14 @@
 # Config
 
-This folder owns Devo's file-backed runtime configuration.
+This crate owns Devo's file-backed runtime configuration.
+
+Shared serializable config contract types that are consumed by multiple crates
+also live here. Runtime interpretation of the resolved config stays in the
+consumer crates.
 
 ## Module Map
 
-- `mod.rs` re-exports the public config surface.
+- `lib.rs` re-exports the public config surface.
 - `app.rs` defines `AppConfig`, its defaults, config loading, merge behavior,
   validation, project config keys, and `AppConfigStore`.
 - `server.rs` defines server transport and connection defaults.

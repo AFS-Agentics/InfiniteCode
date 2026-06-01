@@ -13,25 +13,25 @@ use serde::Serialize;
 use devo_utils::FileSystemConfigPathResolver;
 use devo_utils::git_op::get_git_repo_root;
 
-use crate::AgentsMdConfig;
+use crate::AUTH_CONFIG_FILE_NAME;
+use crate::AppConfigError;
+use crate::LogRotation;
+use crate::LoggingConfig;
+use crate::LoggingFileConfig;
+use crate::ModelBindingConfig;
+use crate::OAuthCredentialsStoreMode;
+use crate::ProviderConfigError;
+use crate::ProviderConfigSection;
+use crate::ResolvedProviderSettings;
+use crate::ServerConfig;
 use crate::SkillsConfig;
-use crate::config::AUTH_CONFIG_FILE_NAME;
-use crate::config::AppConfigError;
-use crate::config::LogRotation;
-use crate::config::LoggingConfig;
-use crate::config::LoggingFileConfig;
-use crate::config::ModelBindingConfig;
-use crate::config::ProviderConfigError;
-use crate::config::ProviderConfigSection;
-use crate::config::ResolvedProviderSettings;
-use crate::config::ServerConfig;
-use crate::config::non_empty_string;
-use crate::config::provider_vendor_from_config;
-use crate::config::read_provider_config;
-use crate::config::read_user_auth_config;
-use crate::config::resolve_provider_settings_from_config_and_auth;
-use crate::config::upsert_user_auth_api_key;
-use crate::config::write_provider_config;
+use crate::non_empty_string;
+use crate::provider_vendor_from_config;
+use crate::read_provider_config;
+use crate::read_user_auth_config;
+use crate::resolve_provider_settings_from_config_and_auth;
+use crate::upsert_user_auth_api_key;
+use crate::write_provider_config;
 
 /// Stores the fully normalized runtime configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,6 +44,12 @@ pub struct AppConfig {
     pub logging: LoggingConfig,
     /// Skill discovery roots and behavior.
     pub skills: SkillsConfig,
+    /// Preferred backend for storing MCP OAuth credentials.
+    /// keyring: Use an OS-specific keyring service.
+    /// file: Use a file in the Devo home directory.
+    /// auto (default): Use the OS-specific keyring service if available, otherwise use a file.
+    #[serde(default)]
+    pub mcp_oauth_credentials_store: Option<OAuthCredentialsStoreMode>,
     /// Provider, model, and active model defaults.
     #[serde(flatten)]
     pub provider: ProviderConfigSection,
@@ -131,6 +137,7 @@ impl Default for AppConfig {
                 workspace_roots: vec![PathBuf::from("skills")],
                 watch_for_changes: true,
             },
+            mcp_oauth_credentials_store: Some(OAuthCredentialsStoreMode::default()),
             provider: ProviderConfigSection::default(),
             updates: UpdatesConfig {
                 enabled: true,
@@ -340,13 +347,6 @@ impl AppConfig {
         !self.provider.providers.is_empty()
             || !self.provider.model_bindings.is_empty()
             || !self.provider.model_providers.is_empty()
-    }
-
-    pub fn agents_md_config(&self) -> AgentsMdConfig {
-        AgentsMdConfig {
-            project_root_markers: self.project_root_markers.clone(),
-            ..AgentsMdConfig::default()
-        }
     }
 }
 

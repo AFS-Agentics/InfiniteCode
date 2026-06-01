@@ -7,7 +7,7 @@ use std::time::UNIX_EPOCH;
 use devo_protocol::ProviderVendor;
 use toml::Value;
 
-use crate::config::ProviderConfigError;
+use crate::ProviderConfigError;
 
 use super::schema::ProviderConfigSection;
 use super::schema::ProviderVendorConfig;

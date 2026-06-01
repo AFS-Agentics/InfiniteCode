@@ -1,6 +1,6 @@
 use devo_utils::current_user_config_file;
 
-use crate::config::ProviderConfigError;
+use crate::ProviderConfigError;
 
 use super::auth::current_user_auth_config;
 use super::schema::AuthCredentialKind;

@@ -1,4 +1,3 @@
-mod config;
 #[allow(dead_code)]
 mod config_resolution;
 mod context;
@@ -50,12 +49,12 @@ pub(crate) use tools::tool_summary;
 pub(crate) use tools::unified_exec;
 
 #[allow(ambiguous_glob_reexports)]
-pub use config::*;
-#[allow(ambiguous_glob_reexports)]
 pub use context::*;
 #[allow(ambiguous_glob_reexports)]
 pub use context_pipeline::*;
 pub use conversation::*;
+#[allow(ambiguous_glob_reexports)]
+pub use devo_config::*;
 #[allow(ambiguous_glob_reexports)]
 pub use devo_protocol::*;
 pub use devo_protocol::{ContentBlock, Message, Role};

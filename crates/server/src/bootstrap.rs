@@ -4,6 +4,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use clap::Parser;
 use clap::ValueEnum;
+use devo_core::AgentsMdConfig;
 use devo_core::AppConfigStore;
 use devo_core::FileSystemSkillCatalog;
 use devo_core::ModelCatalog;
@@ -141,7 +142,10 @@ pub async fn run_server_process(args: ServerProcessArgs) -> Result<()> {
             Arc::new(ProviderVendorCatalog::default()),
             skill_workspace_root,
             skill_catalog,
-            config.agents_md_config(),
+            AgentsMdConfig {
+                project_root_markers: config.project_root_markers.clone(),
+                ..AgentsMdConfig::default()
+            },
             db,
             config_store,
         ),

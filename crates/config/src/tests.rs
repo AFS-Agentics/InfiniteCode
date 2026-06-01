@@ -13,6 +13,7 @@ use super::FileSystemAppConfigLoader;
 use super::LogRotation;
 use super::LoggingConfig;
 use super::ModelBindingConfig;
+use super::OAuthCredentialsStoreMode;
 use super::ProjectConfig;
 use super::ProviderConfigSection;
 use super::ProviderDefaultsConfig;
@@ -110,6 +111,7 @@ check_interval_hours = 48
                 workspace_roots: vec![PathBuf::from("project-skills")],
                 watch_for_changes: false,
             },
+            mcp_oauth_credentials_store: Some(OAuthCredentialsStoreMode::default()),
             provider: ProviderConfigSection::default(),
             updates: UpdatesConfig {
                 enabled: false,

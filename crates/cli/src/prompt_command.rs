@@ -1,4 +1,5 @@
 use anyhow::Result;
+use devo_core::AgentsMdConfig;
 use devo_core::AppConfig;
 use devo_core::AppConfigLoader;
 use devo_core::FileSystemAppConfigLoader;
@@ -27,7 +28,10 @@ pub(crate) async fn run_prompt(input: &str, log_level: Option<&str>) -> Result<(
 
     let mut session_state = SessionState::new(
         SessionConfig {
-            agents_md: app_config.agents_md_config(),
+            agents_md: AgentsMdConfig {
+                project_root_markers: app_config.project_root_markers.clone(),
+                ..AgentsMdConfig::default()
+            },
             ..SessionConfig::default()
         },
         cwd.clone(),
