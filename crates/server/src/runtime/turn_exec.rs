@@ -1340,6 +1340,7 @@ impl ServerRuntime {
                 .resolve_thinking_selection(turn_config.thinking_selection.as_deref());
             (turn_config, resolved_request)
         };
+        let request_model = turn_config.provider_request_model(&resolved_request.request_model);
 
         let sequence = {
             let session_arc = match self.sessions.lock().await.get(&session_id).cloned() {
@@ -1360,7 +1361,7 @@ impl ServerRuntime {
             model: turn_config.model.slug.clone(),
             thinking: turn_config.thinking_selection.clone(),
             reasoning_effort: resolved_request.effective_reasoning_effort,
-            request_model: resolved_request.request_model.clone(),
+            request_model,
             request_thinking: resolved_request.request_thinking.clone(),
             started_at: now,
             completed_at: None,
@@ -1446,6 +1447,7 @@ impl ServerRuntime {
                 .resolve_thinking_selection(tc.thinking_selection.as_deref());
             (tc, rr)
         };
+        let request_model = turn_config.provider_request_model(&resolved_request.request_model);
 
         let sequence = {
             let session_arc = match self.sessions.lock().await.get(&session_id).cloned() {
@@ -1466,7 +1468,7 @@ impl ServerRuntime {
             model: turn_config.model.slug.clone(),
             thinking: turn_config.thinking_selection.clone(),
             reasoning_effort: resolved_request.effective_reasoning_effort,
-            request_model: resolved_request.request_model.clone(),
+            request_model,
             request_thinking: resolved_request.request_thinking.clone(),
             started_at: now,
             completed_at: None,

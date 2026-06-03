@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
 use devo_core::AppConfigStore;
+use devo_core::ProviderRequestModelMap;
 use devo_core::ProviderVendorCatalog;
 use tokio::sync::Mutex;
 use tokio::sync::oneshot;
@@ -26,6 +27,8 @@ use devo_core::TurnConfig;
 use devo_core::TurnId;
 use devo_core::default_base_instructions;
 use devo_core::normalize_canonical_path;
+use devo_core::provider_request_model_map_for_binding;
+use devo_core::resolve_enabled_model_binding;
 use devo_core::tools::ToolRegistry;
 use devo_protocol::ApprovalDecisionValue;
 use devo_protocol::PendingInputItem;
@@ -154,6 +157,17 @@ impl ServerRuntimeDependencies {
         state
     }
 
+    fn catalog_model_or_fallback(&self, model_slug: &str) -> Model {
+        self.model_catalog
+            .get(model_slug)
+            .cloned()
+            .unwrap_or_else(|| Model {
+                slug: model_slug.to_string(),
+                base_instructions: default_base_instructions().to_string(),
+                ..Model::default()
+            })
+    }
+
     /// Resolves one runtime model for a turn, applying the server default when needed.
     pub(crate) fn resolve_turn_model(&self, requested_model: Option<&str>) -> Model {
         if let Some(model) = requested_model.and_then(|requested| self.model_catalog.get(requested))
@@ -172,17 +186,38 @@ impl ServerRuntimeDependencies {
             })
     }
 
-    /// TODO: We don't need this, the model and reasonning effort(thinking) field are at session metadata.
     /// Resolves the full turn configuration used by the core query loop.
     pub(crate) fn resolve_turn_config(
         &self,
         requested_model: Option<&str>,
         thinking_selection: Option<String>,
     ) -> TurnConfig {
-        TurnConfig {
-            model: self.resolve_turn_model(requested_model),
-            thinking_selection,
+        let provider_config = self
+            .config_store
+            .lock()
+            .expect("app config store mutex should not be poisoned")
+            .effective_config()
+            .provider
+            .clone();
+
+        if let Some(binding) = resolve_enabled_model_binding(&provider_config, requested_model) {
+            // Variant request models are scoped to the selected provider. If
+            // both OpenRouter and a custom provider configure
+            // `model_slug = "kimi-k2.5-thinking"`, a turn selected through
+            // OpenRouter must use OpenRouter's `model_name`.
+            let provider_request_models = ProviderRequestModelMap::new(
+                provider_request_model_map_for_binding(&provider_config, &binding),
+            );
+            return TurnConfig::with_request_model(
+                self.catalog_model_or_fallback(&binding.model_slug),
+                binding.model_name,
+                provider_request_models,
+                thinking_selection,
+            );
         }
+
+        let model = self.resolve_turn_model(requested_model);
+        TurnConfig::new(model, thinking_selection)
     }
 
     /// Should move the discover skill main logic to skills crate, and server just keep a simple wrapper.
@@ -507,5 +542,173 @@ impl RuntimeSession {
     /// Wraps a new runtime session in an async mutex for storage in the session map.
     pub(crate) fn shared(self) -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(self))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::pin::Pin;
+
+    use anyhow::Result;
+    use async_trait::async_trait;
+    use devo_core::AppConfigStore;
+    use devo_core::BundledSkillsConfig;
+    use devo_core::FileSystemSkillCatalog;
+    use devo_core::Model;
+    use devo_core::PresetModelCatalog;
+    use devo_core::ProviderVendorCatalog;
+    use devo_core::SkillsConfig;
+    use devo_core::tools::ToolRegistry;
+    use devo_protocol::ModelRequest;
+    use devo_protocol::ModelResponse;
+    use devo_protocol::StreamEvent;
+    use devo_provider::ModelProviderSDK;
+    use devo_provider::SingleProviderRouter;
+    use futures::Stream;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::db::Database;
+
+    struct NoopProvider;
+
+    #[async_trait]
+    impl ModelProviderSDK for NoopProvider {
+        async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
+            unreachable!("not used by turn config resolution tests")
+        }
+
+        async fn completion_stream(
+            &self,
+            _request: ModelRequest,
+        ) -> Result<Pin<Box<dyn Stream<Item = Result<StreamEvent>> + Send>>> {
+            unreachable!("not used by turn config resolution tests")
+        }
+
+        fn name(&self) -> &str {
+            "noop"
+        }
+    }
+
+    fn unique_temp_dir(name: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        std::env::temp_dir().join(format!("devo-{name}-{nanos}"))
+    }
+
+    fn test_deps(config: &str) -> ServerRuntimeDependencies {
+        let root = unique_temp_dir("turn-config-model-name");
+        std::fs::create_dir_all(&root).expect("create root");
+        std::fs::write(root.join("config.toml"), config).expect("write config");
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(NoopProvider);
+        let db = Arc::new(Database::open(root.join("test.db")).expect("open db"));
+
+        ServerRuntimeDependencies::new(
+            Arc::clone(&provider),
+            Arc::new(SingleProviderRouter::new(provider)),
+            Arc::new(ToolRegistry::new()),
+            "catalog-slug".to_string(),
+            Arc::new(PresetModelCatalog::new(vec![
+                Model {
+                    slug: "catalog-slug".to_string(),
+                    display_name: "Catalog Model".to_string(),
+                    ..Model::default()
+                },
+                Model {
+                    slug: "catalog-slug-thinking".to_string(),
+                    display_name: "Catalog Thinking Model".to_string(),
+                    ..Model::default()
+                },
+            ])),
+            Arc::new(ProviderVendorCatalog::default()),
+            None,
+            Box::new(FileSystemSkillCatalog::new(SkillsConfig {
+                bundled: Some(BundledSkillsConfig { enabled: false }),
+                ..SkillsConfig::default()
+            })),
+            devo_core::AgentsMdConfig::default(),
+            db,
+            Arc::new(std::sync::Mutex::new(
+                AppConfigStore::load(root, /*workspace_root*/ None).expect("load config"),
+            )),
+        )
+    }
+
+    #[test]
+    fn resolve_turn_config_preserves_catalog_slug_and_uses_binding_model_name_for_request() {
+        let deps = test_deps(
+            r#"
+[defaults]
+model_binding = "main"
+
+[providers.openrouter]
+enabled = true
+name = "OpenRouter"
+wire_apis = ["openai_chat_completions"]
+
+[providers.other]
+enabled = true
+name = "Other"
+wire_apis = ["openai_chat_completions"]
+
+[model_bindings.main]
+enabled = true
+model_slug = "catalog-slug"
+provider = "openrouter"
+model_name = "vendor/model-name"
+invocation_method = "openai_chat_completions"
+"#,
+        );
+
+        let turn_config =
+            deps.resolve_turn_config(Some("vendor/model-name"), /*thinking_selection*/ None);
+
+        assert_eq!(turn_config.model.slug, "catalog-slug");
+        assert_eq!(turn_config.request_model, "vendor/model-name");
+    }
+
+    #[test]
+    fn resolve_turn_config_maps_variant_slug_to_binding_model_name() {
+        let deps = test_deps(
+            r#"
+[defaults]
+model_binding = "main"
+
+[providers.openrouter]
+enabled = true
+name = "OpenRouter"
+wire_apis = ["openai_chat_completions"]
+
+[model_bindings.main]
+enabled = true
+model_slug = "catalog-slug"
+provider = "openrouter"
+model_name = "vendor/model-name"
+invocation_method = "openai_chat_completions"
+
+[model_bindings.thinking]
+enabled = true
+model_slug = "catalog-slug-thinking"
+provider = "openrouter"
+model_name = "vendor/model-name-thinking"
+invocation_method = "openai_chat_completions"
+
+[model_bindings.other-thinking]
+enabled = true
+model_slug = "catalog-slug-thinking"
+provider = "other"
+model_name = "other-provider/model-name-thinking"
+invocation_method = "openai_chat_completions"
+"#,
+        );
+
+        let turn_config = deps.resolve_turn_config(Some("catalog-slug"), None);
+
+        assert_eq!(
+            turn_config.provider_request_model("catalog-slug-thinking"),
+            "vendor/model-name-thinking"
+        );
     }
 }

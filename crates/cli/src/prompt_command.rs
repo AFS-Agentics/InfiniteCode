@@ -83,8 +83,8 @@ pub(crate) async fn run_prompt(
     );
     let model_catalog = PresetModelCatalog::load_from_config(&home_dir, Some(&cwd))?;
 
-    let turn_config = devo_core::TurnConfig {
-        model: model_catalog
+    let turn_config = devo_core::TurnConfig::new(
+        model_catalog
             .get(&selected_model)
             .cloned()
             .unwrap_or_else(|| devo_core::Model {
@@ -92,8 +92,8 @@ pub(crate) async fn run_prompt(
                 base_instructions: default_base_instructions().to_string(),
                 ..Default::default()
             }),
-        thinking_selection: None,
-    };
+        /*thinking_selection*/ None,
+    );
 
     eprintln!("devo [prompt] model={selected_model} sending...");
 

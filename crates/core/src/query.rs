@@ -249,7 +249,7 @@ fn provider_retry_decision(
 async fn summarize_and_compact(
     session: &mut SessionState,
     provider: &Arc<dyn ModelProviderSDK>,
-    model_slug: &str,
+    request_model: &str,
     max_tokens: usize,
 ) {
     let items: Vec<ResponseItem> = session
@@ -271,7 +271,7 @@ async fn summarize_and_compact(
     };
 
     let summarizer =
-        DefaultHistorySummarizer::with_slug(Arc::clone(provider), model_slug, max_tokens);
+        DefaultHistorySummarizer::with_slug(Arc::clone(provider), request_model, max_tokens);
 
     match compact_history(&items, &token_info, &summarizer, &config).await {
         Ok(CompactAction::Replaced(compacted_items)) => {
@@ -483,7 +483,7 @@ pub async fn query(
             summarize_and_compact(
                 session,
                 &provider,
-                &turn_config.model.slug,
+                &turn_config.request_model,
                 turn_config.model.max_tokens.unwrap_or(4096) as usize,
             )
             .await;
@@ -527,6 +527,7 @@ pub async fn query(
         } = turn_config
             .model
             .resolve_thinking_selection(turn_config.thinking_selection.as_deref());
+        let provider_request_model = turn_config.provider_request_model(&request_model);
 
         let history = History {
             items: session
@@ -553,7 +554,7 @@ pub async fn query(
             .for_prompt_with_prefix(&prefetched_user_inputs, &turn_config.model.input_modalities);
 
         let request = ModelRequest {
-            model: request_model,
+            model: provider_request_model,
             system: prompt_surface.system,
             messages,
             max_tokens: turn_config
@@ -600,7 +601,7 @@ pub async fn query(
                         summarize_and_compact(
                             session,
                             &provider,
-                            &turn_config.model.slug,
+                            &turn_config.request_model,
                             turn_config.model.max_tokens.unwrap_or(4096) as usize,
                         )
                         .await;
@@ -727,7 +728,7 @@ pub async fn query(
                             summarize_and_compact(
                                 session,
                                 &provider,
-                                &turn_config.model.slug,
+                                &turn_config.request_model,
                                 turn_config.model.max_tokens.unwrap_or(4096) as usize,
                             )
                             .await;
@@ -1031,6 +1032,7 @@ fn retry_backoff_duration(attempt: usize) -> Duration {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::pin::Pin;
     use std::sync::Arc;
     use std::sync::Mutex;
@@ -1586,10 +1588,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             provider_sdk,
             registry,
             &runtime,
@@ -1618,10 +1617,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             provider_sdk,
             registry,
             &runtime,
@@ -1672,10 +1668,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             Arc::new(SingleToolUseProvider {
                 requests: AtomicUsize::new(0),
             }),
@@ -1771,10 +1764,16 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
+            &TurnConfig::with_request_model(
                 model,
-                thinking_selection: Some("enabled".into()),
-            },
+                "vendor/kimi-k2.5".into(),
+                HashMap::from([(
+                    "kimi-k2.5-thinking".into(),
+                    "vendor/kimi-k2.5-thinking".into(),
+                )])
+                .into(),
+                Some("enabled".into()),
+            ),
             Arc::clone(&provider),
             registry,
             &runtime,
@@ -1785,8 +1784,55 @@ mod tests {
 
         let captured = requests.lock().expect("lock requests");
         assert_eq!(captured.len(), 1);
-        assert_eq!(captured[0].model, "kimi-k2.5-thinking");
+        assert_eq!(captured[0].model, "vendor/kimi-k2.5-thinking");
         assert_eq!(captured[0].thinking, None);
+    }
+
+    #[tokio::test]
+    async fn query_sends_turn_config_request_model_to_provider() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
+            requests: Arc::clone(&requests),
+        });
+        let registry = Arc::new(ToolRegistry::new());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let model = Model {
+            slug: "catalog-slug".into(),
+            display_name: "Catalog Model".into(),
+            base_instructions: "catalog instructions".into(),
+            ..Model::default()
+        };
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("hello"));
+
+        query(
+            &mut session,
+            &TurnConfig::with_request_model(
+                model,
+                "vendor/model-name".into(),
+                HashMap::new().into(),
+                /*thinking_selection*/ None,
+            ),
+            Arc::clone(&provider),
+            registry,
+            &runtime,
+            None,
+        )
+        .await
+        .expect("query should succeed");
+
+        let captured = requests.lock().expect("lock requests");
+        assert_eq!(captured.len(), 1);
+        assert_eq!(captured[0].model, "vendor/model-name");
+        assert_eq!(
+            session
+                .session_context
+                .as_ref()
+                .expect("session context")
+                .model
+                .slug,
+            "catalog-slug"
+        );
     }
 
     #[tokio::test]
@@ -1816,10 +1862,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: first_model,
-                thinking_selection: None,
-            },
+            &TurnConfig::new(first_model, None),
             Arc::clone(&provider),
             Arc::clone(&registry),
             &runtime,
@@ -1833,10 +1876,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: second_model,
-                thinking_selection: Some("enabled".into()),
-            },
+            &TurnConfig::new(second_model, Some("enabled".into())),
             Arc::clone(&provider),
             registry,
             &runtime,
@@ -1885,10 +1925,7 @@ mod tests {
         session.push_message(Message::user("hello"));
         query(
             &mut session,
-            &TurnConfig {
-                model: first_model,
-                thinking_selection: None,
-            },
+            &TurnConfig::new(first_model, None),
             Arc::clone(&provider),
             Arc::clone(&registry),
             &runtime,
@@ -1900,10 +1937,7 @@ mod tests {
         session.push_message(Message::user("follow up"));
         query(
             &mut session,
-            &TurnConfig {
-                model: second_model,
-                thinking_selection: Some("enabled".into()),
-            },
+            &TurnConfig::new(second_model, Some("enabled".into())),
             Arc::clone(&provider),
             registry,
             &runtime,
@@ -1950,10 +1984,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             provider,
             registry,
             &runtime,
@@ -2056,10 +2087,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             Arc::new(ReasoningProvider),
             registry,
             &runtime,
@@ -2117,10 +2145,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model,
-                thinking_selection: Some("enabled".into()),
-            },
+            &TurnConfig::new(model, Some("enabled".into())),
             Arc::clone(&provider),
             registry,
             &runtime,
@@ -2169,10 +2194,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             Arc::new(SingleToolUseProvider {
                 requests: AtomicUsize::new(0),
             }),
@@ -2229,10 +2251,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             Arc::new(SingleToolUseProvider {
                 requests: AtomicUsize::new(0),
             }),
@@ -2285,10 +2304,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             Arc::new(InterleavedToolUseProvider {
                 requests: AtomicUsize::new(0),
             }),
@@ -2347,10 +2363,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             Arc::new(SingleToolUseProvider {
                 requests: AtomicUsize::new(0),
             }),
@@ -2402,10 +2415,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             Arc::new(SingleToolUseProvider {
                 requests: AtomicUsize::new(0),
             }),
@@ -2500,10 +2510,7 @@ mod tests {
 
         query(
             &mut session,
-            &TurnConfig {
-                model: Model::default(),
-                thinking_selection: None,
-            },
+            &TurnConfig::new(Model::default(), None),
             Arc::new(ParallelToolUseProvider {
                 requests: AtomicUsize::new(0),
             }),

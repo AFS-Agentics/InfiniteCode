@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -44,8 +45,81 @@ impl Default for SessionConfig {
 /// Per-turn execution settings resolved before the query loop starts.
 #[derive(Debug, Clone)]
 pub struct TurnConfig {
+    /// Catalog model keyed by `model_slug`; used for prompts, capabilities,
+    /// thinking metadata, context limits, session metadata, and UI state.
     pub model: Model,
+    /// Provider wire model name from the selected binding's `model_name`.
+    /// This is the string sent as `ModelRequest.model` for the base model.
+    pub request_model: String,
+    /// Provider-scoped variant lookup used when thinking resolves to another
+    /// catalog slug before the request is built.
+    pub provider_request_models: ProviderRequestModelMap,
     pub thinking_selection: Option<String>,
+}
+
+/// Provider request model names keyed by catalog model slug for one selected provider.
+///
+/// Example: the catalog slug `kimi-k2.5-thinking` can map to the provider wire
+/// name `moonshotai/kimi-k2.5-thinking`. The map is provider-scoped so a
+/// duplicate slug configured under another provider is ignored for this turn.
+#[derive(Debug, Clone, Default)]
+pub struct ProviderRequestModelMap {
+    by_model_slug: HashMap<String, String>,
+}
+
+impl ProviderRequestModelMap {
+    pub fn new(by_model_slug: HashMap<String, String>) -> Self {
+        Self { by_model_slug }
+    }
+
+    pub fn get(&self, model_slug: &str) -> Option<&str> {
+        self.by_model_slug.get(model_slug).map(String::as_str)
+    }
+}
+
+impl From<HashMap<String, String>> for ProviderRequestModelMap {
+    fn from(by_model_slug: HashMap<String, String>) -> Self {
+        Self::new(by_model_slug)
+    }
+}
+
+impl TurnConfig {
+    pub fn new(model: Model, thinking_selection: Option<String>) -> Self {
+        let request_model = model.slug.clone();
+        Self {
+            model,
+            request_model,
+            provider_request_models: ProviderRequestModelMap::default(),
+            thinking_selection,
+        }
+    }
+
+    pub fn with_request_model(
+        model: Model,
+        request_model: String,
+        provider_request_models: ProviderRequestModelMap,
+        thinking_selection: Option<String>,
+    ) -> Self {
+        Self {
+            model,
+            request_model,
+            provider_request_models,
+            thinking_selection,
+        }
+    }
+
+    pub fn provider_request_model(&self, resolved_catalog_model: &str) -> String {
+        if resolved_catalog_model == self.model.slug {
+            return self.request_model.clone();
+        }
+        // Thinking may resolve the catalog model to a variant slug. Keep catalog
+        // metadata from the variant, but translate the final request back to the
+        // selected provider's `model_name` when a matching binding exists.
+        self.provider_request_models
+            .get(resolved_catalog_model)
+            .map(str::to_string)
+            .unwrap_or_else(|| resolved_catalog_model.to_string())
+    }
 }
 
 /// Mutable state for one conversation session.

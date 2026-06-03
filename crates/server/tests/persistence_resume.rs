@@ -7,6 +7,7 @@ use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
 use devo_core::AppConfigStore;
+use devo_core::BundledSkillsConfig;
 use devo_core::ProviderVendorCatalog;
 use futures::stream::Stream;
 use futures::stream::{self};
@@ -1046,6 +1047,93 @@ async fn compacted_session_next_query_uses_compaction_summary_after_restart() ->
     Ok(())
 }
 
+#[tokio::test]
+async fn configured_model_name_is_used_for_turn_metadata_and_provider_request() -> Result<()> {
+    let data_root = TempDir::new()?;
+    std::fs::write(
+        data_root.path().join("config.toml"),
+        r#"
+[defaults]
+model_binding = "main"
+
+[providers.openrouter]
+enabled = true
+name = "OpenRouter"
+wire_apis = ["openai_chat_completions"]
+
+[model_bindings.main]
+enabled = true
+model_slug = "test-model"
+provider = "openrouter"
+model_name = "vendor/test-model"
+invocation_method = "openai_chat_completions"
+"#,
+    )?;
+    let provider = Arc::new(CapturingProvider::default());
+    let runtime = build_runtime_with_provider(data_root.path(), provider.clone())?;
+    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
+
+    let start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 101,
+                "method": "session/start",
+                "params": {
+                    "cwd": data_root.path(),
+                    "ephemeral": false,
+                    "title": "Model name session",
+                    "model": "test-model"
+                }
+            }),
+        )
+        .await
+        .context("session/start response")?;
+    let session_id = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+    >(start_response)?
+    .result
+    .session
+    .session_id;
+
+    let _ = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 102,
+                "method": "turn/start",
+                "params": {
+                    "session_id": session_id,
+                    "input": [{ "type": "text", "text": "use configured model name" }],
+                    "model": null,
+                    "sandbox": null,
+                    "approval_policy": null,
+                    "cwd": null
+                }
+            }),
+        )
+        .await
+        .context("turn/start response")?;
+    let turn_started = wait_for_notification_value(&mut notifications_rx, "turn/started").await?;
+    wait_for_turn_completed(&mut notifications_rx).await?;
+
+    assert_eq!(
+        turn_started["params"]["turn"]["model"],
+        serde_json::json!("test-model")
+    );
+    assert_eq!(
+        turn_started["params"]["turn"]["request_model"],
+        serde_json::json!("vendor/test-model")
+    );
+    let requests = provider.requests.lock().expect("lock requests");
+    assert_eq!(
+        requests.last().expect("captured request").model,
+        "vendor/test-model"
+    );
+
+    Ok(())
+}
+
 fn build_runtime(data_root: &std::path::Path) -> Result<Arc<ServerRuntime>> {
     build_runtime_with_provider(data_root, Arc::new(SingleReplyProvider))
 }
@@ -1066,7 +1154,10 @@ fn build_runtime_with_provider(
             Arc::new(PresetModelCatalog::default()),
             Arc::new(ProviderVendorCatalog::default()),
             None,
-            Box::new(FileSystemSkillCatalog::new(SkillsConfig::default())),
+            Box::new(FileSystemSkillCatalog::new(SkillsConfig {
+                bundled: Some(BundledSkillsConfig { enabled: false }),
+                ..SkillsConfig::default()
+            })),
             devo_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(
@@ -1173,18 +1264,27 @@ async fn wait_for_notification_method(
     notifications_rx: &mut mpsc::UnboundedReceiver<serde_json::Value>,
     method: &str,
 ) -> Result<()> {
+    wait_for_notification_value(notifications_rx, method)
+        .await
+        .map(|_| ())
+}
+
+async fn wait_for_notification_value(
+    notifications_rx: &mut mpsc::UnboundedReceiver<serde_json::Value>,
+    method: &str,
+) -> Result<serde_json::Value> {
     let wanted = serde_json::json!(method);
-    timeout(Duration::from_secs(5), async {
+    let value = timeout(Duration::from_secs(5), async {
         while let Some(value) = notifications_rx.recv().await {
             if value.get("method") == Some(&wanted) {
-                return Ok(());
+                return Ok(value);
             }
         }
         anyhow::bail!("notification channel closed before {method}")
     })
     .await
     .with_context(|| format!("timed out waiting for {method}"))??;
-    Ok(())
+    Ok(value)
 }
 
 #[tokio::test]

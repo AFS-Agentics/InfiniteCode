@@ -243,11 +243,17 @@ binding in this order:
    `model_name`.
 3. The first enabled model binding.
 
+Runtime turn resolution uses an explicit requested model first, when it matches
+an enabled binding's `model_slug` or `model_name`. Without a requested model, it
+uses `[defaults].model_binding` only when that binding is enabled, then falls
+back to the first enabled binding.
+
 After a binding is selected, resolution requires:
 
 - The binding's `provider` exists in `[providers]`.
 - The provider is enabled.
 - The binding is enabled.
+- The binding's `model_slug` exists in the effective model catalog.
 - If the provider lists `wire_apis`, the binding's `invocation_method` is in
   that list.
 - If the provider references a credential, that credential exists in
@@ -256,6 +262,18 @@ After a binding is selected, resolution requires:
 The resolved runtime settings contain the provider id, wire API, final model
 name, optional base URL, optional API key, model limits, thinking selection,
 response-storage flag, and preferred auth method.
+
+`model_slug` is the local catalog key matching a `slug` in the effective
+`models.json` catalog. `model_name` is the provider-specific model name used for
+the API request. The effective catalog is read at startup from built-in defaults,
+`<DEVO_HOME>/models.json`, then `<workspace>/.devo/models.json`, merged by
+`slug`. Turn metadata records `model` as the catalog slug and `request_model` as
+the provider request model; these values may be identical.
+
+When thinking resolution selects a model variant catalog slug, the provider
+request model is resolved from enabled bindings for the same provider as the
+selected turn binding. Duplicate `model_slug` values under other providers do
+not affect that request.
 
 ## Writing Provider Config
 

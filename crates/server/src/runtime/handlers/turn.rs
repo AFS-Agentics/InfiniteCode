@@ -142,6 +142,7 @@ impl ServerRuntime {
             let resolved_request = turn_config
                 .model
                 .resolve_thinking_selection(turn_config.thinking_selection.as_deref());
+            let request_model = turn_config.provider_request_model(&resolved_request.request_model);
             session.summary.model = Some(turn_config.model.slug.clone());
             session.summary.thinking = turn_config.thinking_selection.clone();
             let turn = TurnMetadata {
@@ -156,7 +157,7 @@ impl ServerRuntime {
                 model: turn_config.model.slug.clone(),
                 thinking: turn_config.thinking_selection.clone(),
                 reasoning_effort: resolved_request.effective_reasoning_effort,
-                request_model: resolved_request.request_model,
+                request_model,
                 request_thinking: resolved_request.request_thinking,
                 started_at: now,
                 completed_at: None,

@@ -92,6 +92,10 @@ impl ServerRuntime {
                 .model
                 .as_deref()
                 .unwrap_or(&self.deps.default_model);
+            let request_model = self
+                .deps
+                .resolve_turn_config(Some(model_slug), /*thinking_selection*/ None)
+                .request_model;
             let max_tokens = self
                 .deps
                 .model_catalog
@@ -101,12 +105,13 @@ impl ServerRuntime {
 
             let summarizer = DefaultHistorySummarizer::with_slug(
                 self.deps.provider.clone(),
-                model_slug,
+                request_model.clone(),
                 max_tokens,
             );
             tracing::debug!(
                 session_id = %session_id,
                 model = %model_slug,
+                request_model = %request_model,
                 item_count = items.len(),
                 input_tokens = token_info.input_tokens,
                 cached_input_tokens = token_info.cached_input_tokens,

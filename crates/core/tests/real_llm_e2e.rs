@@ -134,10 +134,7 @@ async fn run_query(
 
     query(
         session,
-        &TurnConfig {
-            model,
-            thinking_selection,
-        },
+        &TurnConfig::new(model, thinking_selection),
         provider,
         registry,
         &runtime,

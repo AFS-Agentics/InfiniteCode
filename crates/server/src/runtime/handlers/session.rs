@@ -698,6 +698,18 @@ impl ServerRuntime {
                 .clone()
                 .filter(|turn| turn.turn_id == last_turn_id)
                 .or_else(|| {
+                    let model = source
+                        .summary
+                        .model
+                        .clone()
+                        .unwrap_or_else(|| self.deps.default_model.clone());
+                    // Synthetic fork metadata follows normal turn semantics:
+                    // `model` remains the catalog slug, while `request_model`
+                    // is recomputed from the active provider binding.
+                    let request_model = self
+                        .deps
+                        .resolve_turn_config(Some(&model), source.summary.thinking.clone())
+                        .request_model;
                     let sequence = kept_items
                         .iter()
                         .filter(|item| matches!(item.turn_item, TurnItem::UserMessage(_)))
@@ -708,18 +720,10 @@ impl ServerRuntime {
                         sequence,
                         status: TurnStatus::Completed,
                         kind: devo_protocol::TurnKind::Regular,
-                        model: source
-                            .summary
-                            .model
-                            .clone()
-                            .unwrap_or_else(|| self.deps.default_model.clone()),
+                        model,
                         thinking: source.summary.thinking.clone(),
                         reasoning_effort: source.summary.reasoning_effort,
-                        request_model: source
-                            .summary
-                            .model
-                            .clone()
-                            .unwrap_or_else(|| self.deps.default_model.clone()),
+                        request_model,
                         request_thinking: source.summary.thinking.clone(),
                         started_at: source.summary.created_at,
                         completed_at: Some(source.summary.updated_at),
