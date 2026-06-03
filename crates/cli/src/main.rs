@@ -24,6 +24,7 @@ mod prompt_command;
 
 use agent_command::run_agent;
 use doctor_command::run_doctor;
+use prompt_command::PromptOutputFormat;
 use prompt_command::run_prompt;
 
 /// Top-level `devo` command that dispatches to interactive agent mode or one
@@ -34,6 +35,10 @@ use prompt_command::run_prompt;
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
+
+    /// Override the model used for this session.
+    #[arg(long, global = true)]
+    model: Option<String>,
 
     /// Override the logging level for this process.
     #[arg(
@@ -148,10 +153,10 @@ async fn run_cli() -> Result<()> {
             }
             Ok(())
         }
-        Some(Command::Prompt { input }) => {
+        Some(Command::Prompt { input, format }) => {
             maybe_print_startup_update(&cli).await;
             let _logging = install_logging(&cli)?;
-            run_prompt(input, log_level.as_deref()).await
+            run_prompt(input, cli.model.as_deref(), log_level.as_deref(), *format).await
         }
         Some(Command::Doctor) => {
             let _logging = install_logging(&cli)?;
@@ -212,6 +217,9 @@ enum Command {
     },
     /// Send a single prompt to the model and print the response (non-interactive).
     Prompt {
+        /// Output format for non-interactive prompt execution.
+        #[arg(long, value_enum, default_value_t = PromptOutputFormat::Text)]
+        format: PromptOutputFormat,
         /// The prompt text to send to the model.
         input: String,
     },
@@ -313,6 +321,7 @@ mod tests {
 
     use super::Cli;
     use super::Command;
+    use super::PromptOutputFormat;
     use super::cli_logging_overrides;
     use super::exit_messages;
     use super::format_token_usage_line;
@@ -351,6 +360,7 @@ mod tests {
         ] {
             let cli = Cli {
                 command: None,
+                model: None,
                 log_level: Some(level),
             };
 
@@ -372,16 +382,20 @@ mod tests {
         for cli in [
             Cli {
                 command: None,
+                model: None,
                 log_level: None,
             },
             Cli {
                 command: Some(Command::Onboard),
+                model: None,
                 log_level: None,
             },
             Cli {
                 command: Some(Command::Prompt {
                     input: "hello".to_string(),
+                    format: PromptOutputFormat::Text,
                 }),
+                model: None,
                 log_level: None,
             },
         ] {
@@ -399,6 +413,7 @@ mod tests {
     fn startup_update_check_scope_skips_server_and_doctor() {
         let doctor = Cli {
             command: Some(Command::Doctor),
+            model: None,
             log_level: None,
         };
         let server = Cli {
@@ -406,6 +421,7 @@ mod tests {
                 working_root: None,
                 transport: devo_server::ServerTransportMode::Config,
             }),
+            model: None,
             log_level: None,
         };
 
@@ -434,6 +450,20 @@ mod tests {
         match cli.command {
             Some(Command::Resume { session_id: actual }) => assert_eq!(actual, session_id),
             other => panic!("expected resume command, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_prompt_jsonl_output_format() {
+        let cli =
+            Cli::try_parse_from(["devo", "prompt", "--format", "jsonl", "hello"]).expect("parse");
+
+        match cli.command {
+            Some(Command::Prompt { input, format }) => {
+                assert_eq!(input, "hello");
+                assert_eq!(format, PromptOutputFormat::Jsonl);
+            }
+            other => panic!("expected prompt command, got {other:?}"),
         }
     }
 

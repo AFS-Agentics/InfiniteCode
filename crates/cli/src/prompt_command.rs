@@ -1,16 +1,35 @@
 use anyhow::Result;
+use clap::ValueEnum;
 use devo_core::AgentsMdConfig;
 use devo_core::AppConfig;
 use devo_core::AppConfigLoader;
+use devo_core::EventCallback;
 use devo_core::FileSystemAppConfigLoader;
 use devo_core::ModelCatalog;
 use devo_core::PresetModelCatalog;
+use devo_core::QueryEvent;
 use devo_core::tools::ToolPlanConfig;
 use devo_core::tools::handlers;
 use devo_mcp::manager::RmcpMcpManager;
 use devo_utils::find_devo_home;
+use serde::Serialize;
+use std::io::Write;
+use std::path::Path;
+use std::sync::Arc;
 
-pub(crate) async fn run_prompt(input: &str, log_level: Option<&str>) -> Result<()> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub(crate) enum PromptOutputFormat {
+    Text,
+    Json,
+    Jsonl,
+}
+
+pub(crate) async fn run_prompt(
+    input: &str,
+    model_override: Option<&str>,
+    log_level: Option<&str>,
+    output_format: PromptOutputFormat,
+) -> Result<()> {
     if let Some(level) = log_level {
         let _ = tracing_subscriber::fmt()
             .with_env_filter(tracing_subscriber::EnvFilter::new(level))
@@ -26,8 +45,10 @@ pub(crate) async fn run_prompt(input: &str, log_level: Option<&str>) -> Result<(
     let app_config = FileSystemAppConfigLoader::new(home_dir.clone())
         .load(Some(cwd.as_path()))
         .unwrap_or_else(|_| AppConfig::default());
-    let provider = devo_server::load_server_provider(&app_config, None, &home_dir)?;
-    let selected_model = provider.default_model.clone();
+    let provider = devo_server::load_server_provider(&app_config, model_override, &home_dir)?;
+    let selected_model = model_override
+        .map(ToString::to_string)
+        .unwrap_or_else(|| provider.default_model.clone());
 
     let mut session_state = SessionState::new(
         SessionConfig {
@@ -76,22 +97,61 @@ pub(crate) async fn run_prompt(input: &str, log_level: Option<&str>) -> Result<(
 
     eprintln!("devo [prompt] model={selected_model} sending...");
 
+    if output_format == PromptOutputFormat::Jsonl {
+        write_jsonl(&PromptJsonlEvent::SessionStarted {
+            session_id: session_state.id.as_str(),
+            model: selected_model.as_str(),
+            cwd: cwd.as_path(),
+        })?;
+        write_jsonl(&PromptJsonlEvent::TurnStarted {
+            session_id: session_state.id.as_str(),
+            model: selected_model.as_str(),
+        })?;
+    }
+
+    let session_id_for_events = session_state.id.clone();
     let result = devo_core::query(
         &mut session_state,
         &turn_config,
         provider.provider.clone(),
         registry,
         &runtime,
-        None,
+        jsonl_event_callback(output_format, session_id_for_events),
     )
     .await;
 
     match result {
         Ok(()) => match latest_assistant_text(&session_state.messages) {
-            Some(text) => println!("{}", text),
+            Some(text) => match output_format {
+                PromptOutputFormat::Text => println!("{}", text),
+                PromptOutputFormat::Json => write_json(&PromptResult {
+                    r#type: "result",
+                    status: "completed",
+                    session_id: session_state.id.as_str(),
+                    model: selected_model.as_str(),
+                    message: text,
+                    usage: PromptUsage::from_session(&session_state),
+                })?,
+                PromptOutputFormat::Jsonl => write_jsonl(&PromptJsonlEvent::Result {
+                    session_id: session_state.id.as_str(),
+                    status: "completed",
+                    message: text,
+                    usage: PromptUsage::from_session(&session_state),
+                })?,
+            },
             None => eprintln!("devo [prompt] empty response"),
         },
         Err(e) => {
+            if output_format == PromptOutputFormat::Jsonl {
+                write_jsonl(&PromptJsonlEvent::Error {
+                    session_id: session_state.id.as_str(),
+                    message: &e.to_string(),
+                })?;
+                write_jsonl(&PromptJsonlEvent::TurnFailed {
+                    session_id: session_state.id.as_str(),
+                    message: &e.to_string(),
+                })?;
+            }
             anyhow::bail!("prompt failed: {e}");
         }
     }
@@ -99,17 +159,287 @@ pub(crate) async fn run_prompt(input: &str, log_level: Option<&str>) -> Result<(
     Ok(())
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct PromptUsage {
+    input_tokens: usize,
+    output_tokens: usize,
+    cache_creation_input_tokens: usize,
+    cache_read_input_tokens: usize,
+}
+
+impl PromptUsage {
+    fn from_session(session: &devo_core::SessionState) -> Self {
+        Self {
+            input_tokens: session.total_input_tokens,
+            output_tokens: session.total_output_tokens,
+            cache_creation_input_tokens: session.total_cache_creation_tokens,
+            cache_read_input_tokens: session.total_cache_read_tokens,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct PromptResult<'a> {
+    r#type: &'static str,
+    status: &'static str,
+    session_id: &'a str,
+    model: &'a str,
+    message: &'a str,
+    usage: PromptUsage,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum PromptJsonlEvent<'a> {
+    #[serde(rename = "session.started")]
+    SessionStarted {
+        session_id: &'a str,
+        model: &'a str,
+        cwd: &'a Path,
+    },
+    #[serde(rename = "turn.started")]
+    TurnStarted { session_id: &'a str, model: &'a str },
+    #[serde(rename = "item.updated")]
+    AssistantMessageDelta {
+        session_id: &'a str,
+        item_type: &'static str,
+        delta: &'a str,
+    },
+    #[serde(rename = "item.updated")]
+    ReasoningDelta {
+        session_id: &'a str,
+        item_type: &'static str,
+        delta: &'a str,
+    },
+    #[serde(rename = "item.completed")]
+    ReasoningCompleted {
+        session_id: &'a str,
+        item_type: &'static str,
+    },
+    #[serde(rename = "item.started")]
+    ToolCallStarted {
+        session_id: &'a str,
+        item_type: &'static str,
+        tool_call_id: &'a str,
+        tool_name: &'a str,
+        input: &'a serde_json::Value,
+    },
+    #[serde(rename = "item.updated")]
+    ToolProgress {
+        session_id: &'a str,
+        item_type: &'static str,
+        tool_call_id: &'a str,
+        delta: &'a str,
+    },
+    #[serde(rename = "item.completed")]
+    ToolResult {
+        session_id: &'a str,
+        item_type: &'static str,
+        tool_call_id: &'a str,
+        tool_name: &'a str,
+        input: &'a serde_json::Value,
+        content: &'a devo_core::tools::ToolContent,
+        display_content: &'a Option<String>,
+        is_error: bool,
+        summary: &'a str,
+    },
+    #[serde(rename = "turn.usage_delta")]
+    UsageDelta {
+        session_id: &'a str,
+        usage: PromptUsageDelta,
+    },
+    #[serde(rename = "turn.usage")]
+    Usage {
+        session_id: &'a str,
+        usage: PromptUsageDelta,
+    },
+    #[serde(rename = "turn.completed")]
+    TurnCompleted {
+        session_id: &'a str,
+        stop_reason: &'a devo_core::StopReason,
+    },
+    #[serde(rename = "turn.failed")]
+    TurnFailed {
+        session_id: &'a str,
+        message: &'a str,
+    },
+    #[serde(rename = "error")]
+    Error {
+        session_id: &'a str,
+        message: &'a str,
+    },
+    #[serde(rename = "result")]
+    Result {
+        session_id: &'a str,
+        status: &'static str,
+        message: &'a str,
+        usage: PromptUsage,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+struct PromptUsageDelta {
+    input_tokens: usize,
+    output_tokens: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_creation_input_tokens: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_read_input_tokens: Option<usize>,
+}
+
+impl PromptUsageDelta {
+    fn new(
+        input_tokens: usize,
+        output_tokens: usize,
+        cache_creation_input_tokens: Option<usize>,
+        cache_read_input_tokens: Option<usize>,
+    ) -> Self {
+        Self {
+            input_tokens,
+            output_tokens,
+            cache_creation_input_tokens,
+            cache_read_input_tokens,
+        }
+    }
+}
+
+fn jsonl_event_callback(
+    output_format: PromptOutputFormat,
+    session_id: String,
+) -> Option<EventCallback> {
+    if output_format != PromptOutputFormat::Jsonl {
+        return None;
+    }
+
+    Some(Arc::new(move |event| {
+        if let Err(error) = write_query_event_jsonl(session_id.as_str(), &event) {
+            eprintln!("devo [prompt] failed to write jsonl event: {error}");
+        }
+    }))
+}
+
+fn write_query_event_jsonl(session_id: &str, event: &QueryEvent) -> Result<()> {
+    match event {
+        QueryEvent::TextDelta(text) => write_jsonl(&PromptJsonlEvent::AssistantMessageDelta {
+            session_id,
+            item_type: "agent_message",
+            delta: text,
+        }),
+        QueryEvent::ReasoningDelta(text) => write_jsonl(&PromptJsonlEvent::ReasoningDelta {
+            session_id,
+            item_type: "reasoning",
+            delta: text,
+        }),
+        QueryEvent::ReasoningCompleted => write_jsonl(&PromptJsonlEvent::ReasoningCompleted {
+            session_id,
+            item_type: "reasoning",
+        }),
+        QueryEvent::UsageDelta {
+            input_tokens,
+            output_tokens,
+            cache_creation_input_tokens,
+            cache_read_input_tokens,
+        } => write_jsonl(&PromptJsonlEvent::UsageDelta {
+            session_id,
+            usage: PromptUsageDelta::new(
+                *input_tokens,
+                *output_tokens,
+                *cache_creation_input_tokens,
+                *cache_read_input_tokens,
+            ),
+        }),
+        QueryEvent::ToolUseStart { id, name, input } => {
+            write_jsonl(&PromptJsonlEvent::ToolCallStarted {
+                session_id,
+                item_type: "tool_call",
+                tool_call_id: id,
+                tool_name: name,
+                input,
+            })
+        }
+        QueryEvent::ToolProgress {
+            tool_use_id,
+            content,
+        } => write_jsonl(&PromptJsonlEvent::ToolProgress {
+            session_id,
+            item_type: "tool_result",
+            tool_call_id: tool_use_id,
+            delta: content,
+        }),
+        QueryEvent::ToolResult {
+            tool_use_id,
+            tool_name,
+            input,
+            content,
+            display_content,
+            is_error,
+            summary,
+        } => write_jsonl(&PromptJsonlEvent::ToolResult {
+            session_id,
+            item_type: "tool_result",
+            tool_call_id: tool_use_id,
+            tool_name,
+            input,
+            content,
+            display_content,
+            is_error: *is_error,
+            summary,
+        }),
+        QueryEvent::TurnComplete { stop_reason } => write_jsonl(&PromptJsonlEvent::TurnCompleted {
+            session_id,
+            stop_reason,
+        }),
+        QueryEvent::Usage {
+            input_tokens,
+            output_tokens,
+            cache_creation_input_tokens,
+            cache_read_input_tokens,
+        } => write_jsonl(&PromptJsonlEvent::Usage {
+            session_id,
+            usage: PromptUsageDelta::new(
+                *input_tokens,
+                *output_tokens,
+                *cache_creation_input_tokens,
+                *cache_read_input_tokens,
+            ),
+        }),
+    }
+}
+
+fn write_json<T: Serialize>(value: &T) -> Result<()> {
+    let stdout = std::io::stdout();
+    let mut stdout = stdout.lock();
+    serde_json::to_writer(&mut stdout, value)?;
+    writeln!(stdout)?;
+    Ok(())
+}
+
+fn write_jsonl<T: Serialize>(value: &T) -> Result<()> {
+    write_json(value)
+}
+
 fn latest_assistant_text(messages: &[devo_core::Message]) -> Option<&str> {
     messages.iter().rev().find_map(|message| {
         if message.role != devo_core::Role::Assistant {
             return None;
         }
-        message.content.iter().find_map(|block| match block {
-            devo_core::ContentBlock::Reasoning { text } => Some(text.as_str()),
-            devo_core::ContentBlock::Text { text } => Some(text.as_str()),
-            devo_core::ContentBlock::ToolUse { .. }
-            | devo_core::ContentBlock::ToolResult { .. } => None,
-        })
+        message
+            .content
+            .iter()
+            .find_map(|block| match block {
+                devo_core::ContentBlock::Text { text } => Some(text.as_str()),
+                devo_core::ContentBlock::Reasoning { .. }
+                | devo_core::ContentBlock::ToolUse { .. }
+                | devo_core::ContentBlock::ToolResult { .. } => None,
+            })
+            .or_else(|| {
+                message.content.iter().find_map(|block| match block {
+                    devo_core::ContentBlock::Reasoning { text } => Some(text.as_str()),
+                    devo_core::ContentBlock::Text { .. }
+                    | devo_core::ContentBlock::ToolUse { .. }
+                    | devo_core::ContentBlock::ToolResult { .. } => None,
+                })
+            })
     })
 }
 
@@ -118,9 +448,45 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::latest_assistant_text;
+    use super::{PromptResult, PromptUsage};
     use devo_core::ContentBlock;
     use devo_core::Message;
     use devo_core::Role;
+
+    #[test]
+    fn prompt_result_serializes_completed_json_shape() {
+        let value = serde_json::to_value(PromptResult {
+            r#type: "result",
+            status: "completed",
+            session_id: "session-1",
+            model: "model-1",
+            message: "done",
+            usage: PromptUsage {
+                input_tokens: 3,
+                output_tokens: 5,
+                cache_creation_input_tokens: 0,
+                cache_read_input_tokens: 2,
+            },
+        })
+        .expect("serialize prompt result");
+
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "type": "result",
+                "status": "completed",
+                "session_id": "session-1",
+                "model": "model-1",
+                "message": "done",
+                "usage": {
+                    "input_tokens": 3,
+                    "output_tokens": 5,
+                    "cache_creation_input_tokens": 0,
+                    "cache_read_input_tokens": 2
+                }
+            })
+        );
+    }
 
     #[test]
     fn latest_assistant_text_returns_none_for_empty_messages() {
@@ -180,5 +546,22 @@ mod tests {
         }];
 
         assert_eq!(latest_assistant_text(&messages), Some("first text"));
+    }
+
+    #[test]
+    fn latest_assistant_text_prefers_text_over_reasoning() {
+        let messages = vec![Message {
+            role: Role::Assistant,
+            content: vec![
+                ContentBlock::Reasoning {
+                    text: "internal summary".to_string(),
+                },
+                ContentBlock::Text {
+                    text: "final answer".to_string(),
+                },
+            ],
+        }];
+
+        assert_eq!(latest_assistant_text(&messages), Some("final answer"));
     }
 }
