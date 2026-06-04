@@ -475,9 +475,13 @@ fn mcp_results(filter: &str, sources: &[McpReferenceSource]) -> Vec<ReferenceSea
 fn file_results(file_matches: &[FileMatch]) -> Vec<ReferenceSearchResult> {
     file_matches
         .iter()
-        .map(|file_match| {
+        .filter_map(|file_match| {
             let display_name = file_match.path.to_string_lossy().into_owned();
-            ReferenceSearchResult {
+            if display_name.trim().is_empty() {
+                return None;
+            }
+
+            Some(ReferenceSearchResult {
                 kind: ReferenceSearchResultKind::File,
                 display_name: display_name.clone(),
                 description: None,
@@ -490,7 +494,7 @@ fn file_results(file_matches: &[FileMatch]) -> Vec<ReferenceSearchResult> {
                     .map(|indices| indices.iter().map(|idx| *idx as usize).collect()),
                 is_disabled: false,
                 disabled_reason: None,
-            }
+            })
         })
         .collect()
 }
@@ -607,6 +611,19 @@ mod tests {
                     "docs/tui-chat-composer.md".to_string(),
                 ),
             ]
+        );
+    }
+
+    #[test]
+    fn empty_file_display_names_are_not_returned() {
+        let results = reference_results("", &[], &[], &[file(""), file("apps")]);
+
+        assert_eq!(
+            results
+                .into_iter()
+                .map(|result| (result.kind, result.display_name))
+                .collect::<Vec<_>>(),
+            vec![(ReferenceSearchResultKind::File, "apps".to_string())]
         );
     }
 
