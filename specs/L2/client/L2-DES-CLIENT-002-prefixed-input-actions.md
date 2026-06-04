@@ -44,6 +44,7 @@ Rules:
 
 - `@` triggers prefixed input only when it is the first character of the composer buffer.
 - TUI compatibility extension: the terminal composer may also trigger `@` fuzzy search at the start of the current whitespace-delimited token anywhere in the composer, including slash-command arguments. This does not change the shared leading-prefix contract for other clients.
+- TUI compatibility extension: terminal `@` search is serviced through the server search API even when triggered token-locally.
 - Leading whitespace before `@` does not trigger prefixed input behavior.
 - `\@` at the first character escapes a literal leading `@`; the backslash is removed when submitted as normal chat text.
 - Prefix recognition must occur only after text is committed. IME composition updates must not trigger fuzzy search.
@@ -180,7 +181,7 @@ Rules:
 
 ## Protocol Boundary
 
-The client may use local search providers or server-owned providers depending on client type. When search crosses server-owned state, the client should use server APIs rather than scanning state independently.
+The client may use local search providers or server-owned providers depending on client type. When search crosses server-owned state, the client should use server APIs rather than scanning state independently. The TUI uses the server-owned path for `@` reference search so the terminal process renders snapshots instead of scanning skills, MCP config, or files locally.
 
 Conceptual client-server methods:
 
@@ -199,6 +200,8 @@ Conceptual server events:
 | `search/failed` | Tell the client the search is unavailable or degraded. |
 
 Search events are live UI projections. They are not transcript records.
+
+TUI `@` result snapshots carry skill, MCP server, and file rows in that category order. MCP rows are configured MCP servers only for the first server-backed iteration.
 
 ## Traceability
 
@@ -220,3 +223,4 @@ Search events are live UI projections. They are not transcript records.
 | 1 | 2026-05-25 | Human | Refinement | Clarified that text immediately after `@` is the query keyword, not a provider or result-type selector. |
 | 1 | 2026-05-26 | Human | Refinement | Clarified TUI marker semantics for prefix-search result focus and avoided using `●` for inserted-reference results. |
 | 1 | 2026-06-04 | Assistant | Implementation note | Documented the TUI token-local `@` compatibility extension for slash-command arguments and normal composer text. |
+| 1 | 2026-06-04 | Assistant | Implementation note | Documented server-backed TUI `@` servicing for unified skill, configured MCP server, and file result snapshots. |
