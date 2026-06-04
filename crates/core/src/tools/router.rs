@@ -380,6 +380,10 @@ fn path_for_tool_input(tool_name: &str, input: &serde_json::Value, cwd: &Path) -
             .and_then(serde_json::Value::as_str)
             .or_else(|| input.get("path").and_then(serde_json::Value::as_str)),
         "grep" | "glob" => input.get("path").and_then(serde_json::Value::as_str),
+        "code_search" => input
+            .get("path")
+            .and_then(serde_json::Value::as_str)
+            .or_else(|| input.get("file_path").and_then(serde_json::Value::as_str)),
         _ => None,
     }?;
     let path = PathBuf::from(raw);

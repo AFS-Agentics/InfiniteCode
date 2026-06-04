@@ -1,5 +1,6 @@
 mod apply_patch;
 mod bash;
+mod code_search;
 mod exec_command;
 mod file_write;
 mod glob;
@@ -19,6 +20,7 @@ mod websearch;
 
 pub use apply_patch::ApplyPatchHandler;
 pub use bash::BashHandler;
+pub use code_search::CodeSearchHandler;
 pub use exec_command::{ExecCommandHandler, WriteStdinHandler};
 pub use file_write::WriteHandler;
 pub use glob::GlobHandler;
@@ -122,6 +124,7 @@ fn build_registry_from_builder(
     for (kind, name) in handlers {
         let handler: Arc<dyn ToolHandler> = match kind {
             ToolHandlerKind::Bash => Arc::new(BashHandler::new()),
+            ToolHandlerKind::CodeSearch => Arc::new(CodeSearchHandler::new()),
             ToolHandlerKind::ShellCommand => Arc::new(ShellCommandHandler::new()),
             ToolHandlerKind::Read => Arc::new(ReadHandler::new()),
             ToolHandlerKind::Write => Arc::new(WriteHandler::new()),

@@ -265,6 +265,81 @@ fn grep_schema() -> JsonSchema {
     )
 }
 
+fn code_search_schema() -> JsonSchema {
+    let enum_string = |description: &str, values: &[&str]| {
+        let mut schema = JsonSchema::string(Some(description));
+        schema.enum_values = Some(
+            values
+                .iter()
+                .map(|value| serde_json::Value::String((*value).to_string()))
+                .collect(),
+        );
+        schema
+    };
+    JsonSchema::object(
+        BTreeMap::from([
+            (
+                "operation".to_string(),
+                enum_string(
+                    "Search operation: search for query text or find chunks related to file_path:line",
+                    &["search", "find_related"],
+                ),
+            ),
+            (
+                "query".to_string(),
+                JsonSchema::string(Some("Natural-language or code query. Required for search.")),
+            ),
+            (
+                "file_path".to_string(),
+                JsonSchema::string(Some(
+                    "Workspace-relative or absolute source file path. Required for find_related.",
+                )),
+            ),
+            (
+                "line".to_string(),
+                JsonSchema::integer(Some(
+                    "1-indexed source line inside file_path. Required for find_related.",
+                )),
+            ),
+            (
+                "path".to_string(),
+                JsonSchema::string(Some(
+                    "Workspace-relative or absolute search root inside the workspace. Defaults to workspace root.",
+                )),
+            ),
+            (
+                "content".to_string(),
+                enum_string(
+                    "Content filter. Defaults to code.",
+                    &["code", "docs", "config", "all"],
+                ),
+            ),
+            (
+                "top_k".to_string(),
+                JsonSchema::integer(Some(
+                    "Maximum results to return. Defaults to 5, maximum 20.",
+                )),
+            ),
+            (
+                "filter_paths".to_string(),
+                JsonSchema::array(
+                    JsonSchema::string(Some("Workspace-relative path prefix to include")),
+                    Some("Optional path prefixes to include"),
+                ),
+            ),
+            (
+                "filter_languages".to_string(),
+                JsonSchema::array(
+                    JsonSchema::string(Some("Language name to include")),
+                    Some("Optional language filters such as rust or python"),
+                ),
+            ),
+        ]),
+        Some(vec!["operation".to_string()]),
+        Some(/*additional_properties*/ false),
+    )
+}
+
 fn apply_patch_schema() -> JsonSchema {
     JsonSchema::object(
         BTreeMap::from([(
@@ -585,6 +660,23 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
 
     plan.push(
         ToolSpec {
+            name: "code_search".to_string(),
+            description: "Semble-style hybrid code retrieval for the current workspace. Use this for natural-language codebase questions, symbol-oriented searches, and finding chunks related to a source location when grep is too literal.".to_string(),
+            input_schema: code_search_schema(),
+            output_mode: ToolOutputMode::StructuredJson,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![ToolCapabilityTag::SearchWorkspace],
+            supports_parallel: true,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: None,
+            supports_cancellation: Some(true),
+            supports_streaming: None,
+        },
+        ToolHandlerKind::CodeSearch,
+    );
+
+    plan.push(
+        ToolSpec {
             name: "apply_patch".to_string(),
             description: APPLY_PATCH_DESCRIPTION.to_string(),
             input_schema: apply_patch_schema(),
@@ -772,6 +864,7 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn plan_default_starts_empty() {
@@ -852,5 +945,31 @@ mod tests {
         let handler_names: Vec<&str> = plan.handlers.iter().map(|(_, n)| n.as_str()).collect();
         assert!(!handler_names.contains(&"exec_command"));
         assert!(!handler_names.contains(&"write_stdin"));
+    }
+
+    /// Trace: L2-DES-TOOL-001
+    /// Verifies: semantic code retrieval is registered as a read-only parallel workspace search tool.
+    #[test]
+    fn plan_builder_registers_code_search() {
+        let plan = build_tool_registry_plan(&ToolPlanConfig::default());
+        let spec = plan
+            .specs
+            .iter()
+            .find(|spec| spec.name == "code_search")
+            .expect("code_search spec");
+
+        assert_eq!(spec.execution_mode, ToolExecutionMode::ReadOnly);
+        assert_eq!(spec.output_mode, ToolOutputMode::StructuredJson);
+        assert_eq!(spec.supports_parallel, true);
+        assert_eq!(spec.supports_cancellation, Some(true));
+        assert!(
+            spec.capability_tags
+                .contains(&ToolCapabilityTag::SearchWorkspace)
+        );
+        assert!(
+            plan.handlers
+                .iter()
+                .any(|(kind, name)| *kind == ToolHandlerKind::CodeSearch && name == "code_search")
+        );
     }
 }

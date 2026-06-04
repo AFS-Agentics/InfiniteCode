@@ -1,0 +1,220 @@
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+use hf_hub::HFClientSync;
+use model2vec::model::Model2Vec;
+use sha2::{Digest, Sha256};
+
+use crate::types::CodeSearchError;
+
+const DEFAULT_MODEL_OWNER: &str = "minishlab";
+const DEFAULT_MODEL_NAME: &str = "potion-code-16M";
+const DEFAULT_MODEL_ID: &str = "minishlab/potion-code-16M";
+const MODEL_FILES: [&str; 3] = ["tokenizer.json", "model.safetensors", "config.json"];
+
+/// Embeds code-search documents and queries into dense vectors.
+///
+/// Implementations must return exactly one vector for each input text, keep vector
+/// dimensionality stable for the lifetime of a provider, and return normalized or
+/// otherwise cosine-compatible vectors.
+pub trait EmbeddingProvider: Send + Sync {
+    fn model_id(&self) -> &str;
+    fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, CodeSearchError>;
+}
+
+pub struct Model2VecEmbeddingProvider {
+    model_id: String,
+    model_dir: PathBuf,
+    model: Mutex<Option<Model2Vec>>,
+}
+
+impl Model2VecEmbeddingProvider {
+    pub fn default_cached() -> Self {
+        let model_dir = default_model_cache_dir();
+        Self {
+            model_id: DEFAULT_MODEL_ID.to_string(),
+            model_dir,
+            model: Mutex::new(None),
+        }
+    }
+
+    fn load_model(&self) -> Result<Model2Vec, CodeSearchError> {
+        ensure_model_files(&self.model_dir)?;
+        let normalize_from_config = None;
+        let subdir = None;
+        Model2Vec::from_pretrained(&self.model_dir, normalize_from_config, subdir)
+            .map_err(|error| CodeSearchError::ModelUnavailable(error.to_string()))
+    }
+}
+
+impl Default for Model2VecEmbeddingProvider {
+    fn default() -> Self {
+        Self::default_cached()
+    }
+}
+
+impl EmbeddingProvider for Model2VecEmbeddingProvider {
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
+
+    fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, CodeSearchError> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+        let mut guard = self
+            .model
+            .lock()
+            .map_err(|_| CodeSearchError::Index("model lock poisoned".to_string()))?;
+        if guard.is_none() {
+            *guard = Some(self.load_model()?);
+        }
+        let model = guard
+            .as_ref()
+            .ok_or_else(|| CodeSearchError::ModelUnavailable("model failed to load".to_string()))?;
+        let matrix = model
+            .encode(texts)
+            .map_err(|error| CodeSearchError::ModelUnavailable(error.to_string()))?;
+        Ok(matrix.rows().into_iter().map(|row| row.to_vec()).collect())
+    }
+}
+
+#[derive(Debug)]
+pub struct HashEmbeddingProvider {
+    model_id: String,
+    dimensions: usize,
+}
+
+impl HashEmbeddingProvider {
+    pub fn new(model_id: impl Into<String>, dimensions: usize) -> Self {
+        Self {
+            model_id: model_id.into(),
+            dimensions,
+        }
+    }
+}
+
+impl EmbeddingProvider for HashEmbeddingProvider {
+    fn model_id(&self) -> &str {
+        &self.model_id
+    }
+
+    fn embed(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, CodeSearchError> {
+        Ok(texts
+            .iter()
+            .map(|text| hash_embedding(text, self.dimensions))
+            .collect())
+    }
+}
+
+pub fn cosine_similarity(left: &[f32], right: &[f32]) -> f32 {
+    if left.is_empty() || left.len() != right.len() {
+        return 0.0;
+    }
+    let mut dot = 0.0;
+    let mut left_norm = 0.0;
+    let mut right_norm = 0.0;
+    for (left_value, right_value) in left.iter().zip(right) {
+        dot += left_value * right_value;
+        left_norm += left_value * left_value;
+        right_norm += right_value * right_value;
+    }
+    let denominator = left_norm.sqrt() * right_norm.sqrt();
+    if denominator <= f32::EPSILON {
+        0.0
+    } else {
+        dot / denominator
+    }
+}
+
+fn ensure_model_files(model_dir: &PathBuf) -> Result<(), CodeSearchError> {
+    if MODEL_FILES
+        .iter()
+        .all(|file| model_dir.join(file).is_file())
+    {
+        return Ok(());
+    }
+    std::fs::create_dir_all(model_dir)?;
+    let client = HFClientSync::new()
+        .map_err(|error| CodeSearchError::ModelUnavailable(error.to_string()))?;
+    let repo = client.model(DEFAULT_MODEL_OWNER, DEFAULT_MODEL_NAME);
+    for file in MODEL_FILES {
+        repo.download_file()
+            .filename(file.to_string())
+            .local_dir(model_dir.clone())
+            .send()
+            .map_err(|error| CodeSearchError::ModelUnavailable(error.to_string()))?;
+    }
+    if MODEL_FILES
+        .iter()
+        .all(|file| model_dir.join(file).is_file())
+    {
+        Ok(())
+    } else {
+        Err(CodeSearchError::ModelUnavailable(format!(
+            "model files for {DEFAULT_MODEL_ID} were not found in {} after download",
+            model_dir.display()
+        )))
+    }
+}
+
+fn default_model_cache_dir() -> PathBuf {
+    dirs::cache_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join("devo")
+        .join("code-search")
+        .join("models")
+        .join(DEFAULT_MODEL_ID.replace('/', "--"))
+}
+
+fn hash_embedding(text: &str, dimensions: usize) -> Vec<f32> {
+    let dimensions = dimensions.max(1);
+    let mut vector = vec![0.0; dimensions];
+    for token in text
+        .split(|ch: char| !ch.is_ascii_alphanumeric())
+        .filter(|token| !token.is_empty())
+    {
+        let mut hasher = Sha256::new();
+        hasher.update(token.to_lowercase().as_bytes());
+        let digest = hasher.finalize();
+        let index = u64::from_le_bytes([
+            digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
+        ]) as usize
+            % dimensions;
+        vector[index] += 1.0;
+    }
+    let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
+    if norm > f32::EPSILON {
+        for value in &mut vector {
+            *value /= norm;
+        }
+    }
+    vector
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    /// Trace: L2-DES-TOOL-001
+    /// Verifies: test embedding provider returns one stable vector per input.
+    #[test]
+    fn hash_embedding_provider_is_deterministic() {
+        let provider = HashEmbeddingProvider::new("test", 8);
+        let texts = vec!["parse input".to_string(), "parse input".to_string()];
+        let embeddings = provider.embed(&texts).expect("embed");
+
+        assert_eq!(embeddings.len(), 2);
+        assert_eq!(embeddings[0], embeddings[1]);
+    }
+
+    /// Trace: L2-DES-TOOL-001
+    /// Verifies: dense ranking similarity is cosine-compatible.
+    #[test]
+    fn cosine_similarity_scores_identical_vectors_highest() {
+        assert_eq!(cosine_similarity(&[1.0, 0.0], &[1.0, 0.0]), 1.0);
+        assert_eq!(cosine_similarity(&[1.0, 0.0], &[0.0, 1.0]), 0.0);
+    }
+}

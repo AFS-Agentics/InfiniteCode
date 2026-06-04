@@ -80,6 +80,26 @@ pub fn tool_summary(name: &str, input: &serde_json::Value, cwd: &Path) -> String
             let rel = make_relative(cwd, path);
             format!("grep: '{pattern}' in {rel}")
         }
+        "code_search" => {
+            let operation = input["operation"].as_str().unwrap_or("search");
+            match operation {
+                "find_related" => {
+                    let path = input["file_path"].as_str().unwrap_or("");
+                    let rel = make_relative(cwd, path);
+                    let line = input["line"]
+                        .as_u64()
+                        .map(|line| line.to_string())
+                        .unwrap_or_else(|| "?".to_string());
+                    format!("code_search related {rel}:{line}")
+                }
+                _ => {
+                    let query = input["query"].as_str().unwrap_or("");
+                    let path = input["path"].as_str().unwrap_or(".");
+                    let rel = make_relative(cwd, path);
+                    format!("code_search: {query} in {rel}")
+                }
+            }
+        }
         "glob" => {
             let pattern = input["pattern"].as_str().unwrap_or("");
             let path = input["path"].as_str().unwrap_or(".");
@@ -126,6 +146,7 @@ pub fn tool_summary(name: &str, input: &serde_json::Value, cwd: &Path) -> String
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
     use serde_json::json;
 
     fn cwd() -> PathBuf {
@@ -201,6 +222,23 @@ mod tests {
         let input = json!({"pattern": "TODO", "path": "src/"});
         let s = tool_summary("grep", &input, &cwd());
         assert_eq!(s, "grep: 'TODO' in src/");
+    }
+
+    /// Trace: L2-DES-TOOL-001
+    /// Verifies: code_search summaries distinguish search and find-related operations.
+    #[test]
+    fn code_search_summary() {
+        let input = json!({"operation": "search", "query": "parser error", "path": "src"});
+        let s = tool_summary("code_search", &input, &cwd());
+        assert_eq!(s, "code_search: parser error in src");
+
+        let input = json!({
+            "operation": "find_related",
+            "file_path": "src/lib.rs",
+            "line": 42
+        });
+        let s = tool_summary("code_search", &input, &cwd());
+        assert_eq!(s, "code_search related src/lib.rs:42");
     }
 
     #[test]
