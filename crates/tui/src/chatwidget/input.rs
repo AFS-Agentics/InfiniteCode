@@ -15,6 +15,7 @@ use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
 
+use crate::ansi_escape::ansi_escape_line;
 use crate::app_command::AppCommand;
 use crate::app_event::AppEvent;
 use crate::bottom_pane::InputResult;
@@ -23,7 +24,6 @@ use crate::history_cell::PlainHistoryCell;
 use crate::onboarding_widget::OnboardingResult;
 use crate::onboarding_widget::OnboardingTranscriptEvent;
 use crate::slash_command::SlashCommand;
-use devo_utils::ansi_escape::ansi_escape_line;
 
 use super::ChatWidget;
 use super::ExternalEditorState;

@@ -1,0 +1,21 @@
+[package]
+description = "Path and Devo home helpers"
+edition.workspace = true
+license.workspace = true
+name = "devo-util-paths"
+version.workspace = true
+
+[lib]
+name = "devo_util_paths"
+path = "src/lib.rs"
+
+[dependencies]
+dirs = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }

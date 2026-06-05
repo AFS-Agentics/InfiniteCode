@@ -473,8 +473,8 @@ impl ChatComposer {
             audio_device_selection_enabled: false,
             windows_degraded_sandbox_active: false,
             is_zellij: matches!(
-                devo_utils::terminal_detection::terminal_info().multiplexer,
-                Some(devo_utils::terminal_detection::Multiplexer::Zellij {})
+                crate::terminal_detection::terminal_info().multiplexer,
+                Some(crate::terminal_detection::Multiplexer::Zellij {})
             ),
             status_line_value: None,
             status_line_enabled: false,

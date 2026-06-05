@@ -66,6 +66,7 @@ mod worker_events;
 use self::permission_presets::permission_preset_items;
 use self::permission_presets::permission_preset_label;
 use self::resume_browser::ResumeBrowserState;
+use self::session_header::SessionHeaderParams;
 
 use self::text_stream::ActiveTextItem;
 
@@ -324,16 +325,16 @@ impl ChatWidget {
         let history: Vec<Box<dyn HistoryCell>> = if show_model_onboarding {
             vec![Box::new(StartupLogoCell::new(initial_accent_color))]
         } else {
-            vec![Self::build_header_box(
-                &initial_session.cwd,
-                initial_session.model.as_ref(),
-                initial_session.request_model.as_deref(),
-                thinking_selection.as_deref(),
+            vec![Self::build_header_box(SessionHeaderParams {
+                cwd: &initial_session.cwd,
+                model: initial_session.model.as_ref(),
+                request_model: initial_session.request_model.as_deref(),
+                thinking_selection: thinking_selection.as_deref(),
                 is_first_run,
                 startup_tooltip_override,
-                initial_accent_color,
-                0,
-            )]
+                accent_color: initial_accent_color,
+                mascot_frame_index: 0,
+            })]
         };
 
         // Assemble the full widget state from the initial session, composer, history, and queues.

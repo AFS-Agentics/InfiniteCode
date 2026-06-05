@@ -3,8 +3,8 @@ use devo_core::{
     ToolResultItem, TurnItem, TurnRecord,
 };
 use devo_protocol::{SessionHistoryMetadata, SessionPlanStep, SessionPlanStepStatus};
-use devo_utils::git_op::extract_paths_from_patch;
-use devo_utils::shell_command::parse_command::parse_command;
+use devo_util_git::extract_paths_from_patch;
+use devo_util_shell_command::parse_command::parse_command;
 
 use crate::session::{
     SessionHistoryItem, SessionHistoryItemKind, SessionMetadata, SessionRuntimeStatus,

@@ -455,7 +455,7 @@ Full-screen overlays rendered in the terminal alternate screen:
 | `version.rs` | Version tracking and display. |
 | `test_backend.rs` | Test backend for snapshot testing. |
 | `insert_history.rs` | History insertion utilities. |
-| `ansi_escape.rs` | (Re-exported from devo-utils) ANSI escape sequence handling. |
+| `ansi_escape.rs` | ANSI escape sequence handling. |
 
 ## Data Flow: A Turn Lifecycle
 

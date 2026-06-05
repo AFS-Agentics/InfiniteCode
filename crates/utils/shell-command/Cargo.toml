@@ -1,0 +1,28 @@
+[package]
+description = "Shell command parsing and safety helpers"
+edition.workspace = true
+license.workspace = true
+name = "devo-util-shell-command"
+version.workspace = true
+
+[lib]
+name = "devo_util_shell_command"
+path = "src/lib.rs"
+
+[dependencies]
+base64 = { workspace = true }
+devo-protocol = { workspace = true }
+devo-util-paths = { workspace = true }
+once_cell = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+shlex = { workspace = true }
+tree-sitter = { workspace = true }
+tree-sitter-bash = { workspace = true }
+url = { workspace = true }
+which = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+pretty_assertions = { workspace = true }

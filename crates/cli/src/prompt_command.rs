@@ -11,7 +11,7 @@ use devo_core::QueryEvent;
 use devo_core::tools::ToolPlanConfig;
 use devo_core::tools::handlers;
 use devo_mcp::manager::RmcpMcpManager;
-use devo_utils::find_devo_home;
+use devo_util_paths::find_devo_home;
 use serde::Serialize;
 use std::io::Write;
 use std::path::Path;

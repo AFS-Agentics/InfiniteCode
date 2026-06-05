@@ -2,6 +2,7 @@
 //!
 //! public entry point for launching the CLI TUI.
 #![allow(dead_code)]
+mod ansi_escape;
 mod app;
 pub(crate) mod app_command;
 mod app_event;
@@ -17,6 +18,7 @@ mod custom_terminal;
 #[cfg(test)]
 mod custom_terminal_clear_tests;
 mod diff_render;
+mod elapsed;
 mod events;
 mod exec_cell;
 mod exec_command;
@@ -52,6 +54,7 @@ mod state;
 mod status_indicator_widget;
 mod streaming;
 mod style;
+mod terminal_detection;
 mod terminal_palette;
 mod test_backend;
 mod text_formatting;

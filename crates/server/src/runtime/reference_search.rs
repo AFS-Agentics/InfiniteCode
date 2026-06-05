@@ -22,7 +22,7 @@ use devo_protocol::ReferenceSearchStartParams;
 use devo_protocol::ReferenceSearchStartResult;
 use devo_protocol::ReferenceSearchUpdateParams;
 use devo_protocol::ReferenceSearchUpdateResult;
-use devo_utils::fuzzy_match::fuzzy_match;
+use devo_util_fuzzy::fuzzy_match;
 use tokio::sync::mpsc;
 
 use super::ServerRuntime;

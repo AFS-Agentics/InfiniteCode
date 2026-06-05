@@ -15,7 +15,7 @@ use devo_core::format_update_notification;
 use devo_server::ServerProcessArgs;
 use devo_server::ServerTransportMode;
 use devo_server::run_server_process;
-use devo_utils::find_devo_home;
+use devo_util_paths::find_devo_home;
 use tracing_subscriber::filter::LevelFilter;
 
 mod agent_command;

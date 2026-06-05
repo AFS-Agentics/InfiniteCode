@@ -1331,7 +1331,7 @@ dependencies = [
  "clap",
  "devo-core",
  "devo-server",
- "devo-utils",
+ "devo-util-paths",
  "dotenvy",
  "fs2",
  "pretty_assertions",
@@ -1358,7 +1358,7 @@ dependencies = [
  "devo-server",
  "devo-tasks",
  "devo-tui",
- "devo-utils",
+ "devo-util-paths",
  "futures",
  "pretty_assertions",
  "serde",
@@ -1435,7 +1435,8 @@ version = "0.1.11"
 dependencies = [
  "anyhow",
  "devo-protocol",
- "devo-utils",
+ "devo-util-git",
+ "devo-util-paths",
  "pretty_assertions",
  "serde",
  "serde_json",
@@ -1460,7 +1461,7 @@ dependencies = [
  "devo-safety",
  "devo-skills",
  "devo-tools",
- "devo-utils",
+ "devo-util-process",
  "diffy",
  "futures",
  "iana-time-zone",
@@ -1571,7 +1572,8 @@ dependencies = [
  "devo-config",
  "devo-keyring-store",
  "devo-protocol",
- "devo-utils",
+ "devo-util-paths",
+ "devo-util-process",
  "futures",
  "keyring",
  "oauth2",
@@ -1621,7 +1623,10 @@ dependencies = [
  "devo-protocol",
  "devo-provider",
  "devo-safety",
- "devo-utils",
+ "devo-util-fuzzy",
+ "devo-util-git",
+ "devo-util-paths",
+ "devo-util-shell-command",
  "futures",
  "pretty_assertions",
  "rusqlite",
@@ -1688,6 +1693,7 @@ dependencies = [
 name = "devo-tui"
 version = "0.1.11"
 dependencies = [
+ "ansi-to-tui",
  "anyhow",
  "arboard",
  "base64 0.22.1",
@@ -1698,7 +1704,10 @@ dependencies = [
  "devo-protocol",
  "devo-provider",
  "devo-server",
- "devo-utils",
+ "devo-util-fuzzy",
+ "devo-util-git",
+ "devo-util-paths",
+ "devo-util-shell-command",
  "diffy",
  "dirs",
  "futures",
@@ -1740,40 +1749,77 @@ dependencies = [
 ]
 
 [[package]]
-name = "devo-utils"
+name = "devo-util-fuzzy"
 version = "0.1.11"
 dependencies = [
- "ansi-to-tui",
- "anyhow",
- "assert_matches",
- "base64 0.22.1",
- "devo-protocol",
- "dirs",
- "filedescriptor",
- "futures",
- "lazy_static",
- "libc",
- "log",
- "once_cell",
- "portable-pty",
  "pretty_assertions",
- "ratatui",
+]
+
+[[package]]
+name = "devo-util-git"
+version = "0.1.11"
+dependencies = [
+ "assert_matches",
+ "devo-util-paths",
+ "futures",
+ "once_cell",
+ "pretty_assertions",
  "regex",
  "schemars 0.8.22",
  "serde",
- "serde_json",
- "shared_library",
- "shlex",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
- "tracing",
+ "walkdir",
+]
+
+[[package]]
+name = "devo-util-paths"
+version = "0.1.11"
+dependencies = [
+ "dirs",
+ "pretty_assertions",
+ "schemars 0.8.22",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "devo-util-process"
+version = "0.1.11"
+dependencies = [
+ "anyhow",
+ "filedescriptor",
+ "lazy_static",
+ "libc",
+ "log",
+ "portable-pty",
+ "pretty_assertions",
+ "shared_library",
+ "tokio",
+ "winapi",
+]
+
+[[package]]
+name = "devo-util-shell-command"
+version = "0.1.11"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "devo-protocol",
+ "devo-util-paths",
+ "once_cell",
+ "pretty_assertions",
+ "regex",
+ "serde",
+ "serde_json",
+ "shlex",
  "tree-sitter",
  "tree-sitter-bash",
  "url",
- "walkdir",
  "which",
- "winapi",
 ]
 
 [[package]]

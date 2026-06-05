@@ -9,7 +9,7 @@ use devo_core::FileSystemAppConfigLoader;
 use devo_protocol::Model;
 use devo_protocol::ModelCatalog;
 use devo_protocol::ProviderWireApi;
-use devo_utils::find_devo_home;
+use devo_util_paths::find_devo_home;
 use futures::StreamExt;
 use std::path::Path;
 use std::time::Duration;

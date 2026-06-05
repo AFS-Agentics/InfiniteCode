@@ -18,7 +18,7 @@ use crate::exec_cell::new_active_exec_command;
 use crate::get_git_diff::get_git_diff;
 use crate::history_cell;
 use crate::tool_result_cell::ToolResultCell;
-use devo_utils::shell_command::parse_command::parse_command;
+use devo_util_shell_command::parse_command::parse_command;
 
 use super::ActiveToolCall;
 use super::ChatWidget;

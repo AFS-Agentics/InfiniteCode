@@ -10,8 +10,8 @@ use devo_protocol::ProviderVendor;
 use serde::Deserialize;
 use serde::Serialize;
 
-use devo_utils::FileSystemConfigPathResolver;
-use devo_utils::git_op::get_git_repo_root;
+use devo_util_git::get_git_repo_root;
+use devo_util_paths::FileSystemConfigPathResolver;
 
 use crate::AUTH_CONFIG_FILE_NAME;
 use crate::AppConfigError;

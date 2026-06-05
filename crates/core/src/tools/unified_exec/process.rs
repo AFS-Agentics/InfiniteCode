@@ -5,11 +5,11 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::time::Instant;
 
-use devo_utils::pty::SpawnedProcess;
-use devo_utils::pty::TerminalSize;
-use devo_utils::pty::combine_output_receivers;
-use devo_utils::pty::spawn_pipe_process_no_stdin;
-use devo_utils::pty::spawn_pty_process;
+use devo_util_process::SpawnedProcess;
+use devo_util_process::TerminalSize;
+use devo_util_process::combine_output_receivers;
+use devo_util_process::spawn_pipe_process_no_stdin;
+use devo_util_process::spawn_pty_process;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
@@ -119,7 +119,7 @@ fn command_for_shell(cmd: &str, shell_spec: &ShellSpec) -> String {
 }
 
 pub struct UnifiedExecProcess {
-    session: Arc<devo_utils::pty::ProcessHandle>,
+    session: Arc<devo_util_process::ProcessHandle>,
     exit_code: Arc<AtomicI32>,
     terminated_flag: Arc<AtomicBool>,
     stdin_writer: Option<mpsc::Sender<Vec<u8>>>,
@@ -309,7 +309,7 @@ fn monitor_exit(
 }
 
 fn monitor_idle_timeout(
-    session: Arc<devo_utils::pty::ProcessHandle>,
+    session: Arc<devo_util_process::ProcessHandle>,
     terminated_flag: Arc<AtomicBool>,
     last_stdin_interaction: Arc<Mutex<Instant>>,
 ) {

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use devo_core::AppConfigLoader;
 use devo_core::FileSystemAppConfigLoader;
-use devo_utils::find_devo_home;
+use devo_util_paths::find_devo_home;
 
 pub(crate) async fn run_doctor() -> Result<()> {
     use colored::Colorize;

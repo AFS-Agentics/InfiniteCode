@@ -13,7 +13,7 @@ devo-provider = { workspace = true }
 devo-safety = { workspace = true }
 devo-skills = { workspace = true }
 devo-tools = { workspace = true }
-devo-utils = { workspace = true }
+devo-util-process = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }

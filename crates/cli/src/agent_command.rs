@@ -15,7 +15,7 @@ use devo_tui::InitialTuiSession;
 use devo_tui::InteractiveTuiConfig;
 use devo_tui::SavedModelEntry;
 use devo_tui::run_interactive_tui;
-use devo_utils::find_devo_home;
+use devo_util_paths::find_devo_home;
 
 /// Runs the interactive coding-agent entrypoint.
 ///

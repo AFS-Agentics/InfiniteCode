@@ -10,6 +10,7 @@ name = "devo_tui"
 path = "src/lib.rs"
 
 [dependencies]
+ansi-to-tui = { workspace = true }
 anyhow = { workspace = true }
 arboard = { workspace = true }
 base64 = { workspace = true }
@@ -20,7 +21,10 @@ devo-core = { workspace = true }
 devo-protocol = { workspace = true }
 devo-provider = { workspace = true }
 devo-server = { workspace = true }
-devo-utils = { workspace = true }
+devo-util-fuzzy = { workspace = true }
+devo-util-git = { workspace = true }
+devo-util-paths = { workspace = true }
+devo-util-shell-command = { workspace = true }
 diffy = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use super::*;
 use crate::{FileChangePayload, TurnPlanStepPayload, TurnPlanUpdatedPayload};
 use devo_core::tools::tool_spec::ToolPreparationFeedback;
-use devo_utils::git_op::extract_paths_from_patch;
+use devo_util_git::extract_paths_from_patch;
 use tokio::sync::mpsc;
 
 struct PendingToolCall {

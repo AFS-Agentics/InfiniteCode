@@ -20,7 +20,10 @@ devo-mcp = { workspace = true }
 devo-protocol = { workspace = true }
 devo-provider = { workspace = true }
 devo-safety = { workspace = true }
-devo-utils = { workspace = true }
+devo-util-fuzzy = { workspace = true }
+devo-util-git = { workspace = true }
+devo-util-paths = { workspace = true }
+devo-util-shell-command = { workspace = true }
 futures = { workspace = true }
 rusqlite = { workspace = true }
 serde = { workspace = true }

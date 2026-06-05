@@ -1,0 +1,26 @@
+[package]
+description = "Git helper utilities"
+edition.workspace = true
+license.workspace = true
+name = "devo-util-git"
+version.workspace = true
+
+[lib]
+name = "devo_util_git"
+path = "src/lib.rs"
+
+[dependencies]
+devo-util-paths = { workspace = true }
+futures = { workspace = true, features = ["alloc"] }
+once_cell = { workspace = true }
+regex = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "process", "time"] }
+walkdir = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+pretty_assertions = { workspace = true }

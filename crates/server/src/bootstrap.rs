@@ -14,7 +14,7 @@ use devo_core::tools::ToolPlanConfig;
 use devo_core::tools::handlers;
 use devo_mcp::manager::RmcpMcpManager;
 use devo_provider::SingleProviderRouter;
-use devo_utils::FileSystemConfigPathResolver;
+use devo_util_paths::FileSystemConfigPathResolver;
 
 use crate::ListenTarget;
 use crate::ServerRuntime;

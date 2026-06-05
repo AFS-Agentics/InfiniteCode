@@ -151,7 +151,7 @@ fn build_runtime() -> Result<tokio::runtime::Runtime> {
 async fn run_server_dispatch() {
     use clap::Parser;
     let args = devo_server::ServerProcessArgs::parse();
-    let home_dir = match devo_utils::find_devo_home() {
+    let home_dir = match devo_util_paths::find_devo_home() {
         Ok(d) => d,
         Err(err) => {
             eprintln!("error: could not locate DEVO_HOME: {err}");
@@ -187,7 +187,7 @@ const ILLEGAL_ENV_VAR_PREFIX: &str = "DEVO_";
 /// Security: Do not allow `.env` files to create or modify any variables with
 /// names starting with `DEVO_`.
 fn load_dotenv() {
-    let devo_home = match devo_utils::find_devo_home() {
+    let devo_home = match devo_util_paths::find_devo_home() {
         Ok(d) => d,
         Err(_) => return,
     };
@@ -221,7 +221,7 @@ where
 ///
 /// Returns a guard whose lifetime keeps the directory alive.
 fn prepend_path_for_aliases() -> std::io::Result<Option<PathGuard>> {
-    let devo_home = devo_utils::find_devo_home()?;
+    let devo_home = devo_util_paths::find_devo_home()?;
     let temp_root = devo_home.join("tmp").join(ALIAS_TEMP_ROOT);
     std::fs::create_dir_all(&temp_root)?;
 
