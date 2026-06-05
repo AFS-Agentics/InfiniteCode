@@ -3,6 +3,7 @@
 //! The chat widget owns the session state, while this module keeps header refresh,
 //! token summary text, and small shared rendering helpers out of the root file.
 
+use std::path::Path;
 use std::time::Instant;
 
 use devo_protocol::Model;
@@ -20,41 +21,54 @@ use crate::startup_header::STARTUP_HEADER_ANIMATION_INTERVAL;
 use super::ChatWidget;
 use super::DotStatus;
 
+pub(super) struct SessionHeaderParams<'a> {
+    pub cwd: &'a Path,
+    pub model: Option<&'a Model>,
+    pub request_model: Option<&'a str>,
+    pub thinking_selection: Option<&'a str>,
+    pub is_first_run: bool,
+    pub startup_tooltip_override: Option<String>,
+    pub accent_color: Color,
+    pub mascot_frame_index: usize,
+}
+
 impl ChatWidget {
     pub(super) fn is_blank_line(line: &Line<'_>) -> bool {
         line.spans.iter().all(|span| span.content.trim().is_empty())
     }
 
-    pub(super) fn build_header_box(
-        cwd: &std::path::Path,
-        model: Option<&Model>,
-        thinking_selection: Option<&str>,
-        is_first_run: bool,
-        startup_tooltip_override: Option<String>,
-        accent_color: Color,
-        mascot_frame_index: usize,
-    ) -> Box<dyn HistoryCell> {
-        let model = model.cloned().unwrap_or_else(|| Model {
+    pub(super) fn build_header_box(params: SessionHeaderParams<'_>) -> Box<dyn HistoryCell> {
+        let model = params.model.cloned().unwrap_or_else(|| Model {
             slug: "unknown".to_string(),
             display_name: "unknown".to_string(),
             provider: ProviderWireApi::OpenAIChatCompletions,
             ..Model::default()
         });
+        let header_model = params
+            .request_model
+            .map(str::trim)
+            .filter(|model| !model.is_empty())
+            .or_else(|| {
+                let display_name = model.display_name.trim();
+                (!display_name.is_empty()).then_some(display_name)
+            })
+            .unwrap_or(model.slug.as_str())
+            .to_string();
         Box::new(history_cell::new_session_info(
-            cwd,
-            &model.slug,
-            model.slug.clone(),
-            model.display_name.clone(),
+            params.cwd,
+            header_model.as_str(),
+            header_model.clone(),
+            header_model.clone(),
             model.thinking_capability.clone(),
             model
-                .resolve_thinking_selection(thinking_selection)
+                .resolve_thinking_selection(params.thinking_selection)
                 .effective_reasoning_effort,
             model.thinking_implementation.clone(),
-            is_first_run,
-            startup_tooltip_override,
+            params.is_first_run,
+            params.startup_tooltip_override,
             /*show_fast_status*/ false,
-            accent_color,
-            mascot_frame_index,
+            params.accent_color,
+            params.mascot_frame_index,
         ))
     }
 
@@ -243,12 +257,7 @@ impl ChatWidget {
     }
 
     pub(super) fn session_summary_text(&self) -> String {
-        let model = self
-            .session
-            .model
-            .as_ref()
-            .map(|model| model.slug.as_str())
-            .unwrap_or("unknown");
+        let model = self.model_display_name();
         let thinking = self.thinking_selection.as_deref().unwrap_or("default");
         let cached_input_percent =
             Self::percent_of(self.total_cache_read_tokens, self.total_input_tokens);
@@ -284,6 +293,19 @@ impl ChatWidget {
         parts.join("  ")
     }
 
+    pub(super) fn model_display_name(&self) -> &str {
+        self.session
+            .request_model
+            .as_deref()
+            .or_else(|| {
+                self.session
+                    .model
+                    .as_ref()
+                    .map(|model| model.display_name.as_str())
+            })
+            .unwrap_or("unknown")
+    }
+
     pub(super) fn sync_bottom_pane_summary(&mut self) {
         self.bottom_pane
             .set_status_line(Some(Line::from(self.session_summary_text()).dim()));
@@ -305,15 +327,16 @@ impl ChatWidget {
         startup_tooltip_override: Option<String>,
     ) -> Box<dyn HistoryCell> {
         let accent = self.active_accent_color();
-        Self::build_header_box(
-            &self.session.cwd,
-            self.session.model.as_ref(),
-            self.thinking_selection.as_deref(),
+        Self::build_header_box(SessionHeaderParams {
+            cwd: &self.session.cwd,
+            model: self.session.model.as_ref(),
+            request_model: self.session.request_model.as_deref(),
+            thinking_selection: self.thinking_selection.as_deref(),
             is_first_run,
             startup_tooltip_override,
-            accent,
-            self.startup_header_mascot_frame_index,
-        )
+            accent_color: accent,
+            mascot_frame_index: self.startup_header_mascot_frame_index,
+        })
     }
 
     pub(super) fn history_has_non_header_content(&self) -> bool {
@@ -335,15 +358,16 @@ impl ChatWidget {
             return;
         }
         let accent = self.active_accent_color();
-        self.history[0] = Self::build_header_box(
-            &self.session.cwd,
-            self.session.model.as_ref(),
-            self.thinking_selection.as_deref(),
-            /*is_first_run*/ false,
-            None,
-            accent,
-            self.startup_header_mascot_frame_index,
-        );
+        self.history[0] = Self::build_header_box(SessionHeaderParams {
+            cwd: &self.session.cwd,
+            model: self.session.model.as_ref(),
+            request_model: self.session.request_model.as_deref(),
+            thinking_selection: self.thinking_selection.as_deref(),
+            is_first_run: false,
+            startup_tooltip_override: None,
+            accent_color: accent,
+            mascot_frame_index: self.startup_header_mascot_frame_index,
+        });
     }
 
     pub(super) fn advance_startup_header_animation(&mut self) {

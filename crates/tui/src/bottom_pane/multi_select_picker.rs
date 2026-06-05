@@ -25,7 +25,7 @@
 //! .build();
 //! ```
 
-use devo_utils::fuzzy_match::fuzzy_match;
+use devo_util_fuzzy::fuzzy_match;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyModifiers;

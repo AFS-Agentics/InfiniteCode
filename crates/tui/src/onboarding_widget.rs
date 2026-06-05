@@ -29,6 +29,7 @@ use ratatui::widgets::Widget;
 use ratatui::widgets::Wrap;
 
 use devo_protocol::Model;
+use devo_protocol::ProviderModelBinding;
 use devo_protocol::ProviderVendor;
 use devo_protocol::ProviderWireApi;
 use devo_protocol::ReasoningEffortPreset;
@@ -43,6 +44,12 @@ use crate::render::renderable::Renderable;
 use crate::tui::frame_requester::FrameRequester;
 
 const SPINNER_INTERVAL: std::time::Duration = std::time::Duration::from_millis(80);
+const VALIDATION_FAILED_ACTIONS: [&str; 4] = [
+    "Add model anyway",
+    "Retry with current settings",
+    "Edit settings",
+    "Choose different model",
+];
 
 /// Simple content area with padding, no background styling.
 fn onboarding_content_area(area: Rect) -> Rect {
@@ -63,9 +70,38 @@ pub(crate) enum OnboardingResult {
     ValidationSucceeded {
         model_slug: String,
         model_name: String,
+        display_name: String,
+    },
+    /// Validation failed, but the user chose to save the binding anyway.
+    ValidationBypassed {
+        model_slug: String,
+        model_name: String,
+        display_name: String,
     },
     /// User cancelled onboarding.
     Cancelled,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum OnboardingTranscriptEvent {
+    ModelSelected {
+        model_slug: String,
+        display_name: String,
+    },
+    ProviderSelected {
+        provider_name: String,
+        base_url: Option<String>,
+        credential_summary: String,
+    },
+    SettingsConfirmed {
+        provider_name: String,
+        base_url: Option<String>,
+        model_name: String,
+        display_name: String,
+        invocation_method: ProviderWireApi,
+        default_reasoning_effort: Option<String>,
+        credential_summary: String,
+    },
 }
 
 /// Which field is active in the inline setup view.
@@ -151,6 +187,21 @@ enum OnboardingState {
         api_key: Option<String>,
         started_at: Instant,
     },
+    /// Saving provider and model binding after validation or explicit bypass.
+    Saving {
+        model_slug: String,
+        model_name: String,
+        display_name: String,
+        provider_id: String,
+        provider_name: String,
+        provider_credential_id: Option<String>,
+        invocation_method: ProviderWireApi,
+        default_reasoning_effort: Option<String>,
+        base_url: Option<String>,
+        api_key: Option<String>,
+        bypassed: bool,
+        started_at: Instant,
+    },
     /// Validation failed, show error and retry options.
     ValidationFailed {
         model: String,
@@ -208,6 +259,7 @@ pub(crate) struct OnboardingWidget {
     /// Models from the catalog, stored so `go_back_to_model_selection` can restore them.
     original_models: Vec<Model>,
     provider_vendors: Vec<ProviderVendor>,
+    transcript_events: Vec<OnboardingTranscriptEvent>,
     app_event_tx: AppEventSender,
     frame_requester: FrameRequester,
     animations_enabled: bool,
@@ -236,6 +288,7 @@ impl OnboardingWidget {
             result: None,
             original_models: models.to_vec(),
             provider_vendors: Vec::new(),
+            transcript_events: Vec::new(),
             app_event_tx,
             frame_requester,
             animations_enabled,
@@ -263,6 +316,10 @@ impl OnboardingWidget {
         self.result.take()
     }
 
+    pub(crate) fn take_transcript_events(&mut self) -> Vec<OnboardingTranscriptEvent> {
+        std::mem::take(&mut self.transcript_events)
+    }
+
     pub(crate) fn is_complete(&self) -> bool {
         self.complete
     }
@@ -285,14 +342,96 @@ impl OnboardingWidget {
         if let OnboardingState::Validating {
             model_slug,
             model_name,
+            display_name,
+            provider_id,
+            provider_name,
+            provider_credential_id,
+            invocation_method,
+            default_reasoning_effort,
+            base_url,
+            api_key,
             ..
         } = &self.state
         {
-            self.result = Some(OnboardingResult::ValidationSucceeded {
+            self.state = OnboardingState::Saving {
                 model_slug: model_slug.clone(),
                 model_name: model_name.clone(),
+                display_name: display_name.clone(),
+                provider_id: provider_id.clone(),
+                provider_name: provider_name.clone(),
+                provider_credential_id: provider_credential_id.clone(),
+                invocation_method: *invocation_method,
+                default_reasoning_effort: default_reasoning_effort.clone(),
+                base_url: base_url.clone(),
+                api_key: api_key.clone(),
+                bypassed: false,
+                started_at: Instant::now(),
+            };
+        }
+    }
+
+    pub(crate) fn on_provider_saved(&mut self, model_binding: Option<&ProviderModelBinding>) {
+        if let OnboardingState::Saving {
+            model_slug,
+            model_name,
+            display_name,
+            bypassed,
+            ..
+        } = &self.state
+        {
+            let result_model_slug = model_binding
+                .map(|binding| binding.model_slug.clone())
+                .unwrap_or_else(|| model_slug.clone());
+            let result_model_name = model_binding
+                .map(|binding| binding.model_name.clone())
+                .unwrap_or_else(|| model_name.clone());
+            let result_display_name = model_binding
+                .and_then(|binding| binding.display_name.clone())
+                .unwrap_or_else(|| display_name.clone());
+            self.result = Some(if *bypassed {
+                OnboardingResult::ValidationBypassed {
+                    model_slug: result_model_slug,
+                    model_name: result_model_name,
+                    display_name: result_display_name,
+                }
+            } else {
+                OnboardingResult::ValidationSucceeded {
+                    model_slug: result_model_slug,
+                    model_name: result_model_name,
+                    display_name: result_display_name,
+                }
             });
             self.complete = true;
+        }
+    }
+
+    pub(crate) fn on_provider_save_failed(&mut self, error_message: String) {
+        if let OnboardingState::Saving {
+            model_slug,
+            model_name,
+            display_name,
+            invocation_method,
+            provider_name,
+            provider_credential_id,
+            default_reasoning_effort,
+            base_url,
+            api_key,
+            ..
+        } = &self.state
+        {
+            self.state = OnboardingState::ValidationFailed {
+                model: model_slug.clone(),
+                model_name: model_name.clone(),
+                display_name: display_name.clone(),
+                provider: *invocation_method,
+                provider_name: provider_name.clone(),
+                provider_credential_id: provider_credential_id.clone(),
+                default_reasoning_effort: default_reasoning_effort.clone(),
+                base_url: base_url.clone(),
+                api_key: api_key.clone(),
+                error_message,
+                selected_action: 0,
+            };
         }
     }
 
@@ -348,18 +487,46 @@ impl OnboardingWidget {
             | OnboardingState::InvocationMethod { .. }
             | OnboardingState::ReasoningEffort { .. }
             | OnboardingState::Validating { .. }
+            | OnboardingState::Saving { .. }
             | OnboardingState::ValidationFailed { .. } => {}
         }
     }
 
-    fn insert_at_cursor(input: &mut String, cursor_pos: &mut usize, text: &str) {
-        let byte_pos = input
+    fn char_count(input: &str) -> usize {
+        input.chars().count()
+    }
+
+    fn byte_index_for_char(input: &str, cursor_pos: usize) -> usize {
+        input
             .char_indices()
-            .nth((*cursor_pos).min(input.chars().count()))
+            .nth(cursor_pos.min(Self::char_count(input)))
             .map(|(idx, _)| idx)
-            .unwrap_or(input.len());
+            .unwrap_or(input.len())
+    }
+
+    fn insert_at_cursor(input: &mut String, cursor_pos: &mut usize, text: &str) {
+        let byte_pos = Self::byte_index_for_char(input, *cursor_pos);
         input.insert_str(byte_pos, text);
-        *cursor_pos += text.chars().count();
+        *cursor_pos += Self::char_count(text);
+    }
+
+    fn remove_char_before_cursor(input: &mut String, cursor_pos: &mut usize) {
+        if *cursor_pos == 0 {
+            return;
+        }
+        let start = Self::byte_index_for_char(input, *cursor_pos - 1);
+        let end = Self::byte_index_for_char(input, *cursor_pos);
+        input.replace_range(start..end, "");
+        *cursor_pos -= 1;
+    }
+
+    fn remove_char_at_cursor(input: &mut String, cursor_pos: usize) {
+        if cursor_pos >= Self::char_count(input) {
+            return;
+        }
+        let start = Self::byte_index_for_char(input, cursor_pos);
+        let end = Self::byte_index_for_char(input, cursor_pos + 1);
+        input.replace_range(start..end, "");
     }
 
     // ── Helpers ──
@@ -473,13 +640,44 @@ struct ValidationParams {
 }
 
 impl OnboardingWidget {
+    fn credential_summary(credential_id: Option<&str>, api_key: Option<&str>) -> String {
+        if let Some(id) = credential_id.map(str::trim).filter(|id| !id.is_empty()) {
+            format!("saved credential: {id}")
+        } else if api_key.map(str::trim).is_some_and(|key| !key.is_empty()) {
+            "new API key entered".to_string()
+        } else {
+            "no credential provided".to_string()
+        }
+    }
+
+    fn validation_display_name(&self, params: &ValidationParams) -> String {
+        if params.display_name.trim().is_empty()
+            || (params.display_name == params.model_name && params.model_name == params.model_slug)
+        {
+            self.catalog_display_name(&params.model_slug)
+        } else {
+            params.display_name.clone()
+        }
+    }
+
+    fn record_settings_confirmed(&mut self, params: &ValidationParams) {
+        self.transcript_events
+            .push(OnboardingTranscriptEvent::SettingsConfirmed {
+                provider_name: params.provider_name.clone(),
+                base_url: params.base_url.clone(),
+                model_name: params.model_name.clone(),
+                display_name: self.validation_display_name(params),
+                invocation_method: params.invocation_method,
+                default_reasoning_effort: params.default_reasoning_effort.clone(),
+                credential_summary: Self::credential_summary(
+                    params.provider_credential_id.as_deref(),
+                    params.api_key.as_deref(),
+                ),
+            });
+    }
+
     fn start_validation(&mut self, params: ValidationParams) {
-        let display_name =
-            if params.display_name.trim().is_empty() || params.display_name == params.model_name {
-                self.catalog_display_name(&params.model_slug)
-            } else {
-                params.display_name.clone()
-            };
+        let display_name = self.validation_display_name(&params);
 
         self.state = OnboardingState::Validating {
             model_slug: params.model_slug.clone(),
@@ -566,6 +764,11 @@ impl OnboardingWidget {
                         };
                     } else {
                         let slug = item.slug.clone();
+                        self.transcript_events
+                            .push(OnboardingTranscriptEvent::ModelSelected {
+                                model_slug: slug.clone(),
+                                display_name: item.display_name.clone(),
+                            });
                         self.state = OnboardingState::ProviderSelection {
                             model: slug,
                             items: Self::provider_selection_items(&self.provider_vendors),
@@ -636,19 +839,13 @@ impl OnboardingWidget {
             KeyCode::Char(c)
                 if key.modifiers.is_empty() || key.modifiers.contains(KeyModifiers::SHIFT) =>
             {
-                input.insert(*cursor_pos, c);
-                *cursor_pos += 1;
+                Self::insert_at_cursor(input, cursor_pos, &c.to_string());
             }
             KeyCode::Backspace => {
-                if *cursor_pos > 0 {
-                    input.remove(*cursor_pos - 1);
-                    *cursor_pos -= 1;
-                }
+                Self::remove_char_before_cursor(input, cursor_pos);
             }
             KeyCode::Delete => {
-                if *cursor_pos < input.len() {
-                    input.remove(*cursor_pos);
-                }
+                Self::remove_char_at_cursor(input, *cursor_pos);
             }
             KeyCode::Left => {
                 if *cursor_pos > 0 {
@@ -656,7 +853,7 @@ impl OnboardingWidget {
                 }
             }
             KeyCode::Right => {
-                if *cursor_pos < input.len() {
+                if *cursor_pos < Self::char_count(input) {
                     *cursor_pos += 1;
                 }
             }
@@ -664,13 +861,18 @@ impl OnboardingWidget {
                 *cursor_pos = 0;
             }
             KeyCode::End => {
-                *cursor_pos = input.len();
+                *cursor_pos = Self::char_count(input);
             }
             KeyCode::Enter => {
                 let model = input.trim().to_string();
                 if model.is_empty() {
                     return;
                 }
+                self.transcript_events
+                    .push(OnboardingTranscriptEvent::ModelSelected {
+                        model_slug: model.clone(),
+                        display_name: model.clone(),
+                    });
                 self.state = OnboardingState::ProviderSelection {
                     model,
                     items: Self::provider_selection_items(&self.provider_vendors),
@@ -740,10 +942,28 @@ impl OnboardingWidget {
                                 .copied()
                                 .unwrap_or_else(|| Self::infer_provider(&model_slug));
                             let base_url = provider_vendor.base_url.clone().unwrap_or_default();
+                            self.transcript_events.push(
+                                OnboardingTranscriptEvent::ProviderSelected {
+                                    provider_name: provider_vendor.name.clone(),
+                                    base_url: provider_vendor.base_url.clone(),
+                                    credential_summary: Self::credential_summary(
+                                        provider_vendor.credential.as_deref(),
+                                        None,
+                                    ),
+                                },
+                            );
                             let (active_field, input, cursor_pos) = if base_url.trim().is_empty() {
-                                (InlineField::BaseUrl, base_url.clone(), base_url.len())
+                                (
+                                    InlineField::BaseUrl,
+                                    base_url.clone(),
+                                    Self::char_count(&base_url),
+                                )
                             } else {
-                                (InlineField::ModelName, model_slug.clone(), model_slug.len())
+                                (
+                                    InlineField::ModelName,
+                                    model_slug.clone(),
+                                    Self::char_count(&model_slug),
+                                )
                             };
                             self.state = OnboardingState::InlineSetup {
                                 model: model_slug.clone(),
@@ -760,6 +980,13 @@ impl OnboardingWidget {
                             };
                         }
                         ProviderSelectionKind::AddProvider => {
+                            self.transcript_events.push(
+                                OnboardingTranscriptEvent::ProviderSelected {
+                                    provider_name: "Add provider...".to_string(),
+                                    base_url: None,
+                                    credential_summary: "new provider credentials".to_string(),
+                                },
+                            );
                             self.state = OnboardingState::InlineSetup {
                                 model: model_slug.clone(),
                                 provider: ProviderWireApi::OpenAIChatCompletions,
@@ -808,19 +1035,13 @@ impl OnboardingWidget {
             KeyCode::Char(c)
                 if key.modifiers.is_empty() || key.modifiers.contains(KeyModifiers::SHIFT) =>
             {
-                input.insert(*cursor_pos, c);
-                *cursor_pos += 1;
+                Self::insert_at_cursor(input, cursor_pos, &c.to_string());
             }
             KeyCode::Backspace => {
-                if *cursor_pos > 0 {
-                    input.remove(*cursor_pos - 1);
-                    *cursor_pos -= 1;
-                }
+                Self::remove_char_before_cursor(input, cursor_pos);
             }
             KeyCode::Delete => {
-                if *cursor_pos < input.len() {
-                    input.remove(*cursor_pos);
-                }
+                Self::remove_char_at_cursor(input, *cursor_pos);
             }
             KeyCode::Left => {
                 if *cursor_pos > 0 {
@@ -828,7 +1049,7 @@ impl OnboardingWidget {
                 }
             }
             KeyCode::Right => {
-                if *cursor_pos < input.len() {
+                if *cursor_pos < Self::char_count(input) {
                     *cursor_pos += 1;
                 }
             }
@@ -836,7 +1057,7 @@ impl OnboardingWidget {
                 *cursor_pos = 0;
             }
             KeyCode::End => {
-                *cursor_pos = input.len();
+                *cursor_pos = Self::char_count(input);
             }
             KeyCode::Enter => {
                 // Save current field and advance.
@@ -863,7 +1084,7 @@ impl OnboardingWidget {
                         *api_key = input.trim().to_string();
                         *active_field = InlineField::ModelName;
                         *input = model_name.clone();
-                        *cursor_pos = input.len();
+                        *cursor_pos = Self::char_count(input);
                     }
                     InlineField::ModelName => {
                         *model_name = input.trim().to_string();
@@ -871,7 +1092,7 @@ impl OnboardingWidget {
                         // Prefill display name from model slug.
                         let suggestion = model_name.clone();
                         *input = suggestion.clone();
-                        *cursor_pos = suggestion.len();
+                        *cursor_pos = Self::char_count(&suggestion);
                     }
                     InlineField::DisplayName => {
                         *display_name = input.trim().to_string();
@@ -917,22 +1138,22 @@ impl OnboardingWidget {
                     InlineField::BaseUrl => {
                         *active_field = InlineField::ProviderName;
                         *input = provider_name.clone();
-                        *cursor_pos = input.len();
+                        *cursor_pos = Self::char_count(input);
                     }
                     InlineField::ApiKey => {
                         *active_field = InlineField::BaseUrl;
                         *input = base_url.clone();
-                        *cursor_pos = input.len();
+                        *cursor_pos = Self::char_count(input);
                     }
                     InlineField::ModelName => {
                         *active_field = InlineField::ApiKey;
                         *input = api_key.clone();
-                        *cursor_pos = input.len();
+                        *cursor_pos = Self::char_count(input);
                     }
                     InlineField::DisplayName => {
                         *active_field = InlineField::ModelName;
                         *input = model_name.clone();
-                        *cursor_pos = input.len();
+                        *cursor_pos = Self::char_count(input);
                     }
                 }
             }
@@ -1030,7 +1251,7 @@ impl OnboardingWidget {
                         } else {
                             Some(api_key)
                         };
-                        self.start_validation(ValidationParams {
+                        let params = ValidationParams {
                             model_slug: model,
                             model_name,
                             display_name,
@@ -1041,7 +1262,9 @@ impl OnboardingWidget {
                             default_reasoning_effort: None,
                             base_url: base_url_opt,
                             api_key: api_key_opt,
-                        });
+                        };
+                        self.record_settings_confirmed(&params);
+                        self.start_validation(params);
                     }
                 }
             }
@@ -1066,7 +1289,7 @@ impl OnboardingWidget {
                     display_name: display_name_val.clone(),
                     active_field: InlineField::DisplayName,
                     input: display_name_val,
-                    cursor_pos: display_name.len(),
+                    cursor_pos: Self::char_count(display_name),
                 };
             }
             _ => {}
@@ -1123,7 +1346,7 @@ impl OnboardingWidget {
                 } else {
                     Some(api_key)
                 };
-                self.start_validation(ValidationParams {
+                let params = ValidationParams {
                     model_slug: model,
                     model_name,
                     display_name,
@@ -1134,7 +1357,9 @@ impl OnboardingWidget {
                     default_reasoning_effort,
                     base_url: base_url_opt,
                     api_key: api_key_opt,
-                });
+                };
+                self.record_settings_confirmed(&params);
+                self.start_validation(params);
             }
             KeyCode::Esc => {
                 // Go back to invocation method selection.
@@ -1203,11 +1428,7 @@ impl OnboardingWidget {
             return;
         };
 
-        let actions = [
-            "Retry with current settings",
-            "Edit settings",
-            "Choose different model",
-        ];
+        let actions = VALIDATION_FAILED_ACTIONS;
 
         match key.code {
             KeyCode::Up => {
@@ -1222,6 +1443,47 @@ impl OnboardingWidget {
             }
             KeyCode::Enter => match *selected_action {
                 0 => {
+                    let result_model_slug = model.clone();
+                    let result_model_name = model_name.clone();
+                    let result_display_name = display_name.clone();
+                    let provider = *provider;
+                    let provider_name = provider_name.clone();
+                    let provider_credential_id = provider_credential_id.clone();
+                    let default_reasoning_effort = default_reasoning_effort.clone();
+                    let base_url = base_url.clone();
+                    let api_key = api_key.clone();
+                    let payload = serde_json::json!({
+                        "model_slug": result_model_slug.clone(),
+                        "model_name": result_model_name.clone(),
+                        "display_name": result_display_name.clone(),
+                        "provider_id": provider_name.clone(),
+                        "provider_name": provider_name.clone(),
+                        "provider_credential_id": provider_credential_id.clone(),
+                        "invocation_method": provider,
+                        "default_reasoning_effort": default_reasoning_effort.clone(),
+                        "base_url": base_url.clone(),
+                        "api_key": api_key.clone(),
+                    });
+                    self.app_event_tx
+                        .send(AppEvent::Command(AppCommand::RunUserShellCommand {
+                            command: format!("onboard-skip-validation {payload}"),
+                        }));
+                    self.state = OnboardingState::Saving {
+                        model_slug: result_model_slug,
+                        model_name: result_model_name,
+                        display_name: result_display_name,
+                        provider_id: provider_name.clone(),
+                        provider_name,
+                        provider_credential_id,
+                        invocation_method: provider,
+                        default_reasoning_effort,
+                        base_url,
+                        api_key,
+                        bypassed: true,
+                        started_at: Instant::now(),
+                    };
+                }
+                1 => {
                     // Retry.
                     let model = model.clone();
                     let model_name = model_name.clone();
@@ -1245,7 +1507,7 @@ impl OnboardingWidget {
                         api_key,
                     });
                 }
-                1 => {
+                2 => {
                     // Edit settings — go back to inline setup API key field.
                     let model_slug = model.clone();
                     let model_name = model_name.clone();
@@ -1266,10 +1528,10 @@ impl OnboardingWidget {
                         display_name,
                         active_field: InlineField::ApiKey,
                         input: api_key.clone(),
-                        cursor_pos: api_key.len(),
+                        cursor_pos: Self::char_count(&api_key),
                     };
                 }
-                2 => {
+                3 => {
                     self.go_back_to_model_selection();
                 }
                 _ => {}
@@ -1705,11 +1967,7 @@ impl OnboardingWidget {
     }
 
     fn input_with_cursor(input: &str, cursor_pos: usize) -> String {
-        let byte_pos = input
-            .char_indices()
-            .nth(cursor_pos.min(input.chars().count()))
-            .map(|(i, _)| i)
-            .unwrap_or(input.len());
+        let byte_pos = Self::byte_index_for_char(input, cursor_pos);
         format!("{}▌{}", &input[..byte_pos], &input[byte_pos..])
     }
 
@@ -1815,11 +2073,7 @@ impl OnboardingWidget {
         )]));
         lines.push(Line::from(""));
 
-        let byte_pos = input
-            .char_indices()
-            .nth(cursor_pos.min(input.chars().count()))
-            .map(|(i, _)| i)
-            .unwrap_or(input.len());
+        let byte_pos = Self::byte_index_for_char(input, cursor_pos);
         lines.push(Line::from(vec![
             Span::styled("> ", Style::default().cyan()),
             Span::styled(
@@ -1996,6 +2250,50 @@ impl OnboardingWidget {
             .render(content_area, buf);
     }
 
+    fn render_saving(
+        model: &str,
+        model_name: &str,
+        provider: ProviderWireApi,
+        started_at: Instant,
+        animations_enabled: bool,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
+        if area.height < 3 {
+            return;
+        }
+        let content_area = onboarding_content_area(area);
+        let provider_name = Self::provider_display_name(provider);
+
+        let mut lines: Vec<Line<'static>> = Vec::new();
+        lines.push(Line::from(vec![Span::styled(
+            "Saving provider binding",
+            Style::default().bold(),
+        )]));
+        lines.push(Line::from(vec![Span::styled(
+            format!("model: {model}  ·  request model: {model_name}  ·  wire API: {provider_name}"),
+            Style::default().dim(),
+        )]));
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled("│ ", Style::default().cyan()),
+            spinner(Some(started_at), animations_enabled),
+            Span::raw("  waiting for server confirmation"),
+        ]));
+        lines.push(Line::from(vec![
+            Span::styled("│   ", Style::default().cyan()),
+            Span::styled(
+                "provider/upsert is persisting the provider and model binding",
+                Style::default().dim(),
+            ),
+        ]));
+        Self::render_footer(&mut lines, "Saving", "");
+
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .render(content_area, buf);
+    }
+
     fn render_validation_failed(
         error_message: &str,
         selected_action: usize,
@@ -2006,11 +2304,7 @@ impl OnboardingWidget {
             return;
         }
         let content_area = onboarding_content_area(area);
-        let actions = [
-            "Retry with current settings",
-            "Edit settings",
-            "Choose different model",
-        ];
+        let actions = VALIDATION_FAILED_ACTIONS;
 
         let mut lines: Vec<Line<'static>> = vec![
             Line::from(vec![Span::styled(
@@ -2065,6 +2359,7 @@ impl OnboardingWidget {
                     self.result = Some(OnboardingResult::Cancelled);
                 }
             }
+            OnboardingState::Saving { .. } => {}
             OnboardingState::ValidationFailed { .. } => {
                 self.validation_failed_handle_key(key_event)
             }
@@ -2109,7 +2404,8 @@ impl Renderable for OnboardingWidget {
                 base_height + items.len() as u16 * 2
             }
             OnboardingState::Validating { .. } => 10,
-            OnboardingState::ValidationFailed { .. } => 12,
+            OnboardingState::Saving { .. } => 10,
+            OnboardingState::ValidationFailed { .. } => 13,
         }
     }
 
@@ -2248,6 +2544,26 @@ impl Renderable for OnboardingWidget {
                 }
                 Self::render_validating(
                     model_slug,
+                    *invocation_method,
+                    *started_at,
+                    self.animations_enabled,
+                    area,
+                    buf,
+                );
+            }
+            OnboardingState::Saving {
+                model_slug,
+                model_name,
+                invocation_method,
+                started_at,
+                ..
+            } => {
+                if self.animations_enabled {
+                    self.frame_requester.schedule_frame_in(SPINNER_INTERVAL);
+                }
+                Self::render_saving(
+                    model_slug,
+                    model_name,
                     *invocation_method,
                     *started_at,
                     self.animations_enabled,

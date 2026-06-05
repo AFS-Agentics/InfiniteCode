@@ -28,6 +28,7 @@ use crate::bottom_pane::MentionBinding;
 use crate::history_cell::HistoryCell;
 use crate::onboarding_widget::OnboardingWidget;
 use crate::startup_header::STARTUP_HEADER_ANIMATION_INTERVAL;
+use crate::startup_logo_cell::StartupLogoCell;
 use crate::streaming::chunking::AdaptiveChunkingPolicy;
 use crate::theme::ThemeSet;
 use crate::tui::frame_requester::FrameRequester;
@@ -65,6 +66,7 @@ mod worker_events;
 use self::permission_presets::permission_preset_items;
 use self::permission_presets::permission_preset_label;
 use self::resume_browser::ResumeBrowserState;
+use self::session_header::SessionHeaderParams;
 
 use self::text_stream::ActiveTextItem;
 
@@ -102,6 +104,7 @@ pub(crate) struct ChatWidgetInit {
 pub(crate) struct TuiSessionState {
     pub(crate) cwd: PathBuf,
     pub(crate) model: Option<Model>,
+    pub(crate) request_model: Option<String>,
     pub(crate) provider: Option<ProviderWireApi>,
     pub(crate) reasoning_effort: Option<ReasoningEffort>,
 }
@@ -112,6 +115,7 @@ impl TuiSessionState {
         Self {
             cwd,
             model,
+            request_model: None,
             provider,
             reasoning_effort: None,
         }
@@ -318,15 +322,20 @@ impl ChatWidget {
         });
         bottom_pane.set_accent_color(initial_accent_color);
 
-        let history: Vec<Box<dyn HistoryCell>> = vec![Self::build_header_box(
-            &initial_session.cwd,
-            initial_session.model.as_ref(),
-            thinking_selection.as_deref(),
-            is_first_run,
-            startup_tooltip_override,
-            initial_accent_color,
-            0,
-        )];
+        let history: Vec<Box<dyn HistoryCell>> = if show_model_onboarding {
+            vec![Box::new(StartupLogoCell::new(initial_accent_color))]
+        } else {
+            vec![Self::build_header_box(SessionHeaderParams {
+                cwd: &initial_session.cwd,
+                model: initial_session.model.as_ref(),
+                request_model: initial_session.request_model.as_deref(),
+                thinking_selection: thinking_selection.as_deref(),
+                is_first_run,
+                startup_tooltip_override,
+                accent_color: initial_accent_color,
+                mascot_frame_index: 0,
+            })]
+        };
 
         // Assemble the full widget state from the initial session, composer, history, and queues.
         let mut widget = Self {
@@ -385,8 +394,10 @@ impl ChatWidget {
                 widget.frame_requester.clone(),
                 true, /* animations_enabled */
             ));
-            widget.history.clear();
-            widget.next_history_flush_index = 0;
+            widget.bottom_pane.set_composer_input_enabled(
+                /*enabled*/ false,
+                Some("Complete onboarding to start chatting".to_string()),
+            );
             widget.set_status_message("Onboarding");
         }
 

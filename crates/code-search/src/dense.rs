@@ -1,7 +1,7 @@
 //! Dense embedding providers and vector math.
 //!
 //! Production search uses model2vec with the Semble-compatible
-//! `minishlab/potion-code-16M` model cached under the local Devo cache
+//! `minishlab/potion-code-16M` model cached under the local Devo model
 //! directory. Missing model files are fetched on first use; load/download
 //! failures become typed `ModelUnavailable` errors so the tool can report a
 //! recoverable cache/model problem instead of panicking. Tests use a deterministic
@@ -10,6 +10,7 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+use devo_util_paths::find_devo_home;
 use hf_hub::HFClientSync;
 use model2vec::model::Model2Vec;
 use sha2::{Digest, Sha256};
@@ -19,7 +20,14 @@ use crate::types::CodeSearchError;
 const DEFAULT_MODEL_OWNER: &str = "minishlab";
 const DEFAULT_MODEL_NAME: &str = "potion-code-16M";
 const DEFAULT_MODEL_ID: &str = "minishlab/potion-code-16M";
+const LOCAL_MODELS_DIR: &str = "local-models";
 const MODEL_FILES: [&str; 3] = ["tokenizer.json", "model.safetensors", "config.json"];
+
+#[derive(Debug)]
+struct DefaultModelCacheInputs {
+    devo_home: std::io::Result<PathBuf>,
+    temp_dir: PathBuf,
+}
 
 /// Embeds code-search documents and queries into dense vectors.
 ///
@@ -197,11 +205,18 @@ fn ensure_model_files(model_dir: &PathBuf) -> Result<(), CodeSearchError> {
 
 /// Computes the on-disk directory for the default model.
 fn default_model_cache_dir() -> PathBuf {
-    dirs::cache_dir()
-        .unwrap_or_else(std::env::temp_dir)
-        .join("devo")
-        .join("code-search")
-        .join("models")
+    default_model_cache_dir_from_inputs(DefaultModelCacheInputs {
+        devo_home: find_devo_home(),
+        temp_dir: std::env::temp_dir(),
+    })
+}
+
+fn default_model_cache_dir_from_inputs(inputs: DefaultModelCacheInputs) -> PathBuf {
+    let base_dir = inputs
+        .devo_home
+        .unwrap_or_else(|_| inputs.temp_dir.join(".devo"));
+    base_dir
+        .join(LOCAL_MODELS_DIR)
         .join(DEFAULT_MODEL_ID.replace('/', "--"))
 }
 
@@ -255,5 +270,41 @@ mod tests {
     fn cosine_similarity_scores_identical_vectors_highest() {
         assert_eq!(cosine_similarity(&[1.0, 0.0], &[1.0, 0.0]), 1.0);
         assert_eq!(cosine_similarity(&[1.0, 0.0], &[0.0, 1.0]), 0.0);
+    }
+
+    #[test]
+    fn default_model_cache_dir_uses_resolved_devo_home() {
+        let devo_home = PathBuf::from("devo-home");
+        let inputs = DefaultModelCacheInputs {
+            devo_home: Ok(devo_home.clone()),
+            temp_dir: PathBuf::from("temp"),
+        };
+
+        assert_eq!(
+            default_model_cache_dir_from_inputs(inputs),
+            devo_home
+                .join(LOCAL_MODELS_DIR)
+                .join("minishlab--potion-code-16M")
+        );
+    }
+
+    #[test]
+    fn default_model_cache_dir_falls_back_to_temp_when_devo_home_is_unavailable() {
+        let temp_dir = PathBuf::from("temp");
+        let inputs = DefaultModelCacheInputs {
+            devo_home: Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "home unavailable",
+            )),
+            temp_dir: temp_dir.clone(),
+        };
+
+        assert_eq!(
+            default_model_cache_dir_from_inputs(inputs),
+            temp_dir
+                .join(".devo")
+                .join(LOCAL_MODELS_DIR)
+                .join("minishlab--potion-code-16M")
+        );
     }
 }

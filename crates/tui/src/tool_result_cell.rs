@@ -3,7 +3,7 @@
 //! Inline rendering keeps tool output compact, while transcript rendering keeps
 //! the full output available for the Ctrl+T pager.
 
-use devo_utils::ansi_escape::ansi_escape_line;
+use crate::ansi_escape::ansi_escape_line;
 use ratatui::style::Style;
 use ratatui::text::Line;
 

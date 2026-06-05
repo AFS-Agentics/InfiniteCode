@@ -8,13 +8,14 @@ use devo_core::PresetModelCatalog;
 use devo_core::ResolvedProviderSettings;
 use devo_core::SessionId;
 use devo_core::project_config_key;
+use devo_core::resolve_model_binding;
 use devo_protocol::PermissionPreset;
 use devo_protocol::ProviderWireApi;
 use devo_tui::InitialTuiSession;
 use devo_tui::InteractiveTuiConfig;
 use devo_tui::SavedModelEntry;
 use devo_tui::run_interactive_tui;
-use devo_utils::find_devo_home;
+use devo_util_paths::find_devo_home;
 
 /// Runs the interactive coding-agent entrypoint.
 ///
@@ -57,6 +58,21 @@ pub(crate) async fn run_agent(
         model_thinking_selection,
         ..
     } = resolved;
+    let active_model_binding = if onboarding_mode {
+        None
+    } else {
+        resolve_model_binding(&app_config.provider, /*requested_model*/ None)
+    };
+    let request_model = active_model_binding.as_ref().and_then(|binding| {
+        if binding.model_name == binding.model_slug {
+            None
+        } else {
+            Some(binding.model_name.clone())
+        }
+    });
+    let model = active_model_binding
+        .map(|binding| binding.model_slug)
+        .unwrap_or(model);
 
     tracing::info!("starting interactive tui");
     let exit = run_interactive_tui(InteractiveTuiConfig {
@@ -64,6 +80,7 @@ pub(crate) async fn run_agent(
         initial_session: InitialTuiSession {
             session_id: initial_session_id,
             model,
+            request_model,
             provider: wire_api,
             thinking_selection: model_thinking_selection,
             permission_preset,
@@ -128,8 +145,19 @@ fn saved_model_entries(app_config: &AppConfig) -> Vec<SavedModelEntry> {
         .filter(|binding| binding.enabled)
         .filter_map(|binding| {
             let provider = stored_config.providers.get(&binding.provider)?;
+            let request_model = if binding.model_name == binding.model_slug {
+                None
+            } else {
+                Some(binding.model_name.clone())
+            };
+            let display_name = binding
+                .display_name
+                .clone()
+                .or_else(|| request_model.clone());
             Some(SavedModelEntry {
                 model: binding.model_slug.clone(),
+                request_model,
+                display_name,
                 wire_api: binding.invocation_method,
                 base_url: provider.base_url.clone(),
                 api_key: None,
@@ -152,6 +180,8 @@ fn saved_model_entries(app_config: &AppConfig) -> Vec<SavedModelEntry> {
                     .iter()
                     .map(move |model| SavedModelEntry {
                         model: model.model.clone(),
+                        request_model: None,
+                        display_name: None,
                         wire_api,
                         base_url: model
                             .base_url
@@ -384,17 +414,60 @@ mod tests {
             vec![
                 SavedModelEntry {
                     model: "provider-defaults".to_string(),
+                    request_model: None,
+                    display_name: None,
                     wire_api: ProviderWireApi::OpenAIResponses,
                     base_url: Some("https://provider.example".to_string()),
                     api_key: None,
                 },
                 SavedModelEntry {
                     model: "model-overrides".to_string(),
+                    request_model: None,
+                    display_name: None,
                     wire_api: ProviderWireApi::OpenAIResponses,
                     base_url: Some("https://model.example".to_string()),
                     api_key: Some("model-key".to_string()),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn saved_model_entries_preserve_binding_request_and_display_names() {
+        let app_config = test_app_config(ProviderConfigSection {
+            providers: BTreeMap::from([(
+                "deepseek".to_string(),
+                ProviderVendorConfig {
+                    base_url: Some("https://api.deepseek.com".to_string()),
+                    wire_apis: vec![ProviderWireApi::OpenAIChatCompletions],
+                    enabled: true,
+                    ..ProviderVendorConfig::default()
+                },
+            )]),
+            model_bindings: BTreeMap::from([(
+                "deepseek".to_string(),
+                ModelBindingConfig {
+                    model_slug: "deepseek-v4-flash".to_string(),
+                    provider: "deepseek".to_string(),
+                    model_name: "DeepSeek-V4-Flash".to_string(),
+                    display_name: Some("DeepSeek-V4-Flash".to_string()),
+                    invocation_method: ProviderWireApi::OpenAIChatCompletions,
+                    ..ModelBindingConfig::default()
+                },
+            )]),
+            ..ProviderConfigSection::default()
+        });
+
+        assert_eq!(
+            saved_model_entries(&app_config),
+            vec![SavedModelEntry {
+                model: "deepseek-v4-flash".to_string(),
+                request_model: Some("DeepSeek-V4-Flash".to_string()),
+                display_name: Some("DeepSeek-V4-Flash".to_string()),
+                wire_api: ProviderWireApi::OpenAIChatCompletions,
+                base_url: Some("https://api.deepseek.com".to_string()),
+                api_key: None,
+            }]
         );
     }
 
@@ -418,6 +491,8 @@ mod tests {
             saved_model_entries(&app_config),
             vec![SavedModelEntry {
                 model: "default-wire-api".to_string(),
+                request_model: None,
+                display_name: None,
                 wire_api: ProviderWireApi::OpenAIChatCompletions,
                 base_url: None,
                 api_key: None,

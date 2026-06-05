@@ -12,7 +12,11 @@ members = [
     "crates/config",
     "crates/server",
     "crates/tui",
-    "crates/utils",
+    "crates/utils/fuzzy",
+    "crates/utils/git",
+    "crates/utils/paths",
+    "crates/utils/process",
+    "crates/utils/shell-command",
     "crates/cli",
     "crates/arg0",
     "crates/skills",
@@ -63,12 +67,15 @@ devo-skills = { path = "crates/skills" }
 devo-tasks = { path = "crates/tasks" }
 devo-tools = { path = "crates/tools" }
 devo-tui = { path = "crates/tui" }
-devo-utils = { path = "crates/utils" }
+devo-util-fuzzy = { path = "crates/utils/fuzzy" }
+devo-util-git = { path = "crates/utils/git" }
+devo-util-paths = { path = "crates/utils/paths" }
+devo-util-process = { path = "crates/utils/process" }
+devo-util-shell-command = { path = "crates/utils/shell-command" }
 diffy = "0.4.2"
 dirs = "6"
 fs2 = "0.4"
 futures = { version = "0.3", default-features = false }
-glob = "0.3"
 hf-hub = { version = "1.0.0-rc.1", features = ["blocking", "rustls-tls"] }
 hnsw_rs = "0.3.4"
 iana-time-zone = "0.1.65"

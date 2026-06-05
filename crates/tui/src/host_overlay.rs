@@ -1,7 +1,7 @@
 //! Host-side lifecycle helpers for alternate-screen overlays.
 
+use crate::ansi_escape::ansi_escape_line;
 use anyhow::Result;
-use devo_utils::ansi_escape::ansi_escape_line;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 

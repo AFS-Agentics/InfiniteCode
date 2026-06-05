@@ -22,9 +22,9 @@ use std::time::Duration;
 
 use devo_config::McpServerEnvVar;
 #[cfg(unix)]
-use devo_utils::pty::process_group::kill_process_group;
+use devo_util_process::process_group::kill_process_group;
 #[cfg(unix)]
-use devo_utils::pty::process_group::terminate_process_group;
+use devo_util_process::process_group::terminate_process_group;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use rmcp::service::RoleClient;

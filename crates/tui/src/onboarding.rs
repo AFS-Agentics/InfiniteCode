@@ -10,7 +10,7 @@ use devo_protocol::PermissionPreset;
 use devo_protocol::ProviderModelBinding;
 use devo_protocol::ProviderVendor;
 use devo_protocol::ProviderWireApi;
-use devo_utils::find_devo_home;
+use devo_util_paths::find_devo_home;
 use std::collections::BTreeMap;
 use toml::Value;
 

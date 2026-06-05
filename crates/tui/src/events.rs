@@ -6,6 +6,7 @@ use crate::app_command::InputHistoryDirection;
 use crate::bottom_pane::SkillMetadata;
 use devo_core::ItemId;
 use devo_core::SessionId;
+use devo_protocol::ProviderModelBinding;
 use devo_protocol::ProviderVendor;
 use devo_protocol::ProviderWireApi;
 use devo_protocol::ReasoningEffort;
@@ -45,8 +46,12 @@ pub(crate) struct SessionListEntry {
 /// One persisted model profile available for switching in the interactive model picker.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SavedModelEntry {
-    /// Stable model slug or custom model name.
+    /// Stable catalog model slug or custom model name.
     pub model: String,
+    /// Provider-specific model name used in requests when it differs from `model`.
+    pub request_model: Option<String>,
+    /// Persisted display label for the saved binding.
+    pub display_name: Option<String>,
     /// Concrete wire protocol stored for this model's provider profile.
     pub wire_api: ProviderWireApi,
     /// Optional provider base URL override stored with the model.
@@ -236,6 +241,13 @@ pub(crate) enum WorkerEvent {
     ProviderVendorUpserted {
         /// The provider vendor returned by `provider/upsert`.
         provider_vendor: ProviderVendor,
+        /// Optional model binding returned by `provider/upsert`.
+        model_binding: Option<ProviderModelBinding>,
+    },
+    /// Provider vendor upsert failed during onboarding or provider updates.
+    ProviderVendorUpsertFailed {
+        /// Human-readable failure reason from `provider/upsert`.
+        message: String,
     },
     /// Current known sessions were listed from the server.
     SessionsListed {

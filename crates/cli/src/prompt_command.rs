@@ -11,7 +11,7 @@ use devo_core::QueryEvent;
 use devo_core::tools::ToolPlanConfig;
 use devo_core::tools::handlers;
 use devo_mcp::manager::RmcpMcpManager;
-use devo_utils::find_devo_home;
+use devo_util_paths::find_devo_home;
 use serde::Serialize;
 use std::io::Write;
 use std::path::Path;
@@ -67,9 +67,8 @@ pub(crate) async fn run_prompt(
             app_config.mcp.clone(),
             app_config.mcp_oauth_credentials_store.unwrap_or_default(),
         ));
-        let reg =
-            handlers::build_registry_from_plan_with_mcp(&ToolPlanConfig::default(), mcp_manager)
-                .await;
+        let tool_plan = ToolPlanConfig::from_app_config(&app_config);
+        let reg = handlers::build_registry_from_plan_with_mcp(&tool_plan, mcp_manager).await;
         std::sync::Arc::new(reg)
     };
     let runtime = ToolRuntime::new_with_context(

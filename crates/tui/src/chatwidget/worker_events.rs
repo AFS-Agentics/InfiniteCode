@@ -18,7 +18,7 @@ use crate::exec_cell::new_active_exec_command;
 use crate::get_git_diff::get_git_diff;
 use crate::history_cell;
 use crate::tool_result_cell::ToolResultCell;
-use devo_utils::shell_command::parse_command::parse_command;
+use devo_util_shell_command::parse_command::parse_command;
 
 use super::ActiveToolCall;
 use super::ChatWidget;
@@ -40,7 +40,7 @@ impl ChatWidget {
             } => {
                 self.active_turn_id = Some(turn_id);
                 self.committed_server_assistant_in_turn = false;
-                self.update_session_request_model(model);
+                self.sync_session_catalog_model(model);
                 self.thinking_selection = thinking;
                 self.session.reasoning_effort = reasoning_effort;
                 self.refresh_header_box();
@@ -569,21 +569,20 @@ impl ChatWidget {
             WorkerEvent::ProviderValidationSucceeded { reply_preview } => {
                 if let Some(onboarding) = self.onboarding.as_mut() {
                     onboarding.on_validation_succeeded(reply_preview.clone());
-                    if let Some(result) = onboarding.take_result() {
-                        self.handle_onboarding_result(result);
-                    }
                 }
+                self.drain_onboarding_transcript_events();
                 self.add_to_history(history_cell::new_info_event(
                     format!("Validation reply: {reply_preview}"),
                     Some("provider validation succeeded".to_string()),
                 ));
                 self.busy = false;
-                self.set_status_message("Onboarding complete");
+                self.set_status_message("Saving provider");
             }
             WorkerEvent::ProviderValidationFailed { message } => {
                 if let Some(onboarding) = self.onboarding.as_mut() {
                     onboarding.on_validation_failed(message.clone());
                 }
+                self.drain_onboarding_transcript_events();
                 self.busy = false;
                 self.add_to_history(history_cell::new_error_event_with_hint(
                     message,
@@ -595,12 +594,47 @@ impl ChatWidget {
                 if let Some(onboarding) = self.onboarding.as_mut() {
                     onboarding.on_provider_vendors_listed(provider_vendors);
                 }
+                self.drain_onboarding_transcript_events();
             }
-            WorkerEvent::ProviderVendorUpserted { provider_vendor } => {
-                self.add_to_history(history_cell::new_info_event(
-                    format!("Provider saved: {}", provider_vendor.name),
-                    Some("provider upserted".to_string()),
+            WorkerEvent::ProviderVendorUpserted {
+                provider_vendor,
+                model_binding,
+            } => {
+                let onboarding_was_active = self.onboarding.is_some();
+                if let Some(binding) = model_binding.as_ref() {
+                    self.apply_session_model_binding(binding);
+                }
+                if self.onboarding.is_some() {
+                    if let Some(onboarding) = self.onboarding.as_mut() {
+                        onboarding.on_provider_saved(model_binding.as_ref());
+                    }
+                    self.drain_onboarding_transcript_events();
+                    if let Some(result) = self
+                        .onboarding
+                        .as_mut()
+                        .and_then(crate::onboarding_widget::OnboardingWidget::take_result)
+                    {
+                        self.handle_onboarding_result(result);
+                    }
+                }
+                if !onboarding_was_active {
+                    self.add_to_history(history_cell::new_info_event(
+                        format!("Provider saved: {}", provider_vendor.name),
+                        Some("provider upserted".to_string()),
+                    ));
+                }
+            }
+            WorkerEvent::ProviderVendorUpsertFailed { message } => {
+                if let Some(onboarding) = self.onboarding.as_mut() {
+                    onboarding.on_provider_save_failed(message.clone());
+                }
+                self.drain_onboarding_transcript_events();
+                self.busy = false;
+                self.add_to_history(history_cell::new_error_event_with_hint(
+                    message,
+                    Some("provider upsert failed".to_string()),
                 ));
+                self.set_status_message("Provider save failed");
             }
             WorkerEvent::SessionsListed { sessions } => {
                 self.resume_browser_loading = false;

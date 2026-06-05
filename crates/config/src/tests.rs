@@ -9,6 +9,7 @@ use pretty_assertions::assert_eq;
 use super::AppConfig;
 use super::AppConfigLoader;
 use super::AppConfigStore;
+use super::ExperimentalConfig;
 use super::FileSystemAppConfigLoader;
 use super::LogRotation;
 use super::LoggingConfig;
@@ -115,6 +116,7 @@ check_interval_hours = 48
                 include_instructions: Some(true),
                 config: Vec::new(),
             },
+            experimental: ExperimentalConfig { code_search: false },
             mcp_oauth_credentials_store: Some(OAuthCredentialsStoreMode::default()),
             mcp: super::McpConfig::default(),
             provider: ProviderConfigSection::default(),
@@ -126,6 +128,90 @@ check_interval_hours = 48
             project_root_markers: vec![".workspace".into()],
             projects: BTreeMap::new(),
         }
+    );
+
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn default_app_config_disables_experimental_code_search() {
+    assert_eq!(
+        AppConfig::default().experimental,
+        ExperimentalConfig { code_search: false }
+    );
+}
+
+#[test]
+fn loader_accepts_experimental_code_search_kebab_key() {
+    let root = unique_temp_dir("config-experimental-kebab");
+    let home = root.join("home").join(".devo");
+    std::fs::create_dir_all(&home).expect("home config dir");
+    std::fs::write(
+        home.join("config.toml"),
+        "[experimental]\ncode-search = true\n",
+    )
+    .expect("write user config");
+
+    let loader = FileSystemAppConfigLoader::new(home);
+    let config = loader.load(None).expect("load config");
+
+    assert_eq!(
+        config.experimental,
+        ExperimentalConfig { code_search: true }
+    );
+
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn loader_accepts_experimental_code_search_snake_alias() {
+    let root = unique_temp_dir("config-experimental-snake");
+    let home = root.join("home").join(".devo");
+    std::fs::create_dir_all(&home).expect("home config dir");
+    std::fs::write(
+        home.join("config.toml"),
+        "[experimental]\ncode_search = true\n",
+    )
+    .expect("write user config");
+
+    let loader = FileSystemAppConfigLoader::new(home);
+    let config = loader.load(None).expect("load config");
+
+    assert_eq!(
+        config.experimental,
+        ExperimentalConfig { code_search: true }
+    );
+
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn loader_merges_experimental_config_in_normal_precedence_order() {
+    let root = unique_temp_dir("config-experimental-merge");
+    let home = root.join("home").join(".devo");
+    let workspace = root.join("workspace");
+    std::fs::create_dir_all(&home).expect("home config dir");
+    std::fs::create_dir_all(workspace.join(".devo")).expect("workspace config dir");
+    std::fs::write(
+        home.join("config.toml"),
+        "[experimental]\ncode-search = false\n",
+    )
+    .expect("write user config");
+    std::fs::write(
+        workspace.join(".devo").join("config.toml"),
+        "[experimental]\ncode-search = true\n",
+    )
+    .expect("write project config");
+    let cli_overrides: toml::Value = "[experimental]\ncode-search = false\n"
+        .parse()
+        .expect("parse cli overrides");
+
+    let loader = FileSystemAppConfigLoader::new(home).with_cli_overrides(cli_overrides);
+    let config = loader.load(Some(&workspace)).expect("load config");
+
+    assert_eq!(
+        config.experimental,
+        ExperimentalConfig { code_search: false }
     );
 
     let _ = std::fs::remove_dir_all(root);
@@ -251,6 +337,73 @@ fn provider_upsert_writes_user_config_when_workspace_is_active() {
     assert!(user_config.contains("[model_bindings.qwen-openrouter]"));
     assert!(user_config.contains("model_binding = \"qwen-openrouter\""));
     assert!(!workspace_config.exists());
+
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn provider_upsert_updates_existing_binding_model_name() {
+    let root = unique_temp_dir("provider-upsert-existing-binding");
+    let home = root.join("home").join(".devo");
+    std::fs::create_dir_all(&home).expect("home config dir");
+    std::fs::write(
+        home.join("config.toml"),
+        r#"
+[defaults]
+model_binding = "deepseek-v4-flash-deepseek"
+
+[providers.Deepseek]
+base_url = "https://api.deepseek.com"
+credential = "deepseek_api_key"
+enabled = true
+name = "Deepseek"
+wire_apis = ["openai_chat_completions"]
+
+[model_bindings.deepseek-v4-flash-deepseek]
+display_name = "deepseek-v4-flash"
+enabled = true
+invocation_method = "openai_chat_completions"
+model_name = "deepseek-v4-flash"
+model_slug = "deepseek-v4-flash"
+provider = "Deepseek"
+"#,
+    )
+    .expect("write user config");
+
+    let mut store =
+        AppConfigStore::load(home.clone(), /*workspace_root*/ None).expect("load store");
+    store
+        .upsert_provider_vendor(
+            "Deepseek".to_string(),
+            ProviderVendor {
+                name: "Deepseek".to_string(),
+                base_url: Some("https://api.deepseek.com".to_string()),
+                credential: Some("deepseek_api_key".to_string()),
+                wire_apis: vec![ProviderWireApi::OpenAIChatCompletions],
+                enabled: true,
+            },
+            Some(ProviderModelBinding {
+                binding_id: "deepseek-v4-flash-deepseek".to_string(),
+                model_slug: "deepseek-v4-flash".to_string(),
+                provider: "Deepseek".to_string(),
+                model_name: "DeepSeek-V4-Flash".to_string(),
+                display_name: Some("DeepSeek-V4-Flash".to_string()),
+                invocation_method: ProviderWireApi::OpenAIChatCompletions,
+                default_reasoning_effort: None,
+                enabled: true,
+            }),
+            Some("deepseek-v4-flash-deepseek".to_string()),
+            /*api_key*/ None,
+        )
+        .expect("upsert provider");
+
+    let user_config = std::fs::read_to_string(home.join("config.toml")).expect("user config");
+    let document: toml::Value = toml::from_str(&user_config).expect("parse user config");
+    let binding = &document["model_bindings"]["deepseek-v4-flash-deepseek"];
+
+    assert_eq!(binding["model_slug"].as_str(), Some("deepseek-v4-flash"));
+    assert_eq!(binding["model_name"].as_str(), Some("DeepSeek-V4-Flash"));
+    assert_eq!(binding["display_name"].as_str(), Some("DeepSeek-V4-Flash"));
 
     let _ = std::fs::remove_dir_all(root);
 }

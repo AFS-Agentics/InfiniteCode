@@ -48,7 +48,7 @@ use devo_keyring_store::KeyringStore;
 use rmcp::transport::auth::AuthorizationManager;
 use tokio::sync::Mutex;
 
-use devo_utils::home_dir::find_devo_home;
+use devo_util_paths::find_devo_home;
 
 const KEYRING_SERVICE: &str = "Codex MCP Credentials";
 const REFRESH_SKEW_MILLIS: u64 = 30_000;

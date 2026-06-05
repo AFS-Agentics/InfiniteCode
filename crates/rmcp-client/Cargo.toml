@@ -18,7 +18,8 @@ bytes = { workspace = true }
 devo-config = { workspace = true }
 devo-keyring-store = { workspace = true }
 devo-protocol = { workspace = true }
-devo-utils = { workspace = true }
+devo-util-paths = { workspace = true }
+devo-util-process = { workspace = true }
 futures = { workspace = true, default-features = false, features = ["std"] }
 keyring = { workspace = true, features = ["crypto-rust"] }
 oauth2 = "5"

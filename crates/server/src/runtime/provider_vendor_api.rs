@@ -16,7 +16,7 @@ use devo_provider::ModelProviderSDK;
 use devo_provider::anthropic::AnthropicProvider;
 use devo_provider::openai::OpenAIProvider;
 use devo_provider::openai::OpenAIResponsesProvider;
-use devo_utils::current_user_config_file;
+use devo_util_paths::current_user_config_file;
 use std::time::Duration;
 
 use crate::ProtocolErrorCode;

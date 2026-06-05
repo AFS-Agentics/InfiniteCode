@@ -21,11 +21,6 @@ impl Renderable for ChatWidget {
             return;
         }
 
-        if let Some(onboarding) = &self.onboarding {
-            onboarding.render(area, buf);
-            return;
-        }
-
         let bottom_height = self
             .bottom_pane
             .desired_height(area.width)
@@ -33,17 +28,24 @@ impl Renderable for ChatWidget {
         let [history_area, bottom_area] =
             Layout::vertical([Constraint::Min(1), Constraint::Length(bottom_height)]).areas(area);
 
-        let viewport_lines = self.active_viewport_lines(history_area.width);
-        if !viewport_lines.is_empty() {
-            Paragraph::new(Text::from(viewport_lines)).render(history_area, buf);
+        if let Some(onboarding) = &self.onboarding {
+            onboarding.render(history_area, buf);
+        } else {
+            let viewport_lines = self.active_viewport_lines(history_area.width);
+            if !viewport_lines.is_empty() {
+                Paragraph::new(Text::from(viewport_lines)).render(history_area, buf);
+            }
         }
 
         self.bottom_pane.render(bottom_area, buf);
     }
 
     fn desired_height(&self, width: u16) -> u16 {
-        if self.onboarding.is_some() {
-            return u16::MAX;
+        if let Some(onboarding) = &self.onboarding {
+            return onboarding
+                .desired_height(width.max(1))
+                .saturating_add(self.bottom_pane.desired_height(width))
+                .saturating_add(2);
         }
         if self.resume_browser.is_some() {
             return u16::MAX;
@@ -56,9 +58,6 @@ impl Renderable for ChatWidget {
     }
 
     fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
-        if let Some(onboarding) = &self.onboarding {
-            return onboarding.cursor_pos(area);
-        }
         if self.resume_browser.is_some() {
             return None;
         }
@@ -66,8 +65,13 @@ impl Renderable for ChatWidget {
             .bottom_pane
             .desired_height(area.width)
             .min(area.height.saturating_sub(1).max(3));
-        let [_, bottom_area] =
+        let [history_area, bottom_area] =
             Layout::vertical([Constraint::Min(1), Constraint::Length(bottom_height)]).areas(area);
+        if let Some(onboarding) = &self.onboarding
+            && let Some(cursor) = onboarding.cursor_pos(history_area)
+        {
+            return Some(cursor);
+        }
         self.bottom_pane.cursor_pos(bottom_area)
     }
 }

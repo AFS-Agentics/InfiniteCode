@@ -56,6 +56,30 @@ pub(crate) fn build_startup_header(data: StartupHeaderData<'_>, width: u16) -> V
     }
 }
 
+pub(crate) fn build_devo_logo_intro(width: u16, accent_color: Color) -> Vec<Line<'static>> {
+    let available_width = usize::from(width);
+    if available_width == 0 {
+        return Vec::new();
+    }
+    if available_width < STARTUP_HEADER_MIN_FULL_WIDTH {
+        return vec![Line::from(Span::styled(
+            truncate_right("Devo", available_width),
+            Style::default().fg(accent_color).bold(),
+        ))];
+    }
+
+    let logo_style = Style::default().fg(accent_color).bold();
+    DEVO_LOGO
+        .iter()
+        .map(|logo_line| {
+            Line::from(Span::styled(
+                truncate_right(logo_line, available_width),
+                logo_style,
+            ))
+        })
+        .collect()
+}
+
 fn build_full_header(data: StartupHeaderData<'_>, inner_width: usize) -> Vec<Line<'static>> {
     let border_style = Style::default().dim();
     let muted_style = Style::default().dim();
