@@ -323,6 +323,7 @@ impl ChatWidget {
         let history: Vec<Box<dyn HistoryCell>> = vec![Self::build_header_box(
             &initial_session.cwd,
             initial_session.model.as_ref(),
+            initial_session.request_model.as_deref(),
             thinking_selection.as_deref(),
             is_first_run,
             startup_tooltip_override,

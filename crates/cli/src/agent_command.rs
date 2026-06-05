@@ -145,8 +145,19 @@ fn saved_model_entries(app_config: &AppConfig) -> Vec<SavedModelEntry> {
         .filter(|binding| binding.enabled)
         .filter_map(|binding| {
             let provider = stored_config.providers.get(&binding.provider)?;
+            let request_model = if binding.model_name == binding.model_slug {
+                None
+            } else {
+                Some(binding.model_name.clone())
+            };
+            let display_name = binding
+                .display_name
+                .clone()
+                .or_else(|| request_model.clone());
             Some(SavedModelEntry {
                 model: binding.model_slug.clone(),
+                request_model,
+                display_name,
                 wire_api: binding.invocation_method,
                 base_url: provider.base_url.clone(),
                 api_key: None,
@@ -169,6 +180,8 @@ fn saved_model_entries(app_config: &AppConfig) -> Vec<SavedModelEntry> {
                     .iter()
                     .map(move |model| SavedModelEntry {
                         model: model.model.clone(),
+                        request_model: None,
+                        display_name: None,
                         wire_api,
                         base_url: model
                             .base_url
@@ -401,17 +414,60 @@ mod tests {
             vec![
                 SavedModelEntry {
                     model: "provider-defaults".to_string(),
+                    request_model: None,
+                    display_name: None,
                     wire_api: ProviderWireApi::OpenAIResponses,
                     base_url: Some("https://provider.example".to_string()),
                     api_key: None,
                 },
                 SavedModelEntry {
                     model: "model-overrides".to_string(),
+                    request_model: None,
+                    display_name: None,
                     wire_api: ProviderWireApi::OpenAIResponses,
                     base_url: Some("https://model.example".to_string()),
                     api_key: Some("model-key".to_string()),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn saved_model_entries_preserve_binding_request_and_display_names() {
+        let app_config = test_app_config(ProviderConfigSection {
+            providers: BTreeMap::from([(
+                "deepseek".to_string(),
+                ProviderVendorConfig {
+                    base_url: Some("https://api.deepseek.com".to_string()),
+                    wire_apis: vec![ProviderWireApi::OpenAIChatCompletions],
+                    enabled: true,
+                    ..ProviderVendorConfig::default()
+                },
+            )]),
+            model_bindings: BTreeMap::from([(
+                "deepseek".to_string(),
+                ModelBindingConfig {
+                    model_slug: "deepseek-v4-flash".to_string(),
+                    provider: "deepseek".to_string(),
+                    model_name: "DeepSeek-V4-Flash".to_string(),
+                    display_name: Some("DeepSeek-V4-Flash".to_string()),
+                    invocation_method: ProviderWireApi::OpenAIChatCompletions,
+                    ..ModelBindingConfig::default()
+                },
+            )]),
+            ..ProviderConfigSection::default()
+        });
+
+        assert_eq!(
+            saved_model_entries(&app_config),
+            vec![SavedModelEntry {
+                model: "deepseek-v4-flash".to_string(),
+                request_model: Some("DeepSeek-V4-Flash".to_string()),
+                display_name: Some("DeepSeek-V4-Flash".to_string()),
+                wire_api: ProviderWireApi::OpenAIChatCompletions,
+                base_url: Some("https://api.deepseek.com".to_string()),
+                api_key: None,
+            }]
         );
     }
 
@@ -435,6 +491,8 @@ mod tests {
             saved_model_entries(&app_config),
             vec![SavedModelEntry {
                 model: "default-wire-api".to_string(),
+                request_model: None,
+                display_name: None,
                 wire_api: ProviderWireApi::OpenAIChatCompletions,
                 base_url: None,
                 api_key: None,

@@ -223,7 +223,7 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
         initial_session_id: initial_session.session_id,
         model: initial_session.model.clone(),
         cwd: initial_session.cwd.clone(),
-        server_log_level: config.server_log_level,
+        server_log_level: config.server_log_level.clone(),
         thinking_selection: initial_session.thinking_selection.clone(),
         permission_preset: initial_session.permission_preset,
     });
@@ -234,12 +234,7 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
     let host_app_event_sender = app_event_sender.clone();
 
     // Resolve model metadata for the chat widget, falling back to the session slug.
-    let available_models = config
-        .model_catalog
-        .list_visible()
-        .into_iter()
-        .cloned()
-        .collect::<Vec<_>>();
+    let available_models = available_models_with_saved_metadata(&config);
 
     let saved_model_slugs: Vec<String> = config
         .saved_models
@@ -250,7 +245,7 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
     let cwd = initial_session.cwd.clone();
     let project_config_key = devo_core::project_config_key(&cwd);
 
-    let model = resolve_initial_model(&initial_session, &config.model_catalog);
+    let model = resolve_initial_model(&initial_session, &available_models);
     let request_model = initial_session
         .request_model
         .clone()
@@ -375,12 +370,47 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
     })
 }
 
-fn resolve_initial_model(
-    initial_session: &InitialTuiSession,
-    model_catalog: &impl ModelCatalog,
-) -> Model {
-    model_catalog
-        .get(&initial_session.model)
+pub(crate) fn available_models_with_saved_metadata(config: &InteractiveTuiConfig) -> Vec<Model> {
+    let mut available_models = config
+        .model_catalog
+        .list_visible()
+        .into_iter()
+        .cloned()
+        .collect::<Vec<_>>();
+
+    for saved_model in &config.saved_models {
+        let display_name = saved_model
+            .display_name
+            .as_deref()
+            .or(saved_model.request_model.as_deref())
+            .map(str::trim)
+            .filter(|display_name| !display_name.is_empty())
+            .unwrap_or(saved_model.model.as_str())
+            .to_string();
+
+        if let Some(model) = available_models
+            .iter_mut()
+            .find(|model| model.slug == saved_model.model)
+        {
+            model.display_name = display_name;
+            continue;
+        }
+
+        available_models.push(Model {
+            slug: saved_model.model.clone(),
+            display_name,
+            provider: saved_model.wire_api,
+            ..Model::default()
+        });
+    }
+
+    available_models
+}
+
+fn resolve_initial_model(initial_session: &InitialTuiSession, available_models: &[Model]) -> Model {
+    available_models
+        .iter()
+        .find(|model| model.slug == initial_session.model)
         .cloned()
         .unwrap_or_else(|| Model {
             slug: initial_session.model.clone(),

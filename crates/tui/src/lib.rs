@@ -34,6 +34,8 @@ mod markdown_stream;
 #[cfg(test)]
 mod mcp_command_tests;
 mod mcp_servers;
+#[cfg(test)]
+mod model_display_tests;
 mod onboarding;
 mod onboarding_widget;
 #[cfg(test)]

@@ -1,0 +1,158 @@
+//! Tests for TUI display of provider-specific saved model names.
+
+use std::path::PathBuf;
+
+use devo_core::PresetModelCatalog;
+use devo_protocol::Model;
+use devo_protocol::PermissionPreset;
+use devo_protocol::ProviderWireApi;
+use pretty_assertions::assert_eq;
+use tokio::sync::mpsc;
+
+use crate::app::InitialTuiSession;
+use crate::app::InteractiveTuiConfig;
+use crate::app_event::AppEvent;
+use crate::app_event_sender::AppEventSender;
+use crate::chatwidget::ChatWidget;
+use crate::chatwidget::ChatWidgetInit;
+use crate::chatwidget::TuiSessionState;
+use crate::events::SavedModelEntry;
+use crate::render::renderable::Renderable;
+use crate::tui::frame_requester::FrameRequester;
+
+fn rendered_text(widget: &ChatWidget, width: u16, height: u16) -> String {
+    let area = ratatui::layout::Rect::new(0, 0, width, height);
+    let mut buf = ratatui::buffer::Buffer::empty(area);
+    widget.render(area, &mut buf);
+    (0..area.height)
+        .map(|row| {
+            (0..area.width)
+                .map(|col| buf[(col, row)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn widget_with_model(
+    model: Model,
+    request_model: Option<String>,
+    available_models: Vec<Model>,
+    saved_model_slugs: Vec<String>,
+) -> ChatWidget {
+    let (app_event_tx, _app_event_rx) = mpsc::unbounded_channel();
+    ChatWidget::new_with_app_event(ChatWidgetInit {
+        frame_requester: FrameRequester::test_dummy(),
+        app_event_tx: AppEventSender::new(app_event_tx),
+        initial_session: TuiSessionState {
+            cwd: PathBuf::from("."),
+            model: Some(model),
+            request_model,
+            provider: Some(ProviderWireApi::OpenAIChatCompletions),
+            reasoning_effort: None,
+        },
+        initial_thinking_selection: None,
+        initial_permission_preset: PermissionPreset::Default,
+        initial_user_message: None,
+        enhanced_keys_supported: true,
+        is_first_run: false,
+        available_models,
+        saved_model_slugs,
+        show_model_onboarding: false,
+        startup_tooltip_override: None,
+        initial_theme_name: None,
+    })
+}
+
+#[test]
+fn startup_header_and_summary_prefer_provider_request_model() {
+    let model = Model {
+        slug: "deepseek-v4-flash".to_string(),
+        display_name: "deepseek-v4-flash".to_string(),
+        ..Model::default()
+    };
+    let widget = widget_with_model(
+        model,
+        Some("DeepSeek-V4-Flash".to_string()),
+        Vec::new(),
+        Vec::new(),
+    );
+
+    let rendered = rendered_text(&widget, 100, 16);
+
+    assert_eq!(rendered.contains("DeepSeek-V4-Flash"), true);
+    assert_eq!(
+        widget.status_summary_text().contains("DeepSeek-V4-Flash"),
+        true
+    );
+}
+
+#[test]
+fn saved_model_metadata_overlays_catalog_display_for_picker() {
+    let catalog_model = Model {
+        slug: "deepseek-v4-flash".to_string(),
+        display_name: "deepseek-v4-flash".to_string(),
+        provider: ProviderWireApi::OpenAIChatCompletions,
+        ..Model::default()
+    };
+    let config = InteractiveTuiConfig {
+        initial_session: InitialTuiSession {
+            session_id: None,
+            model: "deepseek-v4-flash".to_string(),
+            request_model: Some("DeepSeek-V4-Flash".to_string()),
+            provider: ProviderWireApi::OpenAIChatCompletions,
+            thinking_selection: None,
+            permission_preset: PermissionPreset::Default,
+            cwd: PathBuf::from("."),
+        },
+        server_log_level: None,
+        model_catalog: PresetModelCatalog::new(vec![catalog_model]),
+        saved_models: vec![SavedModelEntry {
+            model: "deepseek-v4-flash".to_string(),
+            request_model: Some("DeepSeek-V4-Flash".to_string()),
+            display_name: Some("DeepSeek-V4-Flash".to_string()),
+            wire_api: ProviderWireApi::OpenAIChatCompletions,
+            base_url: None,
+            api_key: None,
+        }],
+        show_model_onboarding: false,
+    };
+
+    let available_models = crate::interactive::available_models_with_saved_metadata(&config);
+
+    assert_eq!(
+        available_models,
+        vec![Model {
+            display_name: "DeepSeek-V4-Flash".to_string(),
+            ..Model {
+                slug: "deepseek-v4-flash".to_string(),
+                display_name: "deepseek-v4-flash".to_string(),
+                provider: ProviderWireApi::OpenAIChatCompletions,
+                ..Model::default()
+            }
+        }]
+    );
+}
+
+#[test]
+fn model_picker_renders_saved_display_name() {
+    let model = Model {
+        slug: "deepseek-v4-flash".to_string(),
+        display_name: "DeepSeek-V4-Flash".to_string(),
+        provider: ProviderWireApi::OpenAIChatCompletions,
+        ..Model::default()
+    };
+    let mut widget = widget_with_model(
+        model.clone(),
+        Some("DeepSeek-V4-Flash".to_string()),
+        vec![model],
+        vec!["deepseek-v4-flash".to_string()],
+    );
+
+    widget.handle_app_event(AppEvent::RunSlashCommand {
+        command: "model".to_string(),
+    });
+    let rendered = rendered_text(&widget, 100, 20);
+
+    assert_eq!(rendered.contains("DeepSeek-V4-Flash"), true);
+}

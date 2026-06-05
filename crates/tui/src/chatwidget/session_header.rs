@@ -28,6 +28,7 @@ impl ChatWidget {
     pub(super) fn build_header_box(
         cwd: &std::path::Path,
         model: Option<&Model>,
+        request_model: Option<&str>,
         thinking_selection: Option<&str>,
         is_first_run: bool,
         startup_tooltip_override: Option<String>,
@@ -40,11 +41,20 @@ impl ChatWidget {
             provider: ProviderWireApi::OpenAIChatCompletions,
             ..Model::default()
         });
+        let header_model = request_model
+            .map(str::trim)
+            .filter(|model| !model.is_empty())
+            .or_else(|| {
+                let display_name = model.display_name.trim();
+                (!display_name.is_empty()).then_some(display_name)
+            })
+            .unwrap_or(model.slug.as_str())
+            .to_string();
         Box::new(history_cell::new_session_info(
             cwd,
-            &model.slug,
-            model.slug.clone(),
-            model.display_name.clone(),
+            header_model.as_str(),
+            header_model.clone(),
+            header_model.clone(),
             model.thinking_capability.clone(),
             model
                 .resolve_thinking_selection(thinking_selection)
@@ -243,12 +253,7 @@ impl ChatWidget {
     }
 
     pub(super) fn session_summary_text(&self) -> String {
-        let model = self
-            .session
-            .request_model
-            .as_deref()
-            .or_else(|| self.session.model.as_ref().map(|model| model.slug.as_str()))
-            .unwrap_or("unknown");
+        let model = self.model_display_name();
         let thinking = self.thinking_selection.as_deref().unwrap_or("default");
         let cached_input_percent =
             Self::percent_of(self.total_cache_read_tokens, self.total_input_tokens);
@@ -321,6 +326,7 @@ impl ChatWidget {
         Self::build_header_box(
             &self.session.cwd,
             self.session.model.as_ref(),
+            self.session.request_model.as_deref(),
             self.thinking_selection.as_deref(),
             is_first_run,
             startup_tooltip_override,
@@ -351,6 +357,7 @@ impl ChatWidget {
         self.history[0] = Self::build_header_box(
             &self.session.cwd,
             self.session.model.as_ref(),
+            self.session.request_model.as_deref(),
             self.thinking_selection.as_deref(),
             /*is_first_run*/ false,
             None,

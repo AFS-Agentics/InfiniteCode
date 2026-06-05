@@ -46,8 +46,12 @@ pub(crate) struct SessionListEntry {
 /// One persisted model profile available for switching in the interactive model picker.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SavedModelEntry {
-    /// Stable model slug or custom model name.
+    /// Stable catalog model slug or custom model name.
     pub model: String,
+    /// Provider-specific model name used in requests when it differs from `model`.
+    pub request_model: Option<String>,
+    /// Persisted display label for the saved binding.
+    pub display_name: Option<String>,
     /// Concrete wire protocol stored for this model's provider profile.
     pub wire_api: ProviderWireApi,
     /// Optional provider base URL override stored with the model.
