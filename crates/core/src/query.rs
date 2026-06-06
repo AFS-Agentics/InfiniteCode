@@ -683,13 +683,6 @@ pub async fn query(
                     name,
                     input,
                 }) => {
-                    if emitted_tool_use_starts.insert(id.clone()) {
-                        emit(QueryEvent::ToolUseStart {
-                            id: id.clone(),
-                            name: name.clone(),
-                            input: input.clone(),
-                        });
-                    }
                     tool_uses.push((index, id, name, input, String::new(), false));
                 }
                 Ok(StreamEvent::ToolCallInputDelta {
@@ -2339,6 +2332,59 @@ mod tests {
             } = event
             {
                 seen_clone.lock().unwrap().push((tool_use_id, input));
+            }
+        });
+
+        query(
+            &mut session,
+            &TurnConfig::new(Model::default(), None),
+            Arc::new(InterleavedToolUseProvider {
+                requests: AtomicUsize::new(0),
+            }),
+            registry,
+            &runtime,
+            Some(callback),
+        )
+        .await
+        .expect("query should complete");
+
+        assert_eq!(
+            seen.lock().unwrap().as_slice(),
+            &[
+                (String::from("tool-1"), json!({ "value": 1 })),
+                (String::from("tool-2"), json!({ "value": 2 })),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn query_tool_start_event_includes_final_tool_input() {
+        let mut builder = ToolRegistryBuilder::new();
+        builder.register_handler("mutating_tool", Arc::new(DisplayContentTool));
+        builder.push_spec(ToolSpec {
+            name: "mutating_tool".into(),
+            description: String::new(),
+            input_schema: JsonSchema::object(Default::default(), None, None),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: None,
+            supports_cancellation: None,
+            supports_streaming: None,
+        });
+        let registry = Arc::new(builder.build());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("run the tools"));
+
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let seen_clone = Arc::clone(&seen);
+        let callback = Arc::new(move |event: QueryEvent| {
+            if let QueryEvent::ToolUseStart { id, input, .. } = event {
+                seen_clone.lock().unwrap().push((id, input));
             }
         });
 

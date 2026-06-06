@@ -148,11 +148,13 @@ impl ChatWidget {
         // Pending tool calls are shown with a pending (cyan) dot until their results arrive.
         for pending in &self.pending_tool_calls {
             let pending_lines = if let Some(start_time) = pending.start_time {
-                vec![Line::from(vec![
+                let mut lines = vec![Line::from(vec![
                     crate::exec_cell::spinner(Some(start_time), true),
                     " ".into(),
                     Span::styled(pending.title.clone(), Self::tool_text_style()),
-                ])]
+                ])];
+                lines.extend(pending.lines.clone());
+                lines
             } else {
                 pending.lines.clone()
             };
@@ -197,11 +199,13 @@ impl ChatWidget {
         }
         for pending in &self.pending_tool_calls {
             let pending_lines = if let Some(start_time) = pending.start_time {
-                vec![Line::from(vec![
+                let mut lines = vec![Line::from(vec![
                     crate::exec_cell::spinner(Some(start_time), true),
                     " ".into(),
                     Span::styled(pending.title.clone(), Self::tool_text_style()),
-                ])]
+                ])];
+                lines.extend(pending.lines.clone());
+                lines
             } else {
                 pending.lines.clone()
             };

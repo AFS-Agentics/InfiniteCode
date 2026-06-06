@@ -2694,7 +2694,7 @@ fn tool_call_start_and_finish_are_both_visible_in_history() {
         parsed_commands: None,
     });
 
-    let running = scrollback_plain_lines(&widget.drain_scrollback_lines(80)).join("\n");
+    let running = rendered_rows(&widget, 80, 12).join("\n");
     assert!(
         running.contains("Running powershell -NoProfile -Command Get-Date"),
         "expected running tool cell, got:\n{running}"
@@ -2709,6 +2709,10 @@ fn tool_call_start_and_finish_are_both_visible_in_history() {
     });
 
     let ran = scrollback_plain_lines(&widget.drain_scrollback_lines(80)).join("\n");
+    assert!(
+        !ran.contains("Running powershell -NoProfile -Command Get-Date"),
+        "running tool cell should not remain in history, got:\n{ran}"
+    );
     assert!(
         ran.contains("Ran powershell -NoProfile -Command Get-Date"),
         "expected ran tool cell, got:\n{ran}"
@@ -2768,6 +2772,134 @@ fn non_preparing_tool_call_keeps_existing_summary() {
     assert!(
         !display.contains("Preparing grep"),
         "grep should not use preparing state:\n{display}"
+    );
+}
+
+#[test]
+fn generic_running_tool_call_disappears_after_result() {
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, cwd);
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "code_search".to_string(),
+        preparing: false,
+        parsed_commands: Some(Vec::new()),
+    });
+
+    let running = rendered_rows(&widget, 80, 12).join("\n");
+    assert!(
+        running.contains("Running code_search"),
+        "expected running generic tool row:\n{running}"
+    );
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
+        tool_use_id: "tool-1".to_string(),
+        title: "code_search".to_string(),
+        preview: "Missing necessary parameter display".to_string(),
+        is_error: true,
+        truncated: false,
+    });
+
+    let rendered = rendered_rows(&widget, 80, 16).join("\n");
+    assert!(
+        !rendered.contains("Running code_search"),
+        "running row should disappear after result:\n{rendered}"
+    );
+
+    let history = scrollback_plain_lines(&widget.drain_scrollback_lines(80)).join("\n");
+    assert!(
+        !history.contains("Running code_search"),
+        "running row should not be committed to history:\n{history}"
+    );
+    assert!(
+        history.contains("Ran code_search"),
+        "expected completed generic tool row in history:\n{history}"
+    );
+    assert!(
+        history.contains("Missing necessary parameter display"),
+        "expected final tool output in history:\n{history}"
+    );
+}
+
+#[test]
+fn interrupted_turn_flushes_explored_cell_before_summary() {
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let model = Model {
+        slug: "deepseek-v4-flash".to_string(),
+        display_name: "DeepSeek V4 Flash".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, cwd);
+    let _ = widget.drain_scrollback_lines(100);
+
+    widget.handle_worker_event(crate::events::WorkerEvent::TurnStarted {
+        model: "deepseek-v4-flash".to_string(),
+        thinking: None,
+        reasoning_effort: None,
+        turn_id: Default::default(),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "code_search update_plan tool handler".to_string(),
+        preparing: false,
+        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+            cmd: "code_search update_plan tool handler".to_string(),
+            query: Some("update_plan tool handler".to_string()),
+            path: Some("crates/core/src/tools/handlers".to_string()),
+        }]),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
+        tool_use_id: "tool-1".to_string(),
+        title: "code_search update_plan tool handler".to_string(),
+        preview: "crates/core/src/tools/handlers/plan.rs".to_string(),
+        is_error: false,
+        truncated: false,
+    });
+
+    let live_display = rendered_rows(&widget, 100, 12).join("\n");
+    assert!(
+        live_display.contains("▌ Explored"),
+        "expected completed exploration to be live before turn finish:\n{live_display}"
+    );
+
+    widget.handle_worker_event(crate::events::WorkerEvent::TurnFinished {
+        stop_reason: "Interrupted".to_string(),
+        turn_count: 1,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_cache_read_tokens: 0,
+        last_query_total_tokens: 0,
+        last_query_input_tokens: 0,
+        prompt_token_estimate: 0,
+    });
+
+    let active_display = widget
+        .active_cell_display_lines_for_test(100)
+        .into_iter()
+        .flat_map(|line| line.spans)
+        .map(|span| span.content.to_string())
+        .collect::<String>();
+    assert!(
+        !active_display.contains("Explored"),
+        "explored cell should not remain live after turn finish:\n{active_display}"
+    );
+
+    let history = scrollback_plain_lines(&widget.drain_scrollback_lines(100)).join("\n");
+    let explored_index = history
+        .find("▌ Explored")
+        .expect("history should contain explored cell");
+    let interrupted_index = history
+        .find("interrupted")
+        .expect("history should contain interrupted summary");
+    assert!(
+        explored_index < interrupted_index,
+        "explored cell should appear before interrupted summary:\n{history}"
     );
 }
 
@@ -4070,6 +4202,28 @@ fn read_tool_call_renders_as_explored_group_in_viewport() {
         preparing: false,
         parsed_commands: None,
     });
+
+    let live_display = widget
+        .active_cell_display_lines_for_test(80)
+        .into_iter()
+        .map(|line| {
+            line.spans
+                .into_iter()
+                .map(|span| span.content.to_string())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        live_display.contains("Exploring"),
+        "expected read start to render immediately: {live_display}"
+    );
+    assert!(
+        live_display.contains("Read foo.txt"),
+        "expected live read summary: {live_display}"
+    );
+
     widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
         tool_use_id: "tool-1".to_string(),
         title: "cat foo.txt".to_string(),
@@ -4375,6 +4529,28 @@ fn grep_tool_call_renders_as_explored_group_in_viewport() {
             path: Some("crates/tui/src".to_string()),
         }]),
     });
+
+    let live_display = widget
+        .active_cell_display_lines_for_test(80)
+        .into_iter()
+        .map(|line| {
+            line.spans
+                .into_iter()
+                .map(|span| span.content.to_string())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        live_display.contains("Exploring"),
+        "expected grep start to render immediately: {live_display}"
+    );
+    assert!(
+        live_display.contains("Search rebuild_restored_session in crates/tui/src"),
+        "expected live search summary, got:\n{live_display}"
+    );
+
     widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
         tool_use_id: "tool-1".to_string(),
         title: "grep 'rebuild_restored_session' in crates/tui/src".to_string(),
@@ -4399,6 +4575,52 @@ fn grep_tool_call_renders_as_explored_group_in_viewport() {
     assert!(
         display.contains("Search rebuild_restored_session in crates/tui/src"),
         "expected search summary, got:\n{display}"
+    );
+}
+
+#[test]
+fn code_search_tool_call_renders_as_explored_group_in_viewport() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "code_search live tool feedback in crates".to_string(),
+        preparing: false,
+        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+            cmd: "code_search live tool feedback in crates".to_string(),
+            query: Some("live tool feedback".to_string()),
+            path: Some("crates".to_string()),
+        }]),
+    });
+
+    let live_display = widget
+        .active_cell_display_lines_for_test(80)
+        .into_iter()
+        .map(|line| {
+            line.spans
+                .into_iter()
+                .map(|span| span.content.to_string())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        live_display.contains("Exploring"),
+        "expected code_search start to render immediately: {live_display}"
+    );
+    assert!(
+        live_display.contains("Search live tool feedback in crates"),
+        "expected live code_search summary, got:\n{live_display}"
+    );
+    assert!(
+        !live_display.contains("Running code_search {}"),
+        "code_search should not render raw empty JSON: {live_display}"
     );
 }
 

@@ -1456,15 +1456,8 @@ async fn run_worker_inner(
                                                     payload.item.payload,
                                                 )
                                             {
-                                                let summary = summarize_tool_call(&payload);
-                                                let parsed_commands =
-                                                    tool_call_started_actions(&payload);
-                                                let _ = event_tx.send(WorkerEvent::ToolCall {
-                                                    tool_use_id: payload.tool_call_id.clone(),
-                                                    summary,
-                                                    preparing: payload.tool_name == "write",
-                                                    parsed_commands: Some(parsed_commands),
-                                                });
+                                                let _ =
+                                                    event_tx.send(tool_call_started_event(payload));
                                             }
                                         }
                                         _ => {}
@@ -2250,6 +2243,22 @@ fn summarize_tool_result_title(tool_name: Option<&str>, is_error: bool) -> Strin
     }
 }
 
+fn tool_call_started_event(payload: ToolCallPayload) -> WorkerEvent {
+    let preparing = matches!(payload.tool_name.as_str(), "write" | "apply_patch");
+    let summary = if preparing && payload.tool_name == "apply_patch" {
+        "apply_patch".to_string()
+    } else {
+        summarize_tool_call(&payload)
+    };
+    let parsed_commands = tool_call_started_actions(&payload);
+    WorkerEvent::ToolCall {
+        tool_use_id: payload.tool_call_id,
+        summary,
+        preparing,
+        parsed_commands: Some(parsed_commands),
+    }
+}
+
 fn summarize_tool_call(payload: &ToolCallPayload) -> String {
     let detail = summarize_tool_input(&payload.tool_name, &payload.parameters);
     if detail.is_empty() {
@@ -2366,6 +2375,11 @@ fn tool_call_started_actions(
             ),
         ];
     }
+    if payload.tool_name == "code_search" {
+        return code_search_command_action_from_parameters("code_search", &payload.parameters)
+            .into_iter()
+            .collect();
+    }
     Vec::new()
 }
 
@@ -2383,7 +2397,52 @@ fn tool_call_updated_actions(
         "find" | "glob" => find_command_action_from_parameters(summary, &payload.parameters)
             .into_iter()
             .collect(),
+        "code_search" => code_search_command_action_from_parameters(summary, &payload.parameters)
+            .into_iter()
+            .collect(),
         _ => Vec::new(),
+    }
+}
+
+fn code_search_command_action_from_parameters(
+    command: &str,
+    input: &serde_json::Value,
+) -> Option<devo_protocol::parse_command::ParsedCommand> {
+    match input
+        .get("operation")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("search")
+    {
+        "find_related" => {
+            let path = input
+                .get("file_path")
+                .and_then(serde_json::Value::as_str)
+                .filter(|path| !path.is_empty())?;
+            let line = input
+                .get("line")
+                .and_then(serde_json::Value::as_u64)
+                .map(|line| line.to_string())
+                .unwrap_or_else(|| "?".to_string());
+            Some(devo_protocol::parse_command::ParsedCommand::Search {
+                cmd: command.to_string(),
+                query: Some(format!("related {path}:{line}")),
+                path: Some(path.to_string()),
+            })
+        }
+        _ => {
+            let query = input
+                .get("query")
+                .and_then(serde_json::Value::as_str)
+                .filter(|query| !query.is_empty())?;
+            Some(devo_protocol::parse_command::ParsedCommand::Search {
+                cmd: command.to_string(),
+                query: Some(query.to_string()),
+                path: input
+                    .get("path")
+                    .and_then(serde_json::Value::as_str)
+                    .map(ToOwned::to_owned),
+            })
+        }
     }
 }
 
@@ -2396,6 +2455,43 @@ fn make_path_relative(path: &str) -> String {
         return rel.to_string_lossy().to_string();
     }
     path.to_string()
+}
+
+fn code_search_summary_from_input(input: &serde_json::Value) -> String {
+    match input
+        .get("operation")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("search")
+    {
+        "find_related" => {
+            let path = input
+                .get("file_path")
+                .and_then(serde_json::Value::as_str)
+                .map(make_path_relative);
+            let line = input.get("line").and_then(serde_json::Value::as_u64);
+            match (path, line) {
+                (Some(path), Some(line)) => format!("related {path}:{line}"),
+                (Some(path), None) => format!("related {path}"),
+                (None, _) => "related".to_string(),
+            }
+        }
+        _ => {
+            let query = input
+                .get("query")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let path = input
+                .get("path")
+                .and_then(serde_json::Value::as_str)
+                .map(make_path_relative);
+            match (query.is_empty(), path) {
+                (false, Some(path)) => format!("{query} in {path}"),
+                (false, None) => query.to_string(),
+                (true, Some(path)) => format!("in {path}"),
+                (true, None) => String::new(),
+            }
+        }
+    }
 }
 
 fn fmt_offset_limit(input: &serde_json::Value) -> String {
@@ -2458,6 +2554,7 @@ fn summarize_tool_input(tool_name: &str, input: &serde_json::Value) -> String {
                 None => Some(pattern.to_string()),
             }
         }
+        "code_search" => Some(code_search_summary_from_input(input)),
         "webfetch" | "websearch" => input
             .get("url")
             .and_then(serde_json::Value::as_str)
@@ -2715,6 +2812,7 @@ mod tests {
     use super::render_skill_list_body;
     use super::summarize_tool_call;
     use super::tool_call_started_actions;
+    use super::tool_call_started_event;
     use super::truncate_tool_output;
     use crate::events::PlanStep;
     use crate::events::PlanStepStatus;
@@ -2913,6 +3011,74 @@ mod tests {
                 name: String::new(),
                 path: PathBuf::new(),
             }]
+        );
+    }
+
+    #[test]
+    fn code_search_tool_call_start_emits_search_action() {
+        let payload = ToolCallPayload {
+            tool_call_id: "call-1".to_string(),
+            tool_name: "code_search".to_string(),
+            parameters: serde_json::json!({
+                "operation": "search",
+                "query": "live tool feedback",
+                "path": "crates"
+            }),
+            command_actions: Vec::new(),
+        };
+
+        assert_eq!(
+            tool_call_started_event(payload),
+            WorkerEvent::ToolCall {
+                tool_use_id: "call-1".to_string(),
+                summary: "code_search live tool feedback in crates".to_string(),
+                preparing: false,
+                parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+                    cmd: "code_search".to_string(),
+                    query: Some("live tool feedback".to_string()),
+                    path: Some("crates".to_string()),
+                }]),
+            }
+        );
+    }
+
+    #[test]
+    fn code_search_tool_call_start_with_empty_parameters_omits_json_preview() {
+        let payload = ToolCallPayload {
+            tool_call_id: "call-1".to_string(),
+            tool_name: "code_search".to_string(),
+            parameters: serde_json::json!({}),
+            command_actions: Vec::new(),
+        };
+
+        assert_eq!(
+            tool_call_started_event(payload),
+            WorkerEvent::ToolCall {
+                tool_use_id: "call-1".to_string(),
+                summary: "code_search".to_string(),
+                preparing: false,
+                parsed_commands: Some(Vec::new()),
+            }
+        );
+    }
+
+    #[test]
+    fn apply_patch_tool_call_start_is_preparing() {
+        let payload = ToolCallPayload {
+            tool_call_id: "call-1".to_string(),
+            tool_name: "apply_patch".to_string(),
+            parameters: serde_json::json!({}),
+            command_actions: Vec::new(),
+        };
+
+        assert_eq!(
+            tool_call_started_event(payload),
+            WorkerEvent::ToolCall {
+                tool_use_id: "call-1".to_string(),
+                summary: "apply_patch".to_string(),
+                preparing: true,
+                parsed_commands: Some(Vec::new()),
+            }
         );
     }
 
