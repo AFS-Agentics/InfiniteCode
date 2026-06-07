@@ -35,6 +35,14 @@ impl ChatWidget {
         if !matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
             return;
         }
+        if self.is_subagent_selector_open() {
+            self.handle_subagent_selector_key_event(key);
+            return;
+        }
+        if key.code == KeyCode::Char('x') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            self.open_subagent_selector();
+            return;
+        }
         if self.resume_browser_loading {
             match key.code {
                 KeyCode::Esc | KeyCode::Char('q') => {
@@ -216,6 +224,7 @@ impl ChatWidget {
             | AppEvent::OpenModelPicker
             | AppEvent::OpenThinkingPicker
             | AppEvent::OpenThemePicker
+            | AppEvent::OpenSubagentOverlay { .. }
             | AppEvent::StatusLineBranchUpdated { .. }
             | AppEvent::ReferenceSearchRequested { .. }
             | AppEvent::ReferenceSearchCancelled

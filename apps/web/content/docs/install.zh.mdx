@@ -11,6 +11,12 @@ description: 通过脚本安装 Devo，或从源码构建。
 curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
 ```
 
+预安装语义 `code_search` 使用的本地 Hugging Face 模型：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh -s -- --install-code-search-model
+```
+
 ## Windows
 
 在 Windows 上安装 Devo：
@@ -18,6 +24,14 @@ curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
 ```powershell
 curl.exe -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -Command -
 ```
+
+预安装语义 `code_search` 使用的本地 Hugging Face 模型：
+
+```powershell
+$env:DEVO_INSTALL_CODE_SEARCH_MODEL = "1"; irm https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1 | iex
+```
+
+模型会安装到 `<DEVO_HOME>/local-models/minishlab--potion-code-16M`。
 
 ## 从源码构建
 

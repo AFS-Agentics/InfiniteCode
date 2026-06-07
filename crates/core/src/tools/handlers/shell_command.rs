@@ -101,6 +101,7 @@ impl ToolHandler for ShellCommandHandler {
                 max_output_tokens: default_max_output_tokens(),
             },
             None,
+            ctx.cancel_token.clone(),
         )
         .await
         .map_err(|e| ToolCallError::ExecutionFailed(e.to_string()))?;

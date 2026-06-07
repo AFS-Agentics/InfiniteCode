@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use devo_protocol::ModelRequest;
+use devo_protocol::RequestContent;
+use devo_protocol::RequestMessage;
 use devo_protocol::ResolvedThinkingRequest;
 use devo_protocol::ResponseContent;
 use devo_protocol::ResponseExtra;
@@ -17,6 +19,7 @@ use tracing::info;
 use tracing::info_span;
 use tracing::warn;
 
+use crate::tools::ToolAgentScope;
 use crate::tools::ToolCall;
 use crate::tools::ToolContent;
 use crate::tools::ToolRegistry;
@@ -49,6 +52,9 @@ use crate::response_item::ResponseItem;
 use crate::response_item::message_to_response_items;
 use crate::tool_prompt::build_deferred_tool_prompt_surface;
 use crate::tools::DeferredLoadingConfig;
+use crate::tools::hide_subagent_agent_coordination_tools;
+
+const SUBAGENT_MODE_REMINDER: &str = "<system-reminder>\nYou are running as a sub-agent. Complete the delegated task using the available non-agent tools. Do not call agent coordination tools such as spawn_agent, send_message, wait_agent, list_agents, or close_agent; report progress and final results through assistant output.\n</system-reminder>";
 
 fn estimate_request_prompt_tokens(request: &ModelRequest) -> usize {
     let system_bytes = request.system.as_ref().map_or(0, String::len);
@@ -323,6 +329,42 @@ fn micro_compact(content: String) -> String {
     }
 }
 
+fn preserve_full_tool_result(tool_name: Option<&str>) -> bool {
+    matches!(tool_name, Some("wait_agent" | "subagent_result"))
+}
+
+fn insert_subagent_request_reminders(
+    messages: &mut Vec<RequestMessage>,
+    deferred_reminder: Option<&str>,
+) {
+    let mut reminders = Vec::new();
+    if let Some(reminder) = deferred_reminder.filter(|text| !text.trim().is_empty()) {
+        reminders.push(request_text_message(reminder.to_string()));
+    }
+    reminders.push(request_text_message(SUBAGENT_MODE_REMINDER.to_string()));
+
+    let insert_at = messages
+        .iter()
+        .rposition(is_user_text_message)
+        .unwrap_or(messages.len());
+    messages.splice(insert_at..insert_at, reminders);
+}
+
+fn request_text_message(text: String) -> RequestMessage {
+    RequestMessage {
+        role: Role::User.as_str().to_string(),
+        content: vec![RequestContent::Text { text }],
+    }
+}
+
+fn is_user_text_message(message: &RequestMessage) -> bool {
+    message.role == Role::User.as_str()
+        && message
+            .content
+            .iter()
+            .any(|content| matches!(content, RequestContent::Text { .. }))
+}
+
 fn compact_tool_content(content: ToolContent) -> ToolContent {
     match content {
         ToolContent::Text(text) => ToolContent::Text(micro_compact(text)),
@@ -331,6 +373,17 @@ fn compact_tool_content(content: ToolContent) -> ToolContent {
             text: text.map(micro_compact),
             json,
         },
+    }
+}
+
+fn tool_content_model_bytes(content: &ToolContent) -> usize {
+    match content {
+        ToolContent::Text(text) => text.len(),
+        ToolContent::Json(json) => json.to_string().len(),
+        ToolContent::Mixed { text, json } => {
+            text.as_ref().map_or(0, String::len)
+                + json.as_ref().map_or(0, |json| json.to_string().len())
+        }
     }
 }
 
@@ -502,19 +555,31 @@ pub async fn query(
 
         // Build model request from the session-locked prefix.
         let base_system = session_context.build_system_prompt();
-        let deferred_config = DeferredLoadingConfig::default();
+        let agent_scope = runtime.agent_scope();
+        let mut deferred_config = DeferredLoadingConfig::default();
+        if agent_scope == ToolAgentScope::Subagent {
+            hide_subagent_agent_coordination_tools(&mut deferred_config);
+        }
         let loaded_deferred_tools = registry.loaded_deferred_tools();
         let prompt_surface = {
             let loaded_deferred_tools = loaded_deferred_tools.lock().map_err(|_| {
                 AgentError::Provider(anyhow::anyhow!("loaded deferred tool state lock poisoned"))
             })?;
             build_deferred_tool_prompt_surface(
-                Some(base_system),
+                Some(base_system.clone()),
                 &registry,
                 &session.id,
                 &loaded_deferred_tools,
                 &deferred_config,
             )
+        };
+        let tool_prompt_metrics = prompt_surface.metrics.clone();
+        let deferred_tool_count = prompt_surface.deferred_tool_names.len();
+        let loaded_deferred_tool_count = prompt_surface.loaded_deferred_tool_names.len();
+        let request_system = if agent_scope == ToolAgentScope::Subagent {
+            (!base_system.is_empty()).then_some(base_system)
+        } else {
+            prompt_surface.system.clone()
         };
 
         // resolve thinking request parameter
@@ -529,13 +594,16 @@ pub async fn query(
             .resolve_thinking_selection(turn_config.thinking_selection.as_deref());
         let provider_request_model = turn_config.provider_request_model(&request_model);
 
+        let prompt_source_message_count = session.prompt_source_messages().len();
+        let history_items = session
+            .prompt_source_messages()
+            .iter()
+            .cloned()
+            .flat_map(message_to_response_items)
+            .collect::<Vec<_>>();
+        let prompt_source_item_count = history_items.len();
         let history = History {
-            items: session
-                .prompt_source_messages()
-                .iter()
-                .cloned()
-                .flat_map(message_to_response_items)
-                .collect(),
+            items: history_items,
             token_info: TokenInfo::default(),
             context: ContextView::new(
                 std::env::consts::OS,
@@ -550,12 +618,18 @@ pub async fn query(
                 session_context.environment.cwd.display().to_string(),
             ),
         };
-        let messages = history
+        let mut messages = history
             .for_prompt_with_prefix(&prefetched_user_inputs, &turn_config.model.input_modalities);
+        if agent_scope == ToolAgentScope::Subagent {
+            insert_subagent_request_reminders(
+                &mut messages,
+                prompt_surface.deferred_reminder.as_deref(),
+            );
+        }
 
         let request = ModelRequest {
             model: provider_request_model,
-            system: prompt_surface.system,
+            system: request_system,
             messages,
             max_tokens: turn_config
                 .model
@@ -575,8 +649,18 @@ pub async fn query(
         };
         session.prompt_token_estimate = estimate_request_prompt_tokens(&request);
         debug!(
-            messages = request.messages.len(),
-            tools = request.tools.as_ref().map_or(0, Vec::len),
+            prompt_source_messages = prompt_source_message_count,
+            prompt_source_items = prompt_source_item_count,
+            prefix_user_inputs = prefetched_user_inputs.len(),
+            request_messages = request.messages.len(),
+            exposed_tools = request.tools.as_ref().map_or(0, Vec::len),
+            deferred_tools = deferred_tool_count,
+            loaded_deferred_tools = loaded_deferred_tool_count,
+            baseline_tool_schema_tokens = tool_prompt_metrics.baseline_tool_schema_tokens,
+            exposed_tool_schema_tokens = tool_prompt_metrics.exposed_tool_schema_tokens,
+            deferred_reminder_tokens = tool_prompt_metrics.deferred_reminder_tokens,
+            estimated_tool_tokens_saved = tool_prompt_metrics.estimated_tokens_saved,
+            prompt_token_estimate = session.prompt_token_estimate,
             max_tokens = request.max_tokens,
             has_system = request.system.is_some(),
             "built model request"
@@ -656,13 +740,6 @@ pub async fn query(
                     name,
                     input,
                 }) => {
-                    if emitted_tool_use_starts.insert(id.clone()) {
-                        emit(QueryEvent::ToolUseStart {
-                            id: id.clone(),
-                            name: name.clone(),
-                            input: input.clone(),
-                        });
-                    }
                     tool_uses.push((index, id, name, input, String::new(), false));
                 }
                 Ok(StreamEvent::ToolCallInputDelta {
@@ -938,14 +1015,34 @@ pub async fn query(
         } else {
             runtime.execute_batch(&tool_calls).await
         };
+        let tool_result_count = results.len();
+        let tool_error_count = results.iter().filter(|result| result.is_error).count();
+        let tool_output_bytes = results
+            .iter()
+            .map(|result| tool_content_model_bytes(&result.content))
+            .sum::<usize>();
+        debug!(
+            tool_calls = tool_calls.len(),
+            tool_results = tool_result_count,
+            tool_errors = tool_error_count,
+            tool_output_bytes,
+            "tool batch completed"
+        );
 
         // Build tool result message (user role, per Anthropic API convention)
         // Apply micro-compact to large tool results
         let result_content: Vec<ContentBlock> = results
             .into_iter()
             .map(|r| {
+                let tool_name = tool_result_metadata
+                    .get(r.tool_use_id.as_str())
+                    .map(|(tool_name, _, _)| tool_name.as_str());
                 let content_str = r.content.into_string();
-                let compacted_content = micro_compact(content_str);
+                let compacted_content = if preserve_full_tool_result(tool_name) {
+                    content_str
+                } else {
+                    micro_compact(content_str)
+                };
                 ContentBlock::ToolResult {
                     tool_use_id: r.tool_use_id,
                     content: compacted_content,
@@ -1039,10 +1136,13 @@ mod tests {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
 
+    use crate::tools::ToolAgentScope;
     use crate::tools::ToolPreparationFeedback;
     use crate::tools::ToolRegistry;
     use crate::tools::ToolRuntime;
+    use crate::tools::ToolRuntimeContext;
     use crate::tools::json_schema::JsonSchema;
+    use crate::tools::registry::ToolExposure;
     use crate::tools::registry::ToolRegistryBuilder;
     use crate::tools::router::PermissionChecker;
     use crate::tools::tool_handler::ToolHandler;
@@ -1051,6 +1151,8 @@ mod tests {
     use async_trait::async_trait;
     use devo_protocol::ModelRequest;
     use devo_protocol::ModelResponse;
+    use devo_protocol::RequestContent;
+    use devo_protocol::RequestMessage;
     use devo_protocol::ResponseContent;
     use devo_protocol::ResponseExtra;
     use devo_protocol::ResponseMetadata;
@@ -1064,6 +1166,7 @@ mod tests {
     use serde_json::json;
 
     use super::QueryEvent;
+    use super::insert_subagent_request_reminders;
     use super::query;
     use super::test_model_connection;
     use crate::ContentBlock;
@@ -1631,6 +1734,194 @@ mod tests {
             session.messages.last(),
             Some(&Message::assistant_text("done"))
         );
+    }
+
+    #[tokio::test]
+    async fn query_hides_agent_coordination_tools_and_appends_subagent_warning() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
+            requests: Arc::clone(&requests),
+        });
+        let mut builder = ToolRegistryBuilder::new();
+        builder.push_spec_with_exposure(
+            ToolSpec::new(
+                "ToolSearch",
+                "Load deferred tools.",
+                JsonSchema::object(Default::default(), None, None),
+            ),
+            ToolExposure::Direct,
+        );
+        builder.push_spec_with_exposure(
+            ToolSpec::new(
+                "web_search",
+                "Search the web.",
+                JsonSchema::object(Default::default(), None, None),
+            ),
+            ToolExposure::Deferred,
+        );
+        for (name, description) in [
+            ("spawn_agent", "Create a child agent."),
+            ("send_message", "Send input to a child agent."),
+            ("wait_agent", "Poll child output."),
+            ("list_agents", "List child agents."),
+            ("close_agent", "Close a child agent."),
+        ] {
+            builder.push_spec_with_exposure(
+                ToolSpec::new(
+                    name,
+                    description,
+                    JsonSchema::object(Default::default(), None, None),
+                ),
+                ToolExposure::Deferred,
+            );
+        }
+        let registry = Arc::new(builder.build());
+        let runtime = ToolRuntime::new_with_context(
+            Arc::clone(&registry),
+            PermissionChecker::always_allow(),
+            ToolRuntimeContext {
+                agent_scope: ToolAgentScope::Subagent,
+                ..ToolRuntimeContext::default()
+            },
+        );
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("work on the delegated task"));
+        {
+            let loaded_deferred_tools = registry.loaded_deferred_tools();
+            let mut loaded_deferred_tools = loaded_deferred_tools.lock().expect("loaded tools");
+            for name in [
+                "spawn_agent",
+                "send_message",
+                "wait_agent",
+                "list_agents",
+                "close_agent",
+            ] {
+                loaded_deferred_tools.mark_loaded(&session.id, name);
+            }
+        }
+
+        query(
+            &mut session,
+            &TurnConfig::new(
+                Model {
+                    base_instructions: "base system".to_string(),
+                    ..Model::default()
+                },
+                None,
+            ),
+            provider,
+            registry,
+            &runtime,
+            None,
+        )
+        .await
+        .expect("query should complete");
+
+        let captured = requests.lock().expect("lock requests");
+        assert_eq!(captured.len(), 1);
+        let request = &captured[0];
+        let tool_names = request
+            .tools
+            .as_ref()
+            .expect("tools should be present")
+            .iter()
+            .map(|tool| tool.name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(tool_names, vec!["ToolSearch"]);
+        assert_eq!(request.system.as_deref(), Some("base system"));
+        assert!(
+            !request
+                .system
+                .as_deref()
+                .unwrap_or_default()
+                .contains("web_search")
+        );
+        assert!(
+            !request
+                .system
+                .as_deref()
+                .unwrap_or_default()
+                .contains("spawn_agent")
+        );
+
+        let deferred_reminder_index =
+            request_message_index_containing(request, "web_search: Search the web.");
+        let subagent_reminder_index =
+            request_message_index_containing(request, "You are running as a sub-agent");
+        let task_index = request_message_index_containing(request, "work on the delegated task");
+        assert!(deferred_reminder_index < subagent_reminder_index);
+        assert!(subagent_reminder_index < task_index);
+        let deferred_reminder = &request.messages[deferred_reminder_index];
+        assert!(!message_contains(deferred_reminder, "spawn_agent"));
+        assert_eq!(
+            session.messages,
+            vec![
+                Message::user("work on the delegated task"),
+                Message::assistant_text("done"),
+            ]
+        );
+    }
+
+    #[test]
+    fn subagent_reminder_insertion_preserves_tool_result_adjacency() {
+        let mut messages = vec![
+            RequestMessage {
+                role: Role::User.as_str().to_string(),
+                content: vec![RequestContent::Text {
+                    text: "child task input".to_string(),
+                }],
+            },
+            RequestMessage {
+                role: Role::Assistant.as_str().to_string(),
+                content: vec![RequestContent::ToolUse {
+                    id: "tool-1".to_string(),
+                    name: "read".to_string(),
+                    input: json!({}),
+                }],
+            },
+            RequestMessage {
+                role: Role::User.as_str().to_string(),
+                content: vec![RequestContent::ToolResult {
+                    tool_use_id: "tool-1".to_string(),
+                    content: "tool output".to_string(),
+                    is_error: None,
+                }],
+            },
+        ];
+
+        insert_subagent_request_reminders(
+            &mut messages,
+            Some("<system-reminder>deferred</system-reminder>"),
+        );
+
+        assert!(message_contains(&messages[0], "deferred"));
+        assert!(message_contains(
+            &messages[1],
+            "You are running as a sub-agent"
+        ));
+        assert!(message_contains(&messages[2], "child task input"));
+        assert!(
+            matches!(messages[3].content.as_slice(), [RequestContent::ToolUse { id, .. }] if id == "tool-1")
+        );
+        assert!(
+            matches!(messages[4].content.as_slice(), [RequestContent::ToolResult { tool_use_id, .. }] if tool_use_id == "tool-1")
+        );
+    }
+
+    fn request_message_index_containing(request: &ModelRequest, needle: &str) -> usize {
+        request
+            .messages
+            .iter()
+            .position(|message| message_contains(message, needle))
+            .unwrap_or_else(|| {
+                panic!("expected request message containing {needle:?}: {request:?}")
+            })
+    }
+
+    fn message_contains(message: &RequestMessage, needle: &str) -> bool {
+        message.content.iter().any(
+            |content| matches!(content, RequestContent::Text { text } if text.contains(needle)),
+        )
     }
 
     #[tokio::test]
@@ -2299,6 +2590,59 @@ mod tests {
             } = event
             {
                 seen_clone.lock().unwrap().push((tool_use_id, input));
+            }
+        });
+
+        query(
+            &mut session,
+            &TurnConfig::new(Model::default(), None),
+            Arc::new(InterleavedToolUseProvider {
+                requests: AtomicUsize::new(0),
+            }),
+            registry,
+            &runtime,
+            Some(callback),
+        )
+        .await
+        .expect("query should complete");
+
+        assert_eq!(
+            seen.lock().unwrap().as_slice(),
+            &[
+                (String::from("tool-1"), json!({ "value": 1 })),
+                (String::from("tool-2"), json!({ "value": 2 })),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn query_tool_start_event_includes_final_tool_input() {
+        let mut builder = ToolRegistryBuilder::new();
+        builder.register_handler("mutating_tool", Arc::new(DisplayContentTool));
+        builder.push_spec(ToolSpec {
+            name: "mutating_tool".into(),
+            description: String::new(),
+            input_schema: JsonSchema::object(Default::default(), None, None),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: None,
+            supports_cancellation: None,
+            supports_streaming: None,
+        });
+        let registry = Arc::new(builder.build());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("run the tools"));
+
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let seen_clone = Arc::clone(&seen);
+        let callback = Arc::new(move |event: QueryEvent| {
+            if let QueryEvent::ToolUseStart { id, input, .. } = event {
+                seen_clone.lock().unwrap().push((id, input));
             }
         });
 

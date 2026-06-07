@@ -3,6 +3,8 @@
 //! This module owns the ordering, live-cell synchronization, and final commit
 //! behavior for streaming text items while `ChatWidget` keeps the actual state.
 
+use std::sync::OnceLock;
+use std::time::Duration;
 use std::time::Instant;
 
 use devo_core::ItemId;
@@ -23,6 +25,10 @@ pub(super) struct ActiveTextItem {
     pub(super) kind: TextItemKind,
     pub(super) status: DotStatus,
     pub(super) stream_controller: Option<StreamController>,
+    last_renderable_delta_at: Option<Instant>,
+    last_stream_commit_at: Option<Instant>,
+    stream_stall_warned: bool,
+    delta_seq: u64,
     raw_text: String,
     pub(super) cell: Option<history_cell::AgentMessageCell>,
 }
@@ -34,7 +40,7 @@ pub(super) enum ActiveTextItemId {
 }
 
 impl ActiveTextItemId {
-    fn log_label(self) -> String {
+    pub(super) fn log_label(self) -> String {
         match self {
             Self::Server(item_id) => item_id.to_string(),
             Self::Legacy(kind) => format!("legacy-{kind:?}"),
@@ -82,6 +88,10 @@ impl ChatWidget {
                 kind,
                 status: DotStatus::Pending,
                 stream_controller,
+                last_renderable_delta_at: None,
+                last_stream_commit_at: None,
+                stream_stall_warned: false,
+                delta_seq: 0,
                 raw_text: String::new(),
                 cell: None,
             },
@@ -100,17 +110,55 @@ impl ChatWidget {
         delta: &str,
     ) {
         let index = self.ensure_text_item(item_id, kind);
-        tracing::debug!(
-            item_id = %item_id.log_label(),
-            kind = ?kind,
-            delta_len = delta.len(),
-            active_items = ?self.active_text_item_log_order(),
-            "received active text item delta"
-        );
+        let active_items = self.active_text_item_log_order();
+        let active_cell_revision_before = self.active_cell_revision;
+        let delta_seq = {
+            let item = &mut self.active_text_items[index];
+            item.delta_seq = item.delta_seq.saturating_add(1);
+            item.delta_seq
+        };
+        let queued_lines_before = self.active_text_items[index]
+            .stream_controller
+            .as_ref()
+            .map(StreamController::queued_lines);
+        if let Some(assistant_token_text) = (kind == TextItemKind::Assistant)
+            .then(|| assistant_token_log_preview(delta))
+            .flatten()
+        {
+            tracing::debug!(
+                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                item_id = %item_id.log_label(),
+                kind = ?kind,
+                delta_seq,
+                delta_len = delta.len(),
+                queued_lines_before = ?queued_lines_before,
+                active_cell_revision_before,
+                active_items = ?active_items,
+                assistant_token_text = %assistant_token_text,
+                "received active text item delta"
+            );
+        } else {
+            tracing::debug!(
+                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                item_id = %item_id.log_label(),
+                kind = ?kind,
+                delta_seq,
+                delta_len = delta.len(),
+                queued_lines_before = ?queued_lines_before,
+                active_cell_revision_before,
+                active_items = ?active_items,
+                "received active text item delta"
+            );
+        }
         match kind {
             TextItemKind::Assistant => {
                 if let Some(controller) = self.active_text_items[index].stream_controller.as_mut() {
-                    controller.push(delta);
+                    let produced_renderable_lines = controller.push(delta);
+                    if produced_renderable_lines {
+                        let item = &mut self.active_text_items[index];
+                        item.last_renderable_delta_at = Some(Instant::now());
+                        item.stream_stall_warned = false;
+                    }
                 }
             }
             TextItemKind::Reasoning => {
@@ -118,6 +166,18 @@ impl ChatWidget {
             }
         }
         self.sync_text_item_cell(index);
+        tracing::debug!(
+            stream_elapsed_ms = stream_trace_elapsed_ms(),
+            item_id = %item_id.log_label(),
+            kind = ?kind,
+            delta_seq,
+            queued_lines_after = ?self.active_text_items[index]
+                .stream_controller
+                .as_ref()
+                .map(StreamController::queued_lines),
+            active_cell_revision_after = self.active_cell_revision,
+            "active text item delta synced"
+        );
         self.frame_requester.schedule_frame();
     }
 
@@ -166,6 +226,16 @@ impl ChatWidget {
         self.active_text_items
             .iter()
             .any(|item| matches!(item.item_id, ActiveTextItemId::Server(_)) && item.kind == kind)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn assistant_stream_queued_lines_for_test(&self) -> usize {
+        self.active_text_items
+            .iter()
+            .filter(|item| item.kind == TextItemKind::Assistant)
+            .filter_map(|item| item.stream_controller.as_ref())
+            .map(StreamController::queued_lines)
+            .sum()
     }
 
     fn commit_text_item_at(&mut self, index: usize, status: DotStatus) {
@@ -286,15 +356,33 @@ impl ChatWidget {
             let Some(controller) = item.stream_controller.as_mut() else {
                 continue;
             };
+            let queued_lines_before = controller.queued_lines();
             let output = run_commit_tick(
                 &mut self.stream_chunking_policy,
                 Some(controller),
                 CommitTickScope::AnyMode,
                 now,
             );
+            let queued_lines_after = controller.queued_lines();
+            let emitted_cells = output.cells.len();
+            tracing::debug!(
+                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                item_id = %item.item_id.log_label(),
+                kind = ?item.kind,
+                delta_seq = item.delta_seq,
+                queued_lines_before,
+                queued_lines_after,
+                emitted_cells,
+                all_idle = output.all_idle,
+                "stream commit tick processed active text item"
+            );
             if item.kind == TextItemKind::Assistant {
                 if !output.cells.is_empty() {
                     changed_indexes.push(index);
+                    item.last_stream_commit_at = Some(now);
+                    item.stream_stall_warned = false;
+                } else {
+                    maybe_warn_stream_commit_stall(item, queued_lines_after, now);
                 }
                 if !output.all_idle {
                     needs_followup = true;
@@ -389,17 +477,141 @@ impl ChatWidget {
     }
 }
 
+fn maybe_warn_stream_commit_stall(item: &mut ActiveTextItem, queued_lines: usize, now: Instant) {
+    if item.kind != TextItemKind::Assistant || item.stream_stall_warned || queued_lines == 0 {
+        return;
+    }
+    let Some(last_renderable_delta_at) = item.last_renderable_delta_at else {
+        return;
+    };
+    let threshold = stream_stall_warning_threshold();
+    let age = now.saturating_duration_since(last_renderable_delta_at);
+    if age < threshold {
+        return;
+    }
+    tracing::warn!(
+        stream_elapsed_ms = stream_trace_elapsed_ms(),
+        item_id = %item.item_id.log_label(),
+        queued_lines,
+        stalled_ms = age.as_millis(),
+        threshold_ms = threshold.as_millis(),
+        last_stream_commit_age_ms = item
+            .last_stream_commit_at
+            .map(|last_commit| now.saturating_duration_since(last_commit).as_millis()),
+        "assistant stream has queued renderable lines but no visible commit"
+    );
+    item.stream_stall_warned = true;
+}
+
+fn stream_stall_warning_threshold() -> Duration {
+    static STREAM_STALL_WARNING_THRESHOLD: OnceLock<Duration> = OnceLock::new();
+    *STREAM_STALL_WARNING_THRESHOLD.get_or_init(|| {
+        std::env::var("DEVO_TUI_STREAM_STALL_WARN_MS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .map(Duration::from_millis)
+            .unwrap_or_else(|| Duration::from_millis(750))
+    })
+}
+
+fn stream_trace_elapsed_ms() -> u128 {
+    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    STREAM_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+pub(super) fn assistant_token_log_preview(text: &str) -> Option<String> {
+    assistant_token_log_preview_with_enabled(
+        text,
+        assistant_token_logging_enabled(),
+        assistant_token_log_max_chars(),
+    )
+}
+
+fn assistant_token_log_preview_with_enabled(
+    text: &str,
+    enabled: bool,
+    max_chars: usize,
+) -> Option<String> {
+    enabled.then(|| format_assistant_token_log_preview(text, max_chars))
+}
+
+fn assistant_token_logging_enabled() -> bool {
+    static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
+        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+            .ok()
+            .is_some_and(|value| {
+                matches!(
+                    value.as_str(),
+                    "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                )
+            })
+    })
+}
+
+fn assistant_token_log_max_chars() -> usize {
+    static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
+        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(512)
+    })
+}
+
+fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
+    let max_chars = max_chars.max(1);
+    let mut preview = String::new();
+    let mut chars = text.chars();
+    for ch in chars.by_ref().take(max_chars) {
+        preview.extend(ch.escape_default());
+    }
+    if chars.next().is_some() {
+        preview.push_str("...");
+    }
+    preview
+}
+
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use crate::events::TextItemKind;
 
     use super::ActiveTextItemId;
+    use super::assistant_token_log_preview_with_enabled;
+    use super::format_assistant_token_log_preview;
 
     #[test]
     fn legacy_text_item_id_log_label_includes_kind() {
         assert_eq!(
             ActiveTextItemId::Legacy(TextItemKind::Assistant).log_label(),
             "legacy-Assistant"
+        );
+    }
+
+    #[test]
+    fn assistant_token_log_preview_escapes_and_truncates_text() {
+        assert_eq!(
+            format_assistant_token_log_preview("a\n\tbc", 3),
+            "a\\n\\t..."
+        );
+    }
+
+    #[test]
+    fn assistant_token_log_preview_treats_zero_limit_as_one_char() {
+        assert_eq!(format_assistant_token_log_preview("ab", 0), "a...");
+    }
+
+    #[test]
+    fn assistant_token_log_preview_returns_none_when_disabled() {
+        assert_eq!(
+            assistant_token_log_preview_with_enabled("token", false, 10),
+            None
         );
     }
 }

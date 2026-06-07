@@ -1,4 +1,4 @@
-use portable_pty::{CommandBuilder, PtySize, native_pty_system};
+use portable_pty::{Child, CommandBuilder, ExitStatus, PtySize, native_pty_system};
 use serde_json::json;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -6,6 +6,7 @@ use std::sync::mpsc;
 use std::time::Instant;
 use tokio::process::Command;
 use tokio::time::{Duration, timeout};
+use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use crate::events::ToolProgressSender;
@@ -36,6 +37,42 @@ struct PtyRunConfig {
     timeout_ms: u64,
     yield_time_ms: u64,
     max_output_tokens: usize,
+}
+
+struct PtyChildGuard {
+    child: Option<Box<dyn Child + Send + Sync>>,
+}
+
+impl PtyChildGuard {
+    fn new(child: Box<dyn Child + Send + Sync>) -> Self {
+        Self { child: Some(child) }
+    }
+
+    fn try_wait(&mut self) -> std::io::Result<Option<ExitStatus>> {
+        self.child
+            .as_mut()
+            .expect("PTY child guard must hold child while active")
+            .try_wait()
+    }
+
+    fn kill_and_wait(&mut self) {
+        if let Some(child) = self.child.as_mut() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
+    fn disarm(mut self) {
+        self.child.take();
+    }
+}
+
+impl Drop for PtyChildGuard {
+    fn drop(&mut self) {
+        if let Some(child) = self.child.as_mut() {
+            let _ = child.kill();
+        }
+    }
 }
 
 pub(crate) fn default_timeout_ms() -> u64 {
@@ -83,6 +120,7 @@ Examples of valid command strings:
 pub(crate) async fn execute_shell_command(
     request: ShellExecRequest,
     progress: Option<ToolProgressSender>,
+    cancel_token: CancellationToken,
 ) -> anyhow::Result<FunctionToolOutput> {
     let ShellExecRequest {
         command,
@@ -131,6 +169,7 @@ pub(crate) async fn execute_shell_command(
                 max_output_tokens,
             },
             progress,
+            cancel_token,
         )
         .await;
     }
@@ -144,13 +183,19 @@ pub(crate) async fn execute_shell_command(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .current_dir(&workdir);
+        .current_dir(&workdir)
+        .kill_on_drop(true);
 
     if cfg!(windows) {
         child.env("PYTHONUTF8", "1");
     }
 
-    let result = timeout(Duration::from_millis(timeout_ms), child.output()).await;
+    let result = tokio::select! {
+        result = timeout(Duration::from_millis(timeout_ms), child.output()) => result,
+        _ = cancel_token.cancelled() => {
+            return Ok(FunctionToolOutput::error("command cancelled"));
+        }
+    };
 
     match result {
         Ok(Ok(output)) => {
@@ -294,6 +339,7 @@ fn platform_shell(login: bool) -> ShellSpec {
 async fn run_with_pty(
     config: PtyRunConfig,
     progress: Option<ToolProgressSender>,
+    cancel_token: CancellationToken,
 ) -> anyhow::Result<FunctionToolOutput> {
     let PtyRunConfig {
         shell,
@@ -324,10 +370,11 @@ async fn run_with_pty(
         builder.env("COLORTERM", "truecolor");
     }
 
-    let mut child = pair
+    let child = pair
         .slave
         .spawn_command(builder)
         .map_err(|error| anyhow::anyhow!("failed to spawn PTY command: {error}"))?;
+    let mut child = PtyChildGuard::new(child);
     drop(pair.slave);
 
     let mut reader = pair
@@ -356,6 +403,7 @@ async fn run_with_pty(
     let mut output = Vec::new();
     let mut exit_code = None;
     let mut timed_out = false;
+    let mut cancelled = false;
 
     loop {
         while let Ok(chunk) = rx.try_recv() {
@@ -376,12 +424,18 @@ async fn run_with_pty(
 
         if started.elapsed() >= timeout {
             timed_out = true;
-            let _ = child.kill();
-            let _ = child.wait();
+            child.kill_and_wait();
             break;
         }
 
-        tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_millis(sleep_ms)) => {}
+            _ = cancel_token.cancelled() => {
+                cancelled = true;
+                child.kill_and_wait();
+                break;
+            }
+        }
     }
 
     while let Ok(chunk) = rx.try_recv() {
@@ -396,6 +450,12 @@ async fn run_with_pty(
             "command timed out after {timeout_ms}ms\n{text}"
         )));
     }
+    if cancelled {
+        return Ok(FunctionToolOutput::error(format!(
+            "command cancelled\n{text}"
+        )));
+    }
+    child.disarm();
 
     let is_error = exit_code.unwrap_or(1) != 0;
     let content = if is_error {
@@ -445,6 +505,7 @@ mod tests {
                 max_output_tokens: 100,
             },
             Some(tx),
+            CancellationToken::new(),
         )
         .await;
 
@@ -471,9 +532,92 @@ mod tests {
                 max_output_tokens: 100,
             },
             None,
+            CancellationToken::new(),
         )
         .await;
         assert!(result.is_ok());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn execute_shell_command_cancels_non_tty_process() {
+        let cancel_token = CancellationToken::new();
+        let cancel_task_token = cancel_token.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            cancel_task_token.cancel();
+        });
+
+        let result = execute_shell_command(
+            ShellExecRequest {
+                command: "sleep 5; echo should_not_print".to_string(),
+                workdir: std::env::current_dir().unwrap_or_default(),
+                description: "cancel test".into(),
+                shell_override: None,
+                tty: false,
+                login: false,
+                timeout_ms: 10_000,
+                yield_time_ms: 100,
+                max_output_tokens: 100,
+            },
+            None,
+            cancel_token,
+        )
+        .await
+        .expect("execute shell command");
+
+        assert!(result.is_error);
+        assert_eq!(result.content.into_string(), "command cancelled");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn aborting_tty_command_kills_pty_child() {
+        let temp_dir = tempfile::tempdir().expect("create temp dir");
+        let started_marker = temp_dir.path().join("started");
+        let delayed_marker = temp_dir.path().join("delayed");
+        let quote_path = |path: &std::path::Path| {
+            format!("'{}'", path.display().to_string().replace('\'', "'\\''"))
+        };
+        let command = format!(
+            "touch {}; sleep 2; touch {}",
+            quote_path(&started_marker),
+            quote_path(&delayed_marker)
+        );
+        let cancel_token = CancellationToken::new();
+        let task_cancel_token = cancel_token.clone();
+        let task = tokio::spawn(execute_shell_command(
+            ShellExecRequest {
+                command,
+                workdir: temp_dir.path().to_path_buf(),
+                description: "abort PTY test".into(),
+                shell_override: Some("bash".to_string()),
+                tty: true,
+                login: false,
+                timeout_ms: 10_000,
+                yield_time_ms: 100,
+                max_output_tokens: 100,
+            },
+            None,
+            task_cancel_token,
+        ));
+
+        for _ in 0..50 {
+            if started_marker.exists() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        assert!(started_marker.exists(), "PTY command should have started");
+        cancel_token.cancel();
+        task.abort();
+        let _ = task.await;
+        tokio::time::sleep(Duration::from_millis(2_500)).await;
+
+        assert!(
+            !delayed_marker.exists(),
+            "aborted PTY command should not reach delayed marker"
+        );
     }
 
     #[tokio::test]
@@ -491,6 +635,7 @@ mod tests {
                 max_output_tokens: 100,
             },
             None,
+            CancellationToken::new(),
         )
         .await
         .expect("execute shell command");
@@ -523,6 +668,7 @@ mod tests {
                 max_output_tokens: 100,
             },
             None,
+            CancellationToken::new(),
         )
         .await
         .expect("execute shell command");

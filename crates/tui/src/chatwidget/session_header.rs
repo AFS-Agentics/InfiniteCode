@@ -258,7 +258,9 @@ impl ChatWidget {
 
     pub(super) fn session_summary_text(&self) -> String {
         let model = self.model_display_name();
-        let thinking = self.thinking_selection.as_deref().unwrap_or("default");
+        let thinking = self
+            .display_thinking_selection()
+            .unwrap_or_else(|| "default".to_string());
         let cached_input_percent =
             Self::percent_of(self.total_cache_read_tokens, self.total_input_tokens);
         let context = self
@@ -471,5 +473,58 @@ impl ChatWidget {
                 .map(|span| span.patch_style(style))
                 .collect();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use devo_protocol::PermissionPreset;
+    use devo_protocol::ReasoningEffort;
+    use devo_protocol::ThinkingCapability;
+    use pretty_assertions::assert_eq;
+    use tokio::sync::mpsc;
+
+    use crate::app_event_sender::AppEventSender;
+    use crate::chatwidget::ChatWidgetInit;
+    use crate::chatwidget::TuiSessionState;
+    use crate::tui::frame_requester::FrameRequester;
+
+    use super::*;
+
+    #[test]
+    fn session_summary_resolves_default_reasoning_for_capable_model() {
+        let model = Model {
+            slug: "deepseek-v4-flash".to_string(),
+            display_name: "deepseek-v4-flash".to_string(),
+            thinking_capability: ThinkingCapability::ToggleWithLevels(vec![
+                ReasoningEffort::High,
+                ReasoningEffort::Max,
+            ]),
+            default_reasoning_effort: Some(ReasoningEffort::High),
+            ..Model::default()
+        };
+        let (app_event_tx, _app_event_rx) = mpsc::unbounded_channel();
+        let widget = ChatWidget::new_with_app_event(ChatWidgetInit {
+            frame_requester: FrameRequester::test_dummy(),
+            app_event_tx: AppEventSender::new(app_event_tx),
+            initial_session: TuiSessionState::new(PathBuf::from("."), Some(model)),
+            initial_thinking_selection: None,
+            initial_permission_preset: PermissionPreset::Default,
+            initial_user_message: None,
+            enhanced_keys_supported: true,
+            is_first_run: false,
+            available_models: Vec::new(),
+            saved_model_slugs: Vec::new(),
+            show_model_onboarding: false,
+            startup_tooltip_override: None,
+            initial_theme_name: None,
+        });
+
+        let summary = widget.status_summary_text();
+
+        assert_eq!(summary.contains("default"), false);
+        assert_eq!(summary.starts_with("deepseek-v4-flash high"), true);
     }
 }

@@ -12,6 +12,7 @@ use devo_protocol::ProviderWireApi;
 use devo_util_paths::find_devo_home;
 use futures::StreamExt;
 use std::path::Path;
+use std::sync::OnceLock;
 use std::time::Duration;
 use std::time::Instant;
 use tokio::sync::mpsc;
@@ -275,6 +276,7 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
             request_model,
             provider: Some(initial_provider),
             reasoning_effort: initial_reasoning_effort,
+            active_agent_label: None,
         },
         initial_thinking_selection: initial_session.thinking_selection.clone(),
         initial_permission_preset: initial_session.permission_preset,
@@ -430,6 +432,14 @@ fn clear_before_exit(tui: &mut Tui) -> Result<()> {
     Ok(result?)
 }
 
+fn stream_trace_elapsed_ms() -> u128 {
+    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    STREAM_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
 fn handle_tui_event(
     tui_event: Option<TuiEvent>,
     tui: &mut Tui,
@@ -490,6 +500,7 @@ fn handle_tui_event(
             let width = tui.terminal.size()?.width.max(1);
             // Completed transcript lines are written directly above the live inline viewport.
             let scrollback_lines = chat_widget.drain_scrollback_lines(width);
+            let scrollback_line_count = scrollback_lines.len();
             if !scrollback_lines.is_empty() {
                 tui.insert_history_lines(scrollback_lines);
             }
@@ -499,6 +510,13 @@ fn handle_tui_event(
                 .desired_height(width)
                 .min(tui.terminal.size()?.height.saturating_sub(1))
                 .max(3);
+            tracing::debug!(
+                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                width,
+                height,
+                scrollback_lines = scrollback_line_count,
+                "tui draw frame requested"
+            );
             tui.draw(height, |frame| {
                 let area = frame.area();
                 chat_widget.render(area, frame.buffer_mut());
@@ -507,6 +525,18 @@ fn handle_tui_event(
                     frame.set_cursor_position((x, y));
                 }
             })?;
+            let assistant_render_snapshot =
+                chat_widget.active_assistant_render_snapshot(tui.terminal.viewport_area);
+            chat_widget.note_active_assistant_terminal_flush(
+                assistant_render_snapshot.as_ref(),
+                tui.terminal.last_flush_stats(),
+            );
+            tracing::debug!(
+                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                width,
+                height,
+                "tui draw frame completed"
+            );
         }
         TuiEvent::Key(key) => {
             if chat_widget.handle_onboarding_key_event(key) {
@@ -681,6 +711,12 @@ fn handle_app_event(
             chat_widget.handle_app_event(app_event);
             return Ok(LoopAction::Continue);
         }
+        AppEvent::OpenSubagentOverlay { session_id } => {
+            loop_state
+                .overlay
+                .open_subagent_transcript(tui, chat_widget, *session_id)?;
+            return Ok(LoopAction::Continue);
+        }
         _ => {}
     }
     if let AppEvent::Command(command) = &app_event {
@@ -832,6 +868,8 @@ fn handle_worker_event(
         | WorkerEvent::PlanUpdated { .. }
         | WorkerEvent::ProviderVendorsListed { .. }
         | WorkerEvent::SessionsListed { .. }
+        | WorkerEvent::SubagentDiscovered { .. }
+        | WorkerEvent::SubagentMonitor { .. }
         | WorkerEvent::SkillsListed { .. }
         | WorkerEvent::ReferenceSearchUpdated { .. }
         | WorkerEvent::NewSessionPrepared { .. }

@@ -23,6 +23,8 @@
 // SOFTWARE.
 use std::io;
 use std::io::Write;
+use std::sync::OnceLock;
+use std::time::Instant;
 
 use crossterm::cursor::MoveTo;
 use crossterm::queue;
@@ -159,6 +161,19 @@ where
     session_origin_top: u16,
     /// Count of visible history rows rendered above the viewport in inline mode.
     visible_history_rows: u16,
+    last_flush_stats: FlushStats,
+    next_flush_seq: u64,
+}
+
+#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash)]
+pub(crate) struct FlushStats {
+    pub(crate) frame_seq: u64,
+    pub(crate) diff_commands: usize,
+    pub(crate) put_commands: usize,
+    pub(crate) clear_to_end_commands: usize,
+    pub(crate) changed_row_start: Option<u16>,
+    pub(crate) changed_row_end_exclusive: Option<u16>,
+    pub(crate) flush_duration_ms: u128,
 }
 
 impl<B> Drop for Terminal<B>
@@ -201,6 +216,8 @@ where
             last_known_cursor_pos: cursor_pos,
             session_origin_top: cursor_pos.y.saturating_add(1),
             visible_history_rows: 0,
+            last_flush_stats: FlushStats::default(),
+            next_flush_seq: 1,
         })
     }
 
@@ -253,11 +270,31 @@ where
     /// current backend for drawing.
     pub fn flush(&mut self) -> io::Result<()> {
         let updates = diff_buffers(self.previous_buffer(), self.current_buffer());
+        let frame_seq = self.next_flush_seq;
+        self.next_flush_seq = self.next_flush_seq.saturating_add(1);
+        let mut stats = FlushStats::from_commands(frame_seq, &updates);
         let last_put_command = updates.iter().rfind(|command| command.is_put());
         if let Some(&DrawCommand::Put { x, y, .. }) = last_put_command {
             self.last_known_cursor_pos = Position { x, y };
         }
-        draw(&mut self.backend, updates.into_iter())
+        let flush_started_at = Instant::now();
+        let result = draw(&mut self.backend, updates.into_iter());
+        stats.flush_duration_ms = flush_started_at.elapsed().as_millis();
+        if result.is_ok() {
+            self.last_flush_stats = stats;
+        }
+        tracing::debug!(
+            stream_elapsed_ms = terminal_trace_elapsed_ms(),
+            frame_seq = stats.frame_seq,
+            diff_commands = stats.diff_commands,
+            put_commands = stats.put_commands,
+            clear_to_end_commands = stats.clear_to_end_commands,
+            changed_row_start = ?stats.changed_row_start,
+            changed_row_end_exclusive = ?stats.changed_row_end_exclusive,
+            flush_duration_ms = stats.flush_duration_ms,
+            "terminal flush diff"
+        );
+        result
     }
 
     /// Updates the Terminal so that internal buffers match the requested area.
@@ -583,6 +620,10 @@ where
         self.visible_history_rows
     }
 
+    pub(crate) fn last_flush_stats(&self) -> FlushStats {
+        self.last_flush_stats
+    }
+
     pub fn session_origin_top(&self) -> u16 {
         self.session_origin_top
     }
@@ -612,6 +653,44 @@ use ratatui::buffer::Cell;
 enum DrawCommand {
     Put { x: u16, y: u16, cell: Cell },
     ClearToEnd { x: u16, y: u16, bg: Color },
+}
+
+impl FlushStats {
+    fn from_commands(frame_seq: u64, commands: &[DrawCommand]) -> Self {
+        let mut stats = Self {
+            frame_seq,
+            diff_commands: commands.len(),
+            ..Self::default()
+        };
+        for command in commands {
+            let y = match command {
+                DrawCommand::Put { y, .. } => {
+                    stats.put_commands += 1;
+                    *y
+                }
+                DrawCommand::ClearToEnd { y, .. } => {
+                    stats.clear_to_end_commands += 1;
+                    *y
+                }
+            };
+            stats.changed_row_start = Some(stats.changed_row_start.map_or(y, |start| start.min(y)));
+            let row_end = y.saturating_add(1);
+            stats.changed_row_end_exclusive = Some(
+                stats
+                    .changed_row_end_exclusive
+                    .map_or(row_end, |end| end.max(row_end)),
+            );
+        }
+        stats
+    }
+}
+
+fn terminal_trace_elapsed_ms() -> u128 {
+    static TERMINAL_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    TERMINAL_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
 }
 
 fn diff_buffers(a: &Buffer, b: &Buffer) -> Vec<DrawCommand> {

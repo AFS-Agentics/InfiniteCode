@@ -11,6 +11,12 @@ Install Devo on macOS or Linux:
 curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
 ```
 
+Preinstall the local Hugging Face model used by semantic `code_search`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh -s -- --install-code-search-model
+```
+
 ## Windows
 
 Install Devo on Windows:
@@ -18,6 +24,15 @@ Install Devo on Windows:
 ```powershell
 curl.exe -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1 | powershell -NoProfile -ExecutionPolicy Bypass -Command -
 ```
+
+Preinstall the local Hugging Face model used by semantic `code_search`:
+
+```powershell
+$env:DEVO_INSTALL_CODE_SEARCH_MODEL = "1"; irm https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1 | iex
+```
+
+The model is installed under
+`<DEVO_HOME>/local-models/minishlab--potion-code-16M`.
 
 ## Build From Source
 

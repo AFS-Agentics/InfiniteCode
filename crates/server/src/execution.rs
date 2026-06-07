@@ -503,6 +503,8 @@ pub(crate) struct RuntimeSession {
     pub(crate) record: Option<SessionRecord>,
     /// Transport-facing metadata exposed over the API.
     pub(crate) summary: SessionMetadata,
+    /// Lock-free snapshot of the session configuration for server coordination paths.
+    pub(crate) config: SessionConfig,
     /// Canonical core session state used by the query loop.
     pub(crate) core_session: Arc<Mutex<SessionState>>,
     /// Currently active turn, if any.

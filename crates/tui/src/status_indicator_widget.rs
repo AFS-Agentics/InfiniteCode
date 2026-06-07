@@ -22,10 +22,12 @@ use crate::app_event_sender::AppEventSender;
 use crate::exec_cell::spinner;
 use crate::key_hint;
 use crate::line_truncation::truncate_line_with_ellipsis_if_overflow;
+use crate::render::line_utils::prefix_lines;
 use crate::render::renderable::Renderable;
 use crate::shimmer::shimmer_spans;
 use crate::text_formatting::capitalize_first;
 use crate::tui::frame_requester::FrameRequester;
+use crate::ui_consts::LIVE_PREFIX_COLS;
 use crate::wrapping::RtOptions;
 use crate::wrapping::word_wrap_lines;
 
@@ -48,6 +50,7 @@ pub(crate) struct StatusIndicatorWidget {
     /// Optional suffix rendered after the elapsed/interrupt segment.
     inline_message: Option<String>,
     show_interrupt_hint: bool,
+    subagent_hint_visible: bool,
 
     elapsed_running: Duration,
     last_resume_at: Instant,
@@ -86,6 +89,7 @@ impl StatusIndicatorWidget {
             details_max_lines: STATUS_DETAILS_DEFAULT_MAX_LINES,
             inline_message: None,
             show_interrupt_hint: true,
+            subagent_hint_visible: false,
             elapsed_running: Duration::ZERO,
             last_resume_at: Instant::now(),
             is_paused: false,
@@ -143,6 +147,10 @@ impl StatusIndicatorWidget {
 
     pub(crate) fn set_interrupt_hint_visible(&mut self, visible: bool) {
         self.show_interrupt_hint = visible;
+    }
+
+    pub(crate) fn set_subagent_hint_visible(&mut self, visible: bool) {
+        self.subagent_hint_visible = visible;
     }
 
     #[cfg(test)]
@@ -226,7 +234,9 @@ impl StatusIndicatorWidget {
 
 impl Renderable for StatusIndicatorWidget {
     fn desired_height(&self, width: u16) -> u16 {
-        let details_height = u16::try_from(self.wrapped_details_lines(width).len()).unwrap_or(0);
+        let content_width = width.saturating_sub(LIVE_PREFIX_COLS);
+        let details_height =
+            u16::try_from(self.wrapped_details_lines(content_width).len()).unwrap_or(0);
         1 + details_height
     }
 
@@ -268,19 +278,27 @@ impl Renderable for StatusIndicatorWidget {
             spans.push(" · ".dim());
             spans.push(message.clone().dim());
         }
+        if self.subagent_hint_visible {
+            spans.push(" · ".dim());
+            spans.push(key_hint::ctrl(KeyCode::Char('x')).into());
+            spans.push(" agents".dim());
+        }
 
+        let content_width = area.width.saturating_sub(LIVE_PREFIX_COLS);
         let mut lines = Vec::new();
         lines.push(truncate_line_with_ellipsis_if_overflow(
             Line::from(spans),
-            usize::from(area.width),
+            usize::from(content_width),
         ));
         if area.height > 1 {
             // If there is enough space, add the details lines below the header.
-            let details = self.wrapped_details_lines(area.width);
+            let details = self.wrapped_details_lines(content_width);
             let max_details = usize::from(area.height.saturating_sub(1));
             lines.extend(details.into_iter().take(max_details));
         }
 
+        let left_padding = Span::raw(" ".repeat(LIVE_PREFIX_COLS as usize));
+        let lines = prefix_lines(lines, left_padding.clone(), left_padding);
         Paragraph::new(Text::from(lines)).render_ref(area, buf);
     }
 }
@@ -309,6 +327,7 @@ mod tests {
 
         let top_row: String = (0..area.width).map(|col| buf[(col, 0)].symbol()).collect();
 
+        assert_eq!(top_row.get(..2), Some("  "));
         assert!(top_row.contains("Working"));
     }
 }

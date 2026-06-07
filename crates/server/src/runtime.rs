@@ -11,6 +11,7 @@ use futures::FutureExt;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 
 use devo_core::ApprovalDecisionItem;
 use devo_core::ApprovalRequestItem;
@@ -39,7 +40,11 @@ use devo_core::history::compaction::compact_history;
 use devo_core::history::summarizer::DefaultHistorySummarizer;
 use devo_core::message_to_response_items;
 use devo_core::query;
+use devo_core::tools::AgentToolCoordinator;
 use devo_core::tools::PermissionChecker;
+use devo_core::tools::ToolAgentScope;
+use devo_core::tools::ToolCallError;
+use devo_core::tools::ToolExecutionOptions;
 use devo_core::tools::ToolPermissionRequest;
 use devo_core::tools::ToolRuntime;
 use devo_core::tools::ToolRuntimeContext;
@@ -77,6 +82,7 @@ use crate::SessionForkParams;
 use crate::SessionForkResult;
 use crate::SessionListParams;
 use crate::SessionListResult;
+use crate::SessionMetadata;
 use crate::SessionMetadataUpdateParams;
 use crate::SessionMetadataUpdateResult;
 use crate::SessionPermissionsUpdateParams;
@@ -121,9 +127,11 @@ use crate::persistence::build_turn_record;
 use crate::projection::history_item_from_turn_item;
 use crate::runtime::handlers::goal::GoalProjection;
 use crate::runtime::handlers::goal::GoalStore;
+use crate::subagent::AgentPath;
 use crate::subagent::AgentRegistry;
-use crate::subagent::SpawnAgentParams;
+use crate::subagent::SubagentMailbox;
 use crate::subagent::SubagentMetadata;
+use crate::subagent::SubagentOutputBuffer;
 use crate::subagent::SubagentStatus;
 use crate::titles::build_title_generation_request;
 use crate::titles::derive_provisional_title;
@@ -142,6 +150,7 @@ mod reference_search;
 mod skills;
 mod turn_exec;
 
+pub(crate) use connection::CONNECTION_NOTIFICATION_CHANNEL_CAPACITY;
 pub(crate) use connection::ConnectionRuntime;
 pub(crate) use connection::SubscriptionFilter;
 pub(crate) use items::render_input_items;
@@ -154,11 +163,16 @@ pub struct ServerRuntime {
     sessions: Mutex<HashMap<SessionId, Arc<Mutex<RuntimeSession>>>>,
     connections: Mutex<HashMap<u64, ConnectionRuntime>>,
     active_tasks: Mutex<HashMap<SessionId, tokio::task::AbortHandle>>,
+    active_turn_cancellations: Mutex<HashMap<SessionId, CancellationToken>>,
     next_connection_id: AtomicU64,
     /// Per-session goal stores for goal lifecycle management.
     goal_stores: Mutex<HashMap<SessionId, GoalStore>>,
     /// Per-root-session agent registries for subagent coordination.
     agent_registries: Mutex<HashMap<SessionId, AgentRegistry>>,
+    /// Per-session inboxes used by agent tools to exchange ordered messages.
+    agent_mailboxes: Mutex<HashMap<SessionId, SubagentMailbox>>,
+    /// Per-parent child-output buffers used by wait_agent polling.
+    agent_output_buffers: Mutex<HashMap<SessionId, SubagentOutputBuffer>>,
     /// Live client-owned reference search sessions.
     reference_searches:
         Mutex<HashMap<devo_protocol::ReferenceSearchId, reference_search::ReferenceSearchState>>,
@@ -180,9 +194,12 @@ impl ServerRuntime {
             sessions: Mutex::new(HashMap::new()),
             connections: Mutex::new(HashMap::new()),
             active_tasks: Mutex::new(HashMap::new()),
+            active_turn_cancellations: Mutex::new(HashMap::new()),
             next_connection_id: AtomicU64::new(1),
             goal_stores: Mutex::new(HashMap::new()),
             agent_registries: Mutex::new(HashMap::new()),
+            agent_mailboxes: Mutex::new(HashMap::new()),
+            agent_output_buffers: Mutex::new(HashMap::new()),
             reference_searches: Mutex::new(HashMap::new()),
         })
     }

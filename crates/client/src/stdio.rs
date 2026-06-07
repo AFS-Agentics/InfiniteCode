@@ -2,11 +2,15 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use anyhow::Context;
 use anyhow::Result;
+use devo_protocol::AgentListParams;
+use devo_protocol::AgentListResult;
 use devo_protocol::ApprovalRespondParams;
 use devo_protocol::ClientNotification;
 use devo_protocol::ClientRequest;
@@ -188,6 +192,10 @@ impl StdioServerClient {
 
     pub async fn session_list(&mut self, params: SessionListParams) -> Result<SessionListResult> {
         self.request("session/list", params).await
+    }
+
+    pub async fn agent_list(&mut self, params: AgentListParams) -> Result<AgentListResult> {
+        self.request("agent/list", params).await
     }
 
     pub async fn session_title_update(
@@ -444,6 +452,37 @@ async fn run_stdout_reader(
                 } else if let Ok(notification) =
                     serde_json::from_value::<NotificationEnvelope<serde_json::Value>>(message)
                 {
+                    let event_seq = notification
+                        .params
+                        .get("context")
+                        .and_then(|context| context.get("seq"))
+                        .and_then(serde_json::Value::as_u64);
+                    let item_id = notification_item_id(&notification.params);
+                    let assistant_delta =
+                        notification_assistant_delta(&notification.method, &notification.params);
+                    let delta_len = assistant_delta.map(str::len);
+                    let assistant_token_text =
+                        assistant_delta.and_then(assistant_token_log_preview);
+                    if let Some(assistant_token_text) = assistant_token_text.as_deref() {
+                        tracing::debug!(
+                            stream_elapsed_ms = stream_trace_elapsed_ms(),
+                            method = %notification.method,
+                            event_seq,
+                            item_id = ?item_id,
+                            delta_len = ?delta_len,
+                            assistant_token_text,
+                            "stdio client received server notification"
+                        );
+                    } else {
+                        tracing::debug!(
+                            stream_elapsed_ms = stream_trace_elapsed_ms(),
+                            method = %notification.method,
+                            event_seq,
+                            item_id = ?item_id,
+                            delta_len = ?delta_len,
+                            "stdio client received server notification"
+                        );
+                    }
                     let _ = notifications_tx.send(ServerNotificationMessage {
                         method: notification.method,
                         params: notification.params,
@@ -503,4 +542,72 @@ fn format_protocol_error_code(code: &ProtocolErrorCode) -> &'static str {
         ProtocolErrorCode::WorkspaceRestoreFailedToStart => "workspace_restore_failed_to_start",
         ProtocolErrorCode::InternalError => "internal_error",
     }
+}
+
+fn stream_trace_elapsed_ms() -> u128 {
+    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    STREAM_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+fn notification_item_id(params: &serde_json::Value) -> Option<String> {
+    params
+        .get("context")
+        .and_then(|context| context.get("item_id"))
+        .and_then(serde_json::Value::as_str)
+        .map(ToOwned::to_owned)
+}
+
+fn notification_assistant_delta<'a>(
+    method: &str,
+    params: &'a serde_json::Value,
+) -> Option<&'a str> {
+    (method == "item/agentMessage/delta")
+        .then(|| params.get("delta")?.as_str())
+        .flatten()
+}
+
+fn assistant_token_log_preview(text: &str) -> Option<String> {
+    assistant_token_logging_enabled()
+        .then(|| format_assistant_token_log_preview(text, assistant_token_log_max_chars()))
+}
+
+fn assistant_token_logging_enabled() -> bool {
+    static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
+        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+            .ok()
+            .is_some_and(|value| {
+                matches!(
+                    value.as_str(),
+                    "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                )
+            })
+    })
+}
+
+fn assistant_token_log_max_chars() -> usize {
+    static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
+        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(512)
+    })
+}
+
+fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
+    let max_chars = max_chars.max(1);
+    let mut preview = String::new();
+    let mut chars = text.chars();
+    for ch in chars.by_ref().take(max_chars) {
+        preview.extend(ch.escape_default());
+    }
+    if chars.next().is_some() {
+        preview.push_str("...");
+    }
+    preview
 }

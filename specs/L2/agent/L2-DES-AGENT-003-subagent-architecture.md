@@ -6,28 +6,29 @@ active_baseline: no
 supersedes:
 superseded_by:
 owner: Assistant
-last_updated: 2026-05-25
+last_updated: 2026-06-07
 ---
 
 # L2-DES-AGENT-003 — Subagent Architecture
 
 ## Purpose
 
-Define the architecture for spawning, coordinating, and integrating subagents — independent, bounded execution contexts created as child sessions within a parent session, performing delegated work and reporting results back to the orchestrating agent.
+Define the architecture for spawning, coordinating, and integrating subagents — independent, bounded execution contexts created as child sessions within a parent session, performing delegated work while the parent monitors their output.
 
 ## Scope
 
 This document covers:
-- Agent tree model and hierarchical naming
-- Agent roles and their configuration
+- Agent tree model and generated hierarchical naming
+- Default child role metadata and parent config inheritance
 - Spawn lifecycle (slot reservation, config inheritance, fork modes, initial message delivery)
-- Inter-agent communication (mailbox system, message delivery modes, trigger-turn semantics)
-- Agent status lifecycle and completion notification
-- Subagent tool surface (spawn, send message, followup task, wait, list, close)
+- Parent-to-child input delivery through child mailboxes
+- Child assistant-output buffering and parent polling
+- Agent status lifecycle
+- Parent-only subagent tool surface (spawn, send message, wait, list, close)
 - Depth and concurrency limits
 - Persistence of spawn-tree edges for session resumption
 - Safety, permission, and approval boundaries for subagents
-- Orchestration prompt instructions injected into the model context
+- Orchestration prompt instructions and subagent-mode tool visibility
 
 This document does **not** cover:
 - Session forking implementation details (see L2-DES-CONV-001)
@@ -42,29 +43,29 @@ A subagent is a lightweight child execution context — a child session — that
 
 **Decision**: Subagents are spawned as child sessions within the parent session tree. Each child session has its own conversation history, config snapshot, and state. The root session agent (`/root`) is the top of the tree.
 
-### DD-2: Hierarchical agent paths provide a stable, navigable identity model
+### DD-2: Generated hierarchical agent paths provide a stable, navigable identity model
 
 Flat UUIDs are hard for both humans and models to reason about. A tree-structured path model (`/root/researcher/worker`) mirrors the spawn hierarchy, making ownership and relationships immediately visible.
 
-**Decision**: Every agent is assigned a canonical `AgentPath` — a slash-separated hierarchical path rooted at `/root`. Paths are assigned at spawn time, validated for naming rules, and remain stable for the agent's lifetime. Relative and absolute path references are supported for inter-agent addressing.
+**Decision**: Every agent is assigned a canonical `AgentPath` — a slash-separated hierarchical path rooted at `/root`. The parent does not provide the child name. At spawn time, the runtime generates a unique adjective-noun nickname under the parent and joins it to the parent path. Paths remain stable for the agent's lifetime.
 
-### DD-3: Agent roles are configurable composable layers
+### DD-3: Child sessions inherit parent configuration in the current baseline
 
-Different delegated tasks call for different agent configurations — a codebase explorer needs different instructions and model settings than an implementation worker. Hardcoding these differences into the spawn tool would be brittle.
+The current public spawn tool intentionally keeps configuration simple. A child session inherits the parent's effective model, provider, workspace, permissions, shell environment, and safety posture. The runtime records a role label for metadata, but the model-facing spawn API does not accept role, model, or reasoning overrides in this baseline.
 
-**Decision**: Agent roles are named configuration layers (`default`, `explorer`, `worker`, plus user-defined roles). Each role specifies optional overrides for model, reasoning effort, system instructions, and other config knobs. Roles are applied as a high-precedence config layer layered over the parent's effective config at spawn time, preserving the parent's permission profile and provider unless the role explicitly takes ownership.
+**Decision**: Spawned children use the generated identity plus `agent_role = "default"` metadata and inherit parent configuration. Role-specific configuration can be added later as a new design revision when the public API and safety rules are defined.
 
-### DD-4: Inter-agent communication uses a mailbox with sequence-based waiting
+### DD-4: Parent-to-child messages are delivered as child user input
 
-Agents need to send messages to each other and wait for replies. A simple mpsc channel per agent provides unbounded, ordered delivery. A watch channel for sequence numbers enables efficient waiting with timeout: the waiting agent watches a monotonically increasing counter and wakes when new mail arrives.
+Parent agents need to send additional input to child agents without treating the child as a peer chat participant. Child agents do not need to send messages to their parent; the parent observes child output separately.
 
-**Decision**: Each agent session has a `Mailbox` (unbounded sender + sequence-number watch channel). Messages carry author/recipient `AgentPath`s, text content, and a `trigger_turn` flag. Two delivery modes exist: `QueueOnly` (deliver without triggering a new turn) and `TriggerTurn` (deliver and immediately start a new turn). The `wait_agent` tool subscribes to the mailbox sequence channel and blocks with a configurable timeout.
+**Decision**: Each child session has an internal mailbox for parent-to-child text. `send_message` writes to that mailbox and the runtime consumes mailbox entries as normal child user turns. If the child is idle, the message starts a turn immediately. If the child is active, the message is queued for the next child turn. Child-to-parent mailbox routing is not supported.
 
-### DD-5: Completion notification uses a background watcher, not a polling loop
+### DD-5: Parent polling reads a child-output buffer
 
-When a child subagent finishes, the parent must be informed. A background task per spawned child is more efficient and lower latency than requiring the parent to poll.
+The parent must be able to monitor child progress and completion without receiving child-authored mailbox messages.
 
-**Decision**: When a subagent is spawned, a detached completion watcher task subscribes to the child's `AgentStatus` channel. When the child reaches a terminal status (`Completed`, `Errored`, `Shutdown`), the watcher injects a structured notification into the parent's context. The notification is delivered as an `InterAgentCommunication` message through the mailbox. It is also rendered as a `<subagent_notification>` marker in the parent's conversation transcript.
+**Decision**: Each parent session has a sequence-numbered output buffer for direct child assistant text and terminal status events. Child assistant deltas are appended as they stream. Child terminal status changes are appended as status events. The `wait_agent` tool polls this buffer with an optional target and sequence cursor.
 
 ### DD-6: Subagents inherit permission and safety boundaries, never bypass them
 
@@ -95,7 +96,7 @@ Each agent has three identification dimensions:
 |------------|------|-----------|---------|
 | `session_id` | `SessionId` (UUID) | Stable for lifetime | Internal routing, persistence |
 | `agent_path` | `AgentPath` | Stable for lifetime | Human/model-facing identity, inter-agent addressing |
-| `agent_nickname` | String | Stable for lifetime | Friendly display name (e.g. "Scout", "Atlas") |
+| `agent_nickname` | String | Stable for lifetime | Generated friendly display name (e.g. `brave-apple`) |
 
 #### Agent Metadata
 
@@ -115,56 +116,19 @@ These fields correspond to the existing `SessionRecord` columns: `agent_nickname
 
 #### Nickname Pools
 
-Agent nicknames are drawn from a pool of candidate names (e.g. "Scout", "Atlas", "Echo", "Falcon"). The default pool contains a curated list of short, friendly names. Roles may specify their own nickname pools. The registry tracks used nicknames to avoid duplicates. When the pool is exhausted, it resets with a generation suffix (e.g., "Scout the 2nd").
+Agent nicknames are generated from a fixed ASCII adjective-noun pool. The registry tracks used names under each parent to avoid duplicates. When the pool is exhausted, spawn fails with deterministic invalid input rather than reusing a name.
 
 ### Agent Roles
 
-An agent role is a named configuration profile applied to a subagent at spawn time. Roles are defined either as built-in definitions shipped with the program, or as user-defined entries in config.
-
-#### Built-in Roles
-
-| Role | Purpose | Overrides |
-|------|---------|-----------|
-| `default` | General-purpose agent | None (inherits parent config entirely) |
-| `explorer` | Fast, read-only codebase investigation | May specify a fast model, low reasoning effort, exploration-focused instructions |
-| `worker` | Implementation and production work | May specify instructions emphasizing file ownership and peer awareness |
-
-Additional built-in roles may be added as the system matures (e.g., `awaiter` for long-running command monitoring).
-
-#### User-Defined Roles
-
-Users may define custom roles in config:
-
-```toml
-[agent_roles.code-reviewer]
-description = "Specialized code reviewer that identifies bugs and risks"
-config_file = "~/.config/devo/roles/code-reviewer.toml"
-nickname_candidates = ["Eagle", "Hawk"]
-```
-
-The `config_file` is a standard config TOML fragment containing the role's overrides (model, instructions, etc.). It is loaded as a high-precedence config layer.
-
-#### Role Application Order
-
-When a subagent is spawned:
-
-1. The parent's effective config is cloned as the base.
-2. Runtime fields from the current turn (model selection, reasoning effort, developer instructions, approval policy, cwd, permission profile) are applied.
-3. The role config layer, if specified, is applied at session-flag precedence.
-4. The parent's `profile` and `model_provider` are preserved unless the role explicitly overrides them.
-5. Depth-dependent overrides are applied (e.g., disabling further multi-agent features at max depth).
+The current baseline records `agent_role = "default"` for each child. It does not expose role selection to the model, and it does not support model or reasoning overrides in `spawn_agent`.
 
 ### Spawn Lifecycle
 
 #### Step 1: Model Invocation
 
 The model calls the `spawn_agent` tool with:
-- `task_name`: A unique name for the new agent within its parent's subtree (e.g., `"researcher"`, `"worker"`)
 - `message`: The initial task description for the new agent
-- `agent_type` (optional): Role name (`"default"`, `"explorer"`, `"worker"`, or user-defined)
-- `model` (optional): Override model selection
-- `reasoning_effort` (optional): Override reasoning effort
-- `fork_turns` (optional): `"none"` (no history), `"all"` (full history), or a positive integer N (last N turns)
+- `fork_turns` (optional): `"none"` (no history) or `"all"` (full history)
 
 #### Step 2: Slot Reservation
 
@@ -172,11 +136,11 @@ The `AgentRegistry` checks concurrent agent limits (`agent_max_sub_agents`). If 
 
 #### Step 3: Path and Nickname Assignment
 
-The child's `AgentPath` is computed by joining the parent's path with the requested `task_name`. If the path already exists in the registry, spawn is rejected. A nickname is selected from the role's pool (or the default pool), avoiding duplicates.
+The runtime generates a unique adjective-noun nickname under the parent registry and computes the child's `AgentPath` by joining the parent's path with that nickname. If the generated-name pool is exhausted for the parent, spawn is rejected.
 
 #### Step 4: Config Construction
 
-The child session's config is built from the parent's effective config, with runtime turn-state overrides applied. If a role is specified, the role config layer is applied on top. If `fork_turns` is set to `"all"` or a positive integer, model/reasoning overrides from the spawn call are rejected (the child inherits the parent's model when forking full history).
+The child session's config is built from the parent's effective config, with runtime turn-state settings applied. The child inherits the parent's model, provider, permissions, shell environment, and cwd.
 
 #### Step 5: Child Session Creation
 
@@ -190,9 +154,7 @@ The child session's `SessionRecord` stores `parent_session_id`, `agent_path`, `a
 
 #### Step 6: Message Delivery
 
-The initial task message is delivered as an `InterAgentCommunication` with `trigger_turn = true`, which:
-1. Places the message in the child's mailbox
-2. Triggers a new turn on the child session
+The initial task message is submitted as the child session's first user turn. During model request assembly, request-only subagent reminders are inserted before this task input and are not persisted into the child transcript.
 
 #### Step 7: Spawn-Edge Persistence
 
@@ -201,9 +163,9 @@ The parent-child spawn relationship is persisted to the agent graph store as an 
 - `child_session_id`
 - `status`: `Open` (agent is alive or may be resumed) or `Closed` (agent was explicitly closed)
 
-#### Step 8: Completion Watcher
+#### Step 8: Output Buffer Initialization
 
-A background watcher task is spawned to monitor the child's status. When the child reaches a terminal status, the watcher notifies the parent (see Completion Notification below).
+The parent output buffer records child assistant text deltas and terminal status events. The parent polls this buffer with `wait_agent`.
 
 #### Slot Reservation Lifecycle
 
@@ -242,53 +204,46 @@ Subagents may inherit conversation history from the parent through fork modes:
 |------|----------|
 | `none` (default) | No history inherited. Child starts with a clean conversation containing only the initial task message. |
 | `all` | Full conversation history up to the spawn point is forked. Assistant reasoning items and intermediate tool calls are filtered out; only user/developer/system messages and final assistant answers are retained. |
-| `<N>` (positive integer) | The last N turns of the parent conversation are forked. |
 
-Forked history is deduplicated via reference-based storage rather than deep-copied (see L2-DES-CONV-001). When forking full history, agent type, model, and reasoning effort overrides are rejected — the child inherits the parent's identity to maintain consistency.
+Forked history is deduplicated via reference-based storage rather than deep-copied (see L2-DES-CONV-001). When forking full history, the child inherits the parent's model context to maintain consistency.
 
 ### Inter-Agent Communication
 
-#### Mailbox
+#### Child Input Mailbox
 
-Each agent session has a `Mailbox` — the primitive for receiving messages from sibling/parent agents.
+Each child agent session has an internal mailbox for receiving parent-authored input.
 
 ```
 Mailbox {
-    tx: UnboundedSender<InterAgentCommunication>,
-    next_seq: AtomicU64,
-    seq_tx: watch::Sender<u64>,
-}
-
-MailboxReceiver {
-    rx: UnboundedReceiver<InterAgentCommunication>,
-    pending_mails: VecDeque<InterAgentCommunication>,
+    next_sequence: u64,
+    pending: VecDeque<AgentMailboxMessage>,
 }
 ```
 
 Key properties:
-- Unbounded channel: senders are never blocked.
 - Monotonic sequence numbers: each message gets an incrementing sequence number.
-- Watch channel: subscribers can detect new messages without polling.
-- Queue buffering: the receiver syncs from the channel into a `VecDeque` for draining.
+- Queue buffering: parent messages are drained into normal child user turns.
+- Directionality: only parent-to-child delivery is supported.
 
 #### Message Structure
 
 ```rust
-struct InterAgentCommunication {
-    author: AgentPath,                  // sender
-    recipient: AgentPath,               // primary recipient
-    other_recipients: Vec<AgentPath>,   // CC'd agents
-    content: String,                    // text message body
-    trigger_turn: bool,                 // whether delivery should start a new turn
+struct AgentMailboxMessage {
+    from_session_id: SessionId,
+    to_session_id: SessionId,
+    from_agent_path: String,
+    to_agent_path: String,
+    content: String,
+    sequence: u64,
 }
 ```
 
-#### Delivery Modes
+#### Delivery Behavior
 
-| Mode | `trigger_turn` | Used by | Behavior |
-|------|---------------|---------|----------|
-| `QueueOnly` | `false` | `send_message` | Message is queued. Agent will see it when it drains pending mail (at the start of its next turn or when explicitly waiting). |
-| `TriggerTurn` | `true` | `followup_task`, initial spawn | Message is queued AND a new turn is immediately triggered on the recipient. |
+`send_message` places the message in the target child's mailbox. The runtime drains mailbox entries as child user input:
+- If the child is idle, the drained message starts a child turn immediately.
+- If the child is active, the drained message is queued for the next child turn.
+- If the caller is a child targeting `parent`, `root`, or the parent session id, the request is rejected.
 
 #### Message Flow
 
@@ -299,26 +254,29 @@ Sender Agent                    Mailbox                      Recipient Agent
      │────────────────────────────►│                              │
      │                             │  (queue)                     │
      │                             │                              │
-     │                             │          drain()             │
-     │                             │◄─────────────────────────────│
-     │                             │  [InterAgentCommunication]   │
+     │                             │  drain as user input         │
      │                             │─────────────────────────────►│
-     │                             │                              │
-     │  followup_task(target, msg) │                              │
-     │────────────────────────────►│                              │
-     │                             │  (queue + trigger turn)      │
-     │                             │──────────────────────────────│
-     │                             │         (new turn starts)    │
+     │                             │  starts turn or queues turn  │
 ```
 
-#### Wait Mechanism
+#### Output Buffer Polling
 
-The `wait_agent` tool uses the mailbox sequence watch channel:
+The parent does not receive child-authored mailbox messages. Instead, each parent session has an output buffer:
 
-1. If there are already pending mailbox items, return immediately (not timed out).
-2. Otherwise, subscribe to the sequence watch channel and wait with a deadline.
-3. If the sequence changes before the deadline, return "Wait completed."
-4. If the deadline passes, return "Wait timed out."
+```rust
+struct AgentOutputEvent {
+    sequence: u64,
+    child_session_id: SessionId,
+    agent_path: String,
+    turn_id: Option<TurnId>,
+    kind: String,              // "assistant_delta" or "status"
+    text: Option<String>,
+    status: Option<String>,
+    created_at: DateTime<Utc>,
+}
+```
+
+`wait_agent` reads events after an optional `after_sequence` cursor. If matching events already exist, it returns immediately. Otherwise it waits with a deadline and returns either new events or `timed_out = true`.
 
 Timeout bounds are configurable per session (`min_wait_timeout_ms`, `max_wait_timeout_ms`, `default_wait_timeout_ms`).
 
@@ -341,51 +299,12 @@ NotFound  (queried before spawn or after removal)
 | `PendingInit` | Child session created but not yet started its first turn |
 | `Running` | Agent is actively processing a turn |
 | `Interrupted` | Agent's current turn was interrupted; may receive more input |
-| `Completed(Option<String>)` | Agent finished successfully. Contains optional final message |
+| `Completed` | Agent finished a turn successfully |
 | `Errored(String)` | Agent encountered a fatal error |
 | `Shutdown` | Agent was explicitly closed or the parent session ended |
 | `NotFound` | Agent is not known to the registry |
 
-Terminal statuses (`Completed`, `Errored`, `Shutdown`) trigger completion notification to the parent.
-
-### Completion Notification
-
-When a child subagent reaches a terminal status, the parent must be informed so it can integrate the result and continue coordination.
-
-#### Watcher Task
-
-A detached background task per spawned child:
-1. Subscribes to the child session's `AgentStatus` watch channel.
-2. Waits for a terminal status (or channel close).
-3. Formats a notification message containing the agent reference and final status.
-4. Delivers the notification to the parent.
-
-#### Notification Delivery
-
-Completion notifications are delivered as `InterAgentCommunication` messages through the parent's mailbox:
-
-```
-InterAgentCommunication {
-    author: child_agent_path,
-    recipient: parent_agent_path,
-    content: "agent_path: {path}\nstatus: {status}",
-    trigger_turn: false,
-}
-```
-
-This allows the parent to drain its mailbox and discover which children have finished without polling.
-
-#### Transcript Injection
-
-The notification is also injected as a structured marker in the parent's conversation transcript:
-
-```
-<subagent_notification>
-{"agent_path": "/root/researcher", "status": "completed"}
-</subagent_notification>
-```
-
-This marker is rendered as a user-visible message fragment, making it visible in the conversation history and providing durable evidence of subagent completion.
+Terminal statuses append status events to the parent output buffer.
 
 ### Subagent Tool Surface
 
@@ -397,24 +316,19 @@ Creates a new subagent (child session) and sends an initial task message.
 
 | Parameter | Required | Type | Description |
 |-----------|----------|------|-------------|
-| `task_name` | Yes | string | Unique name for the new agent (lowercase, digits, underscores) |
 | `message` | Yes | string | Initial task description |
-| `agent_type` | No | string | Role name: `"default"`, `"explorer"`, `"worker"`, or user-defined |
-| `model` | No | string | Override model for this agent |
-| `reasoning_effort` | No | string | Override reasoning effort |
-| `fork_turns` | No | string | `"none"`, `"all"`, or `"N"` (positive integer) |
+| `fork_turns` | No | string | `"all"` (default stable-history fork excluding the active parent turn) or `"none"` (clean child context) |
 
-**Output**: Agent path and optionally nickname (if not hidden by config).
+**Output**: Child session id, generated agent path, generated nickname, and current status.
 
 **Errors**:
 - `AgentLimitReached`: Concurrent agent limit exceeded
-- Agent path already exists
-- Invalid role name
+- Generated name pool exhausted
 - Invalid fork_turns value
 
 #### `send_message`
 
-Sends a text message to an existing agent without triggering a new turn.
+Sends parent-authored text to an existing child agent as child user input.
 
 | Parameter | Required | Type | Description |
 |-----------|----------|------|-------------|
@@ -423,32 +337,21 @@ Sends a text message to an existing agent without triggering a new turn.
 
 **Output**: Empty success acknowledgment.
 
-**Errors**: Target not found, empty message, or target is the root agent (use `followup_task` for turn triggers).
-
-#### `followup_task`
-
-Sends a text message to an existing agent AND triggers a new turn.
-
-| Parameter | Required | Type | Description |
-|-----------|----------|------|-------------|
-| `target` | Yes | string | Target agent path (absolute or relative) |
-| `message` | Yes | string | Text message content |
-
-**Output**: Empty success acknowledgment.
-
-**Errors**: Target not found, empty message, or target is the root agent (root agent cannot receive triggered turns from child agents).
+**Errors**: Target not found, empty message, or caller attempts child-to-parent delivery.
 
 #### `wait_agent`
 
-Blocks until a mailbox message arrives or a timeout expires.
+Polls child assistant output and terminal status events, optionally waiting for new output.
 
 | Parameter | Required | Type | Description |
 |-----------|----------|------|-------------|
+| `target` | No | string | Optional child agent path or session id |
+| `after_sequence` | No | integer | Only return events after this parent-buffer sequence |
 | `timeout_ms` | No | integer | Wait timeout in milliseconds (clamped to `[min_wait_timeout_ms, max_wait_timeout_ms]`) |
 
-**Output**: `{ "message": "Wait completed." | "Wait timed out.", "timed_out": bool }`.
+**Output**: `{ "events": AgentOutputEvent[], "next_sequence": integer, "timed_out": bool }`.
 
-**Behavior**: If there are already pending mailbox messages, returns immediately. Otherwise waits on the mailbox sequence channel.
+**Behavior**: If matching output events after `after_sequence` already exist, returns immediately. Otherwise waits until a matching event arrives or the timeout expires.
 
 #### `list_agents`
 
@@ -464,7 +367,7 @@ The root agent is always included when no prefix or a matching prefix is specifi
 
 #### `close_agent`
 
-Shuts down an agent and all of its live descendants, marking the spawn edge as closed.
+Closes a direct child agent and records terminal status for parent polling.
 
 | Parameter | Required | Type | Description |
 |-----------|----------|------|-------------|
@@ -475,9 +378,9 @@ Shuts down an agent and all of its live descendants, marking the spawn edge as c
 **Errors**: Target not found.
 
 **Behavior**:
-1. Persists the spawn edge status as `Closed`.
-2. Shuts down the target agent session.
-3. Recursively shuts down all live descendants in the spawn tree.
+1. Marks the target child as close-requested.
+2. Interrupts active target work if needed.
+3. Records one terminal `closed` status event for parent polling.
 
 ### Depth and Concurrency Limits
 
@@ -521,7 +424,7 @@ The agent registry is rebuilt in-memory from the persisted edges. Resume is recu
 | State | Meaning |
 |-------|---------|
 | `Open` | Agent was spawned and may still be active or resumable |
-| `Closed` | Agent was explicitly closed via `close_agent` and its descendants were shut down |
+| `Closed` | Agent was explicitly closed via `close_agent` |
 
 Closing an edge does not delete the child's transcript — closed agents remain in the session history for audit and review.
 
@@ -564,8 +467,8 @@ When the agent's environment context is assembled, live child subagents are list
 ```
 <environment_context>
 Sub-agents:
-  /root/researcher (Scout) — Investigating authentication module
-  /root/implementer (Atlas) — Implementing database migration
+  /root/brave-apple (brave-apple) — Investigating authentication module
+  /root/calm-fox (calm-fox) — Implementing database migration
 </environment_context>
 ```
 
@@ -580,22 +483,19 @@ When multi-agent features are enabled, a dedicated set of instructions is inject
 - **When you delegate work to a sub-agent, your role becomes coordination.** Do not perform the actual work while sub-agents are working. Trust their results without redundant verification.
 - **Assign clear ownership.** When multiple workers are spawned to modify code, explicitly assign files or modules to each to avoid merge conflicts.
 - **Reuse existing sub-agents for related follow-up questions** rather than spawning new ones.
-- **Use `followup_task`** to send a new task to an existing agent that triggers a turn. Use `send_message` when you want to leave a note without interrupting.
-- **Use `wait_agent`** to block until any sub-agent sends a message or completes, with an appropriate timeout.
+- **Use `send_message`** to send additional user input to an existing child agent.
+- **Use `wait_agent`** to poll child output and terminal status events, with an appropriate timeout.
 - **Close sub-agents when done** to free resources and prevent stale agents from consuming limits.
 
-These instructions adapt to the active configuration: if model selection is hidden from the spawn tool, model descriptions are omitted; if spawn metadata is hidden, nicknames are suppressed from output.
+These instructions adapt to the active tool surface. Parent sessions can see the agent coordination tools and their schema descriptions. Subagent sessions cannot see or load agent coordination tools, even when the parent used `fork_turns = "all"`.
 
-#### Subagent Usage Hints
+#### Subagent Mode Reminder
 
-Configurable usage hint text can customize the instructions injected for both the root agent and subagents:
+Subagent `ModelRequest.system` contains only the inherited base instructions; deferred-tool reminders and subagent-mode reminders are not appended to the system prompt in subagent mode. Each subagent model request receives request-only reminder user messages after any prefix/environment and inherited stable parent history, but before the current child task input. For `fork_turns = "all"`, this yields stable parent history followed by request-only reminders and then the child task. For `fork_turns = "none"`, this yields prefix/environment, request-only reminders, and then the child task. The reminder states that the model is running as a subagent, must not call agent coordination tools such as `spawn_agent`, and should report results through normal assistant output. These reminders are not persisted into the child transcript, preserving context-prefix stability for full-history forks.
 
-| Config Key | Default | Applied To |
-|------------|---------|------------|
-| `root_agent_usage_hint_text` | (built-in orchestration rules) | Root agent |
-| `subagent_usage_hint_text` | (built-in subagent rules) | All subagents |
+#### Tool Visibility
 
-These are injected as developer messages at child session start and are stripped when history is forked (the child gets fresh hints matching its own role).
+In subagent mode, `spawn_agent`, `send_message`, `wait_agent`, `list_agents`, `close_agent`, and their aliases are hidden from model tool schemas, deferred tool reminders, and `ToolSearch` selection. Runtime dispatch still rejects those calls as defense-in-depth if a model attempts one from inherited context or hallucination.
 
 ## Traceability
 

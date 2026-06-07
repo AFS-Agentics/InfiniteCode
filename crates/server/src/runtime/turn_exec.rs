@@ -1,5 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::OnceLock;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc as std_mpsc;
+use std::time::Duration;
+use std::time::Instant;
 
 use super::*;
 use crate::{FileChangePayload, TurnPlanStepPayload, TurnPlanUpdatedPayload};
@@ -7,12 +13,238 @@ use devo_core::tools::tool_spec::ToolPreparationFeedback;
 use devo_util_git::extract_paths_from_patch;
 use tokio::sync::mpsc;
 
+const QUERY_EVENT_CHANNEL_CAPACITY: usize = 1024;
+const QUERY_EVENT_FORWARD_CHANNEL_CAPACITY: usize = 1;
+const QUERY_EVENT_BACKPRESSURE_LOG_THRESHOLD: Duration = Duration::from_millis(50);
+
 struct PendingToolCall {
     item_id: Option<ItemId>,
     item_seq: Option<u64>,
     input: serde_json::Value,
-    is_command_execution: bool,
+    display_kind: ToolDisplayKind,
     command: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ToolDisplayKind {
+    CommandExecution,
+    Generic,
+}
+
+impl ToolDisplayKind {
+    fn for_tool_name(name: &str) -> Self {
+        if is_unified_exec_tool(name) {
+            Self::CommandExecution
+        } else {
+            Self::Generic
+        }
+    }
+
+    fn is_command_execution(self) -> bool {
+        self == Self::CommandExecution
+    }
+}
+
+struct ToolStartItem {
+    item_kind: ItemKind,
+    payload: serde_json::Value,
+}
+
+#[derive(Clone)]
+struct BoundedQueryEventSender {
+    tx: std_mpsc::SyncSender<QueryEvent>,
+    queue_depth: Arc<AtomicUsize>,
+    queue_max_depth: Arc<AtomicUsize>,
+}
+
+impl BoundedQueryEventSender {
+    fn send(&self, event: QueryEvent) {
+        let event_kind = query_event_trace_kind(&event);
+        let delta_len = query_event_trace_delta_len(&event);
+        let assistant_token_text = query_event_trace_token_preview(&event);
+        let depth = self.queue_depth.fetch_add(1, Ordering::AcqRel) + 1;
+        self.queue_max_depth.fetch_max(depth, Ordering::AcqRel);
+        if let Some(assistant_token_text) = assistant_token_text.as_deref() {
+            tracing::debug!(
+                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                event_kind,
+                delta_len,
+                queue_depth = depth,
+                assistant_token_text,
+                "query event bridge enqueue requested"
+            );
+        } else {
+            tracing::debug!(
+                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                event_kind,
+                delta_len,
+                queue_depth = depth,
+                "query event bridge enqueue requested"
+            );
+        }
+        match self.tx.try_send(event) {
+            Ok(()) => {
+                tracing::trace!(
+                    stream_elapsed_ms = stream_trace_elapsed_ms(),
+                    event_kind,
+                    queue_depth = depth,
+                    "query event bridge enqueue accepted"
+                );
+            }
+            Err(std_mpsc::TrySendError::Full(event)) => {
+                let send_started_at = Instant::now();
+                if self.tx.send(event).is_err() {
+                    decrement_query_event_queue_depth(&self.queue_depth);
+                    return;
+                }
+                let waited = send_started_at.elapsed();
+                if waited >= QUERY_EVENT_BACKPRESSURE_LOG_THRESHOLD {
+                    tracing::warn!(
+                        stream_elapsed_ms = stream_trace_elapsed_ms(),
+                        event_kind,
+                        waited_ms = waited.as_millis(),
+                        threshold_ms = QUERY_EVENT_BACKPRESSURE_LOG_THRESHOLD.as_millis(),
+                        "query event bridge applied backpressure"
+                    );
+                }
+            }
+            Err(std_mpsc::TrySendError::Disconnected(_)) => {
+                decrement_query_event_queue_depth(&self.queue_depth);
+            }
+        }
+    }
+}
+
+fn bounded_query_event_channel(
+    capacity: usize,
+    queue_depth: Arc<AtomicUsize>,
+    queue_max_depth: Arc<AtomicUsize>,
+) -> (
+    BoundedQueryEventSender,
+    mpsc::Receiver<QueryEvent>,
+    tokio::task::JoinHandle<()>,
+) {
+    let (ingress_tx, ingress_rx) = std_mpsc::sync_channel::<QueryEvent>(capacity);
+    let (event_tx, event_rx) = mpsc::channel::<QueryEvent>(QUERY_EVENT_FORWARD_CHANNEL_CAPACITY);
+    let queue_depth_for_forwarder = Arc::clone(&queue_depth);
+    let forwarder = tokio::task::spawn_blocking(move || {
+        while let Ok(event) = ingress_rx.recv() {
+            if event_tx.blocking_send(event).is_err() {
+                decrement_query_event_queue_depth(&queue_depth_for_forwarder);
+                while ingress_rx.try_recv().is_ok() {
+                    decrement_query_event_queue_depth(&queue_depth_for_forwarder);
+                }
+                break;
+            }
+        }
+    });
+    (
+        BoundedQueryEventSender {
+            tx: ingress_tx,
+            queue_depth,
+            queue_max_depth,
+        },
+        event_rx,
+        forwarder,
+    )
+}
+
+fn decrement_query_event_queue_depth(queue_depth: &AtomicUsize) {
+    let _ = queue_depth.fetch_update(Ordering::AcqRel, Ordering::Acquire, |depth| {
+        Some(depth.saturating_sub(1))
+    });
+}
+
+fn stream_trace_elapsed_ms() -> u128 {
+    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    STREAM_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+fn query_event_trace_kind(event: &QueryEvent) -> &'static str {
+    match event {
+        QueryEvent::TextDelta(_) => "text_delta",
+        QueryEvent::ReasoningDelta(_) => "reasoning_delta",
+        QueryEvent::ReasoningCompleted => "reasoning_completed",
+        QueryEvent::UsageDelta { .. } => "usage_delta",
+        QueryEvent::ToolUseStart { .. } => "tool_use_start",
+        QueryEvent::ToolProgress { .. } => "tool_progress",
+        QueryEvent::ToolResult { .. } => "tool_result",
+        QueryEvent::TurnComplete { .. } => "turn_complete",
+        QueryEvent::Usage { .. } => "usage",
+    }
+}
+
+fn query_event_trace_delta_len(event: &QueryEvent) -> usize {
+    match event {
+        QueryEvent::TextDelta(text) | QueryEvent::ReasoningDelta(text) => text.len(),
+        QueryEvent::ToolProgress { content, .. } => content.len(),
+        QueryEvent::ReasoningCompleted
+        | QueryEvent::UsageDelta { .. }
+        | QueryEvent::ToolUseStart { .. }
+        | QueryEvent::ToolResult { .. }
+        | QueryEvent::TurnComplete { .. }
+        | QueryEvent::Usage { .. } => 0,
+    }
+}
+
+fn query_event_trace_token_preview(event: &QueryEvent) -> Option<String> {
+    match event {
+        QueryEvent::TextDelta(text) => assistant_token_log_preview(text),
+        QueryEvent::ReasoningDelta(_)
+        | QueryEvent::ReasoningCompleted
+        | QueryEvent::UsageDelta { .. }
+        | QueryEvent::ToolUseStart { .. }
+        | QueryEvent::ToolProgress { .. }
+        | QueryEvent::ToolResult { .. }
+        | QueryEvent::TurnComplete { .. }
+        | QueryEvent::Usage { .. } => None,
+    }
+}
+
+fn assistant_token_log_preview(text: &str) -> Option<String> {
+    assistant_token_logging_enabled()
+        .then(|| format_assistant_token_log_preview(text, assistant_token_log_max_chars()))
+}
+
+fn assistant_token_logging_enabled() -> bool {
+    static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
+        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+            .ok()
+            .is_some_and(|value| {
+                matches!(
+                    value.as_str(),
+                    "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                )
+            })
+    })
+}
+
+fn assistant_token_log_max_chars() -> usize {
+    static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
+        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(512)
+    })
+}
+
+fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
+    let max_chars = max_chars.max(1);
+    let mut preview = String::new();
+    let mut chars = text.chars();
+    for ch in chars.by_ref().take(max_chars) {
+        preview.extend(ch.escape_default());
+    }
+    if chars.next().is_some() {
+        preview.push_str("...");
+    }
+    preview
 }
 
 async fn complete_reasoning_item(
@@ -67,6 +299,116 @@ fn is_file_change_tool(name: &str) -> bool {
 
 fn is_plan_tool(name: &str) -> bool {
     matches!(name, "update_plan")
+}
+
+fn tool_start_item_kind(
+    tool_name: &str,
+    display_kind: ToolDisplayKind,
+    preparation_feedback: ToolPreparationFeedback,
+) -> ItemKind {
+    if preparation_feedback == ToolPreparationFeedback::LiveOnly {
+        ItemKind::ToolCall
+    } else if is_file_change_tool(tool_name) {
+        ItemKind::FileChange
+    } else if display_kind.is_command_execution() {
+        ItemKind::CommandExecution
+    } else if is_plan_tool(tool_name) {
+        ItemKind::Plan
+    } else {
+        ItemKind::ToolCall
+    }
+}
+
+fn tool_start_item(
+    tool_call_id: &str,
+    tool_name: &str,
+    command: &str,
+    input: &serde_json::Value,
+    display_kind: ToolDisplayKind,
+    preparation_feedback: ToolPreparationFeedback,
+    command_actions: Vec<devo_protocol::parse_command::ParsedCommand>,
+) -> ToolStartItem {
+    let item_kind = tool_start_item_kind(tool_name, display_kind, preparation_feedback);
+    let payload = match item_kind {
+        ItemKind::ToolCall => serde_json::to_value(ToolCallPayload {
+            tool_call_id: tool_call_id.to_string(),
+            tool_name: tool_name.to_string(),
+            parameters: input.clone(),
+            command_actions,
+        })
+        .expect("serialize tool call payload"),
+        ItemKind::FileChange => serde_json::to_value(FileChangePayload {
+            tool_call_id: tool_call_id.to_string(),
+            tool_name: Some(tool_name.to_string()),
+            changes: Vec::new(),
+            is_error: false,
+        })
+        .expect("serialize file change payload"),
+        ItemKind::CommandExecution => serde_json::to_value(CommandExecutionPayload {
+            tool_call_id: tool_call_id.to_string(),
+            tool_name: tool_name.to_string(),
+            command: command.to_string(),
+            source: devo_protocol::protocol::ExecCommandSource::Agent,
+            command_actions,
+            output: None,
+            is_error: false,
+        })
+        .expect("serialize command execution payload"),
+        ItemKind::Plan => serde_json::json!({
+            "title": "Plan",
+            "text": ""
+        }),
+        ItemKind::UserMessage
+        | ItemKind::AgentMessage
+        | ItemKind::Reasoning
+        | ItemKind::ToolResult
+        | ItemKind::McpToolCall
+        | ItemKind::WebSearch
+        | ItemKind::ImageView
+        | ItemKind::ContextCompaction
+        | ItemKind::ApprovalRequest
+        | ItemKind::ApprovalDecision => unreachable!("tool start item kind must be tool-like"),
+    };
+    ToolStartItem { item_kind, payload }
+}
+
+fn tool_start_item_from_input(
+    tool_call_id: &str,
+    tool_name: &str,
+    command: &str,
+    input: &serde_json::Value,
+    display_kind: ToolDisplayKind,
+    preparation_feedback: ToolPreparationFeedback,
+) -> ToolStartItem {
+    tool_start_item(
+        tool_call_id,
+        tool_name,
+        command,
+        input,
+        display_kind,
+        preparation_feedback,
+        command_actions_from_tool_input(tool_name, command, input),
+    )
+}
+
+fn tool_start_item_from_result(
+    tool_call_id: &str,
+    tool_name: &str,
+    command: &str,
+    input: &serde_json::Value,
+    display_kind: ToolDisplayKind,
+    preparation_feedback: ToolPreparationFeedback,
+    summary: &str,
+) -> ToolStartItem {
+    tool_start_item(
+        tool_call_id,
+        tool_name,
+        command,
+        input,
+        display_kind,
+        preparation_feedback,
+        command_actions_from_tool_result(tool_name, command, input, summary),
+    )
 }
 
 fn command_display_from_input(tool_name: &str, input: &serde_json::Value) -> String {
@@ -132,6 +474,7 @@ fn command_display_from_input(tool_name: &str, input: &serde_json::Value) -> Str
                 format!("grep {pattern} in {path}")
             }
         }
+        "code_search" => code_search_display_from_input(input),
         _ => String::new(),
     }
 }
@@ -160,7 +503,89 @@ fn command_actions_from_tool_input(
                 .and_then(serde_json::Value::as_str)
                 .map(ToOwned::to_owned),
         }],
+        "code_search" => code_search_action_from_input(command, input)
+            .into_iter()
+            .collect(),
         _ => Vec::new(),
+    }
+}
+
+fn code_search_display_from_input(input: &serde_json::Value) -> String {
+    match input
+        .get("operation")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("search")
+    {
+        "find_related" => {
+            let path = input
+                .get("file_path")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let line = input.get("line").and_then(serde_json::Value::as_u64);
+            match (path.is_empty(), line) {
+                (false, Some(line)) => format!("code_search related {path}:{line}"),
+                (false, None) => format!("code_search related {path}"),
+                (true, _) => "code_search related".to_string(),
+            }
+        }
+        _ => {
+            let query = input
+                .get("query")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let path = input
+                .get("path")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            match (query.is_empty(), path.is_empty()) {
+                (false, false) => format!("code_search {query} in {path}"),
+                (false, true) => format!("code_search {query}"),
+                (true, false) => format!("code_search in {path}"),
+                (true, true) => "code_search".to_string(),
+            }
+        }
+    }
+}
+
+fn code_search_action_from_input(
+    command: &str,
+    input: &serde_json::Value,
+) -> Option<devo_protocol::parse_command::ParsedCommand> {
+    match input
+        .get("operation")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("search")
+    {
+        "find_related" => {
+            let path = input
+                .get("file_path")
+                .and_then(serde_json::Value::as_str)
+                .filter(|path| !path.is_empty())?;
+            let line = input
+                .get("line")
+                .and_then(serde_json::Value::as_u64)
+                .map(|line| line.to_string())
+                .unwrap_or_else(|| "?".to_string());
+            Some(devo_protocol::parse_command::ParsedCommand::Search {
+                cmd: command.to_string(),
+                query: Some(format!("related {path}:{line}")),
+                path: Some(path.to_string()),
+            })
+        }
+        _ => {
+            let query = input
+                .get("query")
+                .and_then(serde_json::Value::as_str)
+                .filter(|query| !query.is_empty())?;
+            Some(devo_protocol::parse_command::ParsedCommand::Search {
+                cmd: command.to_string(),
+                query: Some(query.to_string()),
+                path: input
+                    .get("path")
+                    .and_then(serde_json::Value::as_str)
+                    .map(ToOwned::to_owned),
+            })
+        }
     }
 }
 
@@ -200,7 +625,7 @@ fn command_execution_item_id_for_progress(
 ) -> Option<ItemId> {
     pending_tool_calls
         .get(tool_use_id)
-        .filter(|pending| pending.is_command_execution)
+        .filter(|pending| pending.display_kind.is_command_execution())
         .and_then(|pending| pending.item_id)
 }
 
@@ -235,17 +660,26 @@ impl ServerRuntime {
         let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() else {
             return;
         };
-        let (event_tx, mut event_rx) = mpsc::unbounded_channel::<QueryEvent>();
+        let event_queue_depth = Arc::new(AtomicUsize::new(0));
+        let event_queue_max_depth = Arc::new(AtomicUsize::new(0));
+        let (event_tx, mut event_rx, event_forwarder_task) = bounded_query_event_channel(
+            QUERY_EVENT_CHANNEL_CAPACITY,
+            Arc::clone(&event_queue_depth),
+            Arc::clone(&event_queue_max_depth),
+        );
         let runtime = Arc::clone(&self);
         let turn_for_events = turn.clone();
         let turn_for_plan_updates = turn.clone();
         let event_session_arc = Arc::clone(&session_arc);
+        let event_queue_depth_for_task = Arc::clone(&event_queue_depth);
+        let event_queue_max_depth_for_task = Arc::clone(&event_queue_max_depth);
         let event_task = tokio::spawn(async move {
             // This task owns the streamed model output. It turns raw query
             // callbacks into persisted turn items and keeps enough state to
             // resume cleanly if the turn is interrupted mid-stream.
             let mut assistant_item_id = None;
             let mut assistant_item_seq = None;
+            let mut assistant_delta_seq = 0_u64;
             let mut assistant_text = String::new();
             let mut reasoning_item_id = None;
             let mut reasoning_item_seq = None;
@@ -255,6 +689,26 @@ impl ServerRuntime {
             let mut latest_usage: Option<TurnUsage> = None;
             let mut usage_base: Option<(usize, usize, usize)> = None;
             while let Some(event) = event_rx.recv().await {
+                decrement_query_event_queue_depth(&event_queue_depth_for_task);
+                let assistant_token_text = query_event_trace_token_preview(&event);
+                if let Some(assistant_token_text) = assistant_token_text.as_deref() {
+                    tracing::debug!(
+                        stream_elapsed_ms = stream_trace_elapsed_ms(),
+                        event_kind = query_event_trace_kind(&event),
+                        delta_len = query_event_trace_delta_len(&event),
+                        queue_depth = event_queue_depth_for_task.load(Ordering::Acquire),
+                        assistant_token_text,
+                        "query event bridge dequeued by turn event task"
+                    );
+                } else {
+                    tracing::debug!(
+                        stream_elapsed_ms = stream_trace_elapsed_ms(),
+                        event_kind = query_event_trace_kind(&event),
+                        delta_len = query_event_trace_delta_len(&event),
+                        queue_depth = event_queue_depth_for_task.load(Ordering::Acquire),
+                        "query event bridge dequeued by turn event task"
+                    );
+                }
                 match event {
                     QueryEvent::TextDelta(text) => {
                         let (item_id, item_seq) = match (assistant_item_id, assistant_item_seq) {
@@ -275,6 +729,28 @@ impl ServerRuntime {
                             _ => continue,
                         };
                         assistant_text.push_str(&text);
+                        assistant_delta_seq = assistant_delta_seq.saturating_add(1);
+                        let cumulative_text_len = assistant_text.len();
+                        if let Some(assistant_token_text) = assistant_token_log_preview(&text) {
+                            tracing::debug!(
+                                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                                item_id = %item_id,
+                                assistant_delta_seq,
+                                delta_len = text.len(),
+                                cumulative_text_len,
+                                assistant_token_text = %assistant_token_text,
+                                "server broadcasting assistant item delta"
+                            );
+                        } else {
+                            tracing::debug!(
+                                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                                item_id = %item_id,
+                                assistant_delta_seq,
+                                delta_len = text.len(),
+                                cumulative_text_len,
+                                "server broadcasting assistant item delta"
+                            );
+                        }
                         runtime
                             .broadcast_event(ServerEvent::ItemDelta {
                                 delta_kind: ItemDeltaKind::AgentMessageDelta,
@@ -391,91 +867,33 @@ impl ServerRuntime {
                             .await;
                             assistant_text.clear();
                         }
-                        let is_command_execution = is_unified_exec_tool(&name);
+                        let display_kind = ToolDisplayKind::for_tool_name(&name);
                         let command = command_display_from_input(&name, &input);
                         let preparation_feedback =
                             runtime.deps.registry.preparation_feedback(&name);
-                        let item_kind = if preparation_feedback == ToolPreparationFeedback::LiveOnly
-                        {
-                            ItemKind::ToolCall
-                        } else if is_file_change_tool(&name) {
-                            ItemKind::FileChange
-                        } else if is_command_execution {
-                            ItemKind::CommandExecution
-                        } else if is_plan_tool(&name) {
-                            ItemKind::Plan
-                        } else {
-                            ItemKind::ToolCall
-                        };
-                        let started_payload =
-                            if preparation_feedback == ToolPreparationFeedback::LiveOnly {
-                                serde_json::to_value(ToolCallPayload {
-                                    tool_call_id: id.clone(),
-                                    tool_name: name.clone(),
-                                    parameters: input.clone(),
-                                    command_actions: command_actions_from_tool_input(
-                                        &name, &command, &input,
-                                    ),
-                                })
-                                .expect("serialize tool call payload")
-                            } else if is_file_change_tool(&name) {
-                                serde_json::to_value(FileChangePayload {
-                                    tool_call_id: id.clone(),
-                                    tool_name: Some(name.clone()),
-                                    changes: Vec::new(),
-                                    is_error: false,
-                                })
-                                .expect("serialize file change payload")
-                            } else if is_command_execution {
-                                serde_json::to_value(CommandExecutionPayload {
-                                    tool_call_id: id.clone(),
-                                    tool_name: name.clone(),
-                                    command: command.clone(),
-                                    source: devo_protocol::protocol::ExecCommandSource::Agent,
-                                    command_actions: command_actions_from_tool_input(
-                                        &name, &command, &input,
-                                    ),
-                                    output: None,
-                                    is_error: false,
-                                })
-                                .expect("serialize command execution payload")
-                            } else if is_plan_tool(&name) {
-                                serde_json::json!({
-                                    "title": "Plan",
-                                    "text": ""
-                                })
-                            } else {
-                                serde_json::to_value(ToolCallPayload {
-                                    tool_call_id: id.clone(),
-                                    tool_name: name.clone(),
-                                    parameters: input.clone(),
-                                    command_actions: command_actions_from_tool_input(
-                                        &name, &command, &input,
-                                    ),
-                                })
-                                .expect("serialize tool call payload")
-                            };
-                        let (item_id, item_seq) =
-                            if preparation_feedback == ToolPreparationFeedback::LiveOnly {
-                                let (item_id, item_seq) = runtime
-                                    .start_item(
-                                        session_id,
-                                        turn_for_events.turn_id,
-                                        item_kind,
-                                        started_payload,
-                                    )
-                                    .await;
-                                (Some(item_id), Some(item_seq))
-                            } else {
-                                (None, None)
-                            };
+                        let start_item = tool_start_item_from_input(
+                            &id,
+                            &name,
+                            &command,
+                            &input,
+                            display_kind,
+                            preparation_feedback,
+                        );
+                        let (item_id, item_seq) = runtime
+                            .start_item(
+                                session_id,
+                                turn_for_events.turn_id,
+                                start_item.item_kind,
+                                start_item.payload,
+                            )
+                            .await;
                         pending_tool_calls.insert(
                             id,
                             PendingToolCall {
-                                item_id,
-                                item_seq,
+                                item_id: Some(item_id),
+                                item_seq: Some(item_seq),
                                 input,
-                                is_command_execution,
+                                display_kind,
                                 command,
                             },
                         );
@@ -506,97 +924,30 @@ impl ServerRuntime {
                                     .unwrap_or_default();
                                 pending.input = final_input;
                             }
-                            if pending.item_id.is_none() || pending.item_seq.is_none() {
-                                let started_payload = if let Some(tool_name) = tool_name.clone() {
-                                    let item_kind =
-                                        if runtime.deps.registry.preparation_feedback(&tool_name)
-                                            == ToolPreparationFeedback::LiveOnly
-                                        {
-                                            ItemKind::ToolCall
-                                        } else if is_file_change_tool(&tool_name) {
-                                            ItemKind::FileChange
-                                        } else if pending.is_command_execution {
-                                            ItemKind::CommandExecution
-                                        } else if is_plan_tool(&tool_name) {
-                                            ItemKind::Plan
-                                        } else {
-                                            ItemKind::ToolCall
-                                        };
-                                    let payload =
-                                        if runtime.deps.registry.preparation_feedback(&tool_name)
-                                            == ToolPreparationFeedback::LiveOnly
-                                        {
-                                            serde_json::to_value(ToolCallPayload {
-                                                tool_call_id: tool_use_id.clone(),
-                                                tool_name: tool_name.clone(),
-                                                parameters: pending.input.clone(),
-                                                command_actions: command_actions_from_tool_result(
-                                                    &tool_name,
-                                                    &pending.command,
-                                                    &pending.input,
-                                                    &summary,
-                                                ),
-                                            })
-                                            .expect("serialize tool call payload")
-                                        } else if is_file_change_tool(&tool_name) {
-                                            serde_json::to_value(FileChangePayload {
-                                                tool_call_id: tool_use_id.clone(),
-                                                tool_name: Some(tool_name.clone()),
-                                                changes: Vec::new(),
-                                                is_error: false,
-                                            })
-                                            .expect("serialize file change payload")
-                                        } else if pending.is_command_execution {
-                                            serde_json::to_value(CommandExecutionPayload {
-                                            tool_call_id: tool_use_id.clone(),
-                                            tool_name: tool_name.clone(),
-                                            command: pending.command.clone(),
-                                            source:
-                                                devo_protocol::protocol::ExecCommandSource::Agent,
-                                            command_actions: command_actions_from_tool_result(
-                                                &tool_name,
-                                                &pending.command,
-                                                &pending.input,
-                                                &summary,
-                                            ),
-                                            output: None,
-                                            is_error: false,
-                                        })
-                                        .expect("serialize command execution payload")
-                                        } else if is_plan_tool(&tool_name) {
-                                            serde_json::json!({
-                                                "title": "Plan",
-                                                "text": ""
-                                            })
-                                        } else {
-                                            serde_json::to_value(ToolCallPayload {
-                                                tool_call_id: tool_use_id.clone(),
-                                                tool_name: tool_name.clone(),
-                                                parameters: pending.input.clone(),
-                                                command_actions: command_actions_from_tool_result(
-                                                    &tool_name,
-                                                    &pending.command,
-                                                    &pending.input,
-                                                    &summary,
-                                                ),
-                                            })
-                                            .expect("serialize tool call payload")
-                                        };
-                                    let (item_id, item_seq) = runtime
-                                        .start_item(
-                                            session_id,
-                                            turn_for_events.turn_id,
-                                            item_kind.clone(),
-                                            payload,
-                                        )
-                                        .await;
-                                    pending.item_id = Some(item_id);
-                                    pending.item_seq = Some(item_seq);
-                                    item_kind
-                                } else {
-                                    ItemKind::ToolCall
-                                };
-                                let _ = started_payload;
+                            if (pending.item_id.is_none() || pending.item_seq.is_none())
+                                && let Some(tool_name) = tool_name.clone()
+                            {
+                                let preparation_feedback =
+                                    runtime.deps.registry.preparation_feedback(&tool_name);
+                                let start_item = tool_start_item_from_result(
+                                    &tool_use_id,
+                                    &tool_name,
+                                    &pending.command,
+                                    &pending.input,
+                                    pending.display_kind,
+                                    preparation_feedback,
+                                    &summary,
+                                );
+                                let (item_id, item_seq) = runtime
+                                    .start_item(
+                                        session_id,
+                                        turn_for_events.turn_id,
+                                        start_item.item_kind,
+                                        start_item.payload,
+                                    )
+                                    .await;
+                                pending.item_id = Some(item_id);
+                                pending.item_seq = Some(item_seq);
                             }
 
                             let pending_item_id = pending.item_id.expect("pending item id");
@@ -792,7 +1143,7 @@ impl ServerRuntime {
                                 continue;
                             }
 
-                            if pending.is_command_execution {
+                            if pending.display_kind.is_command_execution() {
                                 let tool_name = tool_name.clone().unwrap_or_default();
                                 let output = match content.clone() {
                                     devo_core::tools::ToolContent::Text(text) => {
@@ -1081,6 +1432,15 @@ impl ServerRuntime {
                 )
                 .await;
             }
+            tracing::debug!(
+                session_id = %session_id,
+                turn_id = %turn_for_events.turn_id,
+                query_event_queue_max_depth =
+                    event_queue_max_depth_for_task.load(Ordering::Acquire),
+                query_event_queue_remaining =
+                    event_queue_depth_for_task.load(Ordering::Acquire),
+                "query event stream drained"
+            );
             latest_usage
         });
 
@@ -1095,20 +1455,32 @@ impl ServerRuntime {
         ) = {
             // Run the model query only after the event pipeline is ready so
             // streamed deltas can be consumed and persisted immediately.
-            let core_session = {
+            let (core_session, agent_scope) = {
                 let session = session_arc.lock().await;
-                Arc::clone(&session.core_session)
+                let agent_scope = if session.summary.parent_session_id.is_some() {
+                    ToolAgentScope::Subagent
+                } else {
+                    ToolAgentScope::Parent
+                };
+                (Arc::clone(&session.core_session), agent_scope)
             };
             let mut core_session = core_session.lock().await;
             core_session.push_message(Message::user(input.clone()));
             let event_callback_tx = event_tx.clone();
             let callback = std::sync::Arc::new(move |event: QueryEvent| {
-                let _ = event_callback_tx.send(event);
+                event_callback_tx.send(event);
             });
             let registry = Arc::clone(&self.deps.registry);
             let permission_mode = core_session.config.permission_mode;
             let permission_profile = core_session.config.permission_profile.clone();
-            let runtime = ToolRuntime::new_with_context(
+            let turn_cancel_token = self
+                .active_turn_cancellations
+                .lock()
+                .await
+                .get(&session_id)
+                .cloned()
+                .unwrap_or_else(CancellationToken::new);
+            let runtime = ToolRuntime::new_with_context_and_options(
                 Arc::clone(&registry),
                 self.build_permission_checker(
                     session_id,
@@ -1120,6 +1492,12 @@ impl ServerRuntime {
                     session_id: session_id.to_string(),
                     turn_id: Some(turn_for_events.turn_id.to_string()),
                     cwd: core_session.cwd.clone(),
+                    agent_scope,
+                    agent_coordinator: Some(Arc::clone(&self) as Arc<dyn AgentToolCoordinator>),
+                },
+                ToolExecutionOptions {
+                    cancel_token: turn_cancel_token,
+                    ..ToolExecutionOptions::default()
                 },
             );
             let result = query(
@@ -1142,10 +1520,22 @@ impl ServerRuntime {
             )
         };
         drop(event_tx);
+        if let Err(error) = event_forwarder_task.await {
+            tracing::warn!(
+                session_id = %session_id,
+                turn_id = %turn.turn_id,
+                error = %error,
+                "query event forwarder failed"
+            );
+        }
         // Wait for the event task to finish draining buffered stream events
         // before we persist the terminal turn state.
         let latest_usage = event_task.await.ok().flatten();
         self.active_tasks.lock().await.remove(&session_id);
+        self.active_turn_cancellations
+            .lock()
+            .await
+            .remove(&session_id);
 
         let final_turn = {
             let mut session = session_arc.lock().await;
@@ -1275,6 +1665,8 @@ impl ServerRuntime {
                 "turn execution completed"
             );
         }
+        self.handle_subagent_turn_completed(session_id, &final_turn)
+            .await;
         self.broadcast_event(ServerEvent::TurnCompleted(TurnEventPayload {
             session_id,
             turn: final_turn,
@@ -1555,7 +1947,7 @@ mod tests {
                 item_id: Some(command_item_id),
                 item_seq: Some(1),
                 input: serde_json::json!({}),
-                is_command_execution: true,
+                display_kind: ToolDisplayKind::CommandExecution,
                 command: "cargo test".to_string(),
             },
         );
@@ -1565,7 +1957,7 @@ mod tests {
                 item_id: Some(tool_item_id),
                 item_seq: Some(2),
                 input: serde_json::json!({}),
-                is_command_execution: false,
+                display_kind: ToolDisplayKind::Generic,
                 command: String::new(),
             },
         );
@@ -1595,6 +1987,238 @@ mod tests {
     fn plan_tool_detection_matches_update_plan() {
         assert!(is_plan_tool("update_plan"));
         assert!(!is_plan_tool("read"));
+    }
+
+    #[test]
+    fn read_tool_start_item_contains_live_read_action() {
+        let input = serde_json::json!({
+            "path": "crates/tui/src/mod.rs"
+        });
+        let start_item = tool_start_item_from_input(
+            "call-1",
+            "read",
+            "read crates/tui/src/mod.rs",
+            &input,
+            ToolDisplayKind::Generic,
+            ToolPreparationFeedback::None,
+        );
+
+        let payload: ToolCallPayload =
+            serde_json::from_value(start_item.payload).expect("tool call payload");
+
+        assert_eq!(start_item.item_kind, ItemKind::ToolCall);
+        assert_eq!(
+            payload,
+            ToolCallPayload {
+                tool_call_id: "call-1".to_string(),
+                tool_name: "read".to_string(),
+                parameters: input,
+                command_actions: vec![devo_protocol::parse_command::ParsedCommand::Read {
+                    cmd: "read crates/tui/src/mod.rs".to_string(),
+                    name: "mod.rs".to_string(),
+                    path: std::path::PathBuf::from("crates/tui/src/mod.rs"),
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn grep_tool_start_item_contains_live_search_action() {
+        let input = serde_json::json!({
+            "pattern": "ToolUseStart",
+            "path": "crates/server/src"
+        });
+        let start_item = tool_start_item_from_input(
+            "call-1",
+            "grep",
+            "grep ToolUseStart in crates/server/src",
+            &input,
+            ToolDisplayKind::Generic,
+            ToolPreparationFeedback::None,
+        );
+
+        let payload: ToolCallPayload =
+            serde_json::from_value(start_item.payload).expect("tool call payload");
+
+        assert_eq!(start_item.item_kind, ItemKind::ToolCall);
+        assert_eq!(
+            payload,
+            ToolCallPayload {
+                tool_call_id: "call-1".to_string(),
+                tool_name: "grep".to_string(),
+                parameters: input,
+                command_actions: vec![devo_protocol::parse_command::ParsedCommand::Search {
+                    cmd: "grep ToolUseStart in crates/server/src".to_string(),
+                    query: Some("ToolUseStart".to_string()),
+                    path: Some("crates/server/src".to_string()),
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn code_search_tool_start_item_contains_live_search_action() {
+        let input = serde_json::json!({
+            "operation": "search",
+            "query": "live tool feedback",
+            "path": "crates"
+        });
+        let start_item = tool_start_item_from_input(
+            "call-1",
+            "code_search",
+            "code_search live tool feedback in crates",
+            &input,
+            ToolDisplayKind::Generic,
+            ToolPreparationFeedback::None,
+        );
+
+        let payload: ToolCallPayload =
+            serde_json::from_value(start_item.payload).expect("tool call payload");
+
+        assert_eq!(start_item.item_kind, ItemKind::ToolCall);
+        assert_eq!(
+            payload,
+            ToolCallPayload {
+                tool_call_id: "call-1".to_string(),
+                tool_name: "code_search".to_string(),
+                parameters: input,
+                command_actions: vec![devo_protocol::parse_command::ParsedCommand::Search {
+                    cmd: "code_search live tool feedback in crates".to_string(),
+                    query: Some("live tool feedback".to_string()),
+                    path: Some("crates".to_string()),
+                }],
+            }
+        );
+    }
+
+    #[test]
+    fn exec_tool_start_item_uses_command_execution_payload() {
+        let input = serde_json::json!({
+            "cmd": "cargo test -p devo-server"
+        });
+        let start_item = tool_start_item_from_input(
+            "call-1",
+            "exec_command",
+            "cargo test -p devo-server",
+            &input,
+            ToolDisplayKind::CommandExecution,
+            ToolPreparationFeedback::None,
+        );
+
+        let payload: CommandExecutionPayload =
+            serde_json::from_value(start_item.payload).expect("command execution payload");
+
+        assert_eq!(start_item.item_kind, ItemKind::CommandExecution);
+        assert_eq!(
+            payload,
+            CommandExecutionPayload {
+                tool_call_id: "call-1".to_string(),
+                tool_name: "exec_command".to_string(),
+                command: "cargo test -p devo-server".to_string(),
+                source: devo_protocol::protocol::ExecCommandSource::Agent,
+                command_actions: Vec::new(),
+                output: None,
+                is_error: false,
+            }
+        );
+    }
+
+    #[test]
+    fn live_only_apply_patch_start_item_stays_tool_call() {
+        let input = serde_json::json!({
+            "patch": "*** Begin Patch\n*** End Patch"
+        });
+        let start_item = tool_start_item_from_input(
+            "call-1",
+            "apply_patch",
+            "apply_patch",
+            &input,
+            ToolDisplayKind::Generic,
+            ToolPreparationFeedback::LiveOnly,
+        );
+
+        let payload: ToolCallPayload =
+            serde_json::from_value(start_item.payload).expect("tool call payload");
+
+        assert_eq!(start_item.item_kind, ItemKind::ToolCall);
+        assert_eq!(
+            payload,
+            ToolCallPayload {
+                tool_call_id: "call-1".to_string(),
+                tool_name: "apply_patch".to_string(),
+                parameters: input,
+                command_actions: Vec::new(),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn bounded_query_event_bridge_preserves_order_and_depth() {
+        let queue_depth = Arc::new(AtomicUsize::new(0));
+        let queue_max_depth = Arc::new(AtomicUsize::new(0));
+        let (sender, mut rx, forwarder) = bounded_query_event_channel(
+            /*capacity*/ 2,
+            Arc::clone(&queue_depth),
+            Arc::clone(&queue_max_depth),
+        );
+
+        sender.send(QueryEvent::TextDelta("one".to_string()));
+        sender.send(QueryEvent::ReasoningDelta("two".to_string()));
+        drop(sender);
+
+        let first = rx.recv().await.expect("first event");
+        decrement_query_event_queue_depth(&queue_depth);
+        let second = rx.recv().await.expect("second event");
+        decrement_query_event_queue_depth(&queue_depth);
+        forwarder.await.expect("forwarder");
+
+        assert!(matches!(first, QueryEvent::TextDelta(text) if text == "one"));
+        assert!(matches!(second, QueryEvent::ReasoningDelta(text) if text == "two"));
+        assert_eq!(queue_depth.load(Ordering::Acquire), 0);
+        assert!(queue_max_depth.load(Ordering::Acquire) >= 1);
+        assert!(rx.recv().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn bounded_query_event_bridge_keeps_terminal_event_after_backpressure() {
+        let queue_depth = Arc::new(AtomicUsize::new(0));
+        let queue_max_depth = Arc::new(AtomicUsize::new(0));
+        let (sender, mut rx, forwarder) = bounded_query_event_channel(
+            /*capacity*/ 1,
+            Arc::clone(&queue_depth),
+            Arc::clone(&queue_max_depth),
+        );
+        let sender_for_task = sender.clone();
+        let send_task = tokio::task::spawn_blocking(move || {
+            sender_for_task.send(QueryEvent::TextDelta("first".to_string()));
+            sender_for_task.send(QueryEvent::TextDelta("second".to_string()));
+            sender_for_task.send(QueryEvent::TurnComplete {
+                stop_reason: devo_core::StopReason::EndTurn,
+            });
+        });
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        let first = rx.recv().await.expect("first event");
+        decrement_query_event_queue_depth(&queue_depth);
+        let second = rx.recv().await.expect("second event");
+        decrement_query_event_queue_depth(&queue_depth);
+        let terminal = rx.recv().await.expect("terminal event");
+        decrement_query_event_queue_depth(&queue_depth);
+
+        send_task.await.expect("send task");
+        drop(sender);
+        forwarder.await.expect("forwarder");
+
+        assert!(matches!(first, QueryEvent::TextDelta(text) if text == "first"));
+        assert!(matches!(second, QueryEvent::TextDelta(text) if text == "second"));
+        assert!(matches!(
+            terminal,
+            QueryEvent::TurnComplete {
+                stop_reason: devo_core::StopReason::EndTurn,
+            }
+        ));
+        assert_eq!(queue_depth.load(Ordering::Acquire), 0);
+        assert!(queue_max_depth.load(Ordering::Acquire) >= 2);
     }
 
     #[test]

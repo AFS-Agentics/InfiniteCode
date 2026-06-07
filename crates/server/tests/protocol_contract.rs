@@ -175,6 +175,7 @@ fn subscribe_params_allow_optional_filters() {
     let payload = EventsSubscribeParams {
         session_id: None,
         event_types: Some(vec!["turn/completed".into()]),
+        include_child_agents: false,
     };
 
     let json = serde_json::to_string(&payload).expect("serialize");
@@ -329,6 +330,10 @@ fn session_title_updated_event_serializes_expected_kind() {
             updated_at: Utc::now(),
             title: Some("Renamed session".into()),
             title_state: SessionTitleState::Final(SessionTitleFinalSource::UserRename),
+            parent_session_id: None,
+            agent_path: None,
+            agent_nickname: None,
+            agent_role: None,
             ephemeral: false,
             model: Some("claude-sonnet".into()),
             thinking: None,
@@ -356,6 +361,10 @@ fn session_compaction_events_serialize_expected_kinds() {
         updated_at: Utc::now(),
         title: Some("Compacting session".into()),
         title_state: SessionTitleState::Unset,
+        parent_session_id: None,
+        agent_path: None,
+        agent_nickname: None,
+        agent_role: None,
         ephemeral: false,
         model: Some("claude-sonnet".into()),
         thinking: None,

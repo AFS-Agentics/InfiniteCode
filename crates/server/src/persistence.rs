@@ -469,7 +469,7 @@ impl ReplayState {
             });
         }
 
-        let record = self.session.context("missing SessionMetaLine in rollout")?;
+        let mut record = self.session.context("missing SessionMetaLine in rollout")?;
         let mut core_session = deps.new_session_state(record.id, record.cwd.clone());
         let mut ordered_items = self.pending_items;
         ordered_items.sort_by(|left, right| {
@@ -527,6 +527,45 @@ impl ReplayState {
             .div_ceil(4);
         let pending_turn_queue = std::sync::Arc::clone(&core_session.pending_turn_queue);
         let btw_input_queue = std::sync::Arc::clone(&core_session.btw_input_queue);
+        let summary_model = self
+            .latest_turn_metadata
+            .as_ref()
+            .map(|turn| turn.model.clone())
+            .or_else(|| record.model.clone())
+            .unwrap_or_else(|| deps.default_model.clone());
+        let turn_config = deps.resolve_turn_config(Some(&summary_model), None);
+        let concrete_selection = |selection: Option<&str>| {
+            selection
+                .map(str::trim)
+                .filter(|selection| !selection.is_empty())
+                .filter(|selection| !selection.eq_ignore_ascii_case("default"))
+                .map(str::to_ascii_lowercase)
+        };
+        let explicit_thinking = self
+            .latest_turn_metadata
+            .as_ref()
+            .and_then(|turn| concrete_selection(turn.thinking.as_deref()))
+            .or_else(|| concrete_selection(record.thinking.as_deref()));
+        let context_thinking = core_session
+            .latest_turn_context
+            .as_ref()
+            .and_then(|context| context.reasoning_effort)
+            .or_else(|| {
+                core_session
+                    .session_context
+                    .as_ref()
+                    .and_then(|context| context.reasoning_effort)
+            })
+            .map(|effort| effort.label().to_lowercase());
+        let summary_thinking = turn_config.model.normalize_thinking_selection(
+            explicit_thinking.as_deref().or(context_thinking.as_deref()),
+        );
+        let summary_reasoning_effort = turn_config
+            .model
+            .resolve_thinking_selection(summary_thinking.as_deref())
+            .effective_reasoning_effort;
+        record.model = Some(turn_config.model.slug.clone());
+        record.thinking = summary_thinking.clone();
 
         let summary = SessionMetadata {
             session_id: record.id,
@@ -535,19 +574,14 @@ impl ReplayState {
             updated_at: record.updated_at,
             title: record.title.clone(),
             title_state: record.title_state.clone(),
+            parent_session_id: record.parent_session_id,
+            agent_path: record.agent_path.clone(),
+            agent_nickname: record.agent_nickname.clone(),
+            agent_role: record.agent_role.clone(),
             ephemeral: false,
-            model: record.model.clone(),
-            thinking: record.thinking.clone(),
-            reasoning_effort: core_session
-                .latest_turn_context
-                .as_ref()
-                .and_then(|context| context.reasoning_effort)
-                .or_else(|| {
-                    core_session
-                        .session_context
-                        .as_ref()
-                        .and_then(|context| context.reasoning_effort)
-                }),
+            model: Some(turn_config.model.slug),
+            thinking: summary_thinking,
+            reasoning_effort: summary_reasoning_effort,
             total_input_tokens: self.total_input_tokens,
             total_output_tokens: self.total_output_tokens,
             total_cache_creation_tokens: self.total_cache_creation_tokens,
@@ -562,9 +596,11 @@ impl ReplayState {
             status: SessionRuntimeStatus::Idle,
         };
 
+        let config = core_session.config.clone();
         Ok(RuntimeSession {
             record: Some(record),
             summary,
+            config,
             core_session: std::sync::Arc::new(Mutex::new(core_session)),
             active_turn: None,
             latest_turn: self.latest_turn_metadata,

@@ -31,6 +31,7 @@ serde_json = { workspace = true }
 smol_str = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tokio-tungstenite = "0.28"
 toml = { workspace = true }
 tracing = { workspace = true }

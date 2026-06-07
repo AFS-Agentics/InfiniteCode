@@ -38,10 +38,11 @@ pub(crate) mod read;
 pub(crate) mod shell_exec;
 
 pub use contracts::{
-    RedactionState, SessionMode, ToolCallError, ToolContext, ToolPermissionProfile, ToolProgress,
-    ToolProgressSender, ToolResult, ToolResultContent, ToolTerminalStatus,
+    RedactionState, SessionMode, ToolAgentScope, ToolCallError, ToolContext, ToolPermissionProfile,
+    ToolProgress, ToolProgressSender, ToolResult, ToolResultContent, ToolTerminalStatus,
 };
 pub use deferred_loading::*;
+pub use devo_tools::AgentToolCoordinator;
 pub use errors::*;
 pub use events::ToolEvent;
 pub use handler_kind::ToolHandlerKind;

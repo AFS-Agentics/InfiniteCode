@@ -88,6 +88,10 @@ impl ServerRuntime {
                 .as_ref()
                 .map(|_| SessionTitleState::Final(SessionTitleFinalSource::ExplicitCreate))
                 .unwrap_or(SessionTitleState::Unset),
+            parent_session_id: None,
+            agent_path: None,
+            agent_nickname: None,
+            agent_role: None,
             ephemeral: params.ephemeral,
             model: Some(model.clone()),
             thinking: None,
@@ -110,6 +114,7 @@ impl ServerRuntime {
             );
         }
         let core_session = self.deps.new_session_state(session_id, params.cwd.clone());
+        let config = core_session.config.clone();
         let pending_turn_queue = Arc::clone(&core_session.pending_turn_queue);
         let btw_input_queue = Arc::clone(&core_session.btw_input_queue);
         self.sessions.lock().await.insert(
@@ -117,6 +122,7 @@ impl ServerRuntime {
             RuntimeSession {
                 record,
                 summary: summary.clone(),
+                config,
                 core_session: Arc::new(Mutex::new(core_session)),
                 active_turn: None,
                 latest_turn: None,
@@ -298,6 +304,8 @@ impl ServerRuntime {
                 core_session.config.permission_mode = profile.permission_mode();
                 core_session.config.permission_profile = profile.clone();
             }
+            session.config.permission_mode = profile.permission_mode();
+            session.config.permission_profile = profile.clone();
             session.session_approval_cache = crate::execution::ApprovalGrantCache::default();
             session.turn_approval_cache = crate::execution::ApprovalGrantCache::default();
             profile
@@ -742,6 +750,10 @@ impl ServerRuntime {
             updated_at,
             title: title_override.or_else(|| source.summary.title.clone()),
             title_state: source.summary.title_state.clone(),
+            parent_session_id: None,
+            agent_path: None,
+            agent_nickname: None,
+            agent_role: None,
             ephemeral: source.summary.ephemeral,
             model: source.summary.model.clone(),
             thinking: source.summary.thinking.clone(),
@@ -760,11 +772,13 @@ impl ServerRuntime {
         };
         drop(source_core_session);
 
+        let config = core_session.config.clone();
         let pending_turn_queue = Arc::clone(&core_session.pending_turn_queue);
         let btw_input_queue = Arc::clone(&core_session.btw_input_queue);
         Ok(RuntimeSession {
             record: None,
             summary,
+            config,
             core_session: Arc::new(Mutex::new(core_session)),
             active_turn: None,
             latest_turn,

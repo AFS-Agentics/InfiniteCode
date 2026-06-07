@@ -135,6 +135,22 @@ impl ChatWidget {
         self.active_viewport_lines(width)
     }
 
+    pub(crate) fn active_viewport_lines_for_area_for_test(
+        &self,
+        width: u16,
+        height: u16,
+    ) -> Vec<Line<'static>> {
+        self.active_viewport_lines_for_area(width, height)
+    }
+
+    pub(super) fn active_viewport_lines_for_area(
+        &self,
+        width: u16,
+        height: u16,
+    ) -> Vec<Line<'static>> {
+        tail_visible_lines(self.active_viewport_lines(width), height)
+    }
+
     pub(super) fn active_viewport_lines(&self, width: u16) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
         if let Some(cell) = &self.active_cell {
@@ -148,11 +164,13 @@ impl ChatWidget {
         // Pending tool calls are shown with a pending (cyan) dot until their results arrive.
         for pending in &self.pending_tool_calls {
             let pending_lines = if let Some(start_time) = pending.start_time {
-                vec![Line::from(vec![
+                let mut lines = vec![Line::from(vec![
                     crate::exec_cell::spinner(Some(start_time), true),
                     " ".into(),
                     Span::styled(pending.title.clone(), Self::tool_text_style()),
-                ])]
+                ])];
+                lines.extend(pending.lines.clone());
+                lines
             } else {
                 pending.lines.clone()
             };
@@ -197,11 +215,13 @@ impl ChatWidget {
         }
         for pending in &self.pending_tool_calls {
             let pending_lines = if let Some(start_time) = pending.start_time {
-                vec![Line::from(vec![
+                let mut lines = vec![Line::from(vec![
                     crate::exec_cell::spinner(Some(start_time), true),
                     " ".into(),
                     Span::styled(pending.title.clone(), Self::tool_text_style()),
-                ])]
+                ])];
+                lines.extend(pending.lines.clone());
+                lines
             } else {
                 pending.lines.clone()
             };
@@ -234,6 +254,10 @@ impl ChatWidget {
         target.append(&mut next);
     }
 
+    pub(super) fn active_viewport_scroll_offset(line_count: usize, height: u16) -> usize {
+        line_count.saturating_sub(height as usize)
+    }
+
     pub(crate) fn drain_scrollback_lines(&mut self, width: u16) -> Vec<ScrollbackLine> {
         let width = width.max(1);
         let mut lines = Vec::new();
@@ -264,4 +288,12 @@ impl ChatWidget {
         }
         lines
     }
+}
+
+fn tail_visible_lines(mut lines: Vec<Line<'static>>, height: u16) -> Vec<Line<'static>> {
+    let height = height as usize;
+    if height == 0 || lines.len() <= height {
+        return lines;
+    }
+    lines.split_off(lines.len() - height)
 }

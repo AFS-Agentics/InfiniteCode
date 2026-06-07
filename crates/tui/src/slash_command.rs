@@ -132,4 +132,14 @@ mod tests {
                 .any(|(name, command)| *name == "mcp" && *command == SlashCommand::Mcp)
         );
     }
+
+    #[test]
+    fn agents_slash_command_is_not_available() {
+        assert_eq!("agents".parse::<SlashCommand>(), Err(()));
+        assert!(
+            !built_in_slash_commands()
+                .iter()
+                .any(|(name, _command)| *name == "agents")
+        );
+    }
 }

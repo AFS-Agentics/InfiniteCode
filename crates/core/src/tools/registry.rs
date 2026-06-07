@@ -403,8 +403,12 @@ fn apply_exposure_overrides(
 ) -> DeferredLoadingConfig {
     let mut config = base.clone();
     for (name, exposure) in exposure {
+        let hidden_by_caller = config.hidden.contains(name);
         config.preloaded.remove(name);
         config.deferred.remove(name);
+        if hidden_by_caller {
+            continue;
+        }
         config.hidden.remove(name);
         match exposure {
             ToolExposure::Direct => {
@@ -437,6 +441,7 @@ mod tests {
     use crate::tool_spec::ToolSpec;
     use async_trait::async_trait;
     use devo_tools::contracts::ToolBudgets;
+    use pretty_assertions::assert_eq;
     use tokio_util::sync::CancellationToken;
 
     struct EchoHandler {
@@ -466,6 +471,8 @@ mod tests {
                 output_limit_bytes: 32 * 1024,
             },
             cancel_token: CancellationToken::new(),
+            agent_scope: crate::contracts::ToolAgentScope::Parent,
+            agent_coordinator: None,
         }
     }
 
@@ -536,8 +543,6 @@ mod tests {
 
     #[test]
     fn registry_builds_deferred_tool_prompt() {
-        use pretty_assertions::assert_eq;
-
         let mut builder = ToolRegistryBuilder::new();
         for name in ["read", "ToolSearch", "web_search"] {
             builder.push_spec(ToolSpec {
@@ -579,6 +584,38 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["web_search"]
         );
+    }
+
+    #[test]
+    fn registry_hidden_config_overrides_deferred_exposure() {
+        let mut builder = ToolRegistryBuilder::new();
+        builder.push_spec_with_exposure(
+            ToolSpec {
+                name: "spawn_agent".into(),
+                description: "spawn description".into(),
+                input_schema: JsonSchema::object(Default::default(), None, None),
+                output_mode: ToolOutputMode::Text,
+                execution_mode: ToolExecutionMode::ReadOnly,
+                capability_tags: vec![],
+                supports_parallel: true,
+                preparation_feedback: ToolPreparationFeedback::None,
+                display_name: None,
+                supports_cancellation: None,
+                supports_streaming: None,
+            },
+            ToolExposure::Deferred,
+        );
+        let registry = builder.build();
+        let mut config = DeferredLoadingConfig::default();
+        config.hidden.insert("spawn_agent".to_string());
+
+        let effective = registry.effective_deferred_loading_config(&config);
+
+        assert_eq!(
+            effective.hidden,
+            std::collections::BTreeSet::from(["spawn_agent".to_string()])
+        );
+        assert!(!effective.deferred.contains("spawn_agent"));
     }
 
     #[test]

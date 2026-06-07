@@ -1,22 +1,12 @@
 <div align="center">
 
-<pre style="font-size: 14px; line-height: 1.15; display: inline-block; text-align: left; color: #60A5FA;">
-██████╗  ███████╗██╗   ██╗ ██████╗
-██╔══██╗ ██╔════╝██║   ██║██╔═══██╗
-██║  ██║ █████╗  ██║   ██║██║   ██║
-██║  ██║ ██╔══╝  ╚██╗ ██╔╝██║   ██║
-██████╔╝ ███████╗ ╚████╔╝ ╚██████╔╝
-╚═════╝  ╚══════╝  ╚═══╝   ╚═════╝
-</pre>
+<img src="./.github/assets/devo-readme-logo.png" alt="Devo" width="220" />
 
 </div>
 
 <div align="center">
 
-**An open-source coding agent that is blazing fast, secure, and model-provider agnostic.**
-
-🚧Early-stage project under active development — not production-ready yet.
-⭐ Star us to follow 
+**A lightweight, model-neutral coding agent that runs as a single binary. Fast, token-efficient, and highly customizable.**
 
 [![Stars](https://img.shields.io/github/stars/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/stargazers)
 [![Language](https://img.shields.io/badge/language-Rust-E57324?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -25,59 +15,86 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/7df-lab/devo/ci.yml?branch=main&style=flat-square)](https://github.com/7df-lab/devo/actions)
 [![Release](https://img.shields.io/github/v/release/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/releases)
 
-
 [English](./README.md) | [简体中文](./README.zh-Hans.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-<table>
-  <tr>
-    <td width="50%" align="center">
-      <strong>Explain Codebase</strong>
-      <br />
-      <sub>Ask Devo to quickly understand a repository.</sub>
-      <br /><br />
-      <img width="100%" alt="Image" src="https://github.com/user-attachments/assets/b2867013-c6e6-4a26-9956-5a8a6133b96c" />
-    </td>
-    <td width="50%" align="center">
-      <strong>中文支持</strong>
-      <br />
-      <sub>用中文回复问题</sub>
-      <br /><br />
-      <img width="100%" alt="Image" src="https://github.com/user-attachments/assets/bd7db80b-f31c-4da5-bf35-bf919385edf3" />
-    </td>
-  </tr>
-  <tr>
-      <td width="50%" align="center">
-      <strong>Deepseek V4 (Cost-Effective)</strong>
-      <br />
-      <sub>Fully Support, input/output token, cached rate, context window usage.</sub>
-      <br /><br />
-      <img width="100%" alt="Image" src="https://github.com/user-attachments/assets/35639cae-9fd7-48ff-9b0f-d43b1aff86d8" />
-    </td>
-    <td width="50%" align="center">
-      <strong>Safety First</strong>
-      <br />
-      <sub>Permission control for tool call.</sub>
-      <br /><br />
-      <img width="100%" alt="Image" src="https://github.com/user-attachments/assets/d70e30af-3194-4dba-b1bf-c0ba869b801f" />
-    </td>
-  </tr>
-</table>
+[Features](#features) · [Tested Models](#tested-models) · [Tested Platforms](#tested-platforms) · [Install](#installation) · [Quick Start](#quick-start) · [Docs](#docs)
 
 </div>
 
 ---
 
-## 📖 Table of Contents
+## Features
 
-- [Installation](#-installation)
-- [Quick Start](#-quick-start)
-- [Configuration](#%EF%B8%8F-configuration)
-- [FAQ](#-faq)
-- [Contributing](#-contributing)
-- [References](#-references)
-- [License](#-license)
+- **Built-in semantic code search** - Runs a local CPU code-embedding model and
+  combines dense retrieval with BM25 keyword matching, reducing code-search
+  context compared with grep/find-only agent.
+- **Bring your own model provider** - Use provider/model bindings for
+  OpenAI-compatible, Anthropic-compatible, DeepSeek, Qwen, Kimi, GLM, MiniMax,
+  Xiaomi MiMo, OpenRouter, or local endpoints.
+- **MCP support** - Connect external tools and context through
+  [Model Context Protocol](https://modelcontextprotocol.io/) servers.
+- **Skill support** - Package repeatable workflows, instructions, scripts, and
+  references as reusable [Agent Skills](https://agentskills.io/).
+- **Long-running task support** - Let Devo manage context automatically across
+  multi-turn work instead of losing the thread as tasks grow.
+- **Multi-agent support** - Split work across specialized agents while keeping
+  coordination visible in the session.
+- **Plan Mode** - Break larger tasks into clear multi-step plans before
+  implementation starts.
+- **Parallel tool calls** - Run multiple independent tools at parallel so
+  models spend less time waiting and more time making progress.
+- **Permissioned tool execution** - Review sensitive tool calls before they
+  touch your workspace.
+- **Auditable sessions** - Keep model output, tool calls, approvals, token
+  usage, and session history inspectable and resumable.
+- **Cost and context visibility** - Show input/output tokens, cached tokens, and
+  context-window usage where providers expose them.
+- **Lightweight Rust runtime** - Built in Rust with low memory overhead and a
+  compact local runtime.
 
-## 📦 Installation
+## Tested Models
+
+<p>
+  <img alt="DeepSeek v4 Flash / Pro" src="https://img.shields.io/badge/DeepSeek-v4%20Flash%20%2F%20Pro-4D6BFE?style=flat-square&logo=deepseek&logoColor=white" />
+  <img alt="Qwen3 Coder Next" src="https://img.shields.io/badge/Qwen3-Coder%20Next-615CED?style=flat-square&logo=qwen&logoColor=white" />
+  <img alt="Kimi K2.5" src="https://img.shields.io/badge/Kimi-K2.5-111111?style=flat-square&logo=moonshotai&logoColor=white" />
+  <img alt="MiniMax M2.7" src="https://img.shields.io/badge/MiniMax-M2.7-0B5FFF?style=flat-square&logo=minimax&logoColor=white" />
+  <img alt="GLM 5.1" src="https://img.shields.io/badge/GLM-5.1-7856FF?style=flat-square" />
+</p>
+
+Devo's built-in model catalog includes tested model definitions for Qwen, Kimi,
+MiniMax, GLM, and DeepSeek. Provider endpoints remain configurable through
+provider/model bindings.
+
+## Tested Platforms
+
+<p>
+  <img alt="macOS tested" src="https://img.shields.io/badge/macOS-tested-000000?style=flat-square&logo=apple&logoColor=white" />
+  <img alt="Linux tested" src="https://img.shields.io/badge/Linux-tested-FCC624?style=flat-square&logo=linux&logoColor=000000" />
+  <img alt="Windows tested" src="https://img.shields.io/badge/Windows-tested-0078D4?style=flat-square&logo=windows&logoColor=white" />
+</p>
+
+Devo has been tested on macOS, Linux, Windows, and Kylin OS.
+
+### For Chinese Enterprise Users
+
+<p>
+  <img alt="Kylin OS tested" src="https://img.shields.io/badge/Kylin%20OS-tested-1E88E5?style=flat-square" />
+  <img alt="HarmonyOS support on the road" src="https://img.shields.io/badge/HarmonyOS-on%20the%20road-111111?style=flat-square&logo=harmonyos&logoColor=white" />
+</p>
+
+Kylin OS coverage is called out because domestic operating systems are often
+part of real deployment requirements in Chinese enterprise environments.
+HarmonyOS support is on the roadmap; contributors with HarmonyOS devices are
+welcome to build, test, and publish releases for that platform.
+
+## Screenshots
+
+<p align="center">
+  <img width="100%" alt="Devo running in a terminal" src="./.github/assets/devo-readme-screenshot.png" />
+</p>
+
+## Installation
 
 ### Linux / macOS
 
@@ -91,51 +108,98 @@ curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
 irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
 ```
 
-> [!TIP]
-> `devo` can check for newer GitHub releases on startup and print the matching
-> upgrade command. You can disable or tune this with the `[updates]` section in
-> `DEVO_HOME/config.toml` (defaults to `~/.devo/config.toml` on macOS/linux, `C:\Users\yourname\.devo\config.toml` on Windows.) or `<workspace>/.devo/config.toml`.
+The online installer places `devo` under the Devo home directory, installs the
+`rg` sidecar used for fast repository search, and can preinstall the local
+Hugging Face model used by `code_search`.
 
-## 🚀 Quick Start
+Preinstall the local `code_search` model:
 
-If you prefer to build from source, use the instructions below.
-
-### Build
+Linux / macOS:
 
 ```bash
-git clone https://github.com/7df-lab/devo && cd devo
-cargo build --release
-
-# linux / macos
-./target/release/devo onboard
-
-# windows
-.\target\release\devo onboard
+curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh -s -- --install-code-search-model
 ```
 
-> [!TIP]
-> Make sure you have Rust installed, 1.75+ recommended (via https://rustup.rs/).
+Windows:
 
-## ⚙️ Configuration
+```powershell
+$env:DEVO_INSTALL_CODE_SEARCH_MODEL = "1"; irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
+```
 
-Devo reads configuration from a TOML file, merged with higher-priority sources
-overriding lower-priority ones:
+<details>
+<summary>Offline Installation</summary>
 
-1. Built-in defaults (compiled into the binary)
-2. `DEVO_HOME/config.toml` — user-level config (defaults to `~/.devo/config.toml` on macOS/linux, `C:\Users\yourname\.devo\config.toml` on Windows.)
-3. `<workspace>/.devo/config.toml` — project-level config
-4. CLI flags — command-line overrides
+Many enterprise and intranet environments do not have internet access. Devo's
+installers support an offline mode that reads all required assets from the same
+directory as the installer script and does not contact the network.
 
-Both config files are optional. A minimal config file needs a provider, an
-invocable model binding, and a default binding selection. Run `devo onboard` for
-an interactive setup that writes this for you.
+On a machine with internet access:
 
-### Minimal Config Example
+1. Download the installer script: `install.sh` for Linux/macOS or `install.ps1`
+   for Windows.
+2. Download the latest Devo release asset for the target CPU and OS, for example
+   `x86_64` vs `aarch64`/`arm64`.
+3. Download the Hugging Face `minishlab/potion-code-16M` model files used by
+   local semantic `code_search`: `config.json`, `model.safetensors`, and
+   `tokenizer.json`.
+4. Download the matching `ripgrep` release asset for the target CPU and OS.
+
+Place these files next to the installer script. The model files can either sit
+next to the installer directly or under a `minishlab--potion-code-16M/`
+subdirectory.
+
+Linux / macOS:
+
+```bash
+sh ./install.sh --offline
+```
+
+Windows:
+
+```powershell
+.\install.ps1 -Offline
+```
+
+Offline mode installs the model into
+`<DEVO_HOME>/local-models/minishlab--potion-code-16M`, which is the directory
+used by the runtime code-search provider. When `DEVO_HOME` is not set, this is
+`~/.devo/local-models/minishlab--potion-code-16M`.
+
+</details>
+
+## Quick Start
+
+Configure a provider, open a repository, and start the TUI:
+
+```bash
+cd /path/to/your/repo
+devo onboard
+```
+
+Useful commands:
+
+```bash
+devo                         # start the interactive TUI in the current repo
+devo resume <session-id>
+```
+
+## Configuration
+
+`devo onboard` is the recommended setup path. For manual configuration, Devo
+merges settings in this order:
+
+1. Built-in defaults
+2. `DEVO_HOME/config.toml` - user-level config, defaulting to `~/.devo/config.toml`
+   on macOS/Linux and `C:\Users\yourname\.devo\config.toml` on Windows
+3. `<workspace>/.devo/config.toml` - project-level config
+4. CLI flags
+
+Credentials live separately in `DEVO_HOME/auth.json`; `config.toml` should refer
+to credential ids instead of storing API keys directly.
+
+Minimal shape:
 
 ```toml
-# ~/.devo/config.toml
-model_thinking_selection = "high"
-
 [defaults]
 model_binding = "deepseek-v4-flash-api-deepseek-com"
 
@@ -156,139 +220,90 @@ invocation_method = "openai_chat_completions"
 default_reasoning_effort = "high"
 ```
 
-<details>
-<summary>Full Config Reference (click to expand)</summary>
+The important separation is:
 
-```toml
-# ── Active Model Defaults ───────────────────────────────────────
-model_thinking_selection = "high"   # optional: thinking/reasoning effort
-model_auto_compact_token_limit = 970000   # optional
-model_context_window = 128000      # optional
-disable_response_storage = false   # optional
-preferred_auth_method = "apikey"   # optional: "apikey"
+- `model_slug` selects Devo's local model metadata from `models.json`.
+- `provider` selects the configured connection record.
+- `model_name` is the provider-specific model string sent on the wire.
+- `invocation_method` selects the provider protocol, such as
+  [`openai_chat_completions`](https://developers.openai.com/api/reference/chat-completions/overview),
+  [`openai_responses`](https://developers.openai.com/api/reference/responses/overview),
+  or [`anthropic_messages`](https://platform.claude.com/docs/en/api/messages).
 
-# ── Providers ───────────────────────────────────────────────────
-[defaults]
-model_binding = "deepseek-v4-flash-api-deepseek-com"
+### Custom Models
 
-[providers."api.deepseek.com"]
-enabled = true
-name = "api.deepseek.com"
-base_url = "https://api.deepseek.com"
-credential = "api_deepseek_com_api_key" # credential id in auth.json
-wire_apis = ["openai_chat_completions"] # openai_chat_completions | openai_responses | anthropic_messages
+If the model you want to use is not in the built-in list, add it to
+`models.json`, then bind it through `config.toml`.
 
-# ── Model Bindings ──────────────────────────────────────────────
-[model_bindings.deepseek-v4-pro-api-deepseek-com]
-enabled = true
-model_slug = "deepseek-v4-pro"
-provider = "api.deepseek.com"
-model_name = "deepseek/deepseek-v4-pro"
-display_name = "DeepSeek V4 Pro"
-invocation_method = "openai_chat_completions"
+User-level model catalog:
 
-[model_bindings.deepseek-v4-flash-api-deepseek-com]
-enabled = true
-model_slug = "deepseek-v4-flash"
-provider = "api.deepseek.com"
-model_name = "deepseek-v4-flash"
-display_name = "DeepSeek V4 Flash"
-invocation_method = "openai_chat_completions"
-default_reasoning_effort = "high"
+- macOS/Linux: `~/.devo/models.json`
+- Windows: `C:\Users\yourname\.devo\models.json`
 
-# ── App Settings (optional) ─────────────────────────────────────
-enable_auxiliary_model = false     # optional, use a second model for safety/summaries
-summary_model = "UseTurnModel"     # optional, "UseTurnModel" or "UseAxiliaryModel"
-safety_policy_model = "UseAxiliaryModel" # optional
-project_root_markers = [".git"] # optional
+Project-level overrides can also be placed at `<workspace>/.devo/models.json`.
+In `models.json`, `provider` is the default wire API metadata for the model; the
+actual endpoint is still selected by the `provider` field in `config.toml`.
 
-[context]
-preserve_recent_turns = 3          # optional, keep last N turns un-compacted
-auto_compact_percent = 97          # optional, trigger compaction at N% of context window
-manual_compaction_enabled = true   # optional
-
-[server]
-listen = []                        # optional, e.g. ["stdio://", "ws://127.0.0.1:3000"]
-max_connections = 32               # optional
-event_buffer_size = 1024           # optional
-idle_session_timeout_secs = 1800   # optional
-persist_ephemeral_sessions = false # optional
-
-[logging]
-level = "info"                     # optional, trace, debug, info, warn, error
-json = false                        # optional, emit JSON-formatted logs
-redact_secrets_in_logs = true      # optional
-
-[logging.file]
-directory = "logs"                 # optional, relative to DEVO_HOME
-filename_prefix = "devo"           # optional
-rotation = "Daily"                 # optional, Never | Minutely | Hourly | Daily
-max_files = 14                     # optional
-
-[skills]
-enabled = true                      # optional
-user_roots = ["skills"]             # optional, dirs to scan for user skills
-workspace_roots = ["skills"]        # optional, dirs to scan for workspace skills
-watch_for_changes = true            # optional
-
-[updates]
-enabled = true                       # optional
-check_on_startup = true              # optional
-check_interval_hours = 24            # optional
-### Model Catalog (`~/.devo/models.json`)
-```
-</details>
-
-A separate JSON file defines available models and their capabilities. On first
-run, the built-in catalog is automatically copied to `~/.devo/models.json` so
-you can customize it. Models are organized by `channel` (brand/vendor). The
-`slug` in this file is the value used by `model_slug` in `config.toml`.
-`model_name` in a model binding is separate: it is the provider-specific name
-sent to the vendor API.
+Example `models.json` entry:
 
 ```json
 [
   {
-    "slug": "deepseek-v4-pro",
-    "display_name": "deepseek-v4-pro",
-    "channel": "DeepSeek",
-    "provider_family": "openai",
-    "description": "DeepSeek v4 pro model",
-    "context_window": 1000000,
-    "max_tokens": 384000,
+    "slug": "my-coding-model",
+    "display_name": "My Coding Model",
+    "channel": "Custom",
+    "provider": "openai_chat_completions",
+    "description": "Custom OpenAI-compatible coding model.",
+    "thinking_capability": "unsupported",
+    "context_window": 200000,
     "effective_context_window_percent": 95,
-    "thinking_capability": "toggle",
-    "supported_reasoning_levels": ["high", "max"],
-    "base_instructions": "You are Devo, a coding agent based on DeepSeek...",
+    "max_tokens": 4096,
     "input_modalities": ["text"],
-    "priority": 10
+    "base_instructions": "You are Devo, a coding agent. Help the user edit and understand code."
   }
 ]
 ```
 
-Merge order: builtin defaults < `~/.devo/models.json` < `<workspace>/.devo/models.json`,
-merged by model `slug`. You can override existing entries (e.g. change prompts or
-context window) or add custom models.
+Then reference that `slug` from a model binding:
 
-For example, a binding can use `model_slug = "deepseek-v4-pro"` to read
-capabilities from the effective catalog entry with `"slug": "deepseek-v4-pro"`,
-while `model_name = "deepseek/deepseek-v4-pro"` is sent to the provider.
-`context_window`, `effective_context_window_percent`, and `max_tokens` are read
-from the effective catalog at startup.
-If thinking selects a model-variant slug, the provider request model is resolved
-from enabled bindings for the same provider as the selected turn binding.
+```toml
+[model_bindings.my-coding-model-example]
+enabled = true
+model_slug = "my-coding-model"
+provider = "my.provider"
+model_name = "provider-specific-model-name"
+display_name = "My Coding Model"
+invocation_method = "openai_chat_completions"
+```
 
-The `/model` slash command in the TUI shows only models you have configured
-with credentials in `config.toml`, not the full catalog.
+## FAQ
 
-### Environment Variables
+### What is the project status?
 
-| Variable      | Purpose                                       |
-|---------------|-----------------------------------------------|
-| `DEVO_HOME`   | Override the config directory (default: `~/.devo`) |
+Devo is pre-1.0 and actively developed. It is ready for local evaluation,
+experiments, and contributor use; public APIs and configuration may still
+change.
 
+### What models are supported?
 
-## Star us
+Built-in model metadata currently covers Qwen, Kimi, MiniMax, GLM, and DeepSeek
+families. Any model endpoint that supports OpenAI-compatible Chat Completions,
+OpenAI-compatible Responses, or the Anthropic Messages API can be connected through
+provider/model bindings.
+
+## Contributing
+
+Contributions are welcome while the project is still early:
+
+- Architecture feedback on the client/server runtime, provider layer, safety
+  model, and TUI.
+- Documentation and translations.
+- Provider, model, and wire API coverage.
+- Focused fixes with validation commands and regression tests.
+
+Open an issue or pull request to discuss changes.
+
+## Star History
 
 <a href="https://www.star-history.com/?repos=7df-lab%2Fdevo&type=date&legend=top-left">
  <picture>
@@ -298,33 +313,10 @@ with credentials in `config.toml`, not the full catalog.
  </picture>
 </a>
 
-## FAQ
-
-### How is this different from Claude Code?
-
-It's very similar to Claude Code in terms of capability. Here are the key differences:
-
-- 100% open source
-- Not coupled to any provider. Devo can be used with Claude, OpenAI, z.ai, Qwen, Deepseek, or even local models. As models evolve, the gaps between them will close and pricing will drop, so being provider-agnostic is important.
-- TUI support is already implemented.
-- Built with a client/server architecture. For example, the core can run locally on your machine while being controlled remotely (e.g., from a mobile app), with the TUI acting as just one of many possible clients.
-
-
-## 🤝 Contributing
-
-Contributions are welcome! This project is in its early design phase, and there are many ways to help:
-
-- **Architecture feedback** — Review the crate design and suggest improvements
-- **RFC discussions** — Propose new ideas via issues
-- **Documentation** — Help improve or translate documentation
-- **Implementation** — Pick up crate implementation once designs stabilize
-
-Please feel free to open an issue or submit a pull request.
-
-## 📄 License
+## License
 
 This project is licensed under the [MIT License](./LICENSE).
 
 ---
 
-**If you find this project useful, please consider giving it a ⭐**
+**If you find Devo useful, please consider giving it a star.**

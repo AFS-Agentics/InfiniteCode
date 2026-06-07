@@ -4,6 +4,7 @@ use devo_protocol::ToolDefinition;
 #[derive(Debug, Clone)]
 pub struct ToolPromptSurface {
     pub system: Option<String>,
+    pub deferred_reminder: Option<String>,
     pub tools: Vec<ToolDefinition>,
     pub metrics: ToolSearchMetrics,
     pub deferred_tool_names: Vec<String>,
@@ -18,17 +19,18 @@ pub fn build_deferred_tool_prompt_surface(
     config: &DeferredLoadingConfig,
 ) -> ToolPromptSurface {
     let prompt = registry.deferred_tool_prompt(session_id, loaded_tools, config);
-    let system = match (base_system, prompt.reminder) {
+    let system = match (base_system, prompt.reminder.as_ref()) {
         (Some(system), Some(reminder)) if !system.is_empty() => {
             Some(format!("{system}\n\n{reminder}"))
         }
-        (Some(_), Some(reminder)) | (None, Some(reminder)) => Some(reminder),
+        (Some(_), Some(reminder)) | (None, Some(reminder)) => Some(reminder.clone()),
         (Some(system), None) if !system.is_empty() => Some(system),
         _ => None,
     };
 
     ToolPromptSurface {
         system,
+        deferred_reminder: prompt.reminder,
         tools: prompt.exposed,
         metrics: prompt.metrics,
         deferred_tool_names: prompt.deferred.into_iter().map(|tool| tool.name).collect(),
@@ -107,6 +109,13 @@ mod tests {
         assert!(system.contains("web_search: web_search description"));
         assert!(system.contains("multi_tool_use: multi_tool_use description"));
         assert!(!system.contains("secret_internal"));
+        let deferred_reminder = surface
+            .deferred_reminder
+            .expect("separate deferred reminder should be present");
+        assert!(deferred_reminder.starts_with("<system-reminder>"));
+        assert!(deferred_reminder.contains("web_search: web_search description"));
+        assert!(deferred_reminder.contains("multi_tool_use: multi_tool_use description"));
+        assert!(!deferred_reminder.contains("secret_internal"));
         assert_eq!(surface.metrics.exposed_tool_count, 3);
         assert_eq!(surface.metrics.hidden_tool_count, 2);
     }
@@ -136,6 +145,11 @@ mod tests {
         let system = surface.system.expect("remaining deferred reminder");
         assert!(!system.contains("web_search:"));
         assert!(system.contains("multi_tool_use:"));
+        let deferred_reminder = surface
+            .deferred_reminder
+            .expect("remaining separate deferred reminder");
+        assert!(!deferred_reminder.contains("web_search:"));
+        assert!(deferred_reminder.contains("multi_tool_use:"));
         assert_eq!(surface.metrics.loaded_deferred_tool_count, 1);
     }
 }

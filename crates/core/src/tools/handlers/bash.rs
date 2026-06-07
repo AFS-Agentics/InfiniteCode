@@ -111,6 +111,7 @@ impl ToolHandler for BashHandler {
                 max_output_tokens,
             },
             None,
+            ctx.cancel_token.clone(),
         )
         .await
         .map_err(|e| ToolCallError::ExecutionFailed(e.to_string()))?;

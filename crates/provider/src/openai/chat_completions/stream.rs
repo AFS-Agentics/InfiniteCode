@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+use std::time::Instant;
 use std::{collections::BTreeMap, pin::Pin};
 
 use anyhow::{Context, Result};
@@ -104,6 +106,12 @@ pub(super) async fn completion_stream(
             match event {
                 Event::Open => {}
                 Event::Message(message) => {
+                    tracing::debug!(
+                        stream_elapsed_ms = stream_trace_elapsed_ms(),
+                        event = %message.event,
+                        data_len = message.data.len(),
+                        "openai chat completions stream chunk received"
+                    );
                     tracing::trace!(
                         event = %message.event,
                         data_len = message.data.len(),
@@ -120,6 +128,24 @@ pub(super) async fn completion_stream(
                         })?;
 
                     for stream_event in state.apply_chunk(chunk) {
+                        if let StreamEvent::TextDelta { index, text } = &stream_event {
+                            if let Some(assistant_token_text) = assistant_token_log_preview(text) {
+                                tracing::debug!(
+                                    stream_elapsed_ms = stream_trace_elapsed_ms(),
+                                    index,
+                                    delta_len = text.len(),
+                                    assistant_token_text = %assistant_token_text,
+                                    "openai chat completions text delta emitted"
+                                );
+                            } else {
+                                tracing::debug!(
+                                    stream_elapsed_ms = stream_trace_elapsed_ms(),
+                                    index,
+                                    delta_len = text.len(),
+                                    "openai chat completions text delta emitted"
+                                );
+                            }
+                        }
                         yield stream_event;
                     }
                 }
@@ -132,6 +158,57 @@ pub(super) async fn completion_stream(
     };
 
     Ok(Box::pin(stream))
+}
+
+fn stream_trace_elapsed_ms() -> u128 {
+    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    STREAM_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+fn assistant_token_log_preview(text: &str) -> Option<String> {
+    assistant_token_logging_enabled()
+        .then(|| format_assistant_token_log_preview(text, assistant_token_log_max_chars()))
+}
+
+fn assistant_token_logging_enabled() -> bool {
+    static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
+        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+            .ok()
+            .is_some_and(|value| {
+                matches!(
+                    value.as_str(),
+                    "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                )
+            })
+    })
+}
+
+fn assistant_token_log_max_chars() -> usize {
+    static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
+        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(512)
+    })
+}
+
+fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
+    let max_chars = max_chars.max(1);
+    let mut preview = String::new();
+    let mut chars = text.chars();
+    for ch in chars.by_ref().take(max_chars) {
+        preview.extend(ch.escape_default());
+    }
+    if chars.next().is_some() {
+        preview.push_str("...");
+    }
+    preview
 }
 
 #[derive(Debug, Default)]

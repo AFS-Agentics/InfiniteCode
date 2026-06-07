@@ -8,6 +8,7 @@ use bm25::SearchEngine;
 use bm25::SearchEngineBuilder;
 use devo_protocol::ToolDefinition;
 
+use crate::contracts::ToolAgentScope;
 use crate::contracts::ToolCallError;
 use crate::contracts::ToolContext;
 use crate::contracts::ToolProgressSender;
@@ -17,6 +18,7 @@ use crate::deferred_loading::DeferredLoadingConfig;
 use crate::deferred_loading::LoadedDeferredTools;
 use crate::deferred_loading::PromptLoadingPolicy;
 use crate::deferred_loading::execute_tool_search;
+use crate::deferred_loading::hide_subagent_agent_coordination_tools;
 use crate::deferred_loading::resolve_tool_policy;
 use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
@@ -111,10 +113,19 @@ impl ToolHandler for ToolSearchHandler {
             ));
         }
 
+        let mut config = self.config.clone();
+        if ctx.agent_scope == ToolAgentScope::Subagent {
+            hide_subagent_agent_coordination_tools(&mut config);
+        }
+
         let selection = if is_select_query(query) {
             query.to_string()
         } else {
-            let names = self.search(query, limit);
+            let names = self
+                .search(query, limit)
+                .into_iter()
+                .filter(|name| resolve_tool_policy(name, &config) != PromptLoadingPolicy::Hidden)
+                .collect::<Vec<_>>();
             if names.is_empty() {
                 return Ok(ToolResult::success(
                     ToolResultContent::Text("No matching deferred tools found.".to_string()),
@@ -132,7 +143,7 @@ impl ToolHandler for ToolSearchHandler {
             &selection,
             &self.definitions,
             &mut loaded_tools,
-            &self.config,
+            &config,
         )
         .map_err(ToolCallError::ExecutionFailed)?;
 
@@ -254,6 +265,8 @@ mod tests {
                         wall_time_limit_ms: None,
                     },
                     cancel_token: tokio_util::sync::CancellationToken::new(),
+                    agent_scope: ToolAgentScope::Parent,
+                    agent_coordinator: None,
                 },
                 serde_json::json!({ "query": "knowledge base" }),
                 None,
@@ -264,5 +277,113 @@ mod tests {
         assert_eq!(result.result_summary, "Tools loaded");
         let loaded_tools = loaded_tools.lock().expect("loaded tools");
         assert!(loaded_tools.is_loaded("session-1", "mcp__docs__search"));
+    }
+
+    #[tokio::test]
+    async fn subagent_tool_search_cannot_load_parent_agent_coordination_tools() {
+        let loaded_tools = Arc::new(Mutex::new(LoadedDeferredTools::default()));
+        let handler = ToolSearchHandler::new(
+            vec![
+                (
+                    definition(
+                        "spawn_agent",
+                        "Create a child agent",
+                        serde_json::json!({"type": "object"}),
+                    ),
+                    None,
+                ),
+                (
+                    definition(
+                        "send_message",
+                        "Send input to a child agent",
+                        serde_json::json!({"type": "object"}),
+                    ),
+                    None,
+                ),
+                (
+                    definition(
+                        "wait_agent",
+                        "Poll child output",
+                        serde_json::json!({"type": "object"}),
+                    ),
+                    None,
+                ),
+                (
+                    definition(
+                        "list_agents",
+                        "List child agents",
+                        serde_json::json!({"type": "object"}),
+                    ),
+                    None,
+                ),
+                (
+                    definition(
+                        "close_agent",
+                        "Close a child agent",
+                        serde_json::json!({"type": "object"}),
+                    ),
+                    None,
+                ),
+            ],
+            Arc::clone(&loaded_tools),
+            DeferredLoadingConfig::default(),
+        );
+
+        for requested in [
+            "spawn_agent",
+            "spawn-agent",
+            "spawnagent",
+            "subagent",
+            "delegate",
+            "send_message",
+            "send-message",
+            "sendmessage",
+            "wait_agent",
+            "wait-agent",
+            "waitagent",
+            "subagent_result",
+            "subagent-result",
+            "list_agents",
+            "list-agents",
+            "listagents",
+            "subagent_status",
+            "subagent-status",
+            "close_agent",
+            "close-agent",
+            "closeagent",
+        ] {
+            let err = handler
+                .handle(
+                    ToolContext {
+                        tool_call_id: crate::invocation::ToolCallId(format!("call-{requested}")),
+                        session_id: "session-1".to_string(),
+                        turn_id: Some("turn-1".to_string()),
+                        workspace_root: std::path::PathBuf::from("."),
+                        budgets: crate::contracts::ToolBudgets {
+                            output_limit_bytes: 1024,
+                            wall_time_limit_ms: None,
+                        },
+                        cancel_token: tokio_util::sync::CancellationToken::new(),
+                        agent_scope: ToolAgentScope::Subagent,
+                        agent_coordinator: None,
+                    },
+                    serde_json::json!({ "query": format!("select:{requested}") }),
+                    None,
+                )
+                .await
+                .expect_err("subagent ToolSearch should not load parent-agent coordination tools");
+
+            match err {
+                ToolCallError::ExecutionFailed(message) => assert!(message.contains("Not found")),
+                other => panic!("unexpected error: {other:?}"),
+            }
+        }
+
+        let loaded_tools = loaded_tools.lock().expect("loaded tools");
+        assert!(!loaded_tools.is_loaded("session-1", "spawn_agent"));
+        assert!(!loaded_tools.is_loaded("session-1", "send_message"));
+        assert!(!loaded_tools.is_loaded("session-1", "wait_agent"));
+        assert!(!loaded_tools.is_loaded("session-1", "list_agents"));
+        assert!(!loaded_tools.is_loaded("session-1", "close_agent"));
     }
 }

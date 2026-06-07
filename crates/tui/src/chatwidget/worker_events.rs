@@ -213,31 +213,31 @@ impl ChatWidget {
                 let tool_call = ActiveToolCall {
                     tool_use_id: tool_use_id.clone(),
                     title: title.clone(),
-                    lines: vec![Self::running_tool_line(&title)],
+                    lines: Vec::new(),
                     exec_like: false,
                     start_time: None,
                 };
                 if preparing {
                     self.pending_tool_calls.push(ActiveToolCall {
+                        lines: Vec::new(),
                         start_time: Some(Instant::now()),
                         ..tool_call
                     });
                 } else {
-                    self.active_tool_calls.insert(
-                        tool_use_id.clone(),
-                        ActiveToolCall {
-                            start_time: None,
-                            ..tool_call.clone()
-                        },
-                    );
-                    self.add_history_entry_without_redraw(Box::new(
-                        history_cell::AgentMessageCell::new_with_prefix(
-                            tool_call.lines,
-                            self.dot_prefix(DotStatus::Pending),
-                            "  ",
-                            false,
-                        ),
-                    ));
+                    self.active_tool_calls
+                        .insert(tool_use_id.clone(), tool_call);
+                    let pending_title = if title.starts_with("Running ") {
+                        title
+                    } else {
+                        format!("Running {title}")
+                    };
+                    self.pending_tool_calls.push(ActiveToolCall {
+                        tool_use_id,
+                        title: pending_title,
+                        lines: Vec::new(),
+                        exec_like: false,
+                        start_time: Some(Instant::now()),
+                    });
                 }
                 self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
                 self.frame_requester.schedule_frame();
@@ -289,8 +289,16 @@ impl ChatWidget {
                         }
                         return;
                     }
-                    let line = Line::from(delta.clone()).patch_style(Self::tool_text_style());
-                    tool_call.lines.push(line);
+                    let line = Line::from(delta).patch_style(Self::tool_text_style());
+                    if let Some(pending) = self
+                        .pending_tool_calls
+                        .iter_mut()
+                        .find(|pending| pending.tool_use_id == tool_use_id)
+                    {
+                        pending.lines.push(line);
+                    } else {
+                        tool_call.lines.push(line);
+                    }
                     self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
                     self.frame_requester.schedule_frame();
                 }
@@ -493,7 +501,17 @@ impl ChatWidget {
                 last_query_input_tokens,
                 prompt_token_estimate,
             } => {
+                let was_interrupted = stop_reason.contains("Interrupted");
                 self.commit_active_streams(DotStatus::Completed);
+                if was_interrupted
+                    && let Some(cell) = self
+                        .active_cell
+                        .as_mut()
+                        .and_then(|cell| cell.as_any_mut().downcast_mut::<ExecCell>())
+                {
+                    cell.mark_failed();
+                }
+                self.flush_active_cell();
                 self.active_tool_calls.clear();
                 self.pending_tool_calls.clear();
                 self.pending_approval = None;
@@ -521,7 +539,6 @@ impl ChatWidget {
                     .filter(|&secs| secs > 0);
                 self.bottom_pane.set_task_running(false);
                 self.set_status_message("Ready");
-                let was_interrupted = stop_reason.contains("Interrupted");
                 let cell = if was_interrupted {
                     history_cell::TurnSummaryCell::new_interrupted(model_name, accent_color)
                 } else {
@@ -640,6 +657,12 @@ impl ChatWidget {
                 self.resume_browser_loading = false;
                 self.open_resume_browser(sessions);
             }
+            WorkerEvent::SubagentDiscovered { agent } => {
+                self.on_subagent_discovered(agent);
+            }
+            WorkerEvent::SubagentMonitor { event } => {
+                self.on_subagent_monitor_event(event);
+            }
             WorkerEvent::SkillsListed {
                 body,
                 skills,
@@ -659,6 +682,7 @@ impl ChatWidget {
                 model,
                 thinking,
                 reasoning_effort,
+                active_agent_label,
                 last_query_total_tokens: _,
                 last_query_input_tokens: _,
                 total_cache_read_tokens: _,
@@ -668,6 +692,9 @@ impl ChatWidget {
                 self.update_session_request_model(model);
                 self.thinking_selection = thinking;
                 self.session.reasoning_effort = reasoning_effort;
+                self.session.active_agent_label = active_agent_label.clone();
+                self.bottom_pane.set_active_agent_label(active_agent_label);
+                self.reset_subagent_monitor();
                 let should_append_header = self.history_has_non_header_content();
                 self.active_cell = None;
                 self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
@@ -698,6 +725,7 @@ impl ChatWidget {
                 model,
                 thinking,
                 reasoning_effort,
+                active_agent_label,
                 total_input_tokens,
                 total_output_tokens,
                 total_cache_read_tokens,
@@ -716,6 +744,9 @@ impl ChatWidget {
                 }
                 self.thinking_selection = thinking;
                 self.session.reasoning_effort = reasoning_effort;
+                self.session.active_agent_label = active_agent_label.clone();
+                self.bottom_pane.set_active_agent_label(active_agent_label);
+                self.reset_subagent_monitor();
                 self.history.clear();
                 self.next_history_flush_index = 0;
                 self.active_text_items.clear();

@@ -208,14 +208,31 @@ impl ToolHandler for ExecCommandHandler {
             .insert_reserved(session_id, Arc::clone(&proc))
             .await;
 
+        let cancel_token = ctx.cancel_token.clone();
+        let store_for_cancel = Arc::clone(&self.store);
+        let proc_for_cancel = Arc::clone(&proc);
+        let cancel_task = tokio::spawn(async move {
+            cancel_token.cancelled().await;
+            proc_for_cancel.terminate();
+            store_for_cancel.remove(session_id).await;
+        });
+
         let mut rx = proc.subscribe();
-        let output = collect_output(
-            &mut rx,
-            &proc,
-            crate::unified_exec::clamp_exec_yield_time(args.yield_time_ms),
-            args.max_output_tokens,
-        )
-        .await;
+        let output = tokio::select! {
+            output = collect_output(
+                &mut rx,
+                &proc,
+                crate::unified_exec::clamp_exec_yield_time(args.yield_time_ms),
+                args.max_output_tokens,
+            ) => output,
+            _ = ctx.cancel_token.cancelled() => {
+                proc.terminate();
+                self.store.remove(session_id).await;
+                cancel_task.abort();
+                return Err(ToolCallError::Cancelled);
+            }
+        };
+        cancel_task.abort();
         let warning = if output.exit_code.is_some() {
             self.store.remove(session_id).await;
             None
@@ -528,6 +545,8 @@ mod tests {
                 output_limit_bytes: 32 * 1024,
             },
             cancel_token: CancellationToken::new(),
+            agent_scope: crate::contracts::ToolAgentScope::Parent,
+            agent_coordinator: None,
         }
     }
 

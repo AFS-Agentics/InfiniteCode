@@ -70,6 +70,33 @@ pub struct ToolSearchResult {
     pub not_found: Vec<String>,
 }
 
+const SUBAGENT_PROHIBITED_AGENT_COORDINATION_TOOLS: &[&str] = &[
+    "spawn_agent",
+    "spawn-agent",
+    "spawnagent",
+    "spawn_subagent",
+    "spawn-subagent",
+    "subagent",
+    "sub_agent",
+    "delegate",
+    "send_message",
+    "send-message",
+    "sendmessage",
+    "wait_agent",
+    "wait-agent",
+    "waitagent",
+    "subagent_result",
+    "subagent-result",
+    "list_agents",
+    "list-agents",
+    "listagents",
+    "subagent_status",
+    "subagent-status",
+    "close_agent",
+    "close-agent",
+    "closeagent",
+];
+
 impl ToolSearchResult {
     pub fn is_error(&self) -> bool {
         self.loaded.is_empty()
@@ -116,6 +143,24 @@ impl ToolSearchResult {
         }
         lines.join("\n")
     }
+}
+
+pub fn hide_subagent_agent_coordination_tools(config: &mut DeferredLoadingConfig) {
+    for name in [
+        "spawn_agent",
+        "send_message",
+        "wait_agent",
+        "list_agents",
+        "close_agent",
+    ] {
+        config.hidden.insert(name.to_string());
+    }
+}
+
+pub fn is_subagent_agent_coordination_tool(name: &str) -> bool {
+    SUBAGENT_PROHIBITED_AGENT_COORDINATION_TOOLS
+        .iter()
+        .any(|tool| name.eq_ignore_ascii_case(tool))
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -376,7 +421,10 @@ fn alias_map(registered: &HashSet<&str>) -> HashMap<String, String> {
     insert_alias(&mut aliases, registered, "loadtool", "ToolSearch");
     insert_alias(&mut aliases, registered, "subagent", "spawn_agent");
     insert_alias(&mut aliases, registered, "delegate", "spawn_agent");
-    insert_alias(&mut aliases, registered, "task_tool", "spawn_agent");
+    insert_alias(&mut aliases, registered, "spawn_subagent", "spawn_agent");
+    insert_alias(&mut aliases, registered, "sub_agent", "spawn_agent");
+    insert_alias(&mut aliases, registered, "subagent_status", "list_agents");
+    insert_alias(&mut aliases, registered, "subagent_result", "wait_agent");
     aliases
 }
 
@@ -425,12 +473,10 @@ fn default_deferred_tools() -> BTreeSet<String> {
         "websearch",
         "fetch_url",
         "webfetch",
-        "task",
         "multi_tool_use",
         "goal_update",
         "spawn_agent",
         "send_message",
-        "followup_task",
         "wait_agent",
         "list_agents",
         "close_agent",
@@ -480,6 +526,17 @@ mod tests {
             tool("fetch_url", "Fetch a URL."),
             tool("spawn_agent", "Spawn a subagent."),
             tool("secret_internal", "Internal lifecycle operation."),
+        ]
+    }
+
+    fn agent_coordination_tools() -> Vec<ToolDefinition> {
+        vec![
+            tool("ToolSearch", "Load deferred tools."),
+            tool("spawn_agent", "Spawn a subagent."),
+            tool("send_message", "Send input to a child agent."),
+            tool("wait_agent", "Poll child output."),
+            tool("list_agents", "List child agents."),
+            tool("close_agent", "Close a child agent."),
         ]
     }
 
@@ -556,6 +613,111 @@ mod tests {
         );
         assert!(loaded.is_loaded("session-1", "web_search"));
         assert!(loaded.is_loaded("session-1", "fetch_url"));
+    }
+
+    #[test]
+    fn tool_search_resolves_agent_spawn_aliases() {
+        let config = DeferredLoadingConfig::default();
+
+        for requested in ["spawn_agent", "subagent", "delegate"] {
+            let mut loaded = LoadedDeferredTools::default();
+            let result = execute_tool_search(
+                "session-1",
+                &format!("select:{requested}"),
+                &tools(),
+                &mut loaded,
+                &config,
+            )
+            .expect("agent spawn alias should resolve");
+
+            assert_eq!(
+                result,
+                ToolSearchResult {
+                    loaded: vec!["spawn_agent".to_string()],
+                    already_loaded: Vec::new(),
+                    already_available: Vec::new(),
+                    not_found: Vec::new(),
+                }
+            );
+            assert!(loaded.is_loaded("session-1", "spawn_agent"));
+        }
+    }
+
+    #[test]
+    fn subagent_hidden_tools_hide_parent_agent_coordination_tools() {
+        let mut config = DeferredLoadingConfig::default();
+        hide_subagent_agent_coordination_tools(&mut config);
+
+        for requested in [
+            "spawn_agent",
+            "spawn-agent",
+            "spawnagent",
+            "spawn_subagent",
+            "spawn-subagent",
+            "subagent",
+            "sub_agent",
+            "delegate",
+            "send_message",
+            "send-message",
+            "sendmessage",
+            "wait_agent",
+            "wait-agent",
+            "waitagent",
+            "subagent_result",
+            "subagent-result",
+            "list_agents",
+            "list-agents",
+            "listagents",
+            "subagent_status",
+            "subagent-status",
+            "close_agent",
+            "close-agent",
+            "closeagent",
+        ] {
+            let mut loaded = LoadedDeferredTools::default();
+            let err = execute_tool_search(
+                "session-1",
+                &format!("select:{requested}"),
+                &agent_coordination_tools(),
+                &mut loaded,
+                &config,
+            )
+            .expect_err("subagent agent coordination tools should remain hidden");
+
+            assert!(err.contains("Not found"));
+            assert!(!loaded.is_loaded("session-1", "spawn_agent"));
+            assert!(!loaded.is_loaded("session-1", "send_message"));
+            assert!(!loaded.is_loaded("session-1", "wait_agent"));
+            assert!(!loaded.is_loaded("session-1", "list_agents"));
+            assert!(!loaded.is_loaded("session-1", "close_agent"));
+        }
+    }
+
+    #[test]
+    fn subagent_hidden_tools_override_loaded_agent_coordination_tools() {
+        let mut config = DeferredLoadingConfig::default();
+        hide_subagent_agent_coordination_tools(&mut config);
+        let loaded = BTreeSet::from([
+            "spawn_agent".to_string(),
+            "send_message".to_string(),
+            "wait_agent".to_string(),
+            "list_agents".to_string(),
+            "close_agent".to_string(),
+        ]);
+
+        let prompt = assemble_deferred_tool_prompt(&agent_coordination_tools(), &loaded, &config);
+
+        assert_eq!(
+            prompt
+                .exposed
+                .iter()
+                .map(|tool| tool.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["ToolSearch"]
+        );
+        assert_eq!(prompt.loaded_deferred, Vec::<String>::new());
+        assert_eq!(prompt.deferred, Vec::<DeferredTool>::new());
+        assert_eq!(prompt.reminder, None);
     }
 
     #[test]
