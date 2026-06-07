@@ -70,6 +70,20 @@ pub struct ToolSearchResult {
     pub not_found: Vec<String>,
 }
 
+const SUBAGENT_PROHIBITED_AGENT_TOOLS: &[&str] = &[
+    "spawn_agent",
+    "spawn-agent",
+    "spawnagent",
+    "spawn_subagent",
+    "spawn-subagent",
+    "subagent",
+    "sub_agent",
+    "delegate",
+    "send_message",
+    "send-message",
+    "sendmessage",
+];
+
 impl ToolSearchResult {
     pub fn is_error(&self) -> bool {
         self.loaded.is_empty()
@@ -116,6 +130,17 @@ impl ToolSearchResult {
         }
         lines.join("\n")
     }
+}
+
+pub fn hide_subagent_agent_spawn_tools(config: &mut DeferredLoadingConfig) {
+    config.hidden.insert("spawn_agent".to_string());
+    config.hidden.insert("send_message".to_string());
+}
+
+pub fn is_subagent_agent_spawn_tool(name: &str) -> bool {
+    SUBAGENT_PROHIBITED_AGENT_TOOLS
+        .iter()
+        .any(|tool| name.eq_ignore_ascii_case(tool))
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -432,7 +457,6 @@ fn default_deferred_tools() -> BTreeSet<String> {
         "goal_update",
         "spawn_agent",
         "send_message",
-        "followup_task",
         "wait_agent",
         "list_agents",
         "close_agent",
@@ -585,6 +609,40 @@ mod tests {
                 }
             );
             assert!(loaded.is_loaded("session-1", "spawn_agent"));
+        }
+    }
+
+    #[test]
+    fn subagent_hidden_tools_hide_parent_agent_coordination_tools() {
+        let mut config = DeferredLoadingConfig::default();
+        hide_subagent_agent_spawn_tools(&mut config);
+
+        for requested in [
+            "spawn_agent",
+            "spawn-agent",
+            "spawnagent",
+            "spawn_subagent",
+            "spawn-subagent",
+            "subagent",
+            "sub_agent",
+            "delegate",
+            "send_message",
+            "send-message",
+            "sendmessage",
+        ] {
+            let mut loaded = LoadedDeferredTools::default();
+            let err = execute_tool_search(
+                "session-1",
+                &format!("select:{requested}"),
+                &tools(),
+                &mut loaded,
+                &config,
+            )
+            .expect_err("subagent spawn aliases should remain hidden");
+
+            assert!(err.contains("Not found"));
+            assert!(!loaded.is_loaded("session-1", "spawn_agent"));
+            assert!(!loaded.is_loaded("session-1", "send_message"));
         }
     }
 

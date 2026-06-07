@@ -1,6 +1,24 @@
 use devo_protocol::{
     ModelRequest, RequestContent, RequestMessage, ResponseContent, SamplingControls,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GeneratedTitleError {
+    NoTextContent,
+    EmptyTextContent,
+    InvalidLength,
+}
+
+impl GeneratedTitleError {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            GeneratedTitleError::NoTextContent => "no_text_content",
+            GeneratedTitleError::EmptyTextContent => "empty_text_content",
+            GeneratedTitleError::InvalidLength => "invalid_length",
+        }
+    }
+}
+
 /// Derives a cheap deterministic provisional session title from the first user prompt.
 pub(crate) fn derive_provisional_title(input: &str) -> Option<String> {
     let mut text = strip_code_fences(input);
@@ -45,39 +63,85 @@ pub(crate) fn build_title_generation_request(model: String, user_input: &str) ->
                 ),
             }],
         }],
-        max_tokens: 32,
+        max_tokens: 24,
         tools: None,
         sampling: SamplingControls {
             temperature: Some(0.0),
             ..SamplingControls::default()
         },
-        thinking: None,
+        thinking: Some("disabled".to_string()),
         reasoning_effort: None,
         extra_body: None,
     }
 }
 
 /// Extracts and normalizes one title candidate from a complete provider response.
-pub(crate) fn normalize_generated_title(content: &[ResponseContent]) -> Option<String> {
-    let raw = content.iter().find_map(|block| match block {
-        ResponseContent::Text(text) => Some(text.as_str()),
-        ResponseContent::ToolUse { .. } => None,
-    })?;
-    let line = raw.lines().next()?.trim();
-    let line = line.trim_matches(|ch| matches!(ch, '"' | '\'' | '#' | '`' | ' '));
+pub(crate) fn normalize_generated_title(
+    content: &[ResponseContent],
+) -> Result<String, GeneratedTitleError> {
+    let mut saw_text = false;
+    for block in content {
+        let ResponseContent::Text(text) = block else {
+            continue;
+        };
+        saw_text = true;
+        for line in text.lines() {
+            let candidate = normalize_generated_title_line(line);
+            if candidate.is_empty() {
+                continue;
+            }
+            let visible = candidate.chars().count();
+            if !(3..=80).contains(&visible) {
+                return Err(GeneratedTitleError::InvalidLength);
+            }
+            return Ok(candidate);
+        }
+    }
+
+    if saw_text {
+        Err(GeneratedTitleError::EmptyTextContent)
+    } else {
+        Err(GeneratedTitleError::NoTextContent)
+    }
+}
+
+fn normalize_generated_title_line(line: &str) -> String {
+    let line = trim_title_wrappers(line.trim());
+    let line = strip_generated_title_prefix(line);
+    let line = trim_title_wrappers(line);
     if line.is_empty() {
-        return None;
+        return String::new();
     }
     let collapsed = collapse_whitespace(line);
     let without_trailing = collapsed
         .trim_end_matches(['.', '!', '?', ':', ';'])
         .to_string();
-    let candidate = sentence_case(without_trailing.trim());
-    let visible = candidate.chars().count();
-    if !(3..=80).contains(&visible) {
-        return None;
+    let without_wrappers = trim_title_wrappers(without_trailing.trim());
+    sentence_case(without_wrappers)
+}
+
+fn trim_title_wrappers(input: &str) -> &str {
+    input.trim_matches(|ch| matches!(ch, '"' | '\'' | '#' | '`' | '*' | '_' | ' '))
+}
+
+fn strip_generated_title_prefix(input: &str) -> &str {
+    let trimmed = input.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    for prefix in [
+        "session title:",
+        "session title -",
+        "generated title:",
+        "generated title -",
+        "short title:",
+        "short title -",
+        "title:",
+        "title -",
+    ] {
+        if lower.starts_with(prefix) {
+            return trimmed[prefix.len()..].trim();
+        }
     }
-    Some(candidate)
+    trimmed
 }
 
 fn strip_code_fences(input: &str) -> String {
@@ -144,7 +208,7 @@ mod tests {
     use devo_protocol::ResponseContent;
     use pretty_assertions::assert_eq;
 
-    use super::{derive_provisional_title, normalize_generated_title};
+    use super::{GeneratedTitleError, derive_provisional_title, normalize_generated_title};
 
     #[test]
     fn derives_title_from_plain_text_prompt() {
@@ -173,7 +237,39 @@ mod tests {
             normalize_generated_title(&[ResponseContent::Text(
                 "\"rollout persistence follow up.\"\nextra".to_string()
             )]),
-            Some("Rollout persistence follow up".to_string())
+            Ok("Rollout persistence follow up".to_string())
+        );
+    }
+
+    #[test]
+    fn skips_blank_generated_title_lines() {
+        assert_eq!(
+            normalize_generated_title(&[ResponseContent::Text(
+                "\n\nTitle: restore token stats".to_string()
+            )]),
+            Ok("Restore token stats".to_string())
+        );
+    }
+
+    #[test]
+    fn strips_common_generated_title_wrappers() {
+        assert_eq!(
+            normalize_generated_title(&[ResponseContent::Text(
+                "**Session title:** `quiet CLI logs`;".to_string()
+            )]),
+            Ok("Quiet CLI logs".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_tool_only_generated_title_response() {
+        assert_eq!(
+            normalize_generated_title(&[ResponseContent::ToolUse {
+                id: "call_1".to_string(),
+                name: "noop".to_string(),
+                input: serde_json::json!({})
+            }]),
+            Err(GeneratedTitleError::NoTextContent)
         );
     }
 }

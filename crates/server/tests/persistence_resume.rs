@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -20,15 +21,24 @@ use tokio::time::timeout;
 
 use devo_core::FileSystemSkillCatalog;
 use devo_core::PresetModelCatalog;
+use devo_core::RolloutLine;
+use devo_core::SessionMetaLine;
+use devo_core::SessionRecord;
 use devo_core::SkillsConfig;
+use devo_core::TurnLine;
+use devo_core::TurnRecord;
 use devo_core::tools::ToolRegistry;
+use devo_protocol::Model;
 use devo_protocol::ModelRequest;
 use devo_protocol::ModelResponse;
+use devo_protocol::ReasoningEffort;
 use devo_protocol::ResponseContent;
 use devo_protocol::ResponseMetadata;
 use devo_protocol::SessionHistoryItemKind;
+use devo_protocol::SessionId;
 use devo_protocol::StopReason;
 use devo_protocol::StreamEvent;
+use devo_protocol::ThinkingCapability;
 use devo_protocol::TurnStatus;
 use devo_protocol::Usage;
 use devo_provider::ModelProviderSDK;
@@ -639,6 +649,136 @@ async fn runtime_skips_invalid_rollout_files_when_loading_sessions() -> Result<(
 }
 
 #[tokio::test]
+async fn resume_normalizes_historical_default_reasoning_effort() -> Result<()> {
+    fn write_historical_rollout(
+        data_root: &std::path::Path,
+        session_id: &SessionId,
+        thinking: Option<String>,
+    ) -> Result<()> {
+        let now = chrono::Utc::now();
+        let rollout_dir = data_root.join("sessions/2026/06/07");
+        std::fs::create_dir_all(&rollout_dir)?;
+        let rollout_path =
+            rollout_dir.join(format!("rollout-2026-06-07T00-00-00-{session_id}.jsonl"));
+        let session = SessionRecord {
+            id: session_id.clone(),
+            rollout_path: rollout_path.clone(),
+            created_at: now,
+            updated_at: now,
+            source: "cli".into(),
+            agent_nickname: None,
+            agent_role: None,
+            agent_path: None,
+            model_provider: "openai_chat_completions".into(),
+            model: Some("deepseek-v4-flash".into()),
+            thinking: thinking.clone(),
+            cwd: data_root.to_path_buf(),
+            cli_version: "0.1.0".into(),
+            title: Some("Historical session".into()),
+            title_state: devo_core::SessionTitleState::Final(
+                devo_core::SessionTitleFinalSource::ExplicitCreate,
+            ),
+            sandbox_policy: "workspace-write".into(),
+            approval_mode: "on-request".into(),
+            tokens_used: 0,
+            first_user_message: None,
+            archived_at: None,
+            git_sha: None,
+            git_branch: None,
+            git_origin_url: None,
+            parent_session_id: None,
+            session_context: None,
+            latest_turn_context: None,
+            schema_version: 2,
+        };
+        let turn = TurnRecord {
+            id: devo_protocol::TurnId::new(),
+            session_id: session_id.clone(),
+            sequence: 1,
+            started_at: now,
+            completed_at: Some(now),
+            status: TurnStatus::Completed,
+            kind: devo_core::TurnKind::Regular,
+            model: "deepseek-v4-flash".into(),
+            thinking,
+            request_model: "deepseek-v4-flash".into(),
+            request_thinking: Some("default".into()),
+            input_token_estimate: None,
+            usage: None,
+            session_context: None,
+            turn_context: None,
+            schema_version: 2,
+        };
+
+        let mut file = std::fs::File::create(&rollout_path)?;
+        writeln!(
+            file,
+            "{}",
+            serde_json::to_string(&RolloutLine::SessionMeta(Box::new(SessionMetaLine {
+                timestamp: now,
+                session,
+            })))?
+        )?;
+        writeln!(
+            file,
+            "{}",
+            serde_json::to_string(&RolloutLine::Turn(Box::new(TurnLine {
+                timestamp: now,
+                turn,
+            })))?
+        )?;
+        Ok(())
+    }
+
+    let data_root = TempDir::new()?;
+    let missing_thinking_session = SessionId::new();
+    let default_thinking_session = SessionId::new();
+    write_historical_rollout(data_root.path(), &missing_thinking_session, None)?;
+    write_historical_rollout(
+        data_root.path(),
+        &default_thinking_session,
+        Some("default".into()),
+    )?;
+
+    let runtime = build_runtime(data_root.path())?;
+    runtime.load_persisted_sessions().await?;
+    let (connection_id, _notifications_rx) = initialize_connection(&runtime).await?;
+
+    for session_id in [&missing_thinking_session, &default_thinking_session] {
+        let resume_response = runtime
+            .handle_incoming(
+                connection_id,
+                serde_json::json!({
+                    "id": 34,
+                    "method": "session/resume",
+                    "params": {
+                        "session_id": session_id
+                    }
+                }),
+            )
+            .await
+            .context("session/resume response")?;
+        let resume_result = serde_json::from_value::<
+            devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        >(resume_response)?
+        .result;
+
+        assert_eq!(resume_result.session.session_id, (*session_id).clone());
+        assert_eq!(
+            resume_result.session.model.as_deref(),
+            Some("deepseek-v4-flash")
+        );
+        assert_eq!(resume_result.session.thinking.as_deref(), Some("high"));
+        assert_eq!(
+            resume_result.session.reasoning_effort,
+            Some(ReasoningEffort::High)
+        );
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn runtime_recovers_session_when_middle_rollout_line_is_corrupted() -> Result<()> {
     let data_root = TempDir::new()?;
     let runtime = build_runtime(data_root.path())?;
@@ -1151,7 +1291,23 @@ fn build_runtime_with_provider(
             Arc::new(SingleProviderRouter::new(provider)),
             Arc::new(ToolRegistry::new()),
             "test-model".to_string(),
-            Arc::new(PresetModelCatalog::default()),
+            Arc::new(PresetModelCatalog::new(vec![
+                Model {
+                    slug: "test-model".to_string(),
+                    display_name: "test-model".to_string(),
+                    ..Model::default()
+                },
+                Model {
+                    slug: "deepseek-v4-flash".to_string(),
+                    display_name: "deepseek-v4-flash".to_string(),
+                    thinking_capability: ThinkingCapability::ToggleWithLevels(vec![
+                        ReasoningEffort::High,
+                        ReasoningEffort::Max,
+                    ]),
+                    default_reasoning_effort: Some(ReasoningEffort::High),
+                    ..Model::default()
+                },
+            ])),
             Arc::new(ProviderVendorCatalog::default()),
             None,
             Box::new(FileSystemSkillCatalog::new(SkillsConfig {

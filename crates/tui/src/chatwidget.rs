@@ -51,6 +51,8 @@ mod restored_session;
 
 mod session_header;
 
+mod subagent_monitor;
+
 mod permission_presets;
 
 mod resume_browser;
@@ -67,6 +69,7 @@ use self::permission_presets::permission_preset_items;
 use self::permission_presets::permission_preset_label;
 use self::resume_browser::ResumeBrowserState;
 use self::session_header::SessionHeaderParams;
+use self::subagent_monitor::SubagentMonitorState;
 
 use self::text_stream::ActiveTextItem;
 
@@ -222,6 +225,7 @@ pub(crate) struct ChatWidget {
     bottom_pane: BottomPane,
     active_cell: Option<Box<dyn HistoryCell>>,
     active_cell_revision: u64,
+    last_terminal_assistant_visible_hash: Option<(String, u64)>,
     active_tool_calls: HashMap<String, ActiveToolCall>,
     pending_tool_calls: Vec<ActiveToolCall>,
     history: Vec<Box<dyn HistoryCell>>,
@@ -236,6 +240,7 @@ pub(crate) struct ChatWidget {
     onboarding: Option<OnboardingWidget>,
     resume_browser: Option<ResumeBrowserState>,
     resume_browser_loading: bool,
+    subagent_monitor: SubagentMonitorState,
     picker_mode: Option<PickerMode>,
     pending_model_selection: Option<PendingModelSelection>,
     theme_set: ThemeSet,
@@ -349,6 +354,7 @@ impl ChatWidget {
             bottom_pane,
             active_cell: None,
             active_cell_revision: 0,
+            last_terminal_assistant_visible_hash: None,
             active_tool_calls: HashMap::new(),
             pending_tool_calls: Vec::new(),
             history,
@@ -363,6 +369,7 @@ impl ChatWidget {
             onboarding: None,
             resume_browser: None,
             resume_browser_loading: false,
+            subagent_monitor: SubagentMonitorState::default(),
             picker_mode: None,
             pending_model_selection: None,
             theme_set,

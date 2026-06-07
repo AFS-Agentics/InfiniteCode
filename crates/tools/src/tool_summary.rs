@@ -119,6 +119,14 @@ pub fn tool_summary(name: &str, input: &serde_json::Value, cwd: &Path) -> String
             let name = input["name"].as_str().unwrap_or("");
             format!("skill: {name}")
         }
+        "spawn_agent" => {
+            let message = input["message"].as_str().unwrap_or("");
+            if message.is_empty() {
+                "spawn_agent".to_string()
+            } else {
+                format!("spawn_agent: {message}")
+            }
+        }
         "question" => "question".to_string(),
         "update_plan" => "update_plan".to_string(),
         "lsp" => {

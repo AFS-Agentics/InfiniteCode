@@ -175,6 +175,7 @@ fn subscribe_params_allow_optional_filters() {
     let payload = EventsSubscribeParams {
         session_id: None,
         event_types: Some(vec!["turn/completed".into()]),
+        include_child_agents: false,
     };
 
     let json = serde_json::to_string(&payload).expect("serialize");

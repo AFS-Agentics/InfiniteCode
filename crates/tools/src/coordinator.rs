@@ -25,11 +25,6 @@ pub trait AgentToolCoordinator: Send + Sync {
         params: AgentMessageParams,
     ) -> Result<AgentMessageResult, ToolCallError>;
 
-    async fn followup_task(
-        self: Arc<Self>,
-        params: AgentMessageParams,
-    ) -> Result<AgentMessageResult, ToolCallError>;
-
     async fn wait_agent(
         self: Arc<Self>,
         params: WaitAgentParams,

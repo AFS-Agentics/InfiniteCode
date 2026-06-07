@@ -3623,6 +3623,194 @@ fn streaming_controller_is_initialized_and_commit_ticks_drain_lines() {
 }
 
 #[test]
+fn fragmented_random_assistant_stream_keeps_rendering_without_queue_stall() {
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, cwd);
+    let assistant_id = ItemId::new();
+
+    widget.handle_worker_event(crate::events::WorkerEvent::TurnStarted {
+        model: "test-model".to_string(),
+        thinking: None,
+        reasoning_effort: None,
+        turn_id: Default::default(),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::TextItemStarted {
+        item_id: assistant_id,
+        kind: crate::events::TextItemKind::Assistant,
+    });
+
+    let mut seed = 0x9e37_79b9_7f4a_7c15_u64;
+    let mut expected_lines = Vec::new();
+    for index in 0..64 {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+        let line = format!("line-{index:02}-{:016x}", seed);
+        let streamed_line = format!("{line}\n");
+        let split_at = 1 + (seed as usize % (streamed_line.len() - 1));
+        expected_lines.push(line);
+
+        for delta in [&streamed_line[..split_at], &streamed_line[split_at..]] {
+            widget.handle_worker_event(crate::events::WorkerEvent::TextItemDelta {
+                item_id: assistant_id,
+                kind: crate::events::TextItemKind::Assistant,
+                delta: delta.to_string(),
+            });
+            widget.pre_draw_tick();
+        }
+
+        for _ in 0..8 {
+            if widget.assistant_stream_queued_lines_for_test() == 0 {
+                break;
+            }
+            widget.pre_draw_tick();
+        }
+        assert_eq!(
+            widget.assistant_stream_queued_lines_for_test(),
+            0,
+            "assistant stream queue should drain after complete random line {index}"
+        );
+
+        let rows = rendered_rows(&widget, 120, 90).join("\n");
+        let latest_line = expected_lines.last().expect("line was generated");
+        assert!(
+            rows.contains(latest_line),
+            "latest streamed line should be visible before turn completion:\n{rows}"
+        );
+    }
+
+    let live_rows = rendered_rows(&widget, 120, 90).join("\n");
+    for expected_line in expected_lines.iter().rev().take(12) {
+        assert!(
+            live_rows.contains(expected_line),
+            "recent streamed line should remain visible before turn completion: {expected_line}"
+        );
+    }
+
+    let committed_before_finish =
+        scrollback_plain_lines(&widget.drain_scrollback_lines(120)).join("\n");
+    let final_line = expected_lines.last().expect("line was generated");
+    assert!(
+        !committed_before_finish.contains(final_line),
+        "assistant stream should still be live, not prematurely committed"
+    );
+}
+
+fn monitor_agent(
+    session_id: SessionId,
+    parent_session_id: SessionId,
+    nickname: &str,
+) -> crate::events::SubagentMonitorAgent {
+    crate::events::SubagentMonitorAgent {
+        session_id,
+        parent_session_id,
+        agent_path: format!("root/{nickname}"),
+        nickname: nickname.to_string(),
+        role: "default".to_string(),
+        status: "running".to_string(),
+        last_task_message: Some(format!("run {nickname}")),
+    }
+}
+
+#[test]
+fn subagent_monitor_auto_opens_and_renders_child_stream() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+    let parent = SessionId::new();
+    let child = SessionId::new();
+    let item_id = ItemId::new();
+
+    widget.handle_worker_event(crate::events::WorkerEvent::SubagentDiscovered {
+        agent: monitor_agent(child, parent, "reviewer"),
+        auto_open: true,
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::SubagentMonitor {
+        event: crate::events::SubagentMonitorEvent::TextItemDelta {
+            session_id: child,
+            item_id: Some(item_id),
+            kind: crate::events::TextItemKind::Assistant,
+            delta: "checking files".to_string(),
+        },
+    });
+
+    assert!(widget.is_subagent_monitor_open_for_test());
+    assert_eq!(widget.selected_subagent_for_test(), Some(child));
+    let rows = rendered_rows(&widget, 100, 18).join("\n");
+    assert!(rows.contains("Sub-agents"), "rows:\n{rows}");
+    assert!(rows.contains("reviewer"), "rows:\n{rows}");
+    assert!(rows.contains("checking files"), "rows:\n{rows}");
+    let parent_transcript = line_texts(widget.transcript_overlay_lines(80)).join("\n");
+    assert!(!parent_transcript.contains("checking files"));
+}
+
+#[test]
+fn subagent_monitor_selects_newest_until_user_selects_another_child() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+    let parent = SessionId::new();
+    let first = SessionId::new();
+    let second = SessionId::new();
+    let third = SessionId::new();
+
+    widget.handle_worker_event(crate::events::WorkerEvent::SubagentDiscovered {
+        agent: monitor_agent(first, parent, "first"),
+        auto_open: true,
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::SubagentDiscovered {
+        agent: monitor_agent(second, parent, "second"),
+        auto_open: true,
+    });
+    assert_eq!(widget.selected_subagent_for_test(), Some(second));
+
+    widget.handle_key_event(press_key(KeyCode::Up));
+    assert_eq!(widget.selected_subagent_for_test(), Some(first));
+
+    widget.handle_worker_event(crate::events::WorkerEvent::SubagentDiscovered {
+        agent: monitor_agent(third, parent, "third"),
+        auto_open: true,
+    });
+    assert_eq!(widget.selected_subagent_for_test(), Some(first));
+}
+
+#[test]
+fn subagent_monitor_closes_and_reopens_from_list_result() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+    let parent = SessionId::new();
+    let child = SessionId::new();
+
+    widget.handle_worker_event(crate::events::WorkerEvent::SubagentsListed {
+        agents: vec![monitor_agent(child, parent, "builder")],
+        open: true,
+    });
+    assert!(widget.is_subagent_monitor_open_for_test());
+
+    widget.handle_key_event(press_key(KeyCode::Esc));
+    assert!(!widget.is_subagent_monitor_open_for_test());
+
+    widget.handle_worker_event(crate::events::WorkerEvent::SubagentsListed {
+        agents: vec![monitor_agent(child, parent, "builder")],
+        open: true,
+    });
+    assert!(widget.is_subagent_monitor_open_for_test());
+}
+
+#[test]
 fn session_switch_sets_active_agent_footer_label() {
     let cwd = std::env::current_dir().expect("current directory is available");
     let model = Model {

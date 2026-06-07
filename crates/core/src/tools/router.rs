@@ -16,7 +16,9 @@ use tracing::warn;
 use crate::invocation::ToolContent;
 use crate::registry::ToolRegistry;
 use crate::tool_spec::ToolCapabilityTag;
+use crate::tools::deferred_loading::is_subagent_agent_spawn_tool;
 use devo_tools::AgentToolCoordinator;
+use devo_tools::ToolAgentScope;
 use tokio_util::sync::CancellationToken;
 
 type ProgressCallback = dyn Fn(&str, &str) + Send + Sync;
@@ -205,12 +207,24 @@ impl ToolRuntime {
             .collect()
     }
 
+    pub fn agent_scope(&self) -> ToolAgentScope {
+        self.context.agent_scope
+    }
+
     pub(crate) async fn execute_single(
         &self,
         call: &ToolCall,
         on_progress: &Option<ProgressCallbackArc>,
     ) -> ToolCallResult {
         let tool_name = canonical_tool_name(&self.registry, &call.name);
+        if self.context.agent_scope == ToolAgentScope::Subagent
+            && (is_subagent_agent_spawn_tool(&call.name) || is_subagent_agent_spawn_tool(tool_name))
+        {
+            return ToolCallResult::error(
+                &call.id,
+                "sub-agents cannot use parent-agent coordination tools",
+            );
+        }
         let tool = match self
             .registry
             .get(tool_name)
@@ -244,6 +258,7 @@ impl ToolRuntime {
             workspace_root: self.context.cwd.clone(),
             budgets: self.execution_options.budgets,
             cancel_token: self.execution_options.cancel_token.clone(),
+            agent_scope: self.context.agent_scope,
             agent_coordinator: self.context.agent_coordinator.clone(),
         };
 
@@ -392,6 +407,7 @@ pub struct ToolRuntimeContext {
     pub session_id: String,
     pub turn_id: Option<String>,
     pub cwd: PathBuf,
+    pub agent_scope: ToolAgentScope,
     pub agent_coordinator: Option<Arc<dyn AgentToolCoordinator>>,
 }
 
@@ -401,6 +417,7 @@ impl std::fmt::Debug for ToolRuntimeContext {
             .field("session_id", &self.session_id)
             .field("turn_id", &self.turn_id)
             .field("cwd", &self.cwd)
+            .field("agent_scope", &self.agent_scope)
             .field(
                 "agent_coordinator",
                 &self.agent_coordinator.as_ref().map(|_| "<configured>"),
@@ -835,6 +852,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn subagent_runtime_blocks_parent_agent_coordination_tools() {
+        let registry = make_registry();
+        let runtime = ToolRuntime::new_with_context(
+            registry,
+            PermissionChecker::always_allow(),
+            ToolRuntimeContext {
+                agent_scope: ToolAgentScope::Subagent,
+                ..ToolRuntimeContext::default()
+            },
+        );
+
+        for name in [
+            "spawn_agent",
+            "spawn-agent",
+            "spawnagent",
+            "spawn_subagent",
+            "subagent",
+            "delegate",
+            "send_message",
+            "send-message",
+            "sendmessage",
+        ] {
+            let call = ToolCall {
+                id: format!("call-{name}"),
+                name: name.to_string(),
+                input: serde_json::json!({}),
+            };
+            let result = runtime.execute_single(&call, &None).await;
+
+            assert!(result.is_error);
+            assert_eq!(
+                result.content.into_string(),
+                "sub-agents cannot use parent-agent coordination tools"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn read_only_tool_succeeds() {
         let registry = make_registry();
         let runtime = ToolRuntime::new_without_permissions(registry);
@@ -962,6 +1017,7 @@ mod tests {
                 session_id: "session-1".into(),
                 turn_id: Some("turn-1".into()),
                 cwd: PathBuf::from("C:/workspace"),
+                agent_scope: ToolAgentScope::Parent,
                 agent_coordinator: None,
             },
         );
@@ -1365,6 +1421,7 @@ mod tests {
         wall_time_limit_ms: Option<u64>,
         cancel_token_cancelled: bool,
         agent_coordinator_configured: bool,
+        agent_scope: ToolAgentScope,
     }
 
     struct ContextCaptureTool {
@@ -1402,6 +1459,7 @@ mod tests {
                 wall_time_limit_ms: ctx.budgets.wall_time_limit_ms,
                 cancel_token_cancelled: ctx.cancel_token.is_cancelled(),
                 agent_coordinator_configured: ctx.agent_coordinator.is_some(),
+                agent_scope: ctx.agent_scope,
             });
             Ok(ToolResult::success(
                 ToolResultContent::Text("captured".into()),
@@ -1461,6 +1519,7 @@ mod tests {
                 wall_time_limit_ms: Some(11),
                 cancel_token_cancelled: true,
                 agent_coordinator_configured: false,
+                agent_scope: ToolAgentScope::Parent,
             })
         );
     }
@@ -1478,13 +1537,6 @@ mod tests {
         }
 
         async fn send_message(
-            self: Arc<Self>,
-            _params: devo_protocol::AgentMessageParams,
-        ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
-            Err(ToolCallError::InternalError("not used".to_string()))
-        }
-
-        async fn followup_task(
             self: Arc<Self>,
             _params: devo_protocol::AgentMessageParams,
         ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {

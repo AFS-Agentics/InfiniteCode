@@ -74,7 +74,7 @@ impl SessionContext {
         cwd: &Path,
         locked_agents_snapshot: Option<AgentsMdSnapshot>,
     ) -> Self {
-        let normalized_thinking_selection = normalize_thinking_selection(thinking_selection);
+        let normalized_thinking_selection = model.normalize_thinking_selection(thinking_selection);
         let resolved = model.resolve_thinking_selection(normalized_thinking_selection.as_deref());
         let workspace_instructions = locked_agents_snapshot
             .as_ref()
@@ -136,7 +136,7 @@ impl TurnContext {
         cwd: &Path,
         observed_agents_snapshot: Option<AgentsMdSnapshot>,
     ) -> Self {
-        let normalized_thinking_selection = normalize_thinking_selection(thinking_selection);
+        let normalized_thinking_selection = model.normalize_thinking_selection(thinking_selection);
         let resolved = model.resolve_thinking_selection(normalized_thinking_selection.as_deref());
         Self {
             environment: EnvironmentContext::capture(cwd),
@@ -271,13 +271,6 @@ pub fn load_workspace_instructions(
     manager: &AgentsMdManager,
 ) -> Option<AgentsMdSnapshot> {
     manager.load(cwd)
-}
-
-fn normalize_thinking_selection(thinking_selection: Option<&str>) -> Option<String> {
-    thinking_selection
-        .map(str::trim)
-        .filter(|selection| !selection.is_empty())
-        .map(ToOwned::to_owned)
 }
 
 fn default_shell_name() -> String {

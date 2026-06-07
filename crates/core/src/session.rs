@@ -86,6 +86,7 @@ impl From<HashMap<String, String>> for ProviderRequestModelMap {
 impl TurnConfig {
     pub fn new(model: Model, thinking_selection: Option<String>) -> Self {
         let request_model = model.slug.clone();
+        let thinking_selection = model.normalize_thinking_selection(thinking_selection.as_deref());
         Self {
             model,
             request_model,
@@ -100,6 +101,7 @@ impl TurnConfig {
         provider_request_models: ProviderRequestModelMap,
         thinking_selection: Option<String>,
     ) -> Self {
+        let thinking_selection = model.normalize_thinking_selection(thinking_selection.as_deref());
         Self {
             model,
             request_model,
@@ -281,7 +283,36 @@ impl SessionState {
 
 #[cfg(test)]
 mod tests {
+    use devo_protocol::ReasoningEffort;
+    use devo_protocol::ThinkingCapability;
+    use pretty_assertions::assert_eq;
+
     use super::*;
+
+    #[test]
+    fn turn_config_normalizes_default_thinking_selection() {
+        let model = Model {
+            slug: "deepseek-v4-flash".to_string(),
+            display_name: "deepseek-v4-flash".to_string(),
+            thinking_capability: ThinkingCapability::ToggleWithLevels(vec![
+                ReasoningEffort::High,
+                ReasoningEffort::Max,
+            ]),
+            default_reasoning_effort: Some(ReasoningEffort::High),
+            ..Model::default()
+        };
+
+        let direct = TurnConfig::new(model.clone(), Some("default".to_string()));
+        let provider_bound = TurnConfig::with_request_model(
+            model,
+            "vendor/deepseek-v4-flash".to_string(),
+            ProviderRequestModelMap::default(),
+            Some(String::new()),
+        );
+
+        assert_eq!(direct.thinking_selection, Some("high".to_string()));
+        assert_eq!(provider_bound.thinking_selection, Some("high".to_string()));
+    }
 
     #[test]
     fn session_config_default_values() {

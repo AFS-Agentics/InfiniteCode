@@ -62,7 +62,7 @@ impl ServerRuntime {
         first_user_input: String,
     ) {
         for attempt in 1..=Self::MAX_TITLE_RETRIES {
-            let (model, should_skip) = {
+            let (model, thinking, should_skip) = {
                 let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() else {
                     return;
                 };
@@ -73,6 +73,7 @@ impl ServerRuntime {
                         .model
                         .clone()
                         .unwrap_or_else(|| self.deps.default_model.clone()),
+                    session.summary.thinking.clone(),
                     matches!(session.summary.title_state, SessionTitleState::Final(_)),
                 )
             };
@@ -81,15 +82,33 @@ impl ServerRuntime {
                 return;
             }
 
+            let turn_config = self
+                .deps
+                .resolve_turn_config(Some(model.as_str()), thinking);
+            let resolved_request = turn_config
+                .model
+                .resolve_thinking_selection(turn_config.thinking_selection.as_deref());
+            let request_model = turn_config.provider_request_model(&resolved_request.request_model);
+
             let response = match self
                 .deps
-                .provider
-                .completion(build_title_generation_request(model, &first_user_input))
+                .provider_router
+                .complete(build_title_generation_request(
+                    request_model.clone(),
+                    &first_user_input,
+                ))
                 .await
             {
                 Ok(response) => response,
                 Err(error) => {
-                    tracing::warn!(session_id = %session_id, attempt, error = %error, "title gen failed");
+                    tracing::warn!(
+                        session_id = %session_id,
+                        attempt,
+                        model = %turn_config.model.slug,
+                        request_model = %request_model,
+                        error = %error,
+                        "title gen failed"
+                    );
                     if attempt < Self::MAX_TITLE_RETRIES {
                         let delay = Self::TITLE_RETRY_BASE_DELAY_SECS * (1u64 << (attempt - 1));
                         tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
@@ -98,13 +117,25 @@ impl ServerRuntime {
                 }
             };
 
-            let Some(generated_title) = normalize_generated_title(&response.content) else {
-                tracing::warn!(session_id = %session_id, attempt, "title gen returned no valid title");
-                if attempt < Self::MAX_TITLE_RETRIES {
-                    let delay = Self::TITLE_RETRY_BASE_DELAY_SECS * (1u64 << (attempt - 1));
-                    tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+            let generated_title = match normalize_generated_title(&response.content) {
+                Ok(title) => title,
+                Err(error) => {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        attempt,
+                        model = %turn_config.model.slug,
+                        request_model = %request_model,
+                        response_id = %response.id,
+                        content_blocks = response.content.len(),
+                        title_error = error.as_str(),
+                        "title gen returned no valid title"
+                    );
+                    if attempt < Self::MAX_TITLE_RETRIES {
+                        let delay = Self::TITLE_RETRY_BASE_DELAY_SECS * (1u64 << (attempt - 1));
+                        tokio::time::sleep(std::time::Duration::from_secs(delay)).await;
+                    }
+                    continue;
                 }
-                continue;
             };
 
             let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() else {

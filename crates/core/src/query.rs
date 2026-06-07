@@ -17,6 +17,7 @@ use tracing::info;
 use tracing::info_span;
 use tracing::warn;
 
+use crate::tools::ToolAgentScope;
 use crate::tools::ToolCall;
 use crate::tools::ToolContent;
 use crate::tools::ToolRegistry;
@@ -49,6 +50,7 @@ use crate::response_item::ResponseItem;
 use crate::response_item::message_to_response_items;
 use crate::tool_prompt::build_deferred_tool_prompt_surface;
 use crate::tools::DeferredLoadingConfig;
+use crate::tools::hide_subagent_agent_spawn_tools;
 
 fn estimate_request_prompt_tokens(request: &ModelRequest) -> usize {
     let system_bytes = request.system.as_ref().map_or(0, String::len);
@@ -323,6 +325,10 @@ fn micro_compact(content: String) -> String {
     }
 }
 
+fn preserve_full_tool_result(tool_name: Option<&str>) -> bool {
+    matches!(tool_name, Some("wait_agent" | "subagent_result"))
+}
+
 fn compact_tool_content(content: ToolContent) -> ToolContent {
     match content {
         ToolContent::Text(text) => ToolContent::Text(micro_compact(text)),
@@ -513,7 +519,10 @@ pub async fn query(
 
         // Build model request from the session-locked prefix.
         let base_system = session_context.build_system_prompt();
-        let deferred_config = DeferredLoadingConfig::default();
+        let mut deferred_config = DeferredLoadingConfig::default();
+        if runtime.agent_scope() == ToolAgentScope::Subagent {
+            hide_subagent_agent_spawn_tools(&mut deferred_config);
+        }
         let loaded_deferred_tools = registry.loaded_deferred_tools();
         let prompt_surface = {
             let loaded_deferred_tools = loaded_deferred_tools.lock().map_err(|_| {
@@ -977,8 +986,15 @@ pub async fn query(
         let result_content: Vec<ContentBlock> = results
             .into_iter()
             .map(|r| {
+                let tool_name = tool_result_metadata
+                    .get(r.tool_use_id.as_str())
+                    .map(|(tool_name, _, _)| tool_name.as_str());
                 let content_str = r.content.into_string();
-                let compacted_content = micro_compact(content_str);
+                let compacted_content = if preserve_full_tool_result(tool_name) {
+                    content_str
+                } else {
+                    micro_compact(content_str)
+                };
                 ContentBlock::ToolResult {
                     tool_use_id: r.tool_use_id,
                     content: compacted_content,
@@ -1072,10 +1088,13 @@ mod tests {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
 
+    use crate::tools::ToolAgentScope;
     use crate::tools::ToolPreparationFeedback;
     use crate::tools::ToolRegistry;
     use crate::tools::ToolRuntime;
+    use crate::tools::ToolRuntimeContext;
     use crate::tools::json_schema::JsonSchema;
+    use crate::tools::registry::ToolExposure;
     use crate::tools::registry::ToolRegistryBuilder;
     use crate::tools::router::PermissionChecker;
     use crate::tools::tool_handler::ToolHandler;
@@ -1664,6 +1683,73 @@ mod tests {
             session.messages.last(),
             Some(&Message::assistant_text("done"))
         );
+    }
+
+    #[tokio::test]
+    async fn query_hides_spawn_agent_from_subagent_tool_surface() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
+            requests: Arc::clone(&requests),
+        });
+        let mut builder = ToolRegistryBuilder::new();
+        builder.push_spec_with_exposure(
+            ToolSpec::new(
+                "ToolSearch",
+                "Load deferred tools.",
+                JsonSchema::object(Default::default(), None, None),
+            ),
+            ToolExposure::Direct,
+        );
+        builder.push_spec_with_exposure(
+            ToolSpec::new(
+                "spawn_agent",
+                "Create a child agent.",
+                JsonSchema::object(Default::default(), None, None),
+            ),
+            ToolExposure::Deferred,
+        );
+        builder.push_spec_with_exposure(
+            ToolSpec::new(
+                "send_message",
+                "Send input to a child agent.",
+                JsonSchema::object(Default::default(), None, None),
+            ),
+            ToolExposure::Deferred,
+        );
+        let registry = Arc::new(builder.build());
+        let runtime = ToolRuntime::new_with_context(
+            Arc::clone(&registry),
+            PermissionChecker::always_allow(),
+            ToolRuntimeContext {
+                agent_scope: ToolAgentScope::Subagent,
+                ..ToolRuntimeContext::default()
+            },
+        );
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("work on the delegated task"));
+
+        query(
+            &mut session,
+            &TurnConfig::new(Model::default(), None),
+            provider,
+            registry,
+            &runtime,
+            None,
+        )
+        .await
+        .expect("query should complete");
+
+        let captured = requests.lock().expect("lock requests");
+        assert_eq!(captured.len(), 1);
+        let tool_names = captured[0]
+            .tools
+            .as_ref()
+            .expect("tools should be present")
+            .iter()
+            .map(|tool| tool.name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(tool_names, vec!["ToolSearch"]);
+        assert!(captured[0].system.is_none());
     }
 
     #[tokio::test]

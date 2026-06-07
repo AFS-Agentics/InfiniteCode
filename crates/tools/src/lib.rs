@@ -10,8 +10,8 @@ pub mod tool_spec;
 pub mod tool_summary;
 
 pub use contracts::{
-    RedactionState, SessionMode, ToolCallError, ToolContext, ToolPermissionProfile, ToolProgress,
-    ToolProgressSender, ToolResult, ToolResultContent, ToolTerminalStatus,
+    RedactionState, SessionMode, ToolAgentScope, ToolCallError, ToolContext, ToolPermissionProfile,
+    ToolProgress, ToolProgressSender, ToolResult, ToolResultContent, ToolTerminalStatus,
 };
 pub use coordinator::AgentToolCoordinator;
 pub use errors::*;

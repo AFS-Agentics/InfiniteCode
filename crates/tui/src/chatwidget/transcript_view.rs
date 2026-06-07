@@ -135,6 +135,22 @@ impl ChatWidget {
         self.active_viewport_lines(width)
     }
 
+    pub(crate) fn active_viewport_lines_for_area_for_test(
+        &self,
+        width: u16,
+        height: u16,
+    ) -> Vec<Line<'static>> {
+        self.active_viewport_lines_for_area(width, height)
+    }
+
+    pub(super) fn active_viewport_lines_for_area(
+        &self,
+        width: u16,
+        height: u16,
+    ) -> Vec<Line<'static>> {
+        tail_visible_lines(self.active_viewport_lines(width), height)
+    }
+
     pub(super) fn active_viewport_lines(&self, width: u16) -> Vec<Line<'static>> {
         let mut lines = Vec::new();
         if let Some(cell) = &self.active_cell {
@@ -238,6 +254,10 @@ impl ChatWidget {
         target.append(&mut next);
     }
 
+    pub(super) fn active_viewport_scroll_offset(line_count: usize, height: u16) -> usize {
+        line_count.saturating_sub(height as usize)
+    }
+
     pub(crate) fn drain_scrollback_lines(&mut self, width: u16) -> Vec<ScrollbackLine> {
         let width = width.max(1);
         let mut lines = Vec::new();
@@ -268,4 +288,12 @@ impl ChatWidget {
         }
         lines
     }
+}
+
+fn tail_visible_lines(mut lines: Vec<Line<'static>>, height: u16) -> Vec<Line<'static>> {
+    let height = height as usize;
+    if height == 0 || lines.len() <= height {
+        return lines;
+    }
+    lines.split_off(lines.len() - height)
 }

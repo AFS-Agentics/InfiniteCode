@@ -7,6 +7,7 @@ pub enum SlashCommand {
     Mcp,
     Compact,
     Resume,
+    Agents,
     New,
     Status,
     Permissions,
@@ -26,6 +27,7 @@ impl SlashCommand {
             SlashCommand::Mcp => "show configured MCP servers",
             SlashCommand::Compact => "compact the current session context",
             SlashCommand::Resume => "resume a saved chat",
+            SlashCommand::Agents => "view sub-agent activity",
             SlashCommand::New => "start a new chat",
             SlashCommand::Status => "show current session configuration and token usage",
             SlashCommand::Permissions => "choose what Devo is allowed to do",
@@ -45,6 +47,7 @@ impl SlashCommand {
             SlashCommand::Mcp => "mcp",
             SlashCommand::Compact => "compact",
             SlashCommand::Resume => "resume",
+            SlashCommand::Agents => "agents",
             SlashCommand::New => "new",
             SlashCommand::Status => "status",
             SlashCommand::Permissions => "permissions",
@@ -85,6 +88,7 @@ impl std::str::FromStr for SlashCommand {
             "mcp" => Ok(Self::Mcp),
             "compact" => Ok(Self::Compact),
             "resume" => Ok(Self::Resume),
+            "agents" => Ok(Self::Agents),
             "new" => Ok(Self::New),
             "status" => Ok(Self::Status),
             "permissions" | "approvals" => Ok(Self::Permissions),
@@ -106,6 +110,7 @@ pub fn built_in_slash_commands() -> Vec<(&'static str, SlashCommand)> {
         ("mcp", SlashCommand::Mcp),
         ("compact", SlashCommand::Compact),
         ("resume", SlashCommand::Resume),
+        ("agents", SlashCommand::Agents),
         ("new", SlashCommand::New),
         ("status", SlashCommand::Status),
         ("permissions", SlashCommand::Permissions),
@@ -131,5 +136,16 @@ mod tests {
                 .iter()
                 .any(|(name, command)| *name == "mcp" && *command == SlashCommand::Mcp)
         );
+    }
+
+    #[test]
+    fn agents_slash_command_parses_and_is_listed() {
+        assert_eq!("agents".parse::<SlashCommand>(), Ok(SlashCommand::Agents));
+        assert!(
+            built_in_slash_commands()
+                .iter()
+                .any(|(name, command)| *name == "agents" && *command == SlashCommand::Agents)
+        );
+        assert!(SlashCommand::Agents.available_during_task());
     }
 }

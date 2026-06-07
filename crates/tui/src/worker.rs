@@ -1,9 +1,14 @@
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use std::time::Duration;
+use std::time::Instant;
 
 use anyhow::Context;
 use anyhow::Result;
+use devo_protocol::AgentListParams;
 use tokio::sync::mpsc;
 use tokio::task::JoinError;
 use tokio::task::JoinHandle;
@@ -64,6 +69,8 @@ use crate::events::TextItemKind;
 use crate::events::TranscriptItem;
 use crate::events::TranscriptItemKind;
 use crate::events::WorkerEvent;
+
+mod subagent_events;
 
 const WORKER_SHUTDOWN_GRACE: Duration = Duration::from_millis(100);
 const WORKER_ABORT_JOIN_TIMEOUT: Duration = Duration::from_millis(500);
@@ -144,6 +151,8 @@ enum OperationCommand {
     },
     /// Request a session list from the server.
     ListSessions,
+    /// Request direct child agents for the active session.
+    ListAgents,
     /// Request a skills list from the server.
     ListSkills,
     /// Request or update a server-backed composer reference search.
@@ -309,6 +318,13 @@ impl QueryWorkerHandle {
     pub(crate) fn list_sessions(&self) -> Result<()> {
         self.command_tx
             .send(OperationCommand::ListSessions)
+            .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
+    }
+
+    /// Requests direct child agents for the active session.
+    pub(crate) fn list_agents(&self) -> Result<()> {
+        self.command_tx
+            .send(OperationCommand::ListAgents)
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
     }
 
@@ -513,6 +529,8 @@ async fn run_worker_inner(
     let mut last_query_input_tokens = 0usize;
     let mut saw_usage_update_for_turn = false;
     let mut latest_completed_agent_message: Option<String> = None;
+    let mut child_agent_sessions: HashSet<SessionId> = HashSet::new();
+    let mut latest_completed_agent_messages_by_child: HashMap<SessionId, String> = HashMap::new();
     let mut input_history_cursor: Option<usize> = None;
     let mut active_reference_search_id: Option<ReferenceSearchId> = None;
 
@@ -779,6 +797,8 @@ async fn run_worker_inner(
                         .await?;
                         client.initialize().await?;
                         session_id = None;
+                        child_agent_sessions.clear();
+                        latest_completed_agent_messages_by_child.clear();
                         active_turn_id = None;
                         active_reference_search_id = None;
                         last_query_total_tokens = 0;
@@ -823,6 +843,59 @@ async fn run_worker_inner(
                             Err(_) => {
                                 let _ = event_tx.send(WorkerEvent::TurnFailed {
                                     message: "session list request timed out".to_string(),
+                                    turn_count,
+                                    total_input_tokens,
+                                    total_output_tokens,
+                                    total_cache_read_tokens,
+                                    prompt_token_estimate: total_input_tokens,
+                                    last_query_input_tokens,
+                                });
+                            }
+                        }
+                    }
+                    Some(OperationCommand::ListAgents) => {
+                        let Some(active_session_id) = session_id else {
+                            let _ = event_tx.send(WorkerEvent::SubagentsListed {
+                                agents: Vec::new(),
+                                open: true,
+                            });
+                            continue;
+                        };
+                        match tokio::time::timeout(
+                            Duration::from_secs(5),
+                            client.agent_list(AgentListParams {
+                                session_id: active_session_id,
+                                path_prefix: None,
+                            }),
+                        )
+                        .await
+                        {
+                            Ok(Ok(result)) => {
+                                let agents = result
+                                    .agents
+                                    .into_iter()
+                                    .filter_map(subagent_events::agent_from_info)
+                                    .collect::<Vec<_>>();
+                                child_agent_sessions.extend(agents.iter().map(|agent| agent.session_id));
+                                let _ = event_tx.send(WorkerEvent::SubagentsListed {
+                                    agents,
+                                    open: true,
+                                });
+                            }
+                            Ok(Err(error)) => {
+                                let _ = event_tx.send(WorkerEvent::TurnFailed {
+                                    message: error.to_string(),
+                                    turn_count,
+                                    total_input_tokens,
+                                    total_output_tokens,
+                                    total_cache_read_tokens,
+                                    prompt_token_estimate: total_input_tokens,
+                                    last_query_input_tokens,
+                                });
+                            }
+                            Err(_) => {
+                                let _ = event_tx.send(WorkerEvent::TurnFailed {
+                                    message: "agent list request timed out".to_string(),
                                     turn_count,
                                     total_input_tokens,
                                     total_output_tokens,
@@ -980,6 +1053,8 @@ async fn run_worker_inner(
                             Ok(result) => {
                                 active_turn_id = None;
                                 session_id = Some(next_session_id);
+                                child_agent_sessions.clear();
+                                latest_completed_agent_messages_by_child.clear();
                                 session_cwd = result.session.cwd.clone();
                                 input_history_cursor = None;
                                 let active_agent_label =
@@ -1185,6 +1260,8 @@ async fn run_worker_inner(
                                     Ok(resumed) => {
                                         active_turn_id = None;
                                         session_id = Some(next_session_id);
+                                        child_agent_sessions.clear();
+                                        latest_completed_agent_messages_by_child.clear();
                                         session_cwd = resumed.session.cwd.clone();
                                         input_history_cursor = None;
                                         let active_agent_label =
@@ -1420,6 +1497,31 @@ async fn run_worker_inner(
             notification = client.recv_event() => {
                 match notification? {
                     Some((method, event)) => {
+                        match subagent_events::route_server_event(
+                            session_id,
+                            &child_agent_sessions,
+                            &event,
+                        ) {
+                            subagent_events::RoutedServerEvent::Discovered(agent) => {
+                                child_agent_sessions.insert(agent.session_id);
+                                let _ = event_tx.send(WorkerEvent::SubagentDiscovered {
+                                    agent,
+                                    auto_open: true,
+                                });
+                                continue;
+                            }
+                            subagent_events::RoutedServerEvent::Child => {
+                                subagent_events::emit_subagent_event(
+                                    &method,
+                                    event,
+                                    event_tx,
+                                    &mut latest_completed_agent_messages_by_child,
+                                );
+                                continue;
+                            }
+                            subagent_events::RoutedServerEvent::Ignore => continue,
+                            subagent_events::RoutedServerEvent::Parent => {}
+                        }
                         match method.as_str() {
                             "turn/started" => {
                                 if let ServerEvent::TurnStarted(payload) = event {
@@ -1487,13 +1589,30 @@ async fn run_worker_inner(
                             "item/agentMessage/delta" => {
                                 if let ServerEvent::ItemDelta { payload, .. } = event {
                                     if let Some(item_id) = payload.context.item_id {
-                                        tracing::debug!(
-                                            item_id = %item_id,
-                                            delta_len = payload.delta.len(),
-                                            stream_index = ?payload.stream_index,
-                                            channel = ?payload.channel,
-                                            "server assistant delta"
-                                        );
+                                        if let Some(assistant_token_text) =
+                                            assistant_token_log_preview(&payload.delta)
+                                        {
+                                            tracing::debug!(
+                                                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                                                item_id = %item_id,
+                                                event_seq = payload.context.seq,
+                                                delta_len = payload.delta.len(),
+                                                stream_index = ?payload.stream_index,
+                                                channel = ?payload.channel,
+                                                assistant_token_text = %assistant_token_text,
+                                                "server assistant delta"
+                                            );
+                                        } else {
+                                            tracing::debug!(
+                                                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                                                item_id = %item_id,
+                                                event_seq = payload.context.seq,
+                                                delta_len = payload.delta.len(),
+                                                stream_index = ?payload.stream_index,
+                                                channel = ?payload.channel,
+                                                "server assistant delta"
+                                            );
+                                        }
                                         let _ = event_tx.send(WorkerEvent::TextItemDelta {
                                             item_id,
                                             kind: TextItemKind::Assistant,
@@ -1754,6 +1873,57 @@ async fn run_worker_inner(
     client.shutdown().await?;
     tracing::info!("query worker stdio client shutdown completed");
     Ok(())
+}
+
+fn stream_trace_elapsed_ms() -> u128 {
+    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    STREAM_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+fn assistant_token_log_preview(text: &str) -> Option<String> {
+    assistant_token_logging_enabled()
+        .then(|| format_assistant_token_log_preview(text, assistant_token_log_max_chars()))
+}
+
+fn assistant_token_logging_enabled() -> bool {
+    static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
+        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+            .ok()
+            .is_some_and(|value| {
+                matches!(
+                    value.as_str(),
+                    "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                )
+            })
+    })
+}
+
+fn assistant_token_log_max_chars() -> usize {
+    static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
+        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(512)
+    })
+}
+
+fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
+    let max_chars = max_chars.max(1);
+    let mut preview = String::new();
+    let mut chars = text.chars();
+    for ch in chars.by_ref().take(max_chars) {
+        preview.extend(ch.escape_default());
+    }
+    if chars.next().is_some() {
+        preview.push_str("...");
+    }
+    preview
 }
 
 async fn ensure_session_started(
@@ -2283,6 +2453,8 @@ fn summarize_tool_call(payload: &ToolCallPayload) -> String {
     let detail = summarize_tool_input(&payload.tool_name, &payload.parameters);
     if detail.is_empty() {
         payload.tool_name.clone()
+    } else if payload.tool_name == "spawn_agent" {
+        format!("spawn_agent: {detail}")
     } else {
         format!("{} {detail}", payload.tool_name)
     }
@@ -2604,6 +2776,11 @@ fn summarize_tool_input(tool_name: &str, input: &serde_json::Value) -> String {
             .get("name")
             .and_then(serde_json::Value::as_str)
             .map(|s| s.to_string()),
+        "spawn_agent" => input
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .filter(|message| !message.is_empty())
+            .map(|message| message.to_string()),
         _ => None,
     };
 
@@ -3501,6 +3678,93 @@ mod tests {
                 parsed_commands: Some(payload.command_actions),
             }
         );
+    }
+
+    fn test_session_metadata(
+        session_id: SessionId,
+        parent_session_id: Option<SessionId>,
+    ) -> SessionMetadata {
+        SessionMetadata {
+            session_id,
+            cwd: ".".into(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            title: Some("Saved conversation".to_string()),
+            title_state: SessionTitleState::Provisional,
+            parent_session_id,
+            agent_path: parent_session_id.map(|_| "root/reviewer".to_string()),
+            agent_nickname: parent_session_id.map(|_| "reviewer".to_string()),
+            agent_role: parent_session_id.map(|_| "default".to_string()),
+            ephemeral: false,
+            model: Some("test-model".to_string()),
+            thinking: None,
+            reasoning_effort: None,
+            total_input_tokens: 0,
+            total_output_tokens: 0,
+            total_cache_creation_tokens: 0,
+            total_cache_read_tokens: 0,
+            prompt_token_estimate: 0,
+            last_query_total_tokens: 0,
+            status: SessionRuntimeStatus::Idle,
+        }
+    }
+
+    #[test]
+    fn route_server_event_discovers_and_routes_child_agents() {
+        let parent = SessionId::new();
+        let child = SessionId::new();
+        let unrelated = SessionId::new();
+        let child_started =
+            devo_server::ServerEvent::SessionStarted(devo_server::SessionEventPayload {
+                session: test_session_metadata(child, Some(parent)),
+            });
+        let mut child_sessions = std::collections::HashSet::new();
+
+        match super::subagent_events::route_server_event(
+            Some(parent),
+            &child_sessions,
+            &child_started,
+        ) {
+            super::subagent_events::RoutedServerEvent::Discovered(agent) => {
+                assert_eq!(agent.session_id, child);
+                child_sessions.insert(agent.session_id);
+            }
+            super::subagent_events::RoutedServerEvent::Parent
+            | super::subagent_events::RoutedServerEvent::Child
+            | super::subagent_events::RoutedServerEvent::Ignore => {
+                panic!("expected child discovery")
+            }
+        }
+
+        let child_status = devo_server::ServerEvent::SessionStatusChanged(
+            devo_server::SessionStatusChangedPayload {
+                session_id: child,
+                status: SessionRuntimeStatus::ActiveTurn,
+            },
+        );
+        let unrelated_status = devo_server::ServerEvent::SessionStatusChanged(
+            devo_server::SessionStatusChangedPayload {
+                session_id: unrelated,
+                status: SessionRuntimeStatus::ActiveTurn,
+            },
+        );
+
+        assert!(matches!(
+            super::subagent_events::route_server_event(
+                Some(parent),
+                &child_sessions,
+                &child_status
+            ),
+            super::subagent_events::RoutedServerEvent::Child
+        ));
+        assert!(matches!(
+            super::subagent_events::route_server_event(
+                Some(parent),
+                &child_sessions,
+                &unrelated_status
+            ),
+            super::subagent_events::RoutedServerEvent::Ignore
+        ));
     }
 
     #[test]

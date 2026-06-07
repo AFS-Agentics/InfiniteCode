@@ -2,29 +2,14 @@ use super::*;
 
 impl ServerRuntime {
     async fn send_message_inner(
-        &self,
-        params: devo_protocol::AgentMessageParams,
-    ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
-        self.queue_agent_message(params.session_id, &params.target, params.message)
-            .await?;
-        Ok(devo_protocol::AgentMessageResult { delivered: true })
-    }
-
-    async fn followup_task_inner(
         self: &Arc<Self>,
         params: devo_protocol::AgentMessageParams,
     ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
         let route = self
-            .queue_agent_message(params.session_id, &params.target, params.message.clone())
+            .queue_agent_message(params.session_id, &params.target, params.message)
             .await?;
-        self.start_runtime_turn(route.to_session_id, params.message.clone(), params.message)
+        self.drain_child_mailbox_into_user_turns(route.to_session_id)
             .await?;
-        self.set_agent_status(
-            route.parent_session_id,
-            route.to_session_id,
-            SubagentStatus::Running,
-        )
-        .await;
         Ok(devo_protocol::AgentMessageResult { delivered: true })
     }
 
@@ -37,10 +22,20 @@ impl ServerRuntime {
             .map(Duration::from_millis)
             .unwrap_or(DEFAULT_WAIT_AGENT_TIMEOUT)
             .min(MAX_WAIT_AGENT_TIMEOUT);
-        let mailbox = self.mailbox(params.session_id).await;
-        let (messages, timed_out) = mailbox.wait(timeout).await;
+        let target_session_ids = self
+            .resolve_wait_agent_targets(params.session_id, params.target.as_deref())
+            .await?;
+        let output_buffer = self.output_buffer(params.session_id).await;
+        let (events, next_sequence, timed_out) = output_buffer
+            .wait_after(
+                params.after_sequence.unwrap_or_default(),
+                &target_session_ids,
+                timeout,
+            )
+            .await;
         Ok(devo_protocol::WaitAgentResult {
-            messages,
+            events,
+            next_sequence,
             timed_out,
         })
     }
@@ -90,13 +85,6 @@ impl AgentToolCoordinator for ServerRuntime {
         params: devo_protocol::AgentMessageParams,
     ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
         self.send_message_inner(params).await
-    }
-
-    async fn followup_task(
-        self: Arc<Self>,
-        params: devo_protocol::AgentMessageParams,
-    ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
-        self.followup_task_inner(params).await
     }
 
     async fn wait_agent(

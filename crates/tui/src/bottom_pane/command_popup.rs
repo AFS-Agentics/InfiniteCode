@@ -331,6 +331,7 @@ mod tests {
                 "mcp",
                 "compact",
                 "resume",
+                "agents",
                 "new",
                 "status",
                 "permissions",

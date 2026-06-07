@@ -1,6 +1,6 @@
 pub use devo_protocol::{
-    AgentCompletionNotification, AgentInfo, AgentListParams, AgentListResult, AgentMailboxMessage,
-    AgentMessageParams, AgentMessageResult, AgentStatusParams, ClientMethod, ClientNotification,
+    AgentInfo, AgentListParams, AgentListResult, AgentMailboxMessage, AgentMessageParams,
+    AgentMessageResult, AgentOutputEvent, AgentStatusParams, ClientMethod, ClientNotification,
     ClientRequest, CloseAgentParams, CloseAgentResult, ErrorResponse, ModelCatalogEntry,
     ModelCatalogParams, ModelCatalogResult, ModelSavedEntry, ModelSavedParams, ModelSavedResult,
     NotificationEnvelope, ProtocolError, ProtocolErrorCode, ReferenceSearchCancelParams,

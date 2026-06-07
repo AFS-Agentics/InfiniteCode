@@ -12,6 +12,7 @@ use devo_protocol::ProviderWireApi;
 use devo_protocol::ReasoningEffort;
 use devo_protocol::ReferenceSearchSnapshot;
 use devo_protocol::SessionHistoryItem;
+use devo_protocol::SessionRuntimeStatus;
 use devo_protocol::parse_command::ParsedCommand;
 use devo_protocol::protocol::FileChange;
 const TOOL_RESULT_FOLD_FINAL_STAGE: u8 = 3;
@@ -41,6 +42,83 @@ pub(crate) struct SessionListEntry {
     pub updated_at: String,
     /// Whether this entry is the currently active session.
     pub is_active: bool,
+}
+
+/// One direct child agent shown in the read-only sub-agent monitor.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SubagentMonitorAgent {
+    pub(crate) session_id: SessionId,
+    pub(crate) parent_session_id: SessionId,
+    pub(crate) agent_path: String,
+    pub(crate) nickname: String,
+    pub(crate) role: String,
+    pub(crate) status: String,
+    pub(crate) last_task_message: Option<String>,
+}
+
+/// Live event routed to the sub-agent monitor instead of the active parent transcript.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum SubagentMonitorEvent {
+    TurnStarted {
+        session_id: SessionId,
+        turn_id: TurnId,
+    },
+    TextItemStarted {
+        session_id: SessionId,
+        item_id: ItemId,
+        kind: TextItemKind,
+    },
+    TextItemDelta {
+        session_id: SessionId,
+        item_id: Option<ItemId>,
+        kind: TextItemKind,
+        delta: String,
+    },
+    TextItemCompleted {
+        session_id: SessionId,
+        item_id: Option<ItemId>,
+        kind: TextItemKind,
+        final_text: String,
+    },
+    ToolCall {
+        session_id: SessionId,
+        tool_use_id: String,
+        summary: String,
+    },
+    ToolCallUpdated {
+        session_id: SessionId,
+        tool_use_id: String,
+        summary: String,
+    },
+    ToolOutputDelta {
+        session_id: SessionId,
+        tool_use_id: String,
+        delta: String,
+    },
+    ToolResult {
+        session_id: SessionId,
+        tool_use_id: String,
+        title: String,
+        preview: String,
+        is_error: bool,
+    },
+    PlanUpdated {
+        session_id: SessionId,
+        explanation: Option<String>,
+        steps: Vec<PlanStep>,
+    },
+    TurnFinished {
+        session_id: SessionId,
+        status: String,
+    },
+    TurnFailed {
+        session_id: SessionId,
+        message: String,
+    },
+    SessionStatusChanged {
+        session_id: SessionId,
+        status: SessionRuntimeStatus,
+    },
 }
 
 /// One persisted model profile available for switching in the interactive model picker.
@@ -254,6 +332,18 @@ pub(crate) enum WorkerEvent {
         /// Structured sessions rendered into the bottom picker panel.
         sessions: Vec<SessionListEntry>,
     },
+    /// Direct child agents were discovered or refreshed for the active session.
+    SubagentsListed {
+        agents: Vec<SubagentMonitorAgent>,
+        open: bool,
+    },
+    /// A new child agent session was observed from server metadata.
+    SubagentDiscovered {
+        agent: SubagentMonitorAgent,
+        auto_open: bool,
+    },
+    /// A live child-agent event should update the read-only monitor.
+    SubagentMonitor { event: SubagentMonitorEvent },
     /// Current known skills were listed from the server.
     SkillsListed {
         /// Pre-rendered skill summary shown in the bottom panel.

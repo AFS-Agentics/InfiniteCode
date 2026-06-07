@@ -317,6 +317,15 @@ impl Model {
         }
     }
 
+    pub fn normalize_thinking_selection(&self, selection: Option<&str>) -> Option<String> {
+        selection
+            .map(str::trim)
+            .filter(|selection| !selection.is_empty())
+            .filter(|selection| !selection.eq_ignore_ascii_case("default"))
+            .map(|selection| selection.to_ascii_lowercase())
+            .or_else(|| self.default_thinking_selection())
+    }
+
     pub fn nearest_supported_reasoning_effort(&self, target: ReasoningEffort) -> ReasoningEffort {
         match &self.thinking_capability {
             ThinkingCapability::Levels(levels) | ThinkingCapability::ToggleWithLevels(levels)
@@ -329,11 +338,7 @@ impl Model {
     }
 
     pub fn resolve_thinking_selection(&self, selection: Option<&str>) -> ResolvedThinkingRequest {
-        let normalized_selection = selection
-            .map(str::trim)
-            .filter(|selection| !selection.is_empty())
-            .map(|selection| selection.to_ascii_lowercase())
-            .or_else(|| self.default_thinking_selection());
+        let normalized_selection = self.normalize_thinking_selection(selection);
 
         match self.effective_thinking_implementation() {
             ThinkingImplementation::Disabled => ResolvedThinkingRequest {
@@ -743,6 +748,29 @@ mod tests {
         assert_eq!(disabled.request_thinking, Some(String::from("disabled")));
         assert_eq!(disabled.request_reasoning_effort, None);
         assert_eq!(disabled.effective_reasoning_effort, None);
+    }
+
+    #[test]
+    fn resolve_thinking_selection_treats_default_as_absent() {
+        let mut toggle = model("toggle-model");
+        toggle.thinking_capability = ThinkingCapability::Toggle;
+
+        let mut levels = model("levels-model");
+        levels.thinking_capability =
+            ThinkingCapability::Levels(vec![ReasoningEffort::Low, ReasoningEffort::High]);
+        levels.default_reasoning_effort = Some(ReasoningEffort::High);
+
+        let mut toggle_with_levels = model("toggle-levels-model");
+        toggle_with_levels.thinking_capability =
+            ThinkingCapability::ToggleWithLevels(vec![ReasoningEffort::High, ReasoningEffort::Max]);
+        toggle_with_levels.default_reasoning_effort = Some(ReasoningEffort::High);
+
+        for preset in [toggle, levels, toggle_with_levels] {
+            let absent = preset.resolve_thinking_selection(None);
+
+            assert_eq!(preset.resolve_thinking_selection(Some("default")), absent);
+            assert_eq!(preset.resolve_thinking_selection(Some("  ")), absent);
+        }
     }
 
     #[test]

@@ -130,6 +130,7 @@ impl ServerRuntime {
                 .and_then(permission_mode_from_approval_policy)
             {
                 session.core_session.lock().await.config.permission_mode = permission_mode;
+                session.config.permission_mode = permission_mode;
             }
             let requested_model = params.model.as_deref().or(session.summary.model.as_deref());
             let requested_thinking = params
@@ -184,6 +185,11 @@ impl ServerRuntime {
             let display_input_for_task = display_input.clone();
             let input_for_task = input_text.clone();
             let turn_config_for_task = turn_config.clone();
+            let cancel_token = CancellationToken::new();
+            self.active_turn_cancellations
+                .lock()
+                .await
+                .insert(params.session_id, cancel_token);
             let task = tokio::spawn(async move {
                 runtime
                     .execute_turn(
@@ -337,6 +343,14 @@ impl ServerRuntime {
             .await;
         }
 
+        if let Some(cancel_token) = self
+            .active_turn_cancellations
+            .lock()
+            .await
+            .remove(&params.session_id)
+        {
+            cancel_token.cancel();
+        }
         if let Some(task) = self.active_tasks.lock().await.remove(&params.session_id) {
             task.abort();
         }
@@ -637,6 +651,7 @@ impl ServerRuntime {
             connection.subscriptions.push(SubscriptionFilter {
                 session_id: params.session_id,
                 event_types: params.event_types.unwrap_or_default().into_iter().collect(),
+                include_child_agents: params.include_child_agents,
             });
         }
         serde_json::to_value(SuccessResponse {

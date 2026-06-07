@@ -24,6 +24,17 @@ pub struct ToolBudgets {
 
 // ── ToolContext ──────────────────────────────────────────────────────
 
+/// Whether a tool invocation is running in a top-level session or a child agent.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolAgentScope {
+    /// A normal top-level session, allowed to use all configured tools.
+    #[default]
+    Parent,
+    /// A child agent session. These sessions may communicate upward but cannot spawn children.
+    Subagent,
+}
+
 /// Full execution context passed to every tool handler invocation.
 #[derive(Clone)]
 pub struct ToolContext {
@@ -33,6 +44,7 @@ pub struct ToolContext {
     pub workspace_root: PathBuf,
     pub budgets: ToolBudgets,
     pub cancel_token: CancellationToken,
+    pub agent_scope: ToolAgentScope,
     pub agent_coordinator: Option<Arc<dyn AgentToolCoordinator>>,
 }
 
@@ -45,6 +57,7 @@ impl std::fmt::Debug for ToolContext {
             .field("workspace_root", &self.workspace_root)
             .field("budgets", &self.budgets)
             .field("cancel_token", &self.cancel_token)
+            .field("agent_scope", &self.agent_scope)
             .field(
                 "agent_coordinator",
                 &self.agent_coordinator.as_ref().map(|_| "<configured>"),

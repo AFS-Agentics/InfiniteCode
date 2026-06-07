@@ -78,6 +78,7 @@ pub(crate) async fn run_prompt(
             session_id: session_state.id.clone(),
             turn_id: None,
             cwd: cwd.clone(),
+            agent_scope: devo_core::tools::ToolAgentScope::Parent,
             agent_coordinator: None,
         },
     );

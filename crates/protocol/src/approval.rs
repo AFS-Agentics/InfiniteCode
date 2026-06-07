@@ -40,6 +40,8 @@ pub enum ApprovalScopeValue {
 pub struct EventsSubscribeParams {
     pub session_id: Option<SessionId>,
     pub event_types: Option<Vec<String>>,
+    #[serde(default)]
+    pub include_child_agents: bool,
 }
 
 /// Describes the response returned by `events/subscribe`.

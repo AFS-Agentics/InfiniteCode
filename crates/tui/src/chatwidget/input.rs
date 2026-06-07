@@ -35,6 +35,10 @@ impl ChatWidget {
         if !matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
             return;
         }
+        if self.is_subagent_monitor_open() {
+            self.handle_subagent_monitor_key_event(key);
+            return;
+        }
         if self.resume_browser_loading {
             match key.code {
                 KeyCode::Esc | KeyCode::Char('q') => {

@@ -5,10 +5,18 @@ use super::*;
 
 mod coordinator;
 mod handlers;
+mod lifecycle;
 
 const DEFAULT_WAIT_AGENT_TIMEOUT: Duration = Duration::from_secs(300);
 const MAX_WAIT_AGENT_TIMEOUT: Duration = Duration::from_secs(900);
-const RESULT_EXCERPT_LIMIT: usize = 600;
+const AGENT_NAME_ADJECTIVES: &[&str] = &[
+    "brave", "clever", "silent", "happy", "gentle", "swift", "bright", "lazy", "wild", "calm",
+    "fuzzy", "tiny", "bold", "lucky", "mighty",
+];
+const AGENT_NAME_NOUNS: &[&str] = &[
+    "apple", "banana", "orange", "peach", "mango", "tiger", "panda", "fox", "rabbit", "eagle",
+    "koala", "lion", "whale", "otter", "wolf",
+];
 
 impl ServerRuntime {
     async fn spawn_agent_inner(
@@ -28,7 +36,6 @@ impl ServerRuntime {
         let parent_arc = self.session_arc(parent_session_id).await?;
         let parent_snapshot = {
             let parent = parent_arc.lock().await;
-            let parent_core = parent.core_session.lock().await;
             let stable_items = if fork_turns == "all" {
                 let active_turn_id = parent.active_turn.as_ref().map(|turn| turn.turn_id);
                 parent
@@ -42,22 +49,24 @@ impl ServerRuntime {
             };
             (
                 parent.summary.clone(),
-                parent_core.config.clone(),
+                parent.config.clone(),
                 stable_items,
                 parent.latest_turn.clone(),
             )
         };
         let (parent_summary, parent_config, stable_items, parent_latest_turn) = parent_snapshot;
 
-        let nickname = sanitize_agent_name(&params.task_name);
-        let role = params.agent_type.unwrap_or_else(|| "default".to_string());
+        let nickname = self
+            .generate_unique_agent_name(parent_session_id, child_session_id)
+            .await?;
+        let role = "default".to_string();
         let parent_path = parent_summary
             .agent_path
             .clone()
             .unwrap_or_else(|| "root".to_string());
         let agent_path = AgentPath::new(parent_path).join(&nickname).0;
-        let model = params.model.or_else(|| parent_summary.model.clone());
-        let thinking = params.thinking.or_else(|| parent_summary.thinking.clone());
+        let model = parent_summary.model.clone();
+        let thinking = parent_summary.thinking.clone();
 
         let mut record = self.rollout_store.create_session_record(
             child_session_id,
@@ -80,7 +89,7 @@ impl ServerRuntime {
         let mut core_session = self
             .deps
             .new_session_state(child_session_id, parent_summary.cwd.clone());
-        core_session.config = parent_config;
+        core_session.config = parent_config.clone();
         let mut rebuilt_history_items = Vec::new();
         let mut rebuilt_messages = Vec::new();
         let mut tool_names_by_id = HashMap::new();
@@ -133,6 +142,7 @@ impl ServerRuntime {
         let child_session = RuntimeSession {
             record: Some(record),
             summary: summary.clone(),
+            config: parent_config,
             core_session: Arc::new(Mutex::new(core_session)),
             active_turn: None,
             latest_turn,
@@ -164,6 +174,11 @@ impl ServerRuntime {
             .await
             .entry(child_session_id)
             .or_default();
+        self.agent_output_buffers
+            .lock()
+            .await
+            .entry(parent_session_id)
+            .or_default();
         self.register_child_agent(
             parent_session_id,
             child_session_id,
@@ -188,20 +203,73 @@ impl ServerRuntime {
                 "failed to persist child session metadata to database"
             );
         }
-        self.broadcast_event(ServerEvent::SessionStarted(SessionEventPayload {
-            session: summary,
-        }))
-        .await;
-        self.start_runtime_turn(child_session_id, params.message.clone(), params.message)
-            .await?;
-        self.set_agent_status(parent_session_id, child_session_id, SubagentStatus::Running)
-            .await;
+        let start_runtime = Arc::clone(self);
+        let start_summary = summary;
+        let start_message = params.message.clone();
+        tokio::spawn(async move {
+            start_runtime
+                .broadcast_event(ServerEvent::SessionStarted(SessionEventPayload {
+                    session: start_summary,
+                }))
+                .await;
+            if start_runtime
+                .agent_close_requested(parent_session_id, child_session_id)
+                .await
+            {
+                return;
+            }
+            match start_runtime
+                .start_runtime_turn(child_session_id, start_message.clone(), start_message)
+                .await
+            {
+                Ok(_) => {
+                    if start_runtime
+                        .agent_close_requested(parent_session_id, child_session_id)
+                        .await
+                    {
+                        let _ = start_runtime
+                            .close_child_agent(parent_session_id, child_session_id)
+                            .await;
+                        return;
+                    }
+                    start_runtime
+                        .set_agent_status(
+                            parent_session_id,
+                            child_session_id,
+                            SubagentStatus::Running,
+                        )
+                        .await;
+                }
+                Err(error) => {
+                    let error_message = error.to_string();
+                    tracing::warn!(
+                        parent_session_id = %parent_session_id,
+                        child_session_id = %child_session_id,
+                        error = %error_message,
+                        "failed to start child agent turn"
+                    );
+                    if start_runtime
+                        .agent_close_requested(parent_session_id, child_session_id)
+                        .await
+                    {
+                        return;
+                    }
+                    start_runtime
+                        .fail_child_agent_startup(
+                            parent_session_id,
+                            child_session_id,
+                            error_message,
+                        )
+                        .await;
+                }
+            }
+        });
 
         Ok(devo_protocol::SpawnAgentResult {
             child_session_id,
             agent_path,
             agent_nickname: nickname,
-            status: SubagentStatus::Running.as_str().to_string(),
+            status: SubagentStatus::Spawning.as_str().to_string(),
         })
     }
 
@@ -222,6 +290,15 @@ impl ServerRuntime {
             .lock()
             .await
             .entry(session_id)
+            .or_default()
+            .clone()
+    }
+
+    async fn output_buffer(&self, parent_session_id: SessionId) -> SubagentOutputBuffer {
+        self.agent_output_buffers
+            .lock()
+            .await
+            .entry(parent_session_id)
             .or_default()
             .clone()
     }
@@ -359,6 +436,11 @@ impl ServerRuntime {
         let runtime = Arc::clone(self);
         let turn_for_task = turn.clone();
         let turn_config_for_task = turn_config.clone();
+        let cancel_token = CancellationToken::new();
+        self.active_turn_cancellations
+            .lock()
+            .await
+            .insert(session_id, cancel_token);
         let task = tokio::spawn(async move {
             runtime
                 .execute_turn(
@@ -436,6 +518,23 @@ impl ServerRuntime {
         Ok(route)
     }
 
+    async fn drain_child_mailbox_into_user_turns(
+        self: &Arc<Self>,
+        child_session_id: SessionId,
+    ) -> Result<(), ToolCallError> {
+        let messages = self.mailbox(child_session_id).await.drain().await;
+        for message in messages {
+            self.start_runtime_turn(child_session_id, message.content.clone(), message.content)
+                .await?;
+            if let Some((parent_session_id, _)) = self.child_parent_and_path(child_session_id).await
+            {
+                self.set_agent_status(parent_session_id, child_session_id, SubagentStatus::Running)
+                    .await;
+            }
+        }
+        Ok(())
+    }
+
     async fn resolve_child_agent(
         &self,
         parent_session_id: SessionId,
@@ -477,33 +576,34 @@ impl ServerRuntime {
         if let Ok(child) = self.resolve_child_agent(from_session_id, target).await {
             let from_path = self.session_agent_path(from_session_id).await;
             return Ok(AgentRoute {
-                parent_session_id: from_session_id,
                 to_session_id: child.session_id,
                 from_agent_path: from_path,
                 to_agent_path: child.agent_path,
             });
         }
-
-        let registries = self.agent_registries.lock().await;
-        for registry in registries.values() {
-            if let Some(parent_session_id) = registry.child_to_parent.get(&from_session_id)
-                && is_parent_target(*parent_session_id, target)
-            {
-                let from_path = registry
-                    .get(from_session_id)
-                    .map(|meta| meta.agent_path.clone())
-                    .unwrap_or_else(|| "root".to_string());
-                return Ok(AgentRoute {
-                    parent_session_id: *parent_session_id,
-                    to_session_id: *parent_session_id,
-                    from_agent_path: from_path,
-                    to_agent_path: self.session_agent_path(*parent_session_id).await,
-                });
-            }
-        }
         Err(ToolCallError::InvalidInput(format!(
             "agent not found: {target}"
         )))
+    }
+
+    async fn resolve_wait_agent_targets(
+        &self,
+        parent_session_id: SessionId,
+        target: Option<&str>,
+    ) -> Result<Vec<SessionId>, ToolCallError> {
+        let registries = self.agent_registries.lock().await;
+        let Some(registry) = registries.get(&parent_session_id) else {
+            return Ok(Vec::new());
+        };
+        if let Some(target) = target {
+            let Some(child_session_id) = registry.find_child(parent_session_id, target) else {
+                return Err(ToolCallError::InvalidInput(format!(
+                    "agent not found: {target}"
+                )));
+            };
+            return Ok(vec![child_session_id]);
+        }
+        Ok(registry.children_of(parent_session_id))
     }
 
     async fn session_agent_path(&self, session_id: SessionId) -> String {
@@ -523,7 +623,7 @@ impl ServerRuntime {
         child_session_id: SessionId,
         turn: &TurnMetadata,
     ) {
-        let Some((parent_session_id, agent_path)) =
+        let Some((parent_session_id, _agent_path)) =
             self.child_parent_and_path(child_session_id).await
         else {
             return;
@@ -546,38 +646,16 @@ impl ServerRuntime {
         };
         self.set_agent_status(parent_session_id, child_session_id, status)
             .await;
-        let result_excerpt = self.child_result_excerpt(child_session_id).await;
-        let notification = devo_protocol::AgentCompletionNotification {
-            child_session_id,
+        self.record_subagent_status_event(
             parent_session_id,
-            agent_path: agent_path.clone(),
-            status: status.as_str().to_string(),
-            turn_id: turn.turn_id,
-            result_excerpt: (!result_excerpt.is_empty()).then_some(result_excerpt),
-        };
-        let content = serde_json::to_string(&notification)
-            .unwrap_or_else(|error| format!("failed to serialize agent notification: {error}"));
-        let message = devo_protocol::AgentMailboxMessage {
-            message_id: String::new(),
-            from_session_id: child_session_id,
-            to_session_id: parent_session_id,
-            from_agent_path: agent_path,
-            to_agent_path: self.session_agent_path(parent_session_id).await,
-            content,
-            sequence: 0,
-            created_at: Utc::now(),
-        };
-        if let Err(error) = self.mailbox(parent_session_id).await.send(message).await {
-            tracing::warn!(
-                parent_session_id = %parent_session_id,
-                child_session_id = %child_session_id,
-                error = %error,
-                "failed to notify parent mailbox about child completion"
-            );
-        }
+            child_session_id,
+            status,
+            turn.turn_id,
+        )
+        .await;
     }
 
-    async fn child_parent_and_path(
+    pub(super) async fn child_parent_and_path(
         &self,
         child_session_id: SessionId,
     ) -> Option<(SessionId, String)> {
@@ -587,6 +665,86 @@ impl ServerRuntime {
             let agent_path = registry.get(child_session_id)?.agent_path.clone();
             Some((parent_session_id, agent_path))
         })
+    }
+
+    pub(super) async fn record_subagent_output_event(&self, event: &ServerEvent) {
+        let ServerEvent::ItemDelta {
+            delta_kind: ItemDeltaKind::AgentMessageDelta,
+            payload,
+        } = event
+        else {
+            return;
+        };
+        if payload.delta.is_empty() {
+            return;
+        }
+        let child_session_id = payload.context.session_id;
+        let Some((parent_session_id, agent_path)) =
+            self.child_parent_and_path(child_session_id).await
+        else {
+            return;
+        };
+        self.output_buffer(parent_session_id)
+            .await
+            .push(devo_protocol::AgentOutputEvent {
+                sequence: 0,
+                child_session_id,
+                agent_path,
+                turn_id: payload.context.turn_id,
+                kind: "assistant_delta".to_string(),
+                text: Some(payload.delta.clone()),
+                status: None,
+                created_at: Utc::now(),
+            })
+            .await;
+    }
+
+    async fn record_subagent_status_event(
+        &self,
+        parent_session_id: SessionId,
+        child_session_id: SessionId,
+        status: SubagentStatus,
+        turn_id: TurnId,
+    ) {
+        self.record_subagent_status_event_with_text(
+            parent_session_id,
+            child_session_id,
+            status,
+            turn_id,
+            None,
+        )
+        .await;
+    }
+
+    async fn record_subagent_status_event_with_text(
+        &self,
+        parent_session_id: SessionId,
+        child_session_id: SessionId,
+        status: SubagentStatus,
+        turn_id: TurnId,
+        text: Option<String>,
+    ) {
+        let agent_path = match self.child_parent_and_path(child_session_id).await {
+            Some((event_parent_session_id, agent_path))
+                if event_parent_session_id == parent_session_id =>
+            {
+                agent_path
+            }
+            _ => self.session_agent_path(child_session_id).await,
+        };
+        self.output_buffer(parent_session_id)
+            .await
+            .push(devo_protocol::AgentOutputEvent {
+                sequence: 0,
+                child_session_id,
+                agent_path,
+                turn_id: Some(turn_id),
+                kind: "status".to_string(),
+                text,
+                status: Some(status.as_str().to_string()),
+                created_at: Utc::now(),
+            })
+            .await;
     }
 
     async fn agent_close_requested(
@@ -600,27 +758,6 @@ impl ServerRuntime {
             .get(&parent_session_id)
             .and_then(|registry| registry.get(child_session_id))
             .is_some_and(|metadata| metadata.close_requested)
-    }
-
-    async fn child_result_excerpt(&self, child_session_id: SessionId) -> String {
-        let Some(session_arc) = self.sessions.lock().await.get(&child_session_id).cloned() else {
-            return String::new();
-        };
-        let session = session_arc.lock().await;
-        let excerpt = session
-            .persisted_turn_items
-            .iter()
-            .rev()
-            .find_map(|item| match &item.turn_item {
-                TurnItem::AgentMessage(TextItem { text }) => Some(text.clone()),
-                TurnItem::ToolResult(ToolResultItem {
-                    display_content: Some(text),
-                    ..
-                }) => Some(text.clone()),
-                _ => None,
-            })
-            .unwrap_or_default();
-        truncate_chars(&excerpt, RESULT_EXCERPT_LIMIT)
     }
 
     async fn close_child_agent(
@@ -655,7 +792,8 @@ impl ServerRuntime {
             }
             terminal
         };
-        if already_terminal {
+        let interrupted_turn = self.interrupt_child_runtime_work(child_session_id).await;
+        if already_terminal && interrupted_turn.is_none() {
             let status = self
                 .resolve_child_agent(parent_session_id, &child_session_id.to_string())
                 .await?
@@ -665,24 +803,6 @@ impl ServerRuntime {
             return Ok(status);
         }
 
-        if let Some(task) = self.active_tasks.lock().await.remove(&child_session_id) {
-            task.abort();
-        }
-        let interrupted_turn = {
-            let Some(session_arc) = self.sessions.lock().await.get(&child_session_id).cloned()
-            else {
-                return Ok(SubagentStatus::Closed.as_str().to_string());
-            };
-            let mut session = session_arc.lock().await;
-            session.summary.status = SessionRuntimeStatus::Idle;
-            session.summary.updated_at = Utc::now();
-            session.active_turn.take().map(|mut turn| {
-                turn.status = TurnStatus::Interrupted;
-                turn.completed_at = Some(Utc::now());
-                session.latest_turn = Some(turn.clone());
-                turn
-            })
-        };
         if let Some(turn) = interrupted_turn {
             self.broadcast_event(ServerEvent::TurnInterrupted(TurnEventPayload {
                 session_id: child_session_id,
@@ -715,76 +835,68 @@ impl ServerRuntime {
         parent_session_id: SessionId,
         child_session_id: SessionId,
     ) {
-        let agent_path = self.session_agent_path(child_session_id).await;
-        let notification = devo_protocol::AgentCompletionNotification {
-            child_session_id,
+        self.record_subagent_status_event(
             parent_session_id,
-            agent_path: agent_path.clone(),
-            status: SubagentStatus::Closed.as_str().to_string(),
-            turn_id: TurnId::new(),
-            result_excerpt: Some("agent closed".to_string()),
+            child_session_id,
+            SubagentStatus::Closed,
+            TurnId::new(),
+        )
+        .await;
+    }
+
+    async fn generate_unique_agent_name(
+        &self,
+        parent_session_id: SessionId,
+        child_session_id: SessionId,
+    ) -> Result<String, ToolCallError> {
+        let used_names = {
+            let registries = self.agent_registries.lock().await;
+            registries
+                .get(&parent_session_id)
+                .map(|registry| {
+                    registry
+                        .children_of(parent_session_id)
+                        .into_iter()
+                        .filter_map(|child_id| registry.get(child_id))
+                        .map(|metadata| metadata.nickname.clone())
+                        .collect::<std::collections::HashSet<_>>()
+                })
+                .unwrap_or_default()
         };
-        let content = serde_json::to_string(&notification)
-            .unwrap_or_else(|error| format!("failed to serialize agent notification: {error}"));
-        let message = devo_protocol::AgentMailboxMessage {
-            message_id: String::new(),
-            from_session_id: child_session_id,
-            to_session_id: parent_session_id,
-            from_agent_path: agent_path,
-            to_agent_path: self.session_agent_path(parent_session_id).await,
-            content,
-            sequence: 0,
-            created_at: Utc::now(),
-        };
-        if let Err(error) = self.mailbox(parent_session_id).await.send(message).await {
-            tracing::warn!(
-                parent_session_id = %parent_session_id,
-                child_session_id = %child_session_id,
-                error = %error,
-                "failed to notify parent mailbox about closed child"
-            );
+        let max_count = AGENT_NAME_ADJECTIVES.len() * AGENT_NAME_NOUNS.len();
+        if used_names.len() >= max_count {
+            return Err(ToolCallError::InvalidInput(
+                "no unique generated agent names available".to_string(),
+            ));
         }
+        let start = generated_name_start_index(child_session_id, max_count);
+        for offset in 0..max_count {
+            let index = (start + offset) % max_count;
+            let adjective = AGENT_NAME_ADJECTIVES[index / AGENT_NAME_NOUNS.len()];
+            let noun = AGENT_NAME_NOUNS[index % AGENT_NAME_NOUNS.len()];
+            let candidate = format!("{adjective}-{noun}");
+            if !used_names.contains(&candidate) {
+                return Ok(candidate);
+            }
+        }
+        Err(ToolCallError::InvalidInput(
+            "no unique generated agent names available".to_string(),
+        ))
     }
 }
 
 struct AgentRoute {
-    parent_session_id: SessionId,
     to_session_id: SessionId,
     from_agent_path: String,
     to_agent_path: String,
 }
 
-fn sanitize_agent_name(name: &str) -> String {
-    let mut sanitized = name
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
-                ch.to_ascii_lowercase()
-            } else {
-                '-'
-            }
+fn generated_name_start_index(child_session_id: SessionId, max_count: usize) -> usize {
+    child_session_id
+        .to_string()
+        .bytes()
+        .fold(0usize, |acc, byte| {
+            acc.wrapping_mul(31).wrapping_add(usize::from(byte))
         })
-        .collect::<String>();
-    while sanitized.contains("--") {
-        sanitized = sanitized.replace("--", "-");
-    }
-    let sanitized = sanitized.trim_matches('-').to_string();
-    if sanitized.is_empty() {
-        "agent".to_string()
-    } else {
-        sanitized
-    }
-}
-
-fn is_parent_target(parent_session_id: SessionId, target: &str) -> bool {
-    target == "parent" || target == "root" || target == parent_session_id.to_string()
-}
-
-fn truncate_chars(text: &str, limit: usize) -> String {
-    if text.chars().count() <= limit {
-        return text.to_string();
-    }
-    let mut truncated = text.chars().take(limit).collect::<String>();
-    truncated.push_str("...");
-    truncated
+        % max_count
 }

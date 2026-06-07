@@ -4,13 +4,16 @@
 //! inter-agent mailbox channels, and spawn/close tool handlers.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
+use std::time::Instant;
 
 use chrono::{DateTime, Utc};
 use devo_protocol::AgentInfo;
 use devo_protocol::AgentMailboxMessage;
+use devo_protocol::AgentOutputEvent;
 use devo_protocol::SessionId;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -255,6 +258,95 @@ impl SubagentMailbox {
             return (Vec::new(), true);
         }
         (self.drain().await, false)
+    }
+}
+
+// ── Parent Output Buffer ────────────────────────────────────────────
+
+/// Per-parent ordered buffer of child assistant output and status changes.
+#[derive(Debug, Clone)]
+pub struct SubagentOutputBuffer {
+    inner: Arc<Mutex<OutputBufferInner>>,
+    notify: Arc<Notify>,
+}
+
+#[derive(Debug, Default)]
+struct OutputBufferInner {
+    next_sequence: u64,
+    events: VecDeque<AgentOutputEvent>,
+}
+
+impl Default for SubagentOutputBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SubagentOutputBuffer {
+    pub fn new() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(OutputBufferInner {
+                next_sequence: 1,
+                events: VecDeque::new(),
+            })),
+            notify: Arc::new(Notify::new()),
+        }
+    }
+
+    pub async fn push(&self, mut event: AgentOutputEvent) -> AgentOutputEvent {
+        let mut inner = self.inner.lock().await;
+        event.sequence = inner.next_sequence;
+        inner.next_sequence = inner.next_sequence.saturating_add(1);
+        inner.events.push_back(event.clone());
+        drop(inner);
+        self.notify.notify_waiters();
+        event
+    }
+
+    pub async fn wait_after(
+        &self,
+        after_sequence: u64,
+        target_session_ids: &[SessionId],
+        timeout: Duration,
+    ) -> (Vec<AgentOutputEvent>, u64, bool) {
+        let target_session_ids = target_session_ids.iter().copied().collect::<HashSet<_>>();
+        let start = Instant::now();
+        loop {
+            let notified = self.notify.notified();
+            let (events, next_sequence) =
+                self.events_after(after_sequence, &target_session_ids).await;
+            if !events.is_empty() {
+                return (events, next_sequence, false);
+            }
+            let elapsed = start.elapsed();
+            if elapsed >= timeout {
+                return (Vec::new(), next_sequence, true);
+            }
+            if tokio::time::timeout(timeout.saturating_sub(elapsed), notified)
+                .await
+                .is_err()
+            {
+                let (_, next_sequence) =
+                    self.events_after(after_sequence, &target_session_ids).await;
+                return (Vec::new(), next_sequence, true);
+            }
+        }
+    }
+
+    async fn events_after(
+        &self,
+        after_sequence: u64,
+        target_session_ids: &HashSet<SessionId>,
+    ) -> (Vec<AgentOutputEvent>, u64) {
+        let inner = self.inner.lock().await;
+        let events = inner
+            .events
+            .iter()
+            .filter(|event| event.sequence > after_sequence)
+            .filter(|event| target_session_ids.contains(&event.child_session_id))
+            .cloned()
+            .collect();
+        (events, inner.next_sequence)
     }
 }
 

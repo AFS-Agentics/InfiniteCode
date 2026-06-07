@@ -39,24 +39,6 @@ impl ServerRuntime {
         }
     }
 
-    pub(in crate::runtime) async fn handle_agent_followup_task(
-        self: &Arc<Self>,
-        request_id: serde_json::Value,
-        params: serde_json::Value,
-    ) -> serde_json::Value {
-        match serde_json::from_value::<devo_protocol::AgentMessageParams>(params) {
-            Ok(params) => match Arc::clone(self).followup_task(params).await {
-                Ok(result) => success_response(request_id, result),
-                Err(error) => self.tool_error_response(request_id, error),
-            },
-            Err(error) => self.error_response(
-                request_id,
-                ProtocolErrorCode::InvalidParams,
-                format!("invalid agent/followup_task params: {error}"),
-            ),
-        }
-    }
-
     pub(in crate::runtime) async fn handle_agent_wait(
         self: &Arc<Self>,
         request_id: serde_json::Value,

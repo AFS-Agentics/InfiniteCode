@@ -20,7 +20,6 @@ use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolPreparationFeedbac
 enum AgentToolKind {
     Spawn,
     SendMessage,
-    FollowupTask,
     Wait,
     List,
     Close,
@@ -43,10 +42,6 @@ pub fn register_agent_tools(builder: &mut ToolRegistryBuilder) {
         send_message_spec(),
         AgentToolKind::SendMessage,
     ));
-    let followup = Arc::new(AgentToolHandler::new(
-        followup_task_spec(),
-        AgentToolKind::FollowupTask,
-    ));
     let wait = Arc::new(AgentToolHandler::new(
         wait_agent_spec(),
         AgentToolKind::Wait,
@@ -62,7 +57,6 @@ pub fn register_agent_tools(builder: &mut ToolRegistryBuilder) {
 
     register(builder, spawn, &["spawn_subagent", "subagent", "delegate"]);
     register(builder, send, &[]);
-    register(builder, followup, &[]);
     register(builder, wait, &["subagent_result"]);
     register(builder, list, &["subagent_status"]);
     register(builder, close, &[]);
@@ -102,11 +96,7 @@ impl ToolHandler for AgentToolHandler {
                 let result = coordinator
                     .spawn_agent(SpawnAgentParams {
                         session_id,
-                        task_name: input.task_name,
                         message: input.message,
-                        agent_type: input.agent_type,
-                        model: input.model,
-                        thinking: input.thinking,
                         fork_turns: input.fork_turns,
                     })
                     .await?;
@@ -123,17 +113,6 @@ impl ToolHandler for AgentToolHandler {
                     .await?;
                 json_result(result, "message delivered")
             }
-            AgentToolKind::FollowupTask => {
-                let input: AgentMessageInput = parse_input(input)?;
-                let result = coordinator
-                    .followup_task(AgentMessageParams {
-                        session_id,
-                        target: input.target,
-                        message: input.message,
-                    })
-                    .await?;
-                json_result(result, "follow-up task sent")
-            }
             AgentToolKind::Wait => {
                 if let Some(progress) = progress {
                     let _ = progress.send(ToolProgress::StatusUpdate {
@@ -142,12 +121,16 @@ impl ToolHandler for AgentToolHandler {
                     });
                 }
                 let input: WaitAgentInput = parse_input(input)?;
-                let result = coordinator
-                    .wait_agent(WaitAgentParams {
-                        session_id,
-                        timeout_ms: input.timeout_ms,
-                    })
-                    .await?;
+                let params = WaitAgentParams {
+                    session_id,
+                    target: input.target,
+                    after_sequence: input.after_sequence,
+                    timeout_ms: input.timeout_ms,
+                };
+                let result = tokio::select! {
+                    result = coordinator.wait_agent(params) => result?,
+                    _ = ctx.cancel_token.cancelled() => return Err(ToolCallError::Cancelled),
+                };
                 json_result(result, "wait completed")
             }
             AgentToolKind::List => {
@@ -176,14 +159,7 @@ impl ToolHandler for AgentToolHandler {
 
 #[derive(serde::Deserialize)]
 struct SpawnAgentInput {
-    task_name: String,
     message: String,
-    #[serde(default)]
-    agent_type: Option<String>,
-    #[serde(default)]
-    model: Option<String>,
-    #[serde(default)]
-    thinking: Option<String>,
     #[serde(default)]
     fork_turns: Option<String>,
 }
@@ -196,6 +172,10 @@ struct AgentMessageInput {
 
 #[derive(serde::Deserialize)]
 struct WaitAgentInput {
+    #[serde(default)]
+    target: Option<String>,
+    #[serde(default)]
+    after_sequence: Option<u64>,
     #[serde(default)]
     timeout_ms: Option<u64>,
 }
@@ -255,31 +235,15 @@ fn spawn_spec() -> ToolSpec {
         JsonSchema::object(
             BTreeMap::from([
                 (
-                    "task_name".to_string(),
-                    JsonSchema::string(Some("Unique child agent name under the current session")),
-                ),
-                (
                     "message".to_string(),
                     JsonSchema::string(Some("Initial task message for the child agent")),
-                ),
-                (
-                    "agent_type".to_string(),
-                    JsonSchema::string(Some("Optional agent role such as default or explorer")),
-                ),
-                (
-                    "model".to_string(),
-                    JsonSchema::string(Some("Optional model override")),
-                ),
-                (
-                    "thinking".to_string(),
-                    JsonSchema::string(Some("Optional thinking selection override")),
                 ),
                 (
                     "fork_turns".to_string(),
                     JsonSchema::string(Some("History fork mode: none or all")),
                 ),
             ]),
-            Some(vec!["task_name".to_string(), "message".to_string()]),
+            Some(vec!["message".to_string()]),
             Some(false),
         ),
     )
@@ -293,23 +257,25 @@ fn send_message_spec() -> ToolSpec {
     )
 }
 
-fn followup_task_spec() -> ToolSpec {
-    spec(
-        "followup_task",
-        "Send a message to an existing child agent and start or queue a turn.",
-        message_schema(),
-    )
-}
-
 fn wait_agent_spec() -> ToolSpec {
     spec(
         "wait_agent",
-        "Wait for subagent mailbox messages or completion notifications.",
+        "Poll child agent output events or wait for new output.",
         JsonSchema::object(
-            BTreeMap::from([(
-                "timeout_ms".to_string(),
-                JsonSchema::integer(Some("Optional wait timeout in milliseconds")),
-            )]),
+            BTreeMap::from([
+                (
+                    "target".to_string(),
+                    JsonSchema::string(Some("Optional child agent path or session id")),
+                ),
+                (
+                    "after_sequence".to_string(),
+                    JsonSchema::integer(Some("Only return output events after this sequence")),
+                ),
+                (
+                    "timeout_ms".to_string(),
+                    JsonSchema::integer(Some("Optional wait timeout in milliseconds")),
+                ),
+            ]),
             None,
             Some(false),
         ),
@@ -346,6 +312,23 @@ fn close_agent_spec() -> ToolSpec {
     )
 }
 
+fn message_schema() -> JsonSchema {
+    JsonSchema::object(
+        BTreeMap::from([
+            (
+                "target".to_string(),
+                JsonSchema::string(Some("Target child agent path or session id")),
+            ),
+            (
+                "message".to_string(),
+                JsonSchema::string(Some("Message content")),
+            ),
+        ]),
+        Some(vec!["target".to_string(), "message".to_string()]),
+        Some(false),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -361,6 +344,9 @@ mod tests {
     struct FakeAgentCoordinator {
         spawned: Mutex<Vec<SpawnAgentParams>>,
     }
+
+    #[derive(Debug, Default)]
+    struct BlockingWaitCoordinator;
 
     #[async_trait]
     impl devo_tools::AgentToolCoordinator for FakeAgentCoordinator {
@@ -384,19 +370,13 @@ mod tests {
             Ok(devo_protocol::AgentMessageResult { delivered: true })
         }
 
-        async fn followup_task(
-            self: Arc<Self>,
-            _params: AgentMessageParams,
-        ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
-            Ok(devo_protocol::AgentMessageResult { delivered: true })
-        }
-
         async fn wait_agent(
             self: Arc<Self>,
             _params: devo_protocol::WaitAgentParams,
         ) -> Result<devo_protocol::WaitAgentResult, ToolCallError> {
             Ok(devo_protocol::WaitAgentResult {
-                messages: Vec::new(),
+                events: Vec::new(),
+                next_sequence: 1,
                 timed_out: false,
             })
         }
@@ -419,6 +399,44 @@ mod tests {
         }
     }
 
+    #[async_trait]
+    impl devo_tools::AgentToolCoordinator for BlockingWaitCoordinator {
+        async fn spawn_agent(
+            self: Arc<Self>,
+            _params: SpawnAgentParams,
+        ) -> Result<devo_protocol::SpawnAgentResult, ToolCallError> {
+            Err(ToolCallError::InternalError("not used".to_string()))
+        }
+
+        async fn send_message(
+            self: Arc<Self>,
+            _params: AgentMessageParams,
+        ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
+            Err(ToolCallError::InternalError("not used".to_string()))
+        }
+
+        async fn wait_agent(
+            self: Arc<Self>,
+            _params: devo_protocol::WaitAgentParams,
+        ) -> Result<devo_protocol::WaitAgentResult, ToolCallError> {
+            std::future::pending().await
+        }
+
+        async fn list_agents(
+            self: Arc<Self>,
+            _params: AgentListParams,
+        ) -> Result<Vec<devo_protocol::AgentInfo>, ToolCallError> {
+            Err(ToolCallError::InternalError("not used".to_string()))
+        }
+
+        async fn close_agent(
+            self: Arc<Self>,
+            _params: CloseAgentParams,
+        ) -> Result<devo_protocol::CloseAgentResult, ToolCallError> {
+            Err(ToolCallError::InternalError("not used".to_string()))
+        }
+    }
+
     #[tokio::test]
     async fn spawn_handler_delegates_to_coordinator() {
         let session_id = SessionId::new();
@@ -431,7 +449,6 @@ mod tests {
                     Some(coordinator.clone() as Arc<dyn devo_tools::AgentToolCoordinator>),
                 ),
                 serde_json::json!({
-                    "task_name": "reviewer",
                     "message": "review this",
                     "fork_turns": "all"
                 }),
@@ -445,11 +462,7 @@ mod tests {
             coordinator.spawned.lock().await.as_slice(),
             &[SpawnAgentParams {
                 session_id,
-                task_name: "reviewer".to_string(),
                 message: "review this".to_string(),
-                agent_type: None,
-                model: None,
-                thinking: None,
                 fork_turns: Some("all".to_string()),
             }]
         );
@@ -462,7 +475,6 @@ mod tests {
             .handle(
                 tool_context(SessionId::new(), None),
                 serde_json::json!({
-                    "task_name": "reviewer",
                     "message": "review this"
                 }),
                 None,
@@ -477,9 +489,38 @@ mod tests {
         ));
     }
 
+    #[tokio::test]
+    async fn wait_handler_stops_when_context_is_cancelled() {
+        let session_id = SessionId::new();
+        let coordinator = Arc::new(BlockingWaitCoordinator);
+        let handler = AgentToolHandler::new(wait_agent_spec(), AgentToolKind::Wait);
+        let cancel_token = CancellationToken::new();
+        let ctx = tool_context_with_cancel_token(
+            session_id,
+            Some(coordinator as Arc<dyn devo_tools::AgentToolCoordinator>),
+            cancel_token.clone(),
+        );
+        cancel_token.cancel();
+
+        let error = handler
+            .handle(ctx, serde_json::json!({}), None)
+            .await
+            .expect_err("cancelled wait should fail");
+
+        assert!(matches!(error, ToolCallError::Cancelled));
+    }
+
     fn tool_context(
         session_id: SessionId,
         agent_coordinator: Option<Arc<dyn devo_tools::AgentToolCoordinator>>,
+    ) -> ToolContext {
+        tool_context_with_cancel_token(session_id, agent_coordinator, CancellationToken::new())
+    }
+
+    fn tool_context_with_cancel_token(
+        session_id: SessionId,
+        agent_coordinator: Option<Arc<dyn devo_tools::AgentToolCoordinator>>,
+        cancel_token: CancellationToken,
     ) -> ToolContext {
         ToolContext {
             tool_call_id: crate::invocation::ToolCallId("tool-call".to_string()),
@@ -490,25 +531,9 @@ mod tests {
                 output_limit_bytes: 1024,
                 wall_time_limit_ms: None,
             },
-            cancel_token: CancellationToken::new(),
+            cancel_token,
+            agent_scope: crate::contracts::ToolAgentScope::Parent,
             agent_coordinator,
         }
     }
-}
-
-fn message_schema() -> JsonSchema {
-    JsonSchema::object(
-        BTreeMap::from([
-            (
-                "target".to_string(),
-                JsonSchema::string(Some("Target child agent path or session id")),
-            ),
-            (
-                "message".to_string(),
-                JsonSchema::string(Some("Message content")),
-            ),
-        ]),
-        Some(vec!["target".to_string(), "message".to_string()]),
-        Some(false),
-    )
 }

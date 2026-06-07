@@ -657,6 +657,15 @@ impl ChatWidget {
                 self.resume_browser_loading = false;
                 self.open_resume_browser(sessions);
             }
+            WorkerEvent::SubagentsListed { agents, open } => {
+                self.on_subagents_listed(agents, open);
+            }
+            WorkerEvent::SubagentDiscovered { agent, auto_open } => {
+                self.on_subagent_discovered(agent, auto_open);
+            }
+            WorkerEvent::SubagentMonitor { event } => {
+                self.on_subagent_monitor_event(event);
+            }
             WorkerEvent::SkillsListed {
                 body,
                 skills,
@@ -688,6 +697,7 @@ impl ChatWidget {
                 self.session.reasoning_effort = reasoning_effort;
                 self.session.active_agent_label = active_agent_label.clone();
                 self.bottom_pane.set_active_agent_label(active_agent_label);
+                self.reset_subagent_monitor();
                 let should_append_header = self.history_has_non_header_content();
                 self.active_cell = None;
                 self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
@@ -739,6 +749,7 @@ impl ChatWidget {
                 self.session.reasoning_effort = reasoning_effort;
                 self.session.active_agent_label = active_agent_label.clone();
                 self.bottom_pane.set_active_agent_label(active_agent_label);
+                self.reset_subagent_monitor();
                 self.history.clear();
                 self.next_history_flush_index = 0;
                 self.active_text_items.clear();

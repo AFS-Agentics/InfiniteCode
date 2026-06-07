@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc as std_mpsc;
@@ -58,10 +59,38 @@ struct BoundedQueryEventSender {
 
 impl BoundedQueryEventSender {
     fn send(&self, event: QueryEvent) {
+        let event_kind = query_event_trace_kind(&event);
+        let delta_len = query_event_trace_delta_len(&event);
+        let assistant_token_text = query_event_trace_token_preview(&event);
         let depth = self.queue_depth.fetch_add(1, Ordering::AcqRel) + 1;
         self.queue_max_depth.fetch_max(depth, Ordering::AcqRel);
+        if let Some(assistant_token_text) = assistant_token_text.as_deref() {
+            tracing::debug!(
+                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                event_kind,
+                delta_len,
+                queue_depth = depth,
+                assistant_token_text,
+                "query event bridge enqueue requested"
+            );
+        } else {
+            tracing::debug!(
+                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                event_kind,
+                delta_len,
+                queue_depth = depth,
+                "query event bridge enqueue requested"
+            );
+        }
         match self.tx.try_send(event) {
-            Ok(()) => {}
+            Ok(()) => {
+                tracing::trace!(
+                    stream_elapsed_ms = stream_trace_elapsed_ms(),
+                    event_kind,
+                    queue_depth = depth,
+                    "query event bridge enqueue accepted"
+                );
+            }
             Err(std_mpsc::TrySendError::Full(event)) => {
                 let send_started_at = Instant::now();
                 if self.tx.send(event).is_err() {
@@ -71,6 +100,8 @@ impl BoundedQueryEventSender {
                 let waited = send_started_at.elapsed();
                 if waited >= QUERY_EVENT_BACKPRESSURE_LOG_THRESHOLD {
                     tracing::warn!(
+                        stream_elapsed_ms = stream_trace_elapsed_ms(),
+                        event_kind,
                         waited_ms = waited.as_millis(),
                         threshold_ms = QUERY_EVENT_BACKPRESSURE_LOG_THRESHOLD.as_millis(),
                         "query event bridge applied backpressure"
@@ -122,6 +153,98 @@ fn decrement_query_event_queue_depth(queue_depth: &AtomicUsize) {
     let _ = queue_depth.fetch_update(Ordering::AcqRel, Ordering::Acquire, |depth| {
         Some(depth.saturating_sub(1))
     });
+}
+
+fn stream_trace_elapsed_ms() -> u128 {
+    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    STREAM_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+fn query_event_trace_kind(event: &QueryEvent) -> &'static str {
+    match event {
+        QueryEvent::TextDelta(_) => "text_delta",
+        QueryEvent::ReasoningDelta(_) => "reasoning_delta",
+        QueryEvent::ReasoningCompleted => "reasoning_completed",
+        QueryEvent::UsageDelta { .. } => "usage_delta",
+        QueryEvent::ToolUseStart { .. } => "tool_use_start",
+        QueryEvent::ToolProgress { .. } => "tool_progress",
+        QueryEvent::ToolResult { .. } => "tool_result",
+        QueryEvent::TurnComplete { .. } => "turn_complete",
+        QueryEvent::Usage { .. } => "usage",
+    }
+}
+
+fn query_event_trace_delta_len(event: &QueryEvent) -> usize {
+    match event {
+        QueryEvent::TextDelta(text) | QueryEvent::ReasoningDelta(text) => text.len(),
+        QueryEvent::ToolProgress { content, .. } => content.len(),
+        QueryEvent::ReasoningCompleted
+        | QueryEvent::UsageDelta { .. }
+        | QueryEvent::ToolUseStart { .. }
+        | QueryEvent::ToolResult { .. }
+        | QueryEvent::TurnComplete { .. }
+        | QueryEvent::Usage { .. } => 0,
+    }
+}
+
+fn query_event_trace_token_preview(event: &QueryEvent) -> Option<String> {
+    match event {
+        QueryEvent::TextDelta(text) => assistant_token_log_preview(text),
+        QueryEvent::ReasoningDelta(_)
+        | QueryEvent::ReasoningCompleted
+        | QueryEvent::UsageDelta { .. }
+        | QueryEvent::ToolUseStart { .. }
+        | QueryEvent::ToolProgress { .. }
+        | QueryEvent::ToolResult { .. }
+        | QueryEvent::TurnComplete { .. }
+        | QueryEvent::Usage { .. } => None,
+    }
+}
+
+fn assistant_token_log_preview(text: &str) -> Option<String> {
+    assistant_token_logging_enabled()
+        .then(|| format_assistant_token_log_preview(text, assistant_token_log_max_chars()))
+}
+
+fn assistant_token_logging_enabled() -> bool {
+    static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
+        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+            .ok()
+            .is_some_and(|value| {
+                matches!(
+                    value.as_str(),
+                    "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                )
+            })
+    })
+}
+
+fn assistant_token_log_max_chars() -> usize {
+    static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
+        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(512)
+    })
+}
+
+fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
+    let max_chars = max_chars.max(1);
+    let mut preview = String::new();
+    let mut chars = text.chars();
+    for ch in chars.by_ref().take(max_chars) {
+        preview.extend(ch.escape_default());
+    }
+    if chars.next().is_some() {
+        preview.push_str("...");
+    }
+    preview
 }
 
 async fn complete_reasoning_item(
@@ -556,6 +679,7 @@ impl ServerRuntime {
             // resume cleanly if the turn is interrupted mid-stream.
             let mut assistant_item_id = None;
             let mut assistant_item_seq = None;
+            let mut assistant_delta_seq = 0_u64;
             let mut assistant_text = String::new();
             let mut reasoning_item_id = None;
             let mut reasoning_item_seq = None;
@@ -566,6 +690,25 @@ impl ServerRuntime {
             let mut usage_base: Option<(usize, usize, usize)> = None;
             while let Some(event) = event_rx.recv().await {
                 decrement_query_event_queue_depth(&event_queue_depth_for_task);
+                let assistant_token_text = query_event_trace_token_preview(&event);
+                if let Some(assistant_token_text) = assistant_token_text.as_deref() {
+                    tracing::debug!(
+                        stream_elapsed_ms = stream_trace_elapsed_ms(),
+                        event_kind = query_event_trace_kind(&event),
+                        delta_len = query_event_trace_delta_len(&event),
+                        queue_depth = event_queue_depth_for_task.load(Ordering::Acquire),
+                        assistant_token_text,
+                        "query event bridge dequeued by turn event task"
+                    );
+                } else {
+                    tracing::debug!(
+                        stream_elapsed_ms = stream_trace_elapsed_ms(),
+                        event_kind = query_event_trace_kind(&event),
+                        delta_len = query_event_trace_delta_len(&event),
+                        queue_depth = event_queue_depth_for_task.load(Ordering::Acquire),
+                        "query event bridge dequeued by turn event task"
+                    );
+                }
                 match event {
                     QueryEvent::TextDelta(text) => {
                         let (item_id, item_seq) = match (assistant_item_id, assistant_item_seq) {
@@ -586,6 +729,28 @@ impl ServerRuntime {
                             _ => continue,
                         };
                         assistant_text.push_str(&text);
+                        assistant_delta_seq = assistant_delta_seq.saturating_add(1);
+                        let cumulative_text_len = assistant_text.len();
+                        if let Some(assistant_token_text) = assistant_token_log_preview(&text) {
+                            tracing::debug!(
+                                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                                item_id = %item_id,
+                                assistant_delta_seq,
+                                delta_len = text.len(),
+                                cumulative_text_len,
+                                assistant_token_text = %assistant_token_text,
+                                "server broadcasting assistant item delta"
+                            );
+                        } else {
+                            tracing::debug!(
+                                stream_elapsed_ms = stream_trace_elapsed_ms(),
+                                item_id = %item_id,
+                                assistant_delta_seq,
+                                delta_len = text.len(),
+                                cumulative_text_len,
+                                "server broadcasting assistant item delta"
+                            );
+                        }
                         runtime
                             .broadcast_event(ServerEvent::ItemDelta {
                                 delta_kind: ItemDeltaKind::AgentMessageDelta,
@@ -1290,9 +1455,14 @@ impl ServerRuntime {
         ) = {
             // Run the model query only after the event pipeline is ready so
             // streamed deltas can be consumed and persisted immediately.
-            let core_session = {
+            let (core_session, agent_scope) = {
                 let session = session_arc.lock().await;
-                Arc::clone(&session.core_session)
+                let agent_scope = if session.summary.parent_session_id.is_some() {
+                    ToolAgentScope::Subagent
+                } else {
+                    ToolAgentScope::Parent
+                };
+                (Arc::clone(&session.core_session), agent_scope)
             };
             let mut core_session = core_session.lock().await;
             core_session.push_message(Message::user(input.clone()));
@@ -1303,6 +1473,13 @@ impl ServerRuntime {
             let registry = Arc::clone(&self.deps.registry);
             let permission_mode = core_session.config.permission_mode;
             let permission_profile = core_session.config.permission_profile.clone();
+            let turn_cancel_token = self
+                .active_turn_cancellations
+                .lock()
+                .await
+                .get(&session_id)
+                .cloned()
+                .unwrap_or_else(CancellationToken::new);
             let runtime = ToolRuntime::new_with_context_and_options(
                 Arc::clone(&registry),
                 self.build_permission_checker(
@@ -1315,9 +1492,13 @@ impl ServerRuntime {
                     session_id: session_id.to_string(),
                     turn_id: Some(turn_for_events.turn_id.to_string()),
                     cwd: core_session.cwd.clone(),
+                    agent_scope,
                     agent_coordinator: Some(Arc::clone(&self) as Arc<dyn AgentToolCoordinator>),
                 },
-                ToolExecutionOptions::default(),
+                ToolExecutionOptions {
+                    cancel_token: turn_cancel_token,
+                    ..ToolExecutionOptions::default()
+                },
             );
             let result = query(
                 &mut core_session,
@@ -1351,6 +1532,10 @@ impl ServerRuntime {
         // before we persist the terminal turn state.
         let latest_usage = event_task.await.ok().flatten();
         self.active_tasks.lock().await.remove(&session_id);
+        self.active_turn_cancellations
+            .lock()
+            .await
+            .remove(&session_id);
 
         let final_turn = {
             let mut session = session_arc.lock().await;

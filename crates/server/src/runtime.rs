@@ -11,6 +11,7 @@ use futures::FutureExt;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 
 use devo_core::ApprovalDecisionItem;
 use devo_core::ApprovalRequestItem;
@@ -41,6 +42,7 @@ use devo_core::message_to_response_items;
 use devo_core::query;
 use devo_core::tools::AgentToolCoordinator;
 use devo_core::tools::PermissionChecker;
+use devo_core::tools::ToolAgentScope;
 use devo_core::tools::ToolCallError;
 use devo_core::tools::ToolExecutionOptions;
 use devo_core::tools::ToolPermissionRequest;
@@ -129,6 +131,7 @@ use crate::subagent::AgentPath;
 use crate::subagent::AgentRegistry;
 use crate::subagent::SubagentMailbox;
 use crate::subagent::SubagentMetadata;
+use crate::subagent::SubagentOutputBuffer;
 use crate::subagent::SubagentStatus;
 use crate::titles::build_title_generation_request;
 use crate::titles::derive_provisional_title;
@@ -160,6 +163,7 @@ pub struct ServerRuntime {
     sessions: Mutex<HashMap<SessionId, Arc<Mutex<RuntimeSession>>>>,
     connections: Mutex<HashMap<u64, ConnectionRuntime>>,
     active_tasks: Mutex<HashMap<SessionId, tokio::task::AbortHandle>>,
+    active_turn_cancellations: Mutex<HashMap<SessionId, CancellationToken>>,
     next_connection_id: AtomicU64,
     /// Per-session goal stores for goal lifecycle management.
     goal_stores: Mutex<HashMap<SessionId, GoalStore>>,
@@ -167,6 +171,8 @@ pub struct ServerRuntime {
     agent_registries: Mutex<HashMap<SessionId, AgentRegistry>>,
     /// Per-session inboxes used by agent tools to exchange ordered messages.
     agent_mailboxes: Mutex<HashMap<SessionId, SubagentMailbox>>,
+    /// Per-parent child-output buffers used by wait_agent polling.
+    agent_output_buffers: Mutex<HashMap<SessionId, SubagentOutputBuffer>>,
     /// Live client-owned reference search sessions.
     reference_searches:
         Mutex<HashMap<devo_protocol::ReferenceSearchId, reference_search::ReferenceSearchState>>,
@@ -188,10 +194,12 @@ impl ServerRuntime {
             sessions: Mutex::new(HashMap::new()),
             connections: Mutex::new(HashMap::new()),
             active_tasks: Mutex::new(HashMap::new()),
+            active_turn_cancellations: Mutex::new(HashMap::new()),
             next_connection_id: AtomicU64::new(1),
             goal_stores: Mutex::new(HashMap::new()),
             agent_registries: Mutex::new(HashMap::new()),
             agent_mailboxes: Mutex::new(HashMap::new()),
+            agent_output_buffers: Mutex::new(HashMap::new()),
             reference_searches: Mutex::new(HashMap::new()),
         })
     }

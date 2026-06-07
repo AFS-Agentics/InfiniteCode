@@ -1,4 +1,6 @@
 use super::*;
+use std::collections::HashMap;
+use std::sync::OnceLock;
 use std::time::Duration;
 use std::time::Instant;
 
@@ -9,6 +11,7 @@ const CONNECTION_NOTIFICATION_BACKPRESSURE_LOG_THRESHOLD: Duration = Duration::f
 struct PendingConnectionNotification {
     connection_id: u64,
     method: String,
+    event_seq: u64,
     sender: mpsc::Sender<serde_json::Value>,
     value: serde_json::Value,
 }
@@ -189,9 +192,6 @@ impl ServerRuntime {
             Some(ClientMethod::AgentSendMessage) => {
                 Some(self.handle_agent_send_message(id?, params).await)
             }
-            Some(ClientMethod::AgentFollowupTask) => {
-                Some(self.handle_agent_followup_task(id?, params).await)
-            }
             Some(ClientMethod::AgentWait) => Some(self.handle_agent_wait(id?, params).await),
             // TODO: list the current sub agents, not sure whther the current agent is right.
             Some(ClientMethod::AgentList) => Some(self.handle_agent_list(id?, params).await),
@@ -241,6 +241,7 @@ impl ServerRuntime {
             connection.subscriptions.push(SubscriptionFilter {
                 session_id: Some(session_id),
                 event_types: desired,
+                include_child_agents: false,
             });
         }
     }
@@ -260,21 +261,24 @@ impl ServerRuntime {
         event: ServerEvent,
     ) {
         let session_id = event.session_id();
+        let child_parent_by_session = self.child_parent_by_session().await;
         let notification = {
             let mut connections = self.connections.lock().await;
             let Some(connection) = connections.get_mut(&connection_id) else {
                 return;
             };
-            if !connection.should_deliver(method, session_id) {
+            if !connection.should_deliver(method, session_id, &child_parent_by_session) {
                 return;
             }
+            let event_seq = connection.next_seq();
             Some(PendingConnectionNotification {
                 connection_id,
                 method: method.to_string(),
+                event_seq,
                 sender: connection.sender.clone(),
                 value: serde_json::to_value(NotificationEnvelope {
                     method: method.to_string(),
-                    params: event.with_seq(connection.next_seq()),
+                    params: event.with_seq(event_seq),
                 })
                 .expect("serialize notification"),
             })
@@ -285,23 +289,27 @@ impl ServerRuntime {
     }
 
     pub(super) async fn broadcast_event(&self, event: ServerEvent) {
+        self.record_subagent_output_event(&event).await;
         let method = event.method_name();
         let session_id = event.session_id();
+        let child_parent_by_session = self.child_parent_by_session().await;
         let notifications = {
             let mut connections = self.connections.lock().await;
             connections
                 .iter_mut()
                 .filter_map(|(connection_id, connection)| {
-                    if !connection.should_deliver(method, session_id) {
+                    if !connection.should_deliver(method, session_id, &child_parent_by_session) {
                         return None;
                     }
+                    let event_seq = connection.next_seq();
                     Some(PendingConnectionNotification {
                         connection_id: *connection_id,
                         method: method.to_string(),
+                        event_seq,
                         sender: connection.sender.clone(),
                         value: serde_json::to_value(NotificationEnvelope {
                             method: method.to_string(),
-                            params: event.clone().with_seq(connection.next_seq()),
+                            params: event.clone().with_seq(event_seq),
                         })
                         .expect("serialize notification"),
                     })
@@ -338,6 +346,23 @@ impl ServerRuntime {
     }
 }
 
+impl ServerRuntime {
+    async fn child_parent_by_session(&self) -> HashMap<SessionId, SessionId> {
+        self.agent_registries
+            .lock()
+            .await
+            .values()
+            .flat_map(|registry| {
+                registry
+                    .child_to_parent
+                    .iter()
+                    .map(|(child, parent)| (*child, *parent))
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+}
+
 pub(crate) struct ConnectionRuntime {
     pub(crate) transport: ClientTransportKind,
     pub(crate) state: ConnectionState,
@@ -348,7 +373,12 @@ pub(crate) struct ConnectionRuntime {
 }
 
 impl ConnectionRuntime {
-    pub(super) fn should_deliver(&self, method: &str, session_id: Option<SessionId>) -> bool {
+    pub(super) fn should_deliver(
+        &self,
+        method: &str,
+        session_id: Option<SessionId>,
+        child_parent_by_session: &HashMap<SessionId, SessionId>,
+    ) -> bool {
         if self.opt_out_notification_methods.contains(method) {
             return false;
         }
@@ -359,9 +389,7 @@ impl ConnectionRuntime {
             return false;
         }
         self.subscriptions.iter().any(|subscription| {
-            let session_matches = subscription
-                .session_id
-                .is_none_or(|expected| session_id == Some(expected));
+            let session_matches = subscription.session_matches(session_id, child_parent_by_session);
             let event_matches =
                 subscription.event_types.is_empty() || subscription.event_types.contains(method);
             session_matches && event_matches
@@ -378,15 +406,61 @@ impl ConnectionRuntime {
 pub(crate) struct SubscriptionFilter {
     pub(crate) session_id: Option<SessionId>,
     pub(crate) event_types: HashSet<String>,
+    pub(crate) include_child_agents: bool,
+}
+
+impl SubscriptionFilter {
+    fn session_matches(
+        &self,
+        session_id: Option<SessionId>,
+        child_parent_by_session: &HashMap<SessionId, SessionId>,
+    ) -> bool {
+        let Some(expected) = self.session_id else {
+            return true;
+        };
+        if session_id == Some(expected) {
+            return true;
+        }
+        self.include_child_agents
+            && session_id.and_then(|session_id| child_parent_by_session.get(&session_id).copied())
+                == Some(expected)
+    }
 }
 
 async fn send_connection_notification(notification: PendingConnectionNotification) {
     let PendingConnectionNotification {
         connection_id,
         method,
+        event_seq,
         sender,
         value,
     } = notification;
+    let item_id = notification_item_id(&value);
+    let assistant_delta = notification_assistant_delta(&method, &value);
+    let delta_len = assistant_delta.map(str::len);
+    let assistant_token_text = assistant_delta.and_then(assistant_token_log_preview);
+    if let Some(assistant_token_text) = assistant_token_text.as_deref() {
+        tracing::debug!(
+            stream_elapsed_ms = stream_trace_elapsed_ms(),
+            connection_id,
+            method = %method,
+            event_seq,
+            item_id = ?item_id,
+            delta_len = ?delta_len,
+            assistant_token_text,
+            "sending client notification"
+        );
+    } else {
+        tracing::debug!(
+            stream_elapsed_ms = stream_trace_elapsed_ms(),
+            connection_id,
+            method = %method,
+            event_seq,
+            item_id = ?item_id,
+            delta_len = ?delta_len,
+            "sending client notification"
+        );
+    }
     let reserve_started_at = Instant::now();
     let permit = match tokio::time::timeout(
         CONNECTION_NOTIFICATION_BACKPRESSURE_LOG_THRESHOLD,
@@ -399,6 +473,7 @@ async fn send_connection_notification(notification: PendingConnectionNotificatio
             tracing::debug!(
                 connection_id,
                 method = %method,
+                event_seq,
                 "client notification receiver dropped"
             );
             return;
@@ -407,6 +482,7 @@ async fn send_connection_notification(notification: PendingConnectionNotificatio
             tracing::warn!(
                 connection_id,
                 method = %method,
+                event_seq,
                 threshold_ms = CONNECTION_NOTIFICATION_BACKPRESSURE_LOG_THRESHOLD.as_millis(),
                 "client notification queue applying backpressure"
             );
@@ -416,6 +492,7 @@ async fn send_connection_notification(notification: PendingConnectionNotificatio
                     tracing::debug!(
                         connection_id,
                         method = %method,
+                        event_seq,
                         "client notification receiver dropped during backpressure"
                     );
                     return;
@@ -428,9 +505,108 @@ async fn send_connection_notification(notification: PendingConnectionNotificatio
         tracing::debug!(
             connection_id,
             method = %method,
+            event_seq,
             waited_ms = waited.as_millis(),
             "client notification queue accepted message after backpressure"
         );
     }
     permit.send(value);
+}
+
+fn stream_trace_elapsed_ms() -> u128 {
+    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    STREAM_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+fn notification_item_id(value: &serde_json::Value) -> Option<String> {
+    value
+        .get("params")
+        .and_then(|params| params.get("context"))
+        .and_then(|context| context.get("item_id"))
+        .and_then(serde_json::Value::as_str)
+        .map(ToOwned::to_owned)
+}
+
+fn notification_assistant_delta<'a>(method: &str, value: &'a serde_json::Value) -> Option<&'a str> {
+    (method == "item/agentMessage/delta")
+        .then(|| value.get("params")?.get("delta")?.as_str())
+        .flatten()
+}
+
+fn assistant_token_log_preview(text: &str) -> Option<String> {
+    assistant_token_logging_enabled()
+        .then(|| format_assistant_token_log_preview(text, assistant_token_log_max_chars()))
+}
+
+fn assistant_token_logging_enabled() -> bool {
+    static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
+        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+            .ok()
+            .is_some_and(|value| {
+                matches!(
+                    value.as_str(),
+                    "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                )
+            })
+    })
+}
+
+fn assistant_token_log_max_chars() -> usize {
+    static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
+        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(512)
+    })
+}
+
+fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
+    let max_chars = max_chars.max(1);
+    let mut preview = String::new();
+    let mut chars = text.chars();
+    for ch in chars.by_ref().take(max_chars) {
+        preview.extend(ch.escape_default());
+    }
+    if chars.next().is_some() {
+        preview.push_str("...");
+    }
+    preview
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+    use std::collections::HashSet;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn subscription_filter_can_match_direct_child_agents() {
+        let parent = SessionId::new();
+        let child = SessionId::new();
+        let unrelated = SessionId::new();
+        let child_parent_by_session = HashMap::from([(child, parent)]);
+        let subscription = SubscriptionFilter {
+            session_id: Some(parent),
+            event_types: HashSet::new(),
+            include_child_agents: true,
+        };
+
+        assert_eq!(
+            vec![true, true, false],
+            vec![
+                subscription.session_matches(Some(parent), &child_parent_by_session),
+                subscription.session_matches(Some(child), &child_parent_by_session),
+                subscription.session_matches(Some(unrelated), &child_parent_by_session),
+            ]
+        );
+    }
 }

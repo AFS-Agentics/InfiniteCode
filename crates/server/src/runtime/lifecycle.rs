@@ -11,6 +11,17 @@ impl ServerRuntime {
         for (session_id, session_arc) in &sessions {
             let mut session = session_arc.lock().await;
 
+            if !session.summary.ephemeral
+                && let Err(err) = self.deps.db.upsert_session(&session.summary)
+            {
+                tracing::warn!(
+                    session_id = %session_id,
+                    error = %err,
+                    "failed to seed restored session metadata to database"
+                );
+                continue;
+            }
+
             match self.deps.db.get_stats(session_id) {
                 Ok(Some(stats)) => {
                     session.summary.total_input_tokens = stats.total_input_tokens;

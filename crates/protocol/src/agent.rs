@@ -9,14 +9,7 @@ use crate::TurnId;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpawnAgentParams {
     pub session_id: SessionId,
-    pub task_name: String,
     pub message: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent_type: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thinking: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fork_turns: Option<String>,
 }
@@ -45,6 +38,10 @@ pub struct AgentMessageResult {
 pub struct WaitAgentParams {
     pub session_id: SessionId,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after_sequence: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout_ms: Option<u64>,
 }
 
@@ -62,8 +59,24 @@ pub struct AgentMailboxMessage {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WaitAgentResult {
-    pub messages: Vec<AgentMailboxMessage>,
+    pub events: Vec<AgentOutputEvent>,
+    pub next_sequence: u64,
     pub timed_out: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentOutputEvent {
+    pub sequence: u64,
+    pub child_session_id: SessionId,
+    pub agent_path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub turn_id: Option<TurnId>,
+    pub kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -109,17 +122,6 @@ pub struct CloseAgentResult {
     pub status: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AgentCompletionNotification {
-    pub child_session_id: SessionId,
-    pub parent_session_id: SessionId,
-    pub agent_path: String,
-    pub status: String,
-    pub turn_id: TurnId,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub result_excerpt: Option<String>,
-}
-
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
@@ -133,11 +135,7 @@ mod tests {
         let payloads = serde_json::json!({
             "spawn": SpawnAgentParams {
                 session_id,
-                task_name: "review".to_string(),
                 message: "review this".to_string(),
-                agent_type: Some("reviewer".to_string()),
-                model: Some("model-a".to_string()),
-                thinking: Some("medium".to_string()),
                 fork_turns: Some("all".to_string()),
             },
             "result": SpawnAgentResult {
@@ -147,16 +145,17 @@ mod tests {
                 status: "running".to_string(),
             },
             "wait": WaitAgentResult {
-                messages: vec![AgentMailboxMessage {
-                    message_id: "mail-1".to_string(),
-                    from_session_id: child_session_id,
-                    to_session_id: session_id,
-                    from_agent_path: "root/review".to_string(),
-                    to_agent_path: "root".to_string(),
-                    content: "done".to_string(),
+                events: vec![AgentOutputEvent {
                     sequence: 1,
+                    child_session_id,
+                    agent_path: "root/review".to_string(),
+                    turn_id: Some(TurnId::new()),
+                    kind: "assistant_delta".to_string(),
+                    text: Some("done".to_string()),
+                    status: None,
                     created_at: Utc::now(),
                 }],
+                next_sequence: 2,
                 timed_out: false,
             },
         });
