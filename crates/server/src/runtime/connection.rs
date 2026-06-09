@@ -189,6 +189,9 @@ impl ServerRuntime {
             Some(ClientMethod::ApprovalRespond) => {
                 Some(self.handle_approval_respond(id?, params).await)
             }
+            Some(ClientMethod::RequestUserInputRespond) => {
+                Some(self.handle_request_user_input_respond(id?, params).await)
+            }
             Some(ClientMethod::SearchStart) => Some(
                 self.handle_reference_search_start(connection_id, id?, params)
                     .await,
@@ -205,9 +208,13 @@ impl ServerRuntime {
             ),
             // TODO: the goal design should be simplified
             Some(ClientMethod::GoalCreate) => Some(self.handle_goal_create(id?, params).await),
+            Some(ClientMethod::GoalSet) => Some(self.handle_goal_set(id?, params).await),
+            Some(ClientMethod::GoalPause) => Some(self.handle_goal_pause(id?, params).await),
             Some(ClientMethod::GoalResume) => Some(self.handle_goal_resume(id?, params).await),
+            Some(ClientMethod::GoalComplete) => Some(self.handle_goal_complete(id?, params).await),
             // cancel the current goal loop
             Some(ClientMethod::GoalCancel) => Some(self.handle_goal_cancel(id?, params).await),
+            Some(ClientMethod::GoalClear) => Some(self.handle_goal_clear(id?, params).await),
             Some(ClientMethod::GoalStatus) => Some(self.handle_goal_status(id?, params).await),
             Some(ClientMethod::AgentSpawn) => Some(self.handle_agent_spawn(id?, params).await),
             Some(ClientMethod::AgentSendMessage) => {

@@ -114,6 +114,7 @@ impl ChatWidget {
                 self.refresh_header_box();
                 self.busy = true;
                 self.active_text_items.clear();
+                self.active_proposed_plan = None;
                 self.stream_chunking_policy.reset();
                 self.bottom_pane.set_task_running(true);
             }
@@ -146,6 +147,18 @@ impl ChatWidget {
                     TextItemKind::Assistant => "Generating",
                     TextItemKind::Reasoning => "Thinking",
                 });
+            }
+            WorkerEvent::ProposedPlanStarted { item_id } => {
+                self.start_proposed_plan(item_id);
+            }
+            WorkerEvent::ProposedPlanDelta { item_id, delta } => {
+                self.push_proposed_plan_delta(item_id, delta);
+            }
+            WorkerEvent::ProposedPlanCompleted {
+                item_id,
+                final_text,
+            } => {
+                self.complete_proposed_plan(item_id, final_text);
             }
             WorkerEvent::TextDelta(text) => {
                 if !self.has_server_active_item(TextItemKind::Assistant) {
@@ -517,6 +530,19 @@ impl ChatWidget {
                 self.bottom_pane.set_task_running(false);
                 self.set_status_message("Approval required");
             }
+            WorkerEvent::RequestUserInput {
+                session_id,
+                turn_id,
+                request_id,
+                questions,
+            } => {
+                self.commit_active_streams(DotStatus::Completed);
+                self.bottom_pane
+                    .open_request_user_input(session_id, turn_id, request_id, questions);
+                self.busy = true;
+                self.bottom_pane.set_task_running(false);
+                self.set_status_message("Input requested");
+            }
             WorkerEvent::ApprovalDecision {
                 approval_id: _,
                 decision,
@@ -841,6 +867,27 @@ impl ChatWidget {
                 }
                 self.busy = false;
                 self.set_status_message("Session switched");
+            }
+            WorkerEvent::GoalStatusLoaded { goal } => {
+                self.show_goal_status(goal);
+            }
+            WorkerEvent::GoalUpdated { goal } => {
+                self.show_goal_updated(goal);
+            }
+            WorkerEvent::GoalReplaceConfirmationRequested {
+                current_goal,
+                objective,
+            } => {
+                self.show_goal_replace_confirmation(current_goal, objective);
+            }
+            WorkerEvent::GoalEditLoaded { goal } => {
+                self.show_goal_edit_prompt(goal);
+            }
+            WorkerEvent::GoalCleared { cleared } => {
+                self.show_goal_cleared(cleared);
+            }
+            WorkerEvent::GoalOperationFailed { message } => {
+                self.show_goal_operation_failed(message);
             }
             WorkerEvent::SessionRenamed { session_id, title } => {
                 self.add_to_history(history_cell::new_info_event(
