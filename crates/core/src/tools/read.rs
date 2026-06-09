@@ -24,43 +24,46 @@ pub(crate) fn read_directory(
     items.sort_by_cached_key(|name| name.to_lowercase());
 
     let start = offset.saturating_sub(1);
-    let sliced = items
-        .iter()
-        .skip(start)
-        .take(limit)
-        .cloned()
-        .collect::<Vec<_>>();
-    let truncated = start + sliced.len() < items.len();
-    let preview = sliced
-        .iter()
-        .take(20)
-        .cloned()
-        .collect::<Vec<_>>()
-        .join("\n");
+    let (sliced, truncated) = if start < items.len() {
+        let end = start.saturating_add(limit).min(items.len());
+        (&items[start..end], end < items.len())
+    } else {
+        (&[][..], false)
+    };
 
-    let display_content = [
-        sliced.join("\n"),
-        if truncated {
-            format!(
-                "\n(Showing {} of {} entries. Use 'offset' parameter to read beyond entry {})",
-                sliced.len(),
-                items.len(),
-                offset + sliced.len()
-            )
-        } else {
-            format!("\n({} entries)", items.len())
-        },
-    ]
-    .join("\n");
+    let mut preview = String::new();
+    for (index, item) in sliced.iter().take(20).enumerate() {
+        if index > 0 {
+            preview.push('\n');
+        }
+        preview.push_str(item);
+    }
 
-    let output = [
-        format!("<path>{}</path>", path.display()),
-        "<type>directory</type>".to_string(),
-        "<entries>".to_string(),
-        display_content.clone(),
-        "</entries>".to_string(),
-    ]
-    .join("\n");
+    let selected_bytes = sliced.iter().map(String::len).sum::<usize>();
+    let mut display_content =
+        String::with_capacity(selected_bytes + sliced.len().saturating_sub(1) + 128);
+    for (index, item) in sliced.iter().enumerate() {
+        if index > 0 {
+            display_content.push('\n');
+        }
+        display_content.push_str(item);
+    }
+    if truncated {
+        let _ = write!(
+            display_content,
+            "\n\n(Showing {} of {} entries. Use 'offset' parameter to read beyond entry {})",
+            sliced.len(),
+            items.len(),
+            offset + sliced.len()
+        );
+    } else {
+        let _ = write!(display_content, "\n\n({} entries)", items.len());
+    }
+
+    let output = format!(
+        "<path>{}</path>\n<type>directory</type>\n<entries>\n{display_content}\n</entries>",
+        path.display()
+    );
 
     Ok(FunctionToolOutput::success_with_metadata(
         output,
@@ -81,7 +84,7 @@ pub(crate) fn read_file(
     let file = File::open(path)?;
     let reader = BufReader::new(file);
     let start = offset.saturating_sub(1);
-    let mut raw = Vec::new();
+    let mut raw = Vec::with_capacity(limit.min(1024));
     let mut bytes = 0usize;
     let mut count = 0usize;
     let mut cut = false;
@@ -119,7 +122,7 @@ pub(crate) fn read_file(
         )));
     }
 
-    let mut display_content = String::new();
+    let mut display_content = String::with_capacity(bytes + raw.len() * 16 + 128);
     for (index, line) in raw.iter().enumerate() {
         let _ = writeln!(display_content, "{}: {}", offset + index, line);
     }
@@ -127,17 +130,26 @@ pub(crate) fn read_file(
     let last = offset + raw.len().saturating_sub(1);
     let next = last + 1;
     if cut {
-        display_content.push_str(&format!(
+        let _ = write!(
+            display_content,
             "\n(Output capped at 50 KB. Showing lines {}-{}. Use offset={} to continue.)",
             offset, last, next
-        ));
+        );
     } else if more {
-        display_content.push_str(&format!(
+        let _ = write!(
+            display_content,
             "\n(Showing lines {}-{} of {}. Use offset={} to continue.)",
             offset, last, count, next
-        ))
+        );
     } else {
-        display_content.push_str(&format!("\n(End of file - total {} lines)", count))
+        let _ = write!(display_content, "\n(End of file - total {count} lines)");
+    }
+    let mut preview = String::new();
+    for (index, line) in raw.iter().take(20).enumerate() {
+        if index > 0 {
+            preview.push('\n');
+        }
+        preview.push_str(line);
     }
     let output = format!(
         "<path>{}</path>\n<type>file</type>\n<content>\n{display_content}\n</content>",
@@ -147,7 +159,7 @@ pub(crate) fn read_file(
     Ok(FunctionToolOutput::success_with_metadata(
         output,
         json!({
-            "preview": raw.iter().take(20).cloned().collect::<Vec<_>>().join("\n"),
+            "preview": preview,
             "truncated": cut || more,
             "loaded": []
         }),
@@ -267,9 +279,11 @@ mod tests {
     use std::env;
     use std::fs::File;
     use std::fs::{self};
+    use std::hint::black_box;
     use std::io::Write;
     use std::path::Path;
     use std::path::PathBuf;
+    use std::time::Instant;
     use std::time::SystemTime;
     use std::time::UNIX_EPOCH;
 
@@ -339,6 +353,34 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    fn bench_read_directory_many_entries() {
+        let dir = create_temp_dir("dir-bench");
+        for idx in 0..400 {
+            File::create(dir.join(format!("file-{idx:04}.rs"))).unwrap();
+        }
+        for idx in 0..40 {
+            fs::create_dir_all(dir.join(format!("module-{idx:04}"))).unwrap();
+        }
+        let iterations = 5_000;
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            let output = black_box(read_directory(black_box(&dir), 400, 1)).expect("read dir");
+            total_len += output.content.into_string().len();
+        }
+
+        let elapsed = started.elapsed();
+        assert!(total_len > 0);
+        println!(
+            "read_directory_many_entries iterations={iterations} entries=440 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
     fn read_file_applies_limit_and_reports_more() {
         let dir = create_temp_dir("file");
         let path = dir.join("sample.txt");
@@ -378,6 +420,37 @@ mod tests {
                 .content
                 .text_part()
                 .is_some_and(|text| text.contains("Offset 5 is out of range"))
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_read_file_many_loaded_lines() {
+        let dir = create_temp_dir("file-bench");
+        let path = dir.join("large.txt");
+        let mut content = String::new();
+        for idx in 0..400 {
+            let _ = writeln!(
+                content,
+                "line {idx}: repeated read tool output payload for formatting"
+            );
+        }
+        fs::write(&path, content).unwrap();
+        let iterations = 5_000;
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            let output = black_box(read_file(black_box(&path), 400, 1)).expect("read file");
+            total_len += output.content.into_string().len();
+        }
+
+        let elapsed = started.elapsed();
+        assert!(total_len > 0);
+        println!(
+            "read_file_many_loaded_lines iterations={iterations} lines=400 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
         );
     }
 

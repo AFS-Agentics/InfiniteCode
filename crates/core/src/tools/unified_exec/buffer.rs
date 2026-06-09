@@ -4,6 +4,8 @@ const TAIL_LIMIT: usize = 512 * 1024;
 pub struct HeadTailBuffer {
     head: Vec<u8>,
     tail: Vec<u8>,
+    tail_start: usize,
+    tail_len: usize,
     total: usize,
     dropped: bool,
     head_limit: usize,
@@ -15,6 +17,8 @@ impl HeadTailBuffer {
         HeadTailBuffer {
             head: Vec::new(),
             tail: Vec::new(),
+            tail_start: 0,
+            tail_len: 0,
             total: 0,
             dropped: false,
             head_limit: HEAD_LIMIT,
@@ -35,29 +39,11 @@ impl HeadTailBuffer {
 
             if take < bytes.len() {
                 self.dropped = true;
-                let remaining = &bytes[take..];
-
-                if remaining.len() > self.tail_limit {
-                    self.tail = remaining[remaining.len() - self.tail_limit..].to_vec();
-                } else {
-                    self.tail.extend_from_slice(remaining);
-                    if self.tail.len() > self.tail_limit {
-                        let excess = self.tail.len() - self.tail_limit;
-                        self.tail.drain(0..excess);
-                    }
-                }
+                self.push_tail(&bytes[take..]);
             }
         } else {
             self.dropped = true;
-            if bytes.len() > self.tail_limit {
-                self.tail = bytes[bytes.len() - self.tail_limit..].to_vec();
-            } else {
-                self.tail.extend_from_slice(bytes);
-                if self.tail.len() > self.tail_limit {
-                    let excess = self.tail.len() - self.tail_limit;
-                    self.tail.drain(0..excess);
-                }
-            }
+            self.push_tail(bytes);
         }
     }
 
@@ -68,17 +54,16 @@ impl HeadTailBuffer {
         let head_str = String::from_utf8_lossy(&self.head);
         result.push_str(&head_str);
 
-        let tail_str = String::from_utf8_lossy(&self.tail);
-        result.push_str(&tail_str);
+        self.push_tail_lossy_to_string(&mut result);
 
         result
     }
 
     /// Collect raw bytes (for when callers need `Vec<u8>` directly)
     pub fn collect_bytes(&self) -> Vec<u8> {
-        let mut result = Vec::with_capacity(self.head.len() + self.tail.len());
+        let mut result = Vec::with_capacity(self.head.len() + self.tail_len);
         result.extend_from_slice(&self.head);
-        result.extend_from_slice(&self.tail);
+        self.extend_with_tail(&mut result);
         result
     }
 
@@ -86,6 +71,8 @@ impl HeadTailBuffer {
         let result = self.collect_bytes();
         self.head.clear();
         self.tail.clear();
+        self.tail_start = 0;
+        self.tail_len = 0;
         self.total = 0;
         self.dropped = false;
         result
@@ -98,6 +85,65 @@ impl HeadTailBuffer {
     pub fn truncated(&self) -> bool {
         self.dropped
     }
+
+    fn push_tail(&mut self, bytes: &[u8]) {
+        if bytes.is_empty() || self.tail_limit == 0 {
+            return;
+        }
+
+        if bytes.len() >= self.tail_limit {
+            self.tail.clear();
+            self.tail
+                .extend_from_slice(&bytes[bytes.len() - self.tail_limit..]);
+            self.tail_start = 0;
+            self.tail_len = self.tail_limit;
+            return;
+        }
+
+        if self.tail.len() < self.tail_limit {
+            let available = self.tail_limit - self.tail.len();
+            let take = bytes.len().min(available);
+            self.tail.extend_from_slice(&bytes[..take]);
+            self.tail_len += take;
+            if take == bytes.len() {
+                return;
+            }
+            self.push_tail(&bytes[take..]);
+            return;
+        }
+
+        let first = bytes.len().min(self.tail_limit - self.tail_start);
+        self.tail[self.tail_start..self.tail_start + first].copy_from_slice(&bytes[..first]);
+        if first < bytes.len() {
+            self.tail[..bytes.len() - first].copy_from_slice(&bytes[first..]);
+        }
+        self.tail_start = (self.tail_start + bytes.len()) % self.tail_limit;
+        self.tail_len = self.tail_limit;
+    }
+
+    fn extend_with_tail(&self, out: &mut Vec<u8>) {
+        if self.tail_len == 0 {
+            return;
+        }
+        if self.tail_len < self.tail_limit || self.tail_start == 0 {
+            out.extend_from_slice(&self.tail[..self.tail_len]);
+            return;
+        }
+        out.extend_from_slice(&self.tail[self.tail_start..]);
+        out.extend_from_slice(&self.tail[..self.tail_start]);
+    }
+
+    fn push_tail_lossy_to_string(&self, out: &mut String) {
+        if self.tail_len == 0 {
+            return;
+        }
+        if self.tail_len < self.tail_limit || self.tail_start == 0 {
+            out.push_str(&String::from_utf8_lossy(&self.tail[..self.tail_len]));
+            return;
+        }
+        out.push_str(&String::from_utf8_lossy(&self.tail[self.tail_start..]));
+        out.push_str(&String::from_utf8_lossy(&self.tail[..self.tail_start]));
+    }
 }
 
 impl Default for HeadTailBuffer {
@@ -109,6 +155,9 @@ impl Default for HeadTailBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions::assert_eq;
+    use std::hint::black_box;
+    use std::time::Instant;
 
     #[test]
     fn buffer_keeps_small_content() {
@@ -164,9 +213,7 @@ mod tests {
         // 3-byte UTF-8 character "€" = [0xE2, 0x82, 0xAC]
         // Push data so that head limit is hit in the middle of the character
         buf.push(b"ab"); // 2 bytes
-        buf.push(&[0xE2, 0x82]); // 2 bytes of a 3-byte char → head overflow
-        buf.tail.extend_from_slice(&[0xAC]); // the last byte ends up in tail
-        buf.dropped = true;
+        buf.push(&[0xE2, 0x82, 0xAC]); // head overflows within the 3-byte char
 
         let result = buf.collect();
         // collect() uses from_utf8_lossy which handles broken UTF-8 gracefully
@@ -236,6 +283,20 @@ mod tests {
     }
 
     #[test]
+    fn buffer_circular_tail_preserves_exact_order_after_wrap() {
+        let mut buf = HeadTailBuffer::new();
+        buf.head_limit = 0;
+        buf.tail_limit = 8;
+
+        buf.push(b"abcdefgh");
+        buf.push(b"ijkl");
+
+        assert!(buf.truncated());
+        assert_eq!(buf.collect_bytes(), b"efghijkl");
+        assert_eq!(buf.collect(), "efghijkl");
+    }
+
+    #[test]
     fn buffer_single_push_exactly_fits_head() {
         let mut buf = HeadTailBuffer::new();
         buf.head_limit = 10;
@@ -253,5 +314,60 @@ mod tests {
         assert_eq!(buf.collect_bytes(), b"");
         assert_eq!(buf.total(), 0);
         assert!(!buf.truncated());
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_push_large_chunks_replaces_tail() {
+        let chunk = vec![b'x'; 128 * 1024];
+        let iterations = 5_000;
+        let started = Instant::now();
+        let mut total = 0usize;
+
+        for _ in 0..iterations {
+            let mut buf = HeadTailBuffer::new();
+            buf.head_limit = 0;
+            buf.tail_limit = 64 * 1024;
+            for _ in 0..16 {
+                buf.push(black_box(&chunk));
+            }
+            total += black_box(buf.collect_bytes()).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total, iterations * 64 * 1024);
+        println!(
+            "head_tail_buffer_push_large_chunks iterations={iterations} chunks_per_iter=16 elapsed_ms={} per_iter_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_push_small_chunks_after_tail_saturation() {
+        let chunk = vec![b'x'; 256];
+        let iterations = 2_000;
+        let started = Instant::now();
+        let mut total = 0usize;
+
+        for _ in 0..iterations {
+            let mut buf = HeadTailBuffer::new();
+            buf.head_limit = 0;
+            buf.tail_limit = 64 * 1024;
+            buf.push(&vec![b'a'; 64 * 1024]);
+            for _ in 0..512 {
+                buf.push(black_box(&chunk));
+            }
+            total += black_box(buf.collect_bytes()).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total, iterations * 64 * 1024);
+        println!(
+            "head_tail_buffer_push_small_chunks_after_tail_saturation iterations={iterations} chunks_per_iter=512 elapsed_ms={} per_iter_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 }

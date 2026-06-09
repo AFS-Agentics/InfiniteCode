@@ -80,7 +80,13 @@ pub trait ContextualUserFragment {
             return self.body();
         }
 
-        format!("{}{}{}", Self::START_MARKER, self.body(), Self::END_MARKER)
+        let body = self.body();
+        let mut rendered =
+            String::with_capacity(Self::START_MARKER.len() + body.len() + Self::END_MARKER.len());
+        rendered.push_str(Self::START_MARKER);
+        rendered.push_str(&body);
+        rendered.push_str(Self::END_MARKER);
+        rendered
     }
 
     fn to_response_item(self) -> ResponseItem
@@ -372,9 +378,25 @@ pub use execution_context::*;
 #[cfg(test)]
 mod tests {
     use super::{
-        ByteTokenEstimator, PromptAssemblyInput, SnapshotPersistFailure, TokenBudget,
-        TokenEstimator,
+        ByteTokenEstimator, ContextualUserFragment, PromptAssemblyInput, SnapshotPersistFailure,
+        TokenBudget, TokenEstimator,
     };
+    use std::hint::black_box;
+    use std::time::Instant;
+
+    struct MarkedFragment {
+        body: String,
+    }
+
+    impl ContextualUserFragment for MarkedFragment {
+        const ROLE: &'static str = "user";
+        const START_MARKER: &'static str = "<context-fragment>";
+        const END_MARKER: &'static str = "</context-fragment>";
+
+        fn body(&self) -> String {
+            self.body.clone()
+        }
+    }
 
     #[test]
     fn token_budget_default_values() {
@@ -414,6 +436,42 @@ mod tests {
                 + estimate.safety_tokens
                 + estimate.history_tokens
                 + estimate.tool_tokens
+        );
+    }
+
+    #[test]
+    fn contextual_fragment_render_includes_markers() {
+        let fragment = MarkedFragment {
+            body: "body".to_string(),
+        };
+
+        assert_eq!(
+            fragment.render(),
+            "<context-fragment>body</context-fragment>"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_marked_contextual_fragment_render() {
+        let fragment = MarkedFragment {
+            body: "context body line with enough content to allocate\n".repeat(64),
+        };
+        let expected_len = fragment.render().len();
+        let iterations = 200_000;
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(fragment.render()).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "marked_contextual_fragment_render iterations={iterations} bytes={expected_len} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
         );
     }
 

@@ -2,6 +2,8 @@ pub mod compaction;
 pub mod normalize;
 pub mod summarizer;
 
+use std::collections::HashSet;
+
 use serde::{Deserialize, Serialize};
 
 use devo_protocol::{InputModality, Message, RequestContent, RequestMessage, Role, UserInput};
@@ -277,9 +279,58 @@ impl History {
     /// 4. Merging consecutive messages with the same role (prevents orphan
     ///    tool-call messages that violate provider protocol requirements)
     pub fn for_prompt(&self, modalities: &[InputModality]) -> Vec<RequestMessage> {
+        if modalities.contains(&InputModality::Text)
+            && normalize::text_modality_keeps_all_items(&self.items)
+        {
+            let mut tool_call_ids = None::<HashSet<&str>>;
+            let mut tool_output_ids = None::<HashSet<&str>>;
+            for item in &self.items {
+                match item {
+                    ResponseItem::ToolCall { id, .. } => {
+                        tool_call_ids
+                            .get_or_insert_with(|| HashSet::with_capacity(self.items.len() / 2))
+                            .insert(id.as_str());
+                    }
+                    ResponseItem::ToolCallOutput { tool_use_id, .. } => {
+                        tool_output_ids
+                            .get_or_insert_with(|| HashSet::with_capacity(self.items.len() / 2))
+                            .insert(tool_use_id.as_str());
+                    }
+                    ResponseItem::Reason { .. } | ResponseItem::Message(_) => {}
+                }
+            }
+
+            let mut messages = Vec::with_capacity(self.items.len());
+            for item in &self.items {
+                match item {
+                    ResponseItem::ToolCall { id, .. } => {
+                        if tool_output_ids
+                            .as_ref()
+                            .is_some_and(|ids| ids.contains(id.as_str()))
+                        {
+                            messages.push(item.into());
+                        }
+                    }
+                    ResponseItem::ToolCallOutput { tool_use_id, .. } => {
+                        if tool_call_ids
+                            .as_ref()
+                            .is_some_and(|ids| ids.contains(tool_use_id.as_str()))
+                        {
+                            messages.push(item.into());
+                        }
+                    }
+                    ResponseItem::Reason { .. } | ResponseItem::Message(_) => {
+                        messages.push(item.into());
+                    }
+                }
+            }
+            merge_consecutive_same_role(&mut messages);
+            return messages;
+        }
+
         let mut items = normalize::filter_by_modality(&self.items, modalities);
         normalize::pair_tool_call_items(&mut items);
-        let mut messages: Vec<RequestMessage> = items.iter().map(|item| item.into()).collect();
+        let mut messages: Vec<RequestMessage> = items.into_iter().map(Into::into).collect();
         merge_consecutive_same_role(&mut messages);
         messages
     }
@@ -358,6 +409,9 @@ pub fn prepend_user_inputs(messages: &mut Vec<RequestMessage>, user_inputs: &[Us
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -462,6 +516,93 @@ mod tests {
 
         let msgs = h.for_prompt(&[InputModality::Text]);
         assert_eq!(msgs.len(), 2);
+    }
+
+    #[test]
+    fn history_for_prompt_text_drops_orphaned_tool_items() {
+        let mut h = History::new(test_context());
+        h.push(ResponseItem::Message(Message::user("start")));
+        h.push(ResponseItem::ToolCall {
+            id: "orphan-call".into(),
+            name: "bash".into(),
+            input: serde_json::json!({ "cmd": "missing output" }),
+        });
+        h.push(ResponseItem::ToolCall {
+            id: "tc-1".into(),
+            name: "bash".into(),
+            input: serde_json::json!({ "cmd": "date" }),
+        });
+        h.push(ResponseItem::ToolCallOutput {
+            tool_use_id: "tc-1".into(),
+            content: "ok".into(),
+            is_error: false,
+        });
+        h.push(ResponseItem::ToolCallOutput {
+            tool_use_id: "orphan-output".into(),
+            content: "missing call".into(),
+            is_error: false,
+        });
+
+        let msgs = h.for_prompt(&[InputModality::Text]);
+        let expected = vec![
+            Message::user("start").to_request_message(),
+            RequestMessage {
+                role: Role::Assistant.as_str().to_string(),
+                content: vec![RequestContent::ToolUse {
+                    id: "tc-1".into(),
+                    name: "bash".into(),
+                    input: serde_json::json!({ "cmd": "date" }),
+                }],
+            },
+            RequestMessage {
+                role: Role::User.as_str().to_string(),
+                content: vec![RequestContent::ToolResult {
+                    tool_use_id: "tc-1".into(),
+                    content: "ok".into(),
+                    is_error: None,
+                }],
+            },
+        ];
+
+        assert_eq!(
+            serde_json::to_value(&msgs).unwrap(),
+            serde_json::to_value(&expected).unwrap()
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_history_for_prompt_with_paired_tools() {
+        let mut h = History::new(test_context());
+        for index in 0..500 {
+            h.push(ResponseItem::Message(Message::assistant_text(format!(
+                "message {index}"
+            ))));
+            h.push(ResponseItem::ToolCall {
+                id: format!("tc-{index}"),
+                name: "bash".into(),
+                input: serde_json::json!({ "cmd": "date" }),
+            });
+            h.push(ResponseItem::ToolCallOutput {
+                tool_use_id: format!("tc-{index}"),
+                content: "ok".into(),
+                is_error: false,
+            });
+        }
+
+        let started = Instant::now();
+        let mut total_messages = 0;
+        for _ in 0..2_000 {
+            total_messages += black_box(h.for_prompt(black_box(&[InputModality::Text]))).len();
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_messages, 2_000_000);
+        println!(
+            "history_for_prompt_with_paired_tools iterations=2000 items=1500 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 2_000.0
+        );
     }
 
     #[test]

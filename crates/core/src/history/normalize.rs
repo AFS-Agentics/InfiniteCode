@@ -7,6 +7,8 @@
 //!   by the model are removed.
 //! - Reason-item stripping: `Reason` items can be removed before compaction.
 
+use std::collections::HashSet;
+
 use devo_protocol::InputModality;
 
 use crate::response_item::ResponseItem;
@@ -74,7 +76,9 @@ pub fn filter_by_modality(
     modalities: &[InputModality],
 ) -> Vec<ResponseItem> {
     let supports_text = modalities.contains(&InputModality::Text);
-    let _supports_image = modalities.contains(&InputModality::Image);
+    if supports_text && text_modality_keeps_all_items(items) {
+        return items.to_vec();
+    }
 
     items
         .iter()
@@ -108,6 +112,20 @@ pub fn filter_by_modality(
         .collect()
 }
 
+pub(crate) fn text_modality_keeps_all_items(items: &[ResponseItem]) -> bool {
+    items.iter().all(|item| match item {
+        ResponseItem::Message(msg) => msg.content.iter().all(|block| match block {
+            devo_protocol::ContentBlock::Text { .. }
+            | devo_protocol::ContentBlock::Reasoning { .. }
+            | devo_protocol::ContentBlock::ToolUse { .. }
+            | devo_protocol::ContentBlock::ToolResult { .. } => true,
+        }),
+        ResponseItem::Reason { .. }
+        | ResponseItem::ToolCall { .. }
+        | ResponseItem::ToolCallOutput { .. } => true,
+    })
+}
+
 /// Removes all `Reason` items from the slice and returns the filtered vector.
 ///
 /// This is used before compaction to strip reasoning text that is not
@@ -126,20 +144,33 @@ pub fn filter_reason(items: &[ResponseItem]) -> Vec<ResponseItem> {
 /// is removed from the sequence. This operates on a **mutable** slice
 /// since it is typically called before prompt building.
 pub fn pair_tool_call_items(items: &mut Vec<ResponseItem>) {
-    let tool_call_ids = items
-        .iter()
-        .filter_map(|item| match item {
-            ResponseItem::ToolCall { id, .. } => Some(id.clone()),
-            _ => None,
-        })
-        .collect::<std::collections::HashSet<_>>();
-    let tool_output_ids = items
-        .iter()
-        .filter_map(|item| match item {
-            ResponseItem::ToolCallOutput { tool_use_id, .. } => Some(tool_use_id.clone()),
-            _ => None,
-        })
-        .collect::<std::collections::HashSet<_>>();
+    let mut tool_call_ids = None::<HashSet<String>>;
+    let mut tool_output_ids = None::<HashSet<String>>;
+    for item in items.iter() {
+        match item {
+            ResponseItem::ToolCall { id, .. } => {
+                tool_call_ids
+                    .get_or_insert_with(|| HashSet::with_capacity(items.len() / 2))
+                    .insert(id.clone());
+            }
+            ResponseItem::ToolCallOutput { tool_use_id, .. } => {
+                tool_output_ids
+                    .get_or_insert_with(|| HashSet::with_capacity(items.len() / 2))
+                    .insert(tool_use_id.clone());
+            }
+            _ => {}
+        }
+    }
+    let Some(tool_call_ids) = tool_call_ids else {
+        if tool_output_ids.is_some() {
+            items.retain(|item| !matches!(item, ResponseItem::ToolCallOutput { .. }));
+        }
+        return;
+    };
+    let Some(tool_output_ids) = tool_output_ids else {
+        items.retain(|item| !matches!(item, ResponseItem::ToolCall { .. }));
+        return;
+    };
 
     items.retain(|item| match item {
         ResponseItem::ToolCall { id, .. } => tool_output_ids.contains(id),
@@ -150,6 +181,9 @@ pub fn pair_tool_call_items(items: &mut Vec<ResponseItem>) {
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -230,7 +264,7 @@ mod tests {
         ];
 
         let filtered = filter_by_modality(&items, &[InputModality::Text]);
-        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered, items);
     }
 
     #[test]
@@ -318,5 +352,104 @@ mod tests {
 
         pair_tool_call_items(&mut items);
         assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_pair_tool_call_items_without_tools() {
+        let mut items = (0..2_000)
+            .map(|index| ResponseItem::Message(Message::user(format!("plain message {index}"))))
+            .collect::<Vec<_>>();
+
+        let started = Instant::now();
+        let mut total_items = 0;
+        for _ in 0..10_000 {
+            pair_tool_call_items(black_box(&mut items));
+            total_items += black_box(items.len());
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_items, 20_000_000);
+        println!(
+            "pair_tool_call_items_without_tools iterations=10000 items=2000 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 10_000.0
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_pair_tool_call_items_with_paired_tools() {
+        let template = (0..500)
+            .flat_map(|index| {
+                [
+                    ResponseItem::Message(Message::assistant_text(format!("message {index}"))),
+                    ResponseItem::ToolCall {
+                        id: format!("tc-{index}"),
+                        name: "bash".into(),
+                        input: serde_json::json!({ "cmd": "date" }),
+                    },
+                    ResponseItem::ToolCallOutput {
+                        tool_use_id: format!("tc-{index}"),
+                        content: "ok".into(),
+                        is_error: false,
+                    },
+                ]
+            })
+            .collect::<Vec<_>>();
+
+        let started = Instant::now();
+        let mut total_items = 0;
+        for _ in 0..2_000 {
+            let mut items = black_box(template.clone());
+            pair_tool_call_items(black_box(&mut items));
+            total_items += black_box(items.len());
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_items, 3_000_000);
+        println!(
+            "pair_tool_call_items_with_paired_tools iterations=2000 items=1500 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 2_000.0
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_filter_by_modality_text_preserves_messages() {
+        let items = (0..2_000)
+            .map(|index| {
+                ResponseItem::Message(Message {
+                    role: devo_protocol::Role::Assistant,
+                    content: vec![
+                        devo_protocol::ContentBlock::Text {
+                            text: format!("assistant text {index}"),
+                        },
+                        devo_protocol::ContentBlock::Reasoning {
+                            text: format!("reasoning {index}"),
+                        },
+                    ],
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let started = Instant::now();
+        let mut total_items = 0;
+        for _ in 0..5_000 {
+            total_items += black_box(filter_by_modality(
+                black_box(&items),
+                black_box(&[InputModality::Text]),
+            ))
+            .len();
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_items, 10_000_000);
+        println!(
+            "filter_by_modality_text_preserves_messages iterations=5000 items=2000 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 5_000.0
+        );
     }
 }
