@@ -501,10 +501,11 @@ fn insert_subagent_request_reminders(
 }
 
 fn insert_goal_context_message(messages: &mut Vec<RequestMessage>, goal_context: &str) {
-    let insert_at = messages
-        .iter()
-        .rposition(is_user_text_message)
-        .unwrap_or(messages.len());
+    let insert_at = if messages.last().is_some_and(is_user_text_message) {
+        messages.len().saturating_sub(1)
+    } else {
+        messages.len()
+    };
     messages.splice(
         insert_at..insert_at,
         [request_text_message(goal_context.to_string())],
@@ -2405,6 +2406,50 @@ mod tests {
             .position(|message| message_contains(message, "finish implementation"))
             .expect("latest user request message");
         assert!(goal_index < request_index);
+    }
+
+    #[tokio::test]
+    async fn autonomous_goal_context_is_latest_request_after_completed_turn() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
+            requests: Arc::clone(&requests),
+        });
+        let registry = Arc::new(ToolRegistry::new());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let model = Model {
+            slug: "model-a".into(),
+            base_instructions: "base instructions".into(),
+            ..Model::default()
+        };
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("older user prompt"));
+        session.push_message(Message::assistant_text("older assistant reply"));
+
+        query_with_interaction_mode(
+            &mut session,
+            &TurnConfig::new(model, None),
+            Arc::clone(&provider),
+            registry,
+            &runtime,
+            None,
+            InteractionMode::Build,
+            Some("<goal_context>continue the active goal</goal_context>"),
+        )
+        .await
+        .expect("query should succeed");
+
+        let captured = requests.lock().expect("lock requests");
+        assert_eq!(captured.len(), 1);
+        let messages = &captured[0].messages;
+        let goal_index = messages
+            .iter()
+            .position(|message| message_contains(message, "continue the active goal"))
+            .expect("goal context message");
+        let assistant_index = messages
+            .iter()
+            .position(|message| message_contains(message, "older assistant reply"))
+            .expect("assistant history message");
+        assert!(goal_index > assistant_index);
     }
 
     #[tokio::test]

@@ -207,6 +207,7 @@ impl ServerRuntime {
                         display_input_for_task,
                         input_for_task,
                         params.interaction_mode,
+                        TurnInputMode::VisibleUserMessage,
                     )
                     .await;
             });

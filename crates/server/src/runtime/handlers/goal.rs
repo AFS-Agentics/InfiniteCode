@@ -32,6 +32,10 @@ impl GoalStore {
         self.active_goal.as_ref()
     }
 
+    pub fn get_mut(&mut self) -> Option<&mut Goal> {
+        self.active_goal.as_mut()
+    }
+
     pub fn create(&mut self, params: GoalCreateParams) -> Result<Goal, GoalError> {
         if self.active_goal.is_some() && !params.replace_existing {
             return Err(GoalError::AlreadyActive);

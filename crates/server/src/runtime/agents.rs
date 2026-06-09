@@ -451,6 +451,7 @@ impl ServerRuntime {
                     display_input,
                     input_text,
                     devo_protocol::InteractionMode::Build,
+                    TurnInputMode::VisibleUserMessage,
                 )
                 .await;
         });

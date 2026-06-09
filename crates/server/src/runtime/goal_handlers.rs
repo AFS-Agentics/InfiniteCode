@@ -4,7 +4,7 @@ impl ServerRuntime {
     // ── Goal Handlers ─────────────────────────────────────────────────
 
     pub(super) async fn handle_goal_create(
-        &self,
+        self: &Arc<Self>,
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
@@ -18,19 +18,26 @@ impl ServerRuntime {
                 );
             }
         };
+        let session_id = params.session_id;
 
         let mut stores = self.goal_stores.lock().await;
-        let store = stores
-            .entry(params.session_id)
-            .or_insert_with(GoalStore::new);
+        let store = stores.entry(session_id).or_insert_with(GoalStore::new);
         match store.create(params) {
-            Ok(goal) => serde_json::to_value(SuccessResponse {
-                id: request_id,
-                result: devo_protocol::GoalCreateResult {
-                    goal: goal.to_thread_goal(),
-                },
-            })
-            .expect("serialize goal create result"),
+            Ok(goal) => {
+                let should_continue = goal.status == crate::goal::GoalStatus::Active;
+                let result = serde_json::to_value(SuccessResponse {
+                    id: request_id,
+                    result: devo_protocol::GoalCreateResult {
+                        goal: goal.to_thread_goal(),
+                    },
+                })
+                .expect("serialize goal create result");
+                drop(stores);
+                if should_continue {
+                    self.maybe_start_goal_continuation_turn(session_id).await;
+                }
+                result
+            }
             Err(e) => self.error_response(
                 request_id,
                 ProtocolErrorCode::InvalidParams,
@@ -40,7 +47,7 @@ impl ServerRuntime {
     }
 
     pub(super) async fn handle_goal_set(
-        &self,
+        self: &Arc<Self>,
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
@@ -54,19 +61,26 @@ impl ServerRuntime {
                 );
             }
         };
+        let session_id = params.session_id;
 
         let mut stores = self.goal_stores.lock().await;
-        let store = stores
-            .entry(params.session_id)
-            .or_insert_with(GoalStore::new);
+        let store = stores.entry(session_id).or_insert_with(GoalStore::new);
         match store.set(params) {
-            Ok(goal) => serde_json::to_value(SuccessResponse {
-                id: request_id,
-                result: devo_protocol::GoalSetResult {
-                    goal: goal.to_thread_goal(),
-                },
-            })
-            .expect("serialize goal set result"),
+            Ok(goal) => {
+                let should_continue = goal.status == crate::goal::GoalStatus::Active;
+                let result = serde_json::to_value(SuccessResponse {
+                    id: request_id,
+                    result: devo_protocol::GoalSetResult {
+                        goal: goal.to_thread_goal(),
+                    },
+                })
+                .expect("serialize goal set result");
+                drop(stores);
+                if should_continue {
+                    self.maybe_start_goal_continuation_turn(session_id).await;
+                }
+                result
+            }
             Err(e) => self.error_response(
                 request_id,
                 ProtocolErrorCode::InvalidParams,
@@ -117,7 +131,7 @@ impl ServerRuntime {
     }
 
     pub(super) async fn handle_goal_resume(
-        &self,
+        self: &Arc<Self>,
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
@@ -131,9 +145,10 @@ impl ServerRuntime {
                 );
             }
         };
+        let session_id = params.session_id;
 
         let mut stores = self.goal_stores.lock().await;
-        let Some(store) = stores.get_mut(&params.session_id) else {
+        let Some(store) = stores.get_mut(&session_id) else {
             return self.error_response(
                 request_id,
                 ProtocolErrorCode::SessionNotFound,
@@ -141,13 +156,21 @@ impl ServerRuntime {
             );
         };
         match store.set_status(devo_protocol::ThreadGoalStatus::Active) {
-            Ok(goal) => serde_json::to_value(SuccessResponse {
-                id: request_id,
-                result: devo_protocol::GoalSetStatusResult {
-                    goal: goal.to_thread_goal(),
-                },
-            })
-            .expect("serialize goal resume result"),
+            Ok(goal) => {
+                let should_continue = goal.status == crate::goal::GoalStatus::Active;
+                let result = serde_json::to_value(SuccessResponse {
+                    id: request_id,
+                    result: devo_protocol::GoalSetStatusResult {
+                        goal: goal.to_thread_goal(),
+                    },
+                })
+                .expect("serialize goal resume result");
+                drop(stores);
+                if should_continue {
+                    self.maybe_start_goal_continuation_turn(session_id).await;
+                }
+                result
+            }
             Err(e) => self.error_response(
                 request_id,
                 ProtocolErrorCode::InvalidParams,

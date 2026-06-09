@@ -1033,23 +1033,26 @@ impl ServerRuntime {
         display_input: String,
         input: String,
         interaction_mode: devo_protocol::InteractionMode,
+        input_mode: TurnInputMode,
     ) {
         if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
             session_arc.lock().await.turn_approval_cache =
                 crate::execution::ApprovalGrantCache::default();
         }
-        // Record the user's message immediately so the UI can show it even if
-        // the model call or event stream takes a moment to start.
-        self.emit_turn_item(
-            session_id,
-            turn.turn_id,
-            ItemKind::UserMessage,
-            TurnItem::UserMessage(TextItem {
-                text: display_input.clone(),
-            }),
-            serde_json::json!({ "title": "You", "text": display_input.clone() }),
-        )
-        .await;
+        if input_mode.emits_user_message() {
+            // Record the user's message immediately so the UI can show it even if
+            // the model call or event stream takes a moment to start.
+            self.emit_turn_item(
+                session_id,
+                turn.turn_id,
+                ItemKind::UserMessage,
+                TurnItem::UserMessage(TextItem {
+                    text: display_input.clone(),
+                }),
+                serde_json::json!({ "title": "You", "text": display_input.clone() }),
+            )
+            .await;
+        }
 
         let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() else {
             return;
@@ -1856,15 +1859,22 @@ impl ServerRuntime {
                 };
                 (Arc::clone(&session.core_session), agent_scope)
             };
-            let goal_context = {
-                let stores = self.goal_stores.lock().await;
-                stores
-                    .get(&session_id)
-                    .and_then(GoalStore::get)
-                    .and_then(crate::goal::Goal::continuation_prompt)
+            let goal_context = match &input_mode {
+                TurnInputMode::VisibleUserMessage => {
+                    let stores = self.goal_stores.lock().await;
+                    stores
+                        .get(&session_id)
+                        .and_then(GoalStore::get)
+                        .and_then(crate::goal::Goal::continuation_prompt)
+                }
+                TurnInputMode::HiddenGoalContinuation { goal_context } => {
+                    Some(goal_context.clone())
+                }
             };
             let mut core_session = core_session.lock().await;
-            core_session.push_message(Message::user(input.clone()));
+            if input_mode.emits_user_message() {
+                core_session.push_message(Message::user(input.clone()));
+            }
             let event_callback_tx = event_tx.clone();
             let callback = std::sync::Arc::new(move |event: QueryEvent| {
                 event_callback_tx.send(event);
@@ -2084,7 +2094,7 @@ impl ServerRuntime {
         .await;
 
         // After the turn completes, check for queued inputs and start the next turn.
-        let (display_input, input_text, queued_interaction_mode) = {
+        let queued_input = {
             let session_arc = match self.sessions.lock().await.get(&session_id).cloned() {
                 Some(s) => s,
                 None => return,
@@ -2104,11 +2114,11 @@ impl ServerRuntime {
                     kind: devo_core::PendingInputKind::UserText { text },
                     metadata,
                     ..
-                }) => (
+                }) => Some((
                     text.clone(),
                     text,
                     interaction_mode_from_pending_metadata(metadata.as_ref()),
-                ),
+                )),
                 Some(devo_core::PendingInputItem {
                     kind:
                         devo_core::PendingInputKind::UserInput {
@@ -2118,13 +2128,17 @@ impl ServerRuntime {
                         },
                     metadata,
                     ..
-                }) => (
+                }) => Some((
                     display_text,
                     prompt_text,
                     interaction_mode_from_pending_metadata(metadata.as_ref()),
-                ),
-                _ => return,
+                )),
+                _ => None,
             }
+        };
+        let Some((display_input, input_text, queued_interaction_mode)) = queued_input else {
+            self.maybe_start_goal_continuation_turn(session_id).await;
+            return;
         };
         // Update clients before starting the next turn so dequeued input is
         // removed from any pending queue display.
@@ -2197,6 +2211,7 @@ impl ServerRuntime {
             display_input,
             input_text,
             queued_interaction_mode,
+            TurnInputMode::VisibleUserMessage,
         ))
         .await;
     }
@@ -2319,6 +2334,7 @@ impl ServerRuntime {
                     display_input,
                     input_text,
                     queued_interaction_mode,
+                    TurnInputMode::VisibleUserMessage,
                 )
                 .await;
         });

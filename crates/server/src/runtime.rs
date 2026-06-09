@@ -151,6 +151,7 @@ mod agents;
 mod approval;
 mod command_exec;
 mod connection;
+mod goal_continuation;
 mod goal_handlers;
 mod handlers;
 mod items;
@@ -191,6 +192,18 @@ pub struct ServerRuntime {
         Mutex<HashMap<devo_protocol::ReferenceSearchId, reference_search::ReferenceSearchState>>,
     /// Live client-owned shell/process sessions.
     command_exec_manager: command_exec::CommandExecManager,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TurnInputMode {
+    VisibleUserMessage,
+    HiddenGoalContinuation { goal_context: String },
+}
+
+impl TurnInputMode {
+    fn emits_user_message(&self) -> bool {
+        matches!(self, Self::VisibleUserMessage)
+    }
 }
 
 impl ServerRuntime {
