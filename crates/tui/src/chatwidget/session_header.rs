@@ -3,6 +3,7 @@
 //! The chat widget owns the session state, while this module keeps header refresh,
 //! token summary text, and small shared rendering helpers out of the root file.
 
+use std::fmt::Write as _;
 use std::path::Path;
 use std::time::Instant;
 
@@ -225,27 +226,44 @@ impl ChatWidget {
     }
 
     pub(super) fn format_compact_token_count(value: usize) -> String {
+        let mut rendered = String::new();
+        Self::push_compact_token_count(&mut rendered, value);
+        rendered
+    }
+
+    fn push_compact_token_count(rendered: &mut String, value: usize) {
         if value >= 1_000_000 {
-            format!("{:.1}M", value as f64 / 1_000_000.0)
+            write!(rendered, "{:.1}M", value as f64 / 1_000_000.0)
+                .expect("writing to String should not fail");
         } else if value >= 1_000 {
-            format!("{:.0}k", value as f64 / 1_000.0)
+            write!(rendered, "{:.0}k", value as f64 / 1_000.0)
+                .expect("writing to String should not fail");
         } else {
-            value.to_string()
+            write!(rendered, "{value}").expect("writing to String should not fail");
         }
     }
 
     pub(super) fn render_progress_bar(used: usize, total: usize, bar_width: usize) -> String {
+        let mut rendered = String::with_capacity(bar_width.saturating_mul(3).saturating_add(5));
+        Self::push_progress_bar(&mut rendered, used, total, bar_width);
+        rendered
+    }
+
+    fn push_progress_bar(rendered: &mut String, used: usize, total: usize, bar_width: usize) {
         if total == 0 {
-            return String::new();
+            return;
         }
         let ratio = (used as f64 / total as f64).clamp(0.0, 1.0);
         let filled = (ratio * bar_width as f64).round() as usize;
         let empty = bar_width.saturating_sub(filled);
-        let bar: String = std::iter::repeat_n('▰', filled)
-            .chain(std::iter::repeat_n('▱', empty))
-            .collect();
+        for _ in 0..filled {
+            rendered.push('▰');
+        }
+        for _ in 0..empty {
+            rendered.push('▱');
+        }
         let pct = (ratio * 100.0).round() as usize;
-        format!("{bar} {pct}%")
+        write!(rendered, " {pct}%").expect("writing to String should not fail");
     }
 
     pub(super) fn percent_of(numerator: usize, denominator: usize) -> usize {
@@ -257,42 +275,37 @@ impl ChatWidget {
     }
 
     pub(super) fn session_summary_text(&self) -> String {
+        self.session_summary_text_with_context(/*include_context*/ true)
+    }
+
+    fn session_summary_text_with_context(&self, include_context: bool) -> String {
         let model = self.model_display_name();
         let thinking = self
             .display_thinking_selection()
             .unwrap_or_else(|| "default".to_string());
         let cached_input_percent =
             Self::percent_of(self.total_cache_read_tokens, self.total_input_tokens);
-        let context = self
-            .context_usage()
-            .map_or_else(String::new, |(used, total, _percent)| {
-                format!(
-                    "{} {}/{}",
-                    Self::render_progress_bar(used, total, 10),
-                    Self::format_compact_token_count(used),
-                    Self::format_compact_token_count(total)
-                )
-            });
 
-        let mut parts: Vec<String> = Vec::new();
-        parts.push(format!("{model} {thinking}"));
-        parts.push(format!(
-            "↑{}",
-            Self::format_compact_token_count(self.total_input_tokens)
-        ));
-        parts.push(format!(
-            "(cached {} {}%)",
-            Self::format_compact_token_count(self.total_cache_read_tokens),
-            cached_input_percent
-        ));
-        parts.push(format!(
-            "↓{}",
-            Self::format_compact_token_count(self.total_output_tokens)
-        ));
-        if !context.is_empty() {
-            parts.push(context);
+        let mut summary = String::with_capacity(model.len() + thinking.len() + 96);
+        summary.push_str(model);
+        summary.push(' ');
+        summary.push_str(&thinking);
+        summary.push_str("  ↑");
+        Self::push_compact_token_count(&mut summary, self.total_input_tokens);
+        summary.push_str("  (cached ");
+        Self::push_compact_token_count(&mut summary, self.total_cache_read_tokens);
+        write!(summary, " {cached_input_percent}%)  ↓").expect("writing to String should not fail");
+        Self::push_compact_token_count(&mut summary, self.total_output_tokens);
+
+        if include_context && let Some((used, total, _percent)) = self.context_usage() {
+            summary.push_str("  ");
+            Self::push_progress_bar(&mut summary, used, total, 10);
+            summary.push(' ');
+            Self::push_compact_token_count(&mut summary, used);
+            summary.push('/');
+            Self::push_compact_token_count(&mut summary, total);
         }
-        parts.join("  ")
+        summary
     }
 
     pub(super) fn model_display_name(&self) -> &str {
@@ -309,8 +322,10 @@ impl ChatWidget {
     }
 
     pub(super) fn sync_bottom_pane_summary(&mut self) {
+        let summary =
+            self.session_summary_text_with_context(self.session.active_agent_label.is_none());
         self.bottom_pane
-            .set_status_line(Some(Line::from(self.session_summary_text()).dim()));
+            .set_status_line(Some(Line::from(summary).dim()));
         self.bottom_pane.set_status_line_enabled(true);
     }
 
@@ -479,11 +494,13 @@ impl ChatWidget {
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::time::Instant;
 
     use devo_protocol::PermissionPreset;
     use devo_protocol::ReasoningEffort;
     use devo_protocol::ThinkingCapability;
     use pretty_assertions::assert_eq;
+    use std::hint::black_box;
     use tokio::sync::mpsc;
 
     use crate::app_event_sender::AppEventSender;
@@ -492,6 +509,37 @@ mod tests {
     use crate::tui::frame_requester::FrameRequester;
 
     use super::*;
+
+    fn widget_for_summary_bench() -> ChatWidget {
+        let model = Model {
+            slug: "test-model".to_string(),
+            display_name: "Test Model".to_string(),
+            context_window: 200_000,
+            effective_context_window_percent: Some(95),
+            ..Model::default()
+        };
+        let (app_event_tx, _app_event_rx) = mpsc::unbounded_channel();
+        let mut widget = ChatWidget::new_with_app_event(ChatWidgetInit {
+            frame_requester: FrameRequester::test_dummy(),
+            app_event_tx: AppEventSender::new(app_event_tx),
+            initial_session: TuiSessionState::new(PathBuf::from("."), Some(model)),
+            initial_thinking_selection: None,
+            initial_permission_preset: PermissionPreset::Default,
+            initial_user_message: None,
+            enhanced_keys_supported: true,
+            is_first_run: false,
+            available_models: Vec::new(),
+            saved_model_slugs: Vec::new(),
+            show_model_onboarding: false,
+            startup_tooltip_override: None,
+            initial_theme_name: None,
+        });
+        widget.total_input_tokens = 124_000;
+        widget.total_cache_read_tokens = 82_000;
+        widget.total_output_tokens = 9_600;
+        widget.last_query_input_tokens = 157_000;
+        widget
+    }
 
     #[test]
     fn session_summary_resolves_default_reasoning_for_capable_model() {
@@ -526,5 +574,63 @@ mod tests {
 
         assert_eq!(summary.contains("default"), false);
         assert_eq!(summary.starts_with("deepseek-v4-flash high"), true);
+    }
+
+    #[test]
+    fn session_summary_text_formats_token_context() {
+        let widget = widget_for_summary_bench();
+
+        assert_eq!(
+            widget.status_summary_text(),
+            "Test Model default  ↑124k  (cached 82k 66%)  ↓10k  ▰▰▰▰▰▰▰▰▱▱ 83% 157k/190k"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_render_progress_bar() {
+        let iterations = 500_000;
+        let expected_len = ChatWidget::render_progress_bar(157_000, 190_000, 10).len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(ChatWidget::render_progress_bar(
+                black_box(157_000),
+                black_box(190_000),
+                black_box(10),
+            ))
+            .len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "render_progress_bar iterations={iterations} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_session_summary_text() {
+        let widget = widget_for_summary_bench();
+        let iterations = 200_000;
+        let expected_len = widget.status_summary_text().len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(widget.status_summary_text()).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "session_summary_text iterations={iterations} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 }

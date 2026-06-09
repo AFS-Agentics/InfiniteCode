@@ -51,13 +51,13 @@ impl ToolResultCell {
             INLINE_OUTPUT_PREVIEW_ROWS,
             INLINE_OUTPUT_PREVIEW_LINE_LIMIT,
         );
-        for line in &mut preview_lines {
-            line.spans = line
-                .spans
-                .clone()
-                .into_iter()
-                .map(|span| span.patch_style(self.output_style))
-                .collect();
+        if self.output_style != Style::default() {
+            for line in &mut preview_lines {
+                line.spans = std::mem::take(&mut line.spans)
+                    .into_iter()
+                    .map(|span| span.patch_style(self.output_style))
+                    .collect();
+            }
         }
         if self.show_empty_ellipsis && preview_lines.is_empty() {
             preview_lines.push(Line::from("...").patch_style(self.output_style));
@@ -71,11 +71,13 @@ impl ToolResultCell {
             .lines()
             .map(|line| {
                 let mut line = ansi_escape_line(line);
-                line.spans = line
-                    .spans
-                    .into_iter()
-                    .map(|span| span.patch_style(self.output_style))
-                    .collect();
+                if self.output_style != Style::default() {
+                    line.spans = line
+                        .spans
+                        .into_iter()
+                        .map(|span| span.patch_style(self.output_style))
+                        .collect();
+                }
                 line
             })
             .collect()
@@ -110,7 +112,10 @@ impl HistoryCell for ToolResultCell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ratatui::style::Color;
     use ratatui::text::Span;
+    use std::hint::black_box;
+    use std::time::Instant;
 
     fn plain(lines: Vec<Line<'static>>) -> Vec<String> {
         lines
@@ -122,6 +127,21 @@ mod tests {
                     .collect::<String>()
             })
             .collect()
+    }
+
+    fn large_default_cell() -> ToolResultCell {
+        let output = (1..=512)
+            .map(|index| format!("line {index}: tool output payload"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        ToolResultCell::new(
+            Some(Line::from("Ran test")),
+            output,
+            Line::from(vec![Span::from("| ")]),
+            Line::from("  "),
+            Style::default(),
+            false,
+        )
     }
 
     #[test]
@@ -151,5 +171,67 @@ mod tests {
         assert!(!inline.contains("line 6"));
         assert!(transcript.contains("line 5"));
         assert!(transcript.contains("line 8"));
+    }
+
+    #[test]
+    fn output_style_patches_transcript_output() {
+        let cell = ToolResultCell::new(
+            None,
+            "styled output".to_string(),
+            Line::from(vec![Span::from("| ")]),
+            Line::from("  "),
+            Style::default().fg(Color::Red),
+            false,
+        );
+
+        let lines = cell.transcript_lines(80);
+
+        assert!(lines.iter().flat_map(|line| line.spans.iter()).any(|span| {
+            span.content.contains("styled output") && span.style.fg == Some(Color::Red)
+        }));
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_display_lines_default_style() {
+        let cell = large_default_cell();
+        let iterations = 20_000;
+        let expected_len = cell.display_lines(100).len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(cell.display_lines(black_box(100))).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "tool_result_cell_display_lines_default_style iterations={iterations} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_transcript_lines_default_style() {
+        let cell = large_default_cell();
+        let iterations = 10_000;
+        let expected_len = cell.transcript_lines(100).len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(cell.transcript_lines(black_box(100))).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "tool_result_cell_transcript_lines_default_style iterations={iterations} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 }

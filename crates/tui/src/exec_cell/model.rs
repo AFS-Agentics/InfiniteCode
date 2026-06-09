@@ -65,8 +65,10 @@ impl ExecCell {
             interaction_input,
         };
         if self.is_exploring_cell() && Self::is_exploring_call(&call) {
+            let mut calls = self.calls.clone();
+            calls.push(call);
             Some(Self {
-                calls: [self.calls.clone(), vec![call]].concat(),
+                calls,
                 animations_enabled: self.animations_enabled,
             })
         } else {
@@ -196,5 +198,118 @@ impl ExecCall {
 
     pub(crate) fn is_unified_exec_interaction(&self) -> bool {
         matches!(self.source, ExecCommandSource::UnifiedExecInteraction)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::hint::black_box;
+    use std::path::PathBuf;
+    use std::time::Instant;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    fn exploring_call(index: usize) -> ExecCall {
+        ExecCall {
+            call_id: format!("call-{index}"),
+            command: vec!["rg".into(), format!("needle-{index}")],
+            parsed: vec![ParsedCommand::Search {
+                cmd: format!("rg needle-{index}"),
+                query: Some(format!("needle-{index}")),
+                path: Some("crates/tui/src".to_string()),
+            }],
+            output: None,
+            source: ExecCommandSource::Agent,
+            start_time: Some(Instant::now()),
+            duration: None,
+            interaction_input: None,
+        }
+    }
+
+    fn exploring_cell(call_count: usize) -> ExecCell {
+        ExecCell {
+            calls: (0..call_count).map(exploring_call).collect(),
+            animations_enabled: false,
+        }
+    }
+
+    #[test]
+    fn with_added_call_appends_exploring_call_in_order() {
+        let cell = exploring_cell(2);
+
+        let actual = cell
+            .with_added_call(
+                "call-2".to_string(),
+                vec!["rg".into(), "needle-2".into()],
+                vec![ParsedCommand::Search {
+                    cmd: "rg needle-2".to_string(),
+                    query: Some("needle-2".to_string()),
+                    path: Some("crates/tui/src".to_string()),
+                }],
+                ExecCommandSource::Agent,
+                None,
+            )
+            .expect("exploring call should append to exploring cell");
+
+        let call_ids = actual
+            .calls
+            .iter()
+            .map(|call| call.call_id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(call_ids, vec!["call-0", "call-1", "call-2"]);
+        assert!(cell.calls.iter().all(|call| call.output.is_none()));
+    }
+
+    #[test]
+    fn with_added_call_rejects_user_shell_call() {
+        let cell = exploring_cell(1);
+
+        let actual = cell.with_added_call(
+            "shell".to_string(),
+            vec!["bash".into(), "-lc".into(), "date".into()],
+            vec![ParsedCommand::Unknown {
+                cmd: "date".to_string(),
+            }],
+            ExecCommandSource::UserShell,
+            None,
+        );
+
+        assert!(actual.is_none());
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_with_added_call_on_exploring_cell() {
+        let cell = exploring_cell(256);
+        let parsed = vec![ParsedCommand::Read {
+            cmd: "sed -n '1,40p' crates/tui/src/exec_cell/model.rs".to_string(),
+            name: "model.rs".to_string(),
+            path: PathBuf::from("crates/tui/src/exec_cell/model.rs"),
+        }];
+
+        let started = Instant::now();
+        let mut total_calls = 0;
+        for index in 0..20_000 {
+            let next = black_box(&cell)
+                .with_added_call(
+                    format!("new-call-{index}"),
+                    vec!["sed".into(), "-n".into(), "1,40p".into()],
+                    black_box(parsed.clone()),
+                    ExecCommandSource::Agent,
+                    None,
+                )
+                .expect("exploring call should append");
+            total_calls += black_box(next.calls.len());
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_calls, 5_140_000);
+        println!(
+            "with_added_call_on_exploring_cell iterations=20000 existing_calls=256 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 20_000.0
+        );
     }
 }
