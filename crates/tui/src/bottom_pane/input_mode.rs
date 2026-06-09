@@ -2,6 +2,8 @@ use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::text::Span;
 
+use devo_protocol::CollaborationMode;
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum InputMode {
     #[default]
@@ -38,6 +40,20 @@ impl InputMode {
             Self::Shell => Color::Rgb(245, 142, 53),
         }
     }
+
+    pub(crate) fn collaboration_mode(self) -> CollaborationMode {
+        match self {
+            Self::Build | Self::Shell => CollaborationMode::Build,
+            Self::Plan => CollaborationMode::Plan,
+        }
+    }
+
+    pub(crate) fn from_collaboration_mode(collaboration_mode: CollaborationMode) -> Self {
+        match collaboration_mode {
+            CollaborationMode::Build => Self::Build,
+            CollaborationMode::Plan => Self::Plan,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -62,6 +78,26 @@ mod tests {
         assert_eq!(
             InputMode::Shell.styled_span(false),
             Span::styled("SHELL", Style::default().fg(Color::Rgb(245, 142, 53)))
+        );
+        assert_eq!(
+            InputMode::Build.collaboration_mode(),
+            CollaborationMode::Build
+        );
+        assert_eq!(
+            InputMode::Plan.collaboration_mode(),
+            CollaborationMode::Plan
+        );
+        assert_eq!(
+            InputMode::Shell.collaboration_mode(),
+            CollaborationMode::Build
+        );
+        assert_eq!(
+            InputMode::from_collaboration_mode(CollaborationMode::Build),
+            InputMode::Build
+        );
+        assert_eq!(
+            InputMode::from_collaboration_mode(CollaborationMode::Plan),
+            InputMode::Plan
         );
     }
 }

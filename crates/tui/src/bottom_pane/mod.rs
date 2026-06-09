@@ -171,6 +171,7 @@ pub(crate) enum InputResult {
         text_elements: Vec<TextElement>,
         local_images: Vec<LocalImageAttachment>,
         mention_bindings: Vec<MentionBinding>,
+        input_mode: InputMode,
         collaboration_mode: CollaborationMode,
     },
     ShellCommand {
@@ -364,6 +365,7 @@ impl BottomPane {
                 text_elements: Vec::new(),
                 local_images: Vec::new(),
                 mention_bindings: Vec::new(),
+                input_mode: InputMode::Build,
                 collaboration_mode: CollaborationMode::Build,
             };
         }
@@ -785,15 +787,14 @@ impl BottomPane {
         } else {
             (text, text_elements)
         };
+        let input_mode = self.input_mode;
         InputResult::Submitted {
             text,
             text_elements,
             local_images,
             mention_bindings,
-            collaboration_mode: match self.input_mode {
-                InputMode::Build | InputMode::Shell => CollaborationMode::Build,
-                InputMode::Plan => CollaborationMode::Plan,
-            },
+            input_mode,
+            collaboration_mode: input_mode.collaboration_mode(),
         }
     }
 

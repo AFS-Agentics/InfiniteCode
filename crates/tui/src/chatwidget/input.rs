@@ -18,6 +18,7 @@ use ratatui::text::Span;
 use crate::ansi_escape::ansi_escape_line;
 use crate::app_command::AppCommand;
 use crate::app_event::AppEvent;
+use crate::bottom_pane::InputMode;
 use crate::bottom_pane::InputResult;
 use crate::history_cell;
 use crate::history_cell::PlainHistoryCell;
@@ -87,6 +88,7 @@ impl ChatWidget {
                 text_elements,
                 local_images,
                 mention_bindings,
+                input_mode,
                 collaboration_mode,
             } => {
                 let user_message = UserMessage {
@@ -100,6 +102,7 @@ impl ChatWidget {
                     // Turn is active — show in bottom pane as pending cell.
                     self.bottom_pane
                         .push_pending_cell(user_message.text.clone());
+                    self.queued_input_modes.push_back(input_mode);
                     self.queued_count += 1;
                     self.app_event_tx.send(AppEvent::Command(
                         AppCommand::user_turn_with_collaboration_mode(
@@ -114,9 +117,10 @@ impl ChatWidget {
                     ));
                     self.set_status_message("Message queued");
                 } else {
-                    self.submit_user_message_with_collaboration_mode(
+                    self.submit_user_message_with_modes(
                         user_message,
                         collaboration_mode,
+                        input_mode,
                     );
                 }
             }
@@ -124,6 +128,7 @@ impl ChatWidget {
                 if self.busy {
                     self.set_status_message("Cannot run shell command while generating");
                 } else {
+                    self.current_turn_mode = InputMode::Shell;
                     self.app_event_tx
                         .send(AppEvent::Command(AppCommand::execute_shell_command(
                             command,
@@ -135,6 +140,7 @@ impl ChatWidget {
                 if self.busy {
                     self.set_status_message("Cannot run shell command while generating");
                 } else {
+                    self.current_turn_mode = InputMode::Shell;
                     self.app_event_tx
                         .send(AppEvent::Command(AppCommand::submit_shell_input(command)));
                     self.set_status_message("Shell command submitted");
@@ -218,9 +224,7 @@ impl ChatWidget {
                 self.set_status_message("Persistent composer history is not available");
             }
             AppEvent::ClearTranscript => {
-                self.history.clear();
-                self.next_history_flush_index = 0;
-                self.frame_requester.schedule_frame();
+                self.clear_transcript_view();
             }
             AppEvent::Interrupt => self.set_status_message("Interrupted"),
             AppEvent::Command(command) => {
@@ -285,18 +289,24 @@ impl ChatWidget {
     }
 
     pub(super) fn submit_user_message(&mut self, user_message: UserMessage) {
-        self.submit_user_message_with_collaboration_mode(user_message, CollaborationMode::Build);
+        self.submit_user_message_with_modes(
+            user_message,
+            CollaborationMode::Build,
+            InputMode::Build,
+        );
     }
 
-    pub(super) fn submit_user_message_with_collaboration_mode(
+    pub(super) fn submit_user_message_with_modes(
         &mut self,
         user_message: UserMessage,
         collaboration_mode: CollaborationMode,
+        input_mode: InputMode,
     ) {
         if user_message.text.trim().is_empty() {
             return;
         }
 
+        self.current_turn_mode = input_mode;
         let local_image_paths = user_message
             .local_images
             .iter()
@@ -309,6 +319,7 @@ impl ChatWidget {
             local_image_paths,
             user_message.remote_image_urls.clone(),
             self.active_accent_color(),
+            input_mode,
         ));
 
         self.app_event_tx.send(AppEvent::Command(
