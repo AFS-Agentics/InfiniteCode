@@ -4,6 +4,7 @@ use devo_protocol::ApprovalDecisionValue;
 use devo_protocol::ApprovalScopeValue;
 use devo_protocol::InputItem;
 use devo_protocol::InteractionMode;
+use devo_protocol::RequestUserInputResponse;
 use devo_protocol::SessionId;
 use devo_protocol::TurnId;
 use devo_protocol::TurnStartParams;
@@ -59,6 +60,12 @@ pub(crate) enum AppCommand {
         decision: ApprovalDecisionValue,
         scope: ApprovalScopeValue,
     },
+    RequestUserInputRespond {
+        session_id: SessionId,
+        turn_id: TurnId,
+        request_id: String,
+        response: RequestUserInputResponse,
+    },
     UpdatePermissions {
         preset: devo_protocol::PermissionPreset,
     },
@@ -108,6 +115,10 @@ pub(crate) enum AppCommandView<'a> {
         approval_id: &'a str,
         decision: &'a ApprovalDecisionValue,
         scope: &'a ApprovalScopeValue,
+    },
+    RequestUserInputRespond {
+        request_id: &'a str,
+        response: &'a RequestUserInputResponse,
     },
     UpdatePermissions {
         preset: devo_protocol::PermissionPreset,
@@ -261,6 +272,7 @@ impl AppCommand {
             Self::OverrideTurnContext { .. } => "override_turn_context",
             Self::SteerTurn { .. } => "steer_turn",
             Self::ApprovalRespond { .. } => "approval_respond",
+            Self::RequestUserInputRespond { .. } => "request_user_input_respond",
             Self::UpdatePermissions { .. } => "update_permissions",
             Self::BrowseInputHistory { .. } => "browse_input_history",
             Self::SwitchSession { .. } => "switch_session",
@@ -320,6 +332,14 @@ impl AppCommand {
                 approval_id,
                 decision,
                 scope,
+            },
+            Self::RequestUserInputRespond {
+                request_id,
+                response,
+                ..
+            } => AppCommandView::RequestUserInputRespond {
+                request_id,
+                response,
             },
             Self::UpdatePermissions { preset, .. } => {
                 AppCommandView::UpdatePermissions { preset: *preset }
