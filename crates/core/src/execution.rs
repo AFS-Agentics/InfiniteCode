@@ -600,22 +600,22 @@ pub async fn prepare_model_invocation(
         .entries
         .iter()
         .map(|entry| match entry {
-            PipelineContextEntry::InstructionRef { content, .. } => {
+            PipelineContextEntry::Instruction { content, .. } => {
                 ContextEntry::SystemPrompt(content.clone())
             }
-            PipelineContextEntry::TranscriptItemRef { turn_id, item_id } => {
+            PipelineContextEntry::TranscriptItem { turn_id, item_id } => {
                 ContextEntry::TranscriptItem {
                     turn_id: *turn_id,
                     item_id: *item_id,
                 }
             }
-            PipelineContextEntry::TranscriptRangeRef { from, to } => {
+            PipelineContextEntry::TranscriptRange { from, to } => {
                 ContextEntry::ContextSummary(format!("transcript range {}..{}", from, to))
             }
-            PipelineContextEntry::ContextSummaryRef { summary_id } => {
+            PipelineContextEntry::ContextSummary { summary_id } => {
                 ContextEntry::ContextSummary(summary_id.clone())
             }
-            PipelineContextEntry::ArtifactRef { artifact_id } => ContextEntry::InstructionFile {
+            PipelineContextEntry::Artifact { artifact_id } => ContextEntry::InstructionFile {
                 path: artifact_id.clone(),
                 content: String::new(),
             },

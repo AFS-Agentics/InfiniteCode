@@ -51,6 +51,16 @@ struct ToolStartItem {
     payload: serde_json::Value,
 }
 
+pub(super) struct ExecuteTurnRequest {
+    pub(super) session_id: SessionId,
+    pub(super) turn: TurnMetadata,
+    pub(super) turn_config: TurnConfig,
+    pub(super) display_input: String,
+    pub(super) input: String,
+    pub(super) collaboration_mode: devo_protocol::CollaborationMode,
+    pub(super) input_mode: TurnInputMode,
+}
+
 #[derive(Clone)]
 struct BoundedQueryEventSender {
     tx: std_mpsc::SyncSender<QueryEvent>,
@@ -1029,16 +1039,16 @@ impl ServerRuntime {
 
     /// Execute one turn end-to-end, including streaming query events,
     /// persisting turn state, and draining queued follow-up inputs.
-    pub(super) async fn execute_turn(
-        self: Arc<Self>,
-        session_id: SessionId,
-        turn: TurnMetadata,
-        turn_config: TurnConfig,
-        display_input: String,
-        input: String,
-        collaboration_mode: devo_protocol::CollaborationMode,
-        input_mode: TurnInputMode,
-    ) {
+    pub(super) async fn execute_turn(self: Arc<Self>, request: ExecuteTurnRequest) {
+        let ExecuteTurnRequest {
+            session_id,
+            turn,
+            turn_config,
+            display_input,
+            input,
+            collaboration_mode,
+            input_mode,
+        } = request;
         if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
             session_arc.lock().await.turn_approval_cache =
                 crate::execution::ApprovalGrantCache::default();
@@ -2210,15 +2220,15 @@ impl ServerRuntime {
         .await;
         // Chain directly instead of spawning so this drain loop can keep
         // consuming queued input until the queue is empty.
-        Box::pin(Arc::clone(&self).execute_turn(
+        Box::pin(Arc::clone(&self).execute_turn(ExecuteTurnRequest {
             session_id,
             turn,
             turn_config,
             display_input,
-            input_text,
-            queued_collaboration_mode,
-            TurnInputMode::VisibleUserMessage,
-        ))
+            input: input_text,
+            collaboration_mode: queued_collaboration_mode,
+            input_mode: TurnInputMode::VisibleUserMessage,
+        }))
         .await;
     }
 
@@ -2333,15 +2343,15 @@ impl ServerRuntime {
         let runtime = Arc::clone(self);
         tokio::spawn(async move {
             runtime
-                .execute_turn(
+                .execute_turn(ExecuteTurnRequest {
                     session_id,
                     turn,
                     turn_config,
                     display_input,
-                    input_text,
-                    queued_collaboration_mode,
-                    TurnInputMode::VisibleUserMessage,
-                )
+                    input: input_text,
+                    collaboration_mode: queued_collaboration_mode,
+                    input_mode: TurnInputMode::VisibleUserMessage,
+                })
                 .await;
         });
     }

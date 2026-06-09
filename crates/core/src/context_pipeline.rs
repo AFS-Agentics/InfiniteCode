@@ -74,14 +74,14 @@ impl ContextAssembler {
         let context_id = format!("ctx-{}", uuid::Uuid::new_v4());
 
         // Step 1: Base instructions (immutable prefix)
-        entries.push(ContextEntry::InstructionRef {
+        entries.push(ContextEntry::Instruction {
             source: InstructionSource::BaseInstruction,
             content: base_instructions.to_string(),
         });
 
         // Step 2: Prior transcript references
         for (turn_id, item_id) in prior_transcript {
-            entries.push(ContextEntry::TranscriptItemRef {
+            entries.push(ContextEntry::TranscriptItem {
                 turn_id: *turn_id,
                 item_id: *item_id,
             });
@@ -89,13 +89,13 @@ impl ContextAssembler {
 
         // Step 3: Metadata-derived instructions (persona, collaboration mode)
         if let Some(persona_text) = persona {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::Persona("default".into()),
                 content: persona_text.to_string(),
             });
         }
         if let Some(mode_text) = collaboration_mode {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::CollaborationMode("default".into()),
                 content: mode_text.to_string(),
             });
@@ -104,7 +104,7 @@ impl ContextAssembler {
         // Step 4: Project instructions
         for instr in project_instructions {
             if instr.len() <= self.config.max_total_instruction_bytes {
-                entries.push(ContextEntry::InstructionRef {
+                entries.push(ContextEntry::Instruction {
                     source: InstructionSource::ProjectInstruction(std::path::PathBuf::from(".")),
                     content: instr.clone(),
                 });
@@ -113,13 +113,13 @@ impl ContextAssembler {
 
         // Step 5: Activated skills & persistent memory
         for skill in active_skills {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::SkillActivation(skill.clone()),
                 content: format!("Active skill: {}", skill),
             });
         }
         if let Some(mem) = memory_context {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::MemoryContext,
                 content: mem.to_string(),
             });
@@ -127,7 +127,7 @@ impl ContextAssembler {
 
         // Step 6: Hidden goal context
         if let Some(goal) = goal_context {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::HiddenGoalContext,
                 content: goal.to_string(),
             });
@@ -135,7 +135,7 @@ impl ContextAssembler {
 
         // Step 7: Change signal
         if let Some(signal) = change_signal {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::ChangeSignal,
                 content: signal.to_string(),
             });
@@ -143,7 +143,7 @@ impl ContextAssembler {
 
         // Step 8: Current user input
         if let Some((uturn_id, item_id)) = user_input {
-            entries.push(ContextEntry::TranscriptItemRef {
+            entries.push(ContextEntry::TranscriptItem {
                 turn_id: uturn_id,
                 item_id,
             });
@@ -153,7 +153,7 @@ impl ContextAssembler {
         let token_estimate = entries
             .iter()
             .map(|e| match e {
-                ContextEntry::InstructionRef { content, .. } => content.len() as u64 / 4,
+                ContextEntry::Instruction { content, .. } => content.len() as u64 / 4,
                 _ => 0,
             })
             .sum();
@@ -188,22 +188,22 @@ pub struct AssembledContext {
 /// One entry in the assembled context.
 #[derive(Debug, Clone)]
 pub enum ContextEntry {
-    InstructionRef {
+    Instruction {
         source: InstructionSource,
         content: String,
     },
-    TranscriptItemRef {
+    TranscriptItem {
         turn_id: TurnId,
         item_id: ItemId,
     },
-    TranscriptRangeRef {
+    TranscriptRange {
         from: TurnId,
         to: TurnId,
     },
-    ContextSummaryRef {
+    ContextSummary {
         summary_id: String,
     },
-    ArtifactRef {
+    Artifact {
         artifact_id: String,
     },
 }
@@ -417,7 +417,7 @@ impl ContextNormalizer {
         // Build messages from context entries
         for entry in &context.entries {
             match entry {
-                ContextEntry::InstructionRef { source, content } => {
+                ContextEntry::Instruction { source, content } => {
                     let msg = match source {
                         InstructionSource::BaseInstruction => {
                             ProviderMessage::System(content.clone())
@@ -434,7 +434,7 @@ impl ContextNormalizer {
                     };
                     messages.push(msg);
                 }
-                ContextEntry::TranscriptItemRef { turn_id, item_id } => {
+                ContextEntry::TranscriptItem { turn_id, item_id } => {
                     // Find matching transcript content
                     if let Some((_, _, content)) = transcript_items
                         .iter()
@@ -796,7 +796,7 @@ mod tests {
             context_id: "ctx-1".into(),
             session_id: SessionId::new(),
             created_for_turn: TurnId::new(),
-            entries: vec![ContextEntry::InstructionRef {
+            entries: vec![ContextEntry::Instruction {
                 source: InstructionSource::BaseInstruction,
                 content: "You are helpful.".into(),
             }],
@@ -852,7 +852,7 @@ mod tests {
         assert_eq!(ctx.entries.len(), 1);
         assert!(matches!(
             &ctx.entries[0],
-            ContextEntry::InstructionRef {
+            ContextEntry::Instruction {
                 source: InstructionSource::BaseInstruction,
                 ..
             }
@@ -881,7 +881,7 @@ mod tests {
         let has_input = ctx
             .entries
             .iter()
-            .any(|e| matches!(e, ContextEntry::TranscriptItemRef { .. }));
+            .any(|e| matches!(e, ContextEntry::TranscriptItem { .. }));
         assert!(has_input);
     }
 
@@ -966,7 +966,7 @@ mod tests {
             context_id: "test".into(),
             session_id: SessionId::new(),
             created_for_turn: TurnId::new(),
-            entries: vec![ContextEntry::InstructionRef {
+            entries: vec![ContextEntry::Instruction {
                 source: InstructionSource::BaseInstruction,
                 content: "You are helpful.".into(),
             }],

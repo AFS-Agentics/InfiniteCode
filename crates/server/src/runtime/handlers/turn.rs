@@ -200,15 +200,15 @@ impl ServerRuntime {
                 .insert(params.session_id, cancel_token);
             let task = tokio::spawn(async move {
                 runtime
-                    .execute_turn(
-                        params.session_id,
-                        turn_for_task,
-                        turn_config_for_task,
-                        display_input_for_task,
-                        input_for_task,
-                        params.collaboration_mode,
-                        TurnInputMode::VisibleUserMessage,
-                    )
+                    .execute_turn(ExecuteTurnRequest {
+                        session_id: params.session_id,
+                        turn: turn_for_task,
+                        turn_config: turn_config_for_task,
+                        display_input: display_input_for_task,
+                        input: input_for_task,
+                        collaboration_mode: params.collaboration_mode,
+                        input_mode: TurnInputMode::VisibleUserMessage,
+                    })
                     .await;
             });
             self.active_tasks

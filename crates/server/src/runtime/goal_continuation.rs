@@ -123,17 +123,17 @@ impl ServerRuntime {
             let task_turn_config = turn_config.clone();
             let task = tokio::spawn(async move {
                 runtime
-                    .execute_turn(
+                    .execute_turn(ExecuteTurnRequest {
                         session_id,
-                        task_turn,
-                        task_turn_config,
-                        String::new(),
-                        String::new(),
-                        devo_protocol::CollaborationMode::Build,
-                        TurnInputMode::HiddenGoalContinuation {
+                        turn: task_turn,
+                        turn_config: task_turn_config,
+                        display_input: String::new(),
+                        input: String::new(),
+                        collaboration_mode: devo_protocol::CollaborationMode::Build,
+                        input_mode: TurnInputMode::HiddenGoalContinuation {
                             goal: candidate.goal,
                         },
-                    )
+                    })
                     .await;
             });
             self.active_tasks

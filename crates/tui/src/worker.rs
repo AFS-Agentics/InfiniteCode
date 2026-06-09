@@ -3888,8 +3888,14 @@ mod tests {
             &event_tx,
         );
 
+        let event = (0..2)
+            .find_map(|_| match event_rx.try_recv().ok()? {
+                event @ WorkerEvent::ToolCallUpdated { .. } => Some(event),
+                _ => None,
+            })
+            .expect("tool call update event");
         assert_eq!(
-            event_rx.try_recv().expect("worker event"),
+            event,
             WorkerEvent::ToolCallUpdated {
                 tool_use_id: "call-1".to_string(),
                 summary: "read crates/tui/src/mod.rs".to_string(),
@@ -3931,8 +3937,14 @@ mod tests {
             &event_tx,
         );
 
+        let event = (0..2)
+            .find_map(|_| match event_rx.try_recv().ok()? {
+                event @ WorkerEvent::ToolCallUpdated { .. } => Some(event),
+                _ => None,
+            })
+            .expect("tool call update event");
         assert_eq!(
-            event_rx.try_recv().expect("worker event"),
+            event,
             WorkerEvent::ToolCallUpdated {
                 tool_use_id: "call-1".to_string(),
                 summary: "glob **/Cargo.toml in crates".to_string(),

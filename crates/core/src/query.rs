@@ -24,6 +24,7 @@ use crate::tools::ToolCall;
 use crate::tools::ToolContent;
 use crate::tools::ToolRegistry;
 use crate::tools::ToolRuntime;
+use crate::tools::deferred_loading::is_subagent_agent_coordination_tool;
 use devo_provider::ModelProviderSDK;
 
 use crate::AgentError;
@@ -432,7 +433,10 @@ pub async fn query(
     let agents_md_manager = AgentsMdManager::new(session.config.agents_md.clone());
     let current_agents_snapshot = load_workspace_instructions(&session.cwd, &agents_md_manager);
     let agent_scope = runtime.agent_scope();
-    let request_tools = registry.tool_definitions();
+    let mut request_tools = registry.tool_definitions();
+    if agent_scope == ToolAgentScope::Subagent {
+        request_tools.retain(|tool| !is_subagent_agent_coordination_tool(&tool.name));
+    }
 
     if session.session_context.is_none() {
         session.session_context = Some(SessionContext::capture(
@@ -1798,18 +1802,7 @@ mod tests {
             .iter()
             .map(|tool| tool.name.as_str())
             .collect::<Vec<_>>();
-        assert_eq!(
-            tool_names,
-            vec![
-                "ToolSearch",
-                "web_search",
-                "spawn_agent",
-                "send_message",
-                "wait_agent",
-                "list_agents",
-                "close_agent"
-            ]
-        );
+        assert_eq!(tool_names, vec!["ToolSearch", "web_search"]);
         let system = request.system.as_deref().expect("system prompt");
         let mode_prompt = crate::collaboration_mode_prompts::mode_introductions_prompt();
         assert!(system.contains("base system"));

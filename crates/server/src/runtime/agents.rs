@@ -444,15 +444,15 @@ impl ServerRuntime {
             .insert(session_id, cancel_token);
         let task = tokio::spawn(async move {
             runtime
-                .execute_turn(
+                .execute_turn(ExecuteTurnRequest {
                     session_id,
-                    turn_for_task,
-                    turn_config_for_task,
+                    turn: turn_for_task,
+                    turn_config: turn_config_for_task,
                     display_input,
-                    input_text,
-                    devo_protocol::CollaborationMode::Build,
-                    TurnInputMode::VisibleUserMessage,
-                )
+                    input: input_text,
+                    collaboration_mode: devo_protocol::CollaborationMode::Build,
+                    input_mode: TurnInputMode::VisibleUserMessage,
+                })
                 .await;
         });
         self.active_tasks
