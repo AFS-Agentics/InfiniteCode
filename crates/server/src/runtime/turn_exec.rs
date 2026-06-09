@@ -1656,6 +1656,13 @@ impl ServerRuntime {
                 };
                 (Arc::clone(&session.core_session), agent_scope)
             };
+            let goal_context = {
+                let stores = self.goal_stores.lock().await;
+                stores
+                    .get(&session_id)
+                    .and_then(GoalStore::get)
+                    .and_then(crate::goal::Goal::continuation_prompt)
+            };
             let mut core_session = core_session.lock().await;
             core_session.push_message(Message::user(input.clone()));
             let event_callback_tx = event_tx.clone();
@@ -1701,6 +1708,7 @@ impl ServerRuntime {
                 &runtime,
                 Some(callback),
                 interaction_mode,
+                goal_context.as_deref(),
             )
             .await;
             (

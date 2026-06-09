@@ -369,6 +369,17 @@ fn insert_subagent_request_reminders(
     messages.splice(insert_at..insert_at, reminders);
 }
 
+fn insert_goal_context_message(messages: &mut Vec<RequestMessage>, goal_context: &str) {
+    let insert_at = messages
+        .iter()
+        .rposition(is_user_text_message)
+        .unwrap_or(messages.len());
+    messages.splice(
+        insert_at..insert_at,
+        [request_text_message(goal_context.to_string())],
+    );
+}
+
 fn request_text_message(text: String) -> RequestMessage {
     RequestMessage {
         role: Role::User.as_str().to_string(),
@@ -446,6 +457,7 @@ pub async fn query(
         runtime,
         on_event,
         InteractionMode::Build,
+        None,
     )
     .await
 }
@@ -458,6 +470,7 @@ pub async fn query_with_interaction_mode(
     runtime: &ToolRuntime,
     on_event: Option<EventCallback>,
     interaction_mode: InteractionMode,
+    goal_context: Option<&str>,
 ) -> Result<(), AgentError> {
     // emit is the event callback function.
     let emit = |event: QueryEvent| {
@@ -663,6 +676,9 @@ pub async fn query_with_interaction_mode(
         };
         let mut messages = history
             .for_prompt_with_prefix(&prefetched_user_inputs, &turn_config.model.input_modalities);
+        if let Some(goal_context) = goal_context.filter(|text| !text.trim().is_empty()) {
+            insert_goal_context_message(&mut messages, goal_context);
+        }
         if agent_scope == ToolAgentScope::Subagent {
             insert_subagent_request_reminders(
                 &mut messages,
@@ -2197,6 +2213,7 @@ mod tests {
             &runtime,
             None,
             InteractionMode::Plan,
+            None,
         )
         .await
         .expect("query should succeed");
@@ -2206,6 +2223,56 @@ mod tests {
         let system = captured[0].system.as_deref().expect("system prompt");
         assert!(system.contains("base instructions"));
         assert!(system.contains("You are now in Plan Mode"));
+    }
+
+    #[tokio::test]
+    async fn query_inserts_goal_context_before_latest_user_request() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
+            requests: Arc::clone(&requests),
+        });
+        let registry = Arc::new(ToolRegistry::new());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let model = Model {
+            slug: "model-a".into(),
+            base_instructions: "base instructions".into(),
+            ..Model::default()
+        };
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("finish implementation"));
+
+        query_with_interaction_mode(
+            &mut session,
+            &TurnConfig::new(model, None),
+            Arc::clone(&provider),
+            registry,
+            &runtime,
+            None,
+            InteractionMode::Build,
+            Some("<goal_context>ship /goal</goal_context>"),
+        )
+        .await
+        .expect("query should succeed");
+
+        let captured = requests.lock().expect("lock requests");
+        assert_eq!(captured.len(), 1);
+        assert!(
+            !captured[0]
+                .system
+                .as_deref()
+                .unwrap_or_default()
+                .contains("ship /goal")
+        );
+        let messages = &captured[0].messages;
+        let goal_index = messages
+            .iter()
+            .position(|message| message_contains(message, "ship /goal"))
+            .expect("goal context message");
+        let request_index = messages
+            .iter()
+            .position(|message| message_contains(message, "finish implementation"))
+            .expect("latest user request message");
+        assert!(goal_index < request_index);
     }
 
     #[tokio::test]

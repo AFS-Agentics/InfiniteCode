@@ -24,6 +24,16 @@ use devo_protocol::CommandExecTerminateResult;
 use devo_protocol::CommandExecWriteParams;
 use devo_protocol::CommandExecWriteResult;
 use devo_protocol::ErrorResponse;
+use devo_protocol::GoalClearParams;
+use devo_protocol::GoalClearResult;
+use devo_protocol::GoalCreateParams;
+use devo_protocol::GoalCreateResult;
+use devo_protocol::GoalSetParams;
+use devo_protocol::GoalSetResult;
+use devo_protocol::GoalSetStatusParams;
+use devo_protocol::GoalSetStatusResult;
+use devo_protocol::GoalStatusParams;
+use devo_protocol::GoalStatusResult;
 use devo_protocol::InitializeParams;
 use devo_protocol::InitializeResult;
 use devo_protocol::ModelCatalogParams;
@@ -234,6 +244,40 @@ impl StdioServerClient {
         params: SessionCompactParams,
     ) -> Result<SessionCompactResult> {
         self.request("session/compact", params).await
+    }
+
+    pub async fn goal_create(&mut self, params: GoalCreateParams) -> Result<GoalCreateResult> {
+        self.request("goal/create", params).await
+    }
+
+    pub async fn goal_set(&mut self, params: GoalSetParams) -> Result<GoalSetResult> {
+        self.request("goal/set", params).await
+    }
+
+    pub async fn goal_status(&mut self, params: GoalStatusParams) -> Result<GoalStatusResult> {
+        self.request("goal/status", params).await
+    }
+
+    pub async fn goal_pause(&mut self, params: GoalSetStatusParams) -> Result<GoalSetStatusResult> {
+        self.request("goal/pause", params).await
+    }
+
+    pub async fn goal_resume(
+        &mut self,
+        params: GoalSetStatusParams,
+    ) -> Result<GoalSetStatusResult> {
+        self.request("goal/resume", params).await
+    }
+
+    pub async fn goal_complete(
+        &mut self,
+        params: GoalSetStatusParams,
+    ) -> Result<GoalSetStatusResult> {
+        self.request("goal/complete", params).await
+    }
+
+    pub async fn goal_clear(&mut self, params: GoalClearParams) -> Result<GoalClearResult> {
+        self.request("goal/clear", params).await
     }
 
     pub async fn session_fork(&mut self, params: SessionForkParams) -> Result<SessionForkResult> {
