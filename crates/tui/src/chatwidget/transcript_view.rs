@@ -9,6 +9,8 @@ use ratatui::text::Span;
 use crate::history_cell;
 use crate::history_cell::HistoryCell;
 use crate::history_cell::ScrollbackLine;
+use crate::tool_io_cell::ToolIoCell;
+use crate::tool_io_cell::ToolIoCellOptions;
 
 use super::ChatWidget;
 use super::UserMessage;
@@ -202,16 +204,32 @@ impl ChatWidget {
         let mut tool_calls = self.active_tool_calls.values().collect::<Vec<_>>();
         tool_calls.sort_by(|left, right| left.tool_use_id.cmp(&right.tool_use_id));
         for tool_call in tool_calls {
-            Self::extend_lines_with_separator(
-                &mut lines,
-                history_cell::AgentMessageCell::new_with_prefix(
+            if tool_call.exec_like {
+                continue;
+            }
+            let transcript_lines = match (&tool_call.tool_name, &tool_call.input) {
+                (Some(tool_name), Some(input)) => ToolIoCell::from_text_output(
+                    ToolIoCellOptions {
+                        title_line: Some(Self::running_tool_line(&tool_call.title)),
+                        dot_prefix: Self::pending_dot_prefix(),
+                        subsequent_prefix: "  ".into(),
+                        output_style: Self::tool_text_style(),
+                        show_empty_ellipsis: false,
+                    },
+                    tool_name.clone(),
+                    input.clone(),
+                    tool_call.output.clone(),
+                )
+                .transcript_lines(width),
+                _ => history_cell::AgentMessageCell::new_with_prefix(
                     tool_call.lines.clone(),
                     Self::pending_dot_prefix(),
                     "  ",
                     false,
                 )
                 .transcript_lines(width),
-            );
+            };
+            Self::extend_lines_with_separator(&mut lines, transcript_lines);
         }
         for pending in &self.pending_tool_calls {
             let pending_lines = if let Some(start_time) = pending.start_time {

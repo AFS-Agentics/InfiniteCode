@@ -12,6 +12,9 @@ use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
 use crate::tool_spec::{ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, ToolSpec};
 
+const MAX_RESULTS: usize = 500;
+const TRUNCATED_MESSAGE: &str = "(truncated at 500 matches)";
+
 pub struct GrepHandler {
     spec: ToolSpec,
 }
@@ -134,28 +137,106 @@ impl ToolHandler for GrepHandler {
             ));
         }
 
-        const MAX_RESULTS: usize = 500;
         let text = String::from_utf8_lossy(&output.stdout);
-        let mut lines = text.lines();
-        let mut displayed = lines.by_ref().take(MAX_RESULTS).collect::<Vec<_>>();
-        if displayed.is_empty() {
+        let Some((matches, summary)) = format_grep_matches(&text) else {
             return Ok(ToolResult::success(
                 ToolResultContent::Text("(no matches)".into()),
                 "No matches",
             ));
-        }
-        let truncated = lines.next().is_some();
-        if truncated {
-            displayed.push("(truncated at 500 matches)");
-        }
-        let summary = if truncated {
-            "500+ matches".to_string()
-        } else {
-            format!("{} matches", displayed.len())
         };
         Ok(ToolResult::success(
-            ToolResultContent::Text(displayed.join("\n")),
+            ToolResultContent::Text(matches),
             summary,
         ))
+    }
+}
+
+fn format_grep_matches(text: &str) -> Option<(String, String)> {
+    let mut lines = text.lines();
+    let first = lines.next()?;
+    let mut matches = String::with_capacity(text.len().min(64 * 1024));
+    matches.push_str(first);
+    let mut displayed_count = 1;
+    for line in lines.by_ref().take(MAX_RESULTS - 1) {
+        matches.push('\n');
+        matches.push_str(line);
+        displayed_count += 1;
+    }
+    let truncated = lines.next().is_some();
+    if truncated {
+        matches.push('\n');
+        matches.push_str(TRUNCATED_MESSAGE);
+    }
+    let summary = if truncated {
+        "500+ matches".to_string()
+    } else {
+        format!("{displayed_count} matches")
+    };
+    Some((matches, summary))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn format_grep_matches_handles_empty_output() {
+        assert_eq!(format_grep_matches(""), None);
+    }
+
+    #[test]
+    fn format_grep_matches_preserves_lines_and_summary() {
+        assert_eq!(
+            format_grep_matches("a:1:one\nb:2:two\n"),
+            Some(("a:1:one\nb:2:two".to_string(), "2 matches".to_string()))
+        );
+    }
+
+    #[test]
+    fn format_grep_matches_truncates_after_max_results() {
+        let text = (0..=MAX_RESULTS)
+            .map(|idx| format!("src/lib.rs:{idx}:match"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let Some((matches, summary)) = format_grep_matches(&text) else {
+            panic!("matches should be present");
+        };
+        let lines = matches.lines().collect::<Vec<_>>();
+
+        assert_eq!(summary, "500+ matches");
+        assert_eq!(lines.len(), MAX_RESULTS + 1);
+        assert_eq!(lines[MAX_RESULTS], TRUNCATED_MESSAGE);
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_format_grep_matches_many_results() {
+        let text = (0..600)
+            .map(|idx| format!("crates/core/src/lib.rs:{idx}:needle result {idx}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let iterations = 20_000;
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            let (matches, summary) =
+                black_box(format_grep_matches(black_box(&text))).expect("matches");
+            total_len += matches.len() + summary.len();
+        }
+
+        let elapsed = started.elapsed();
+        assert!(total_len > 0);
+        println!(
+            "format_grep_matches_many_results iterations={iterations} bytes={} elapsed_ms={} per_call_us={:.2}",
+            text.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 }

@@ -167,7 +167,7 @@ impl From<&ResponseItem> for RequestMessage {
 /// tool calls with their outputs) and modality-based filtering.
 pub fn message_to_response_items(msg: Message) -> Vec<ResponseItem> {
     let role = msg.role;
-    let mut items = Vec::new();
+    let mut items = Vec::with_capacity(msg.content.len());
 
     for block in msg.content {
         match block {
@@ -206,6 +206,8 @@ pub fn message_to_response_items(msg: Message) -> Vec<ResponseItem> {
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
+    use std::hint::black_box;
+    use std::time::Instant;
 
     use super::*;
     use devo_protocol::{ContentBlock, Message, Role};
@@ -320,7 +322,51 @@ mod tests {
             is_error: false,
         };
         let req: RequestMessage = item.into();
-        assert_eq!(req.role, "user");
+        assert_eq!(
+            serde_json::to_value(req).expect("request message should serialize"),
+            serde_json::json!({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": "tc-1",
+                    "content": "done",
+                }],
+            })
+        );
+    }
+
+    #[test]
+    fn response_item_borrowed_and_owned_request_messages_match() {
+        let items = vec![
+            ResponseItem::Reason {
+                text: "thinking".into(),
+            },
+            ResponseItem::Message(Message::assistant_text("hello")),
+            ResponseItem::ToolCall {
+                id: "tc-1".into(),
+                name: "bash".into(),
+                input: serde_json::json!({"cmd": "ls"}),
+            },
+            ResponseItem::ToolCallOutput {
+                tool_use_id: "tc-1".into(),
+                content: "done".into(),
+                is_error: true,
+            },
+        ];
+
+        let owned = items
+            .clone()
+            .into_iter()
+            .map(RequestMessage::from)
+            .map(|message| serde_json::to_value(message).expect("request message should serialize"))
+            .collect::<Vec<_>>();
+        let borrowed = items
+            .iter()
+            .map(RequestMessage::from)
+            .map(|message| serde_json::to_value(message).expect("request message should serialize"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(owned, borrowed);
     }
 
     #[test]
@@ -371,5 +417,56 @@ mod tests {
             let restored: ResponseItem = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(*item, restored);
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_message_to_response_items_many_blocks() {
+        let content = (0..1_000)
+            .flat_map(|index| {
+                [
+                    ContentBlock::Reasoning {
+                        text: format!("thinking {index}"),
+                    },
+                    ContentBlock::Text {
+                        text: format!("assistant text {index}"),
+                    },
+                    ContentBlock::ToolUse {
+                        id: format!("tool-{index}"),
+                        name: "bash".to_string(),
+                        input: serde_json::json!({"cmd": format!("echo {index}")}),
+                    },
+                    ContentBlock::ToolResult {
+                        tool_use_id: format!("tool-{index}"),
+                        content: format!("output {index}"),
+                        is_error: false,
+                    },
+                ]
+            })
+            .collect::<Vec<_>>();
+        let expected_len = content.len();
+        let iterations = 200;
+        let messages = (0..iterations)
+            .map(|_| Message {
+                role: Role::Assistant,
+                content: content.clone(),
+            })
+            .collect::<Vec<_>>();
+        let started = Instant::now();
+        let mut total_items = 0usize;
+
+        for message in messages {
+            let items = message_to_response_items(black_box(message));
+            total_items += items.len();
+            black_box(items);
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_items, expected_len * iterations);
+        println!(
+            "message_to_response_items_many_blocks iterations={iterations} blocks={expected_len} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 }

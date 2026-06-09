@@ -96,7 +96,7 @@ pub fn discover_files(
         files.push(FileEntry {
             absolute_path,
             relative_path: relative_path.clone(),
-            language,
+            language: language.to_string(),
             content_kind,
             manifest: FileManifestEntry {
                 path: relative_path,
@@ -125,15 +125,31 @@ pub fn read_indexable_text(path: &Path) -> Result<Option<String>, CodeSearchErro
 ///
 /// Unknown extensions are ignored to keep the index focused on text/code files
 /// and to avoid pulling binary formats into lossy UTF-8 chunking.
-pub fn classify_path(path: &Path) -> Option<(String, ContentKind)> {
-    let file_name = path.file_name()?.to_str()?.to_lowercase();
-    if file_name == "dockerfile" {
-        return Some(("dockerfile".to_string(), ContentKind::Config));
+pub fn classify_path(path: &Path) -> Option<(&'static str, ContentKind)> {
+    let file_name = path.file_name()?.to_str()?;
+    if file_name.eq_ignore_ascii_case("dockerfile") {
+        return Some(("dockerfile", ContentKind::Config));
     }
-    let extension = path.extension()?.to_str()?.to_lowercase();
-    let language = language_for_extension(&extension)?;
-    let content_kind = content_kind_for_extension(&extension);
-    Some((language.to_string(), content_kind))
+    let extension = path.extension()?.to_str()?;
+    let normalized_extension;
+    let mut stack_extension = [0u8; 16];
+    let extension = if extension
+        .bytes()
+        .all(|byte| byte.is_ascii() && !byte.is_ascii_uppercase())
+    {
+        extension
+    } else if extension.is_ascii() && extension.len() <= stack_extension.len() {
+        for (target, byte) in stack_extension.iter_mut().zip(extension.bytes()) {
+            *target = byte.to_ascii_lowercase();
+        }
+        std::str::from_utf8(&stack_extension[..extension.len()]).ok()?
+    } else {
+        normalized_extension = extension.to_lowercase();
+        &normalized_extension
+    };
+    let language = language_for_extension(extension)?;
+    let content_kind = content_kind_for_extension(extension);
+    Some((language, content_kind))
 }
 
 fn language_for_extension(extension: &str) -> Option<&'static str> {
@@ -209,6 +225,8 @@ fn is_default_ignored(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::hint::black_box;
+    use std::time::Instant;
 
     use pretty_assertions::assert_eq;
 
@@ -267,6 +285,65 @@ mod tests {
         assert_eq!(
             paths,
             vec![PathBuf::from("config.toml"), PathBuf::from("readme.md")]
+        );
+    }
+
+    #[test]
+    fn classify_path_handles_case_insensitive_ascii_names() {
+        let paths = [
+            PathBuf::from("DOCKERFILE"),
+            PathBuf::from("src/component.TSX"),
+            PathBuf::from("config/settings.TOML"),
+        ];
+        let classified = paths
+            .iter()
+            .map(|path| classify_path(path))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            classified,
+            vec![
+                Some(("dockerfile", ContentKind::Config)),
+                Some(("typescriptreact", ContentKind::Code)),
+                Some(("toml", ContentKind::Config)),
+            ]
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_classify_path_candidates() {
+        let paths = (0..100_000)
+            .map(|idx| match idx % 8 {
+                0 => PathBuf::from(format!("src/module_{idx}.rs")),
+                1 => PathBuf::from(format!("src/component_{idx}.TSX")),
+                2 => PathBuf::from(format!("docs/guide_{idx}.MD")),
+                3 => PathBuf::from(format!("config/settings_{idx}.TOML")),
+                4 => PathBuf::from(format!("data/input_{idx}.csv")),
+                5 => PathBuf::from(format!("scripts/run_{idx}.sh")),
+                6 => PathBuf::from(format!("assets/image_{idx}.png")),
+                _ => PathBuf::from("Dockerfile"),
+            })
+            .collect::<Vec<_>>();
+        let expected_classified = paths.iter().filter_map(|path| classify_path(path)).count();
+        let iterations = 100;
+        let started = Instant::now();
+        let mut classified = 0usize;
+
+        for _ in 0..iterations {
+            classified += paths
+                .iter()
+                .filter_map(|path| black_box(classify_path(black_box(path))))
+                .count();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(classified, expected_classified * iterations);
+        println!(
+            "classify_path_candidates iterations={iterations} paths={} elapsed_ms={} per_path_ns={:.2}",
+            paths.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000_000.0 / (iterations * paths.len()) as f64
         );
     }
 }

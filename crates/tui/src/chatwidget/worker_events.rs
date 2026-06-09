@@ -19,6 +19,9 @@ use crate::exec_cell::ExecCell;
 use crate::exec_cell::new_active_exec_command;
 use crate::get_git_diff::get_git_diff;
 use crate::history_cell;
+use crate::tool_io_cell::FileChangeToolIoCell;
+use crate::tool_io_cell::ToolIoCell;
+use crate::tool_io_cell::ToolIoCellOptions;
 use crate::tool_result_cell::ToolResultCell;
 use devo_util_shell_command::parse_command::parse_command;
 
@@ -37,6 +40,7 @@ impl ChatWidget {
         command: Vec<String>,
         parsed: Vec<ParsedCommand>,
         source: ExecCommandSource,
+        input: Option<serde_json::Value>,
     ) {
         if matches!(source, ExecCommandSource::UserShell) {
             self.current_turn_has_user_shell_command = true;
@@ -46,7 +50,7 @@ impl ChatWidget {
             .active_cell
             .as_mut()
             .and_then(|cell| cell.as_any_mut().downcast_mut::<ExecCell>())
-            && let Some(grouped) = cell.with_added_call(
+            && let Some(mut grouped) = cell.with_added_call(
                 tool_use_id.clone(),
                 command.clone(),
                 parsed.clone(),
@@ -54,13 +58,19 @@ impl ChatWidget {
                 None,
             )
         {
+            if let Some(input) = input.clone() {
+                grouped.set_tool_io_input(&tool_use_id, "exec_command".to_string(), input);
+            }
             *cell = grouped;
             self.active_tool_calls.insert(
                 tool_use_id.clone(),
                 ActiveToolCall {
                     tool_use_id,
+                    tool_name: Some("exec_command".to_string()),
+                    input: input.clone(),
                     title,
                     lines: Vec::new(),
+                    output: String::new(),
                     exec_like: true,
                     start_time: None,
                 },
@@ -72,20 +82,21 @@ impl ChatWidget {
         }
 
         self.flush_active_cell();
-        self.active_cell = Some(Box::new(new_active_exec_command(
-            tool_use_id.clone(),
-            command,
-            parsed,
-            source,
-            None,
-            true,
-        )));
+        let mut cell =
+            new_active_exec_command(tool_use_id.clone(), command, parsed, source, None, true);
+        if let Some(input) = input.clone() {
+            cell.set_tool_io_input(&tool_use_id, "exec_command".to_string(), input);
+        }
+        self.active_cell = Some(Box::new(cell));
         self.active_tool_calls.insert(
             tool_use_id.clone(),
             ActiveToolCall {
                 tool_use_id,
+                tool_name: Some("exec_command".to_string()),
+                input,
                 title,
                 lines: Vec::new(),
+                output: String::new(),
                 exec_like: true,
                 start_time: None,
             },
@@ -230,6 +241,7 @@ impl ChatWidget {
                         command,
                         parsed,
                         ExecCommandSource::Agent,
+                        None,
                     );
                     return;
                 }
@@ -249,8 +261,11 @@ impl ChatWidget {
                 };
                 let tool_call = ActiveToolCall {
                     tool_use_id: tool_use_id.clone(),
+                    tool_name: None,
+                    input: None,
                     title: title.clone(),
                     lines: Vec::new(),
+                    output: String::new(),
                     exec_like: false,
                     start_time: None,
                 };
@@ -270,8 +285,11 @@ impl ChatWidget {
                     };
                     self.pending_tool_calls.push(ActiveToolCall {
                         tool_use_id,
+                        tool_name: None,
+                        input: None,
                         title: pending_title,
                         lines: Vec::new(),
+                        output: String::new(),
                         exec_like: false,
                         start_time: Some(Instant::now()),
                     });
@@ -280,9 +298,50 @@ impl ChatWidget {
                 self.frame_requester.schedule_frame();
                 self.set_status_message("Tool started");
             }
+            WorkerEvent::ToolCallDetails {
+                tool_use_id,
+                tool_name,
+                input,
+            } => {
+                if let Some(tool_call) = self.active_tool_calls.get_mut(&tool_use_id) {
+                    tool_call.tool_name = Some(tool_name.clone());
+                    tool_call.input = Some(input.clone());
+                }
+                if let Some(pending) = self
+                    .pending_tool_calls
+                    .iter_mut()
+                    .find(|pending| pending.tool_use_id == tool_use_id)
+                {
+                    pending.tool_name = Some(tool_name.clone());
+                    pending.input = Some(input.clone());
+                }
+                let updated_active_cell = self
+                    .active_cell
+                    .as_mut()
+                    .and_then(|cell| cell.as_any_mut().downcast_mut::<ExecCell>())
+                    .is_some_and(|cell| {
+                        cell.set_tool_io_input(&tool_use_id, tool_name.clone(), input.clone())
+                    });
+                if !updated_active_cell {
+                    self.history.iter_mut().rev().any(|cell| {
+                        cell.as_any_mut()
+                            .downcast_mut::<ExecCell>()
+                            .is_some_and(|cell| {
+                                cell.set_tool_io_input(
+                                    &tool_use_id,
+                                    tool_name.clone(),
+                                    input.clone(),
+                                )
+                            })
+                    });
+                }
+                self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
+                self.frame_requester.schedule_frame();
+            }
             WorkerEvent::CommandExecutionStarted {
                 tool_use_id,
                 command,
+                input,
                 source,
                 command_actions,
             } => {
@@ -293,6 +352,7 @@ impl ChatWidget {
                     command_parts,
                     command_actions,
                     source,
+                    input,
                 );
             }
             WorkerEvent::ToolCallUpdated {
@@ -329,6 +389,7 @@ impl ChatWidget {
             }
             WorkerEvent::ToolOutputDelta { tool_use_id, delta } => {
                 if let Some(tool_call) = self.active_tool_calls.get_mut(&tool_use_id) {
+                    tool_call.output.push_str(&delta);
                     if tool_call.exec_like {
                         if let Some(cell) = self
                             .active_cell
@@ -353,6 +414,142 @@ impl ChatWidget {
                     }
                     self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
                     self.frame_requester.schedule_frame();
+                }
+            }
+            WorkerEvent::ToolResultIo {
+                tool_use_id,
+                tool_name,
+                title,
+                input,
+                output,
+                display_content,
+                is_error,
+                truncated,
+            } => {
+                if let Some(pos) = self
+                    .pending_tool_calls
+                    .iter()
+                    .position(|tc| tc.tool_use_id == tool_use_id)
+                {
+                    self.pending_tool_calls.remove(pos);
+                }
+                let dot_status = if is_error {
+                    DotStatus::Failed
+                } else {
+                    DotStatus::Completed
+                };
+                let resolved_tool_call =
+                    self.active_tool_calls
+                        .remove(&tool_use_id)
+                        .unwrap_or(ActiveToolCall {
+                            tool_use_id: tool_use_id.clone(),
+                            tool_name: Some(tool_name.clone()),
+                            input: Some(input.clone()),
+                            title,
+                            lines: Vec::new(),
+                            output: String::new(),
+                            exec_like: false,
+                            start_time: None,
+                        });
+                let resolved_title = resolved_tool_call.title;
+                if resolved_tool_call.exec_like {
+                    let preview = display_content.clone().unwrap_or_else(|| match &output {
+                        serde_json::Value::String(text) => text.clone(),
+                        other => other.to_string(),
+                    });
+                    let command_output = CommandOutput {
+                        exit_code: if is_error { 1 } else { 0 },
+                        aggregated_output: preview.clone(),
+                        formatted_output: preview,
+                    };
+                    let duration = std::time::Duration::from_millis(0);
+                    if let Some(cell) = self
+                        .active_cell
+                        .as_mut()
+                        .and_then(|cell| cell.as_any_mut().downcast_mut::<ExecCell>())
+                    {
+                        cell.set_tool_io_input(&tool_use_id, tool_name.clone(), input.clone());
+                        cell.complete_tool_io(
+                            &tool_use_id,
+                            output.clone(),
+                            display_content.clone(),
+                        );
+                        if cell.complete_call(&tool_use_id, command_output.clone(), duration) {
+                            if cell.is_exploring_cell() {
+                                self.active_cell_revision =
+                                    self.active_cell_revision.wrapping_add(1);
+                                self.frame_requester.schedule_frame();
+                            } else if cell.should_flush() {
+                                self.flush_active_cell();
+                            } else {
+                                self.active_cell_revision =
+                                    self.active_cell_revision.wrapping_add(1);
+                                self.frame_requester.schedule_frame();
+                            }
+                            self.set_status_message(if is_error {
+                                "Tool returned an error"
+                            } else {
+                                "Tool completed"
+                            });
+                            return;
+                        }
+                    }
+                    for cell in self
+                        .history
+                        .iter_mut()
+                        .rev()
+                        .filter_map(|cell| cell.as_any_mut().downcast_mut::<ExecCell>())
+                    {
+                        cell.set_tool_io_input(&tool_use_id, tool_name.clone(), input.clone());
+                        cell.complete_tool_io(
+                            &tool_use_id,
+                            output.clone(),
+                            display_content.clone(),
+                        );
+                        if cell.complete_call(&tool_use_id, command_output.clone(), duration) {
+                            self.frame_requester.schedule_frame();
+                            self.set_status_message(if is_error {
+                                "Tool returned an error"
+                            } else {
+                                "Tool completed"
+                            });
+                            return;
+                        }
+                    }
+                }
+                let title_line =
+                    (!resolved_title.is_empty()).then(|| Self::ran_tool_line(&resolved_title));
+                if title_line.is_some()
+                    || display_content.is_some()
+                    || !output.is_null()
+                    || truncated
+                {
+                    self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
+                    self.add_to_history(ToolIoCell::new(
+                        ToolIoCellOptions {
+                            title_line,
+                            dot_prefix: self.dot_prefix(dot_status),
+                            subsequent_prefix: Line::from("  "),
+                            output_style: Self::tool_text_style(),
+                            show_empty_ellipsis: truncated,
+                        },
+                        tool_name,
+                        input,
+                        Some(output),
+                        display_content,
+                    ));
+                }
+                self.set_status_message(if is_error {
+                    "Tool returned an error"
+                } else {
+                    "Tool completed"
+                });
+                if Self::should_auto_show_git_diff(&resolved_title, is_error) {
+                    let tx = self.app_event_tx.clone();
+                    tokio::spawn(async move {
+                        let text = Self::format_git_diff_result(get_git_diff().await);
+                        tx.send(AppEvent::DiffResult(text));
+                    });
                 }
             }
             WorkerEvent::ToolResult {
@@ -380,8 +577,11 @@ impl ChatWidget {
                         .remove(&tool_use_id)
                         .unwrap_or(ActiveToolCall {
                             tool_use_id: tool_use_id.clone(),
+                            tool_name: None,
+                            input: None,
                             title,
                             lines: Vec::new(),
+                            output: String::new(),
                             exec_like: false,
                             start_time: None,
                         });
@@ -484,6 +684,21 @@ impl ChatWidget {
             WorkerEvent::PlanUpdated { explanation, steps } => {
                 self.on_plan_updated(explanation, steps);
                 self.set_status_message("Plan updated");
+            }
+            WorkerEvent::PatchAppliedIo {
+                tool_name,
+                input,
+                changes,
+            } => {
+                self.pending_tool_calls.clear();
+                self.add_to_history(FileChangeToolIoCell::new(
+                    Some(Self::ran_tool_line(&tool_name)),
+                    tool_name,
+                    input,
+                    changes,
+                    self.session.cwd.clone(),
+                ));
+                self.set_status_message("Patch applied");
             }
             WorkerEvent::PatchApplied { changes } => {
                 self.pending_tool_calls.clear();

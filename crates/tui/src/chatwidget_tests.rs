@@ -1798,6 +1798,7 @@ fn session_switch_restores_plan_metadata_into_progress() {
             kind: devo_protocol::SessionHistoryItemKind::Assistant,
             title: String::new(),
             body: r#"{"explanation":"Do work","plan":[{"step":"Inspect","status":"completed"},{"step":"Patch","status":"in_progress"}]}"#.to_string(),
+            tool_io: None,
             metadata: Some(devo_protocol::SessionHistoryMetadata::PlanUpdate {
                 explanation: Some("Do work".to_string()),
                 steps: vec![
@@ -1850,6 +1851,7 @@ fn session_switch_restores_explored_metadata_into_history() {
             kind: devo_protocol::SessionHistoryItemKind::CommandExecution,
             title: "cat foo.txt".to_string(),
             body: "hello".to_string(),
+            tool_io: None,
             metadata: Some(devo_protocol::SessionHistoryMetadata::Explored {
                 actions: vec![devo_protocol::parse_command::ParsedCommand::Read {
                     cmd: "cat foo.txt".to_string(),
@@ -1913,6 +1915,7 @@ fn session_switch_restores_edited_metadata_into_history() {
             kind: devo_protocol::SessionHistoryItemKind::ToolResult,
             title: "apply_patch".to_string(),
             body: String::new(),
+            tool_io: None,
             metadata: Some(devo_protocol::SessionHistoryMetadata::Edited { changes }),
             duration_ms: None,
         }],
@@ -1958,6 +1961,7 @@ fn session_switch_merges_consecutive_explored_items() {
                 kind: devo_protocol::SessionHistoryItemKind::ToolCall,
                 title: "read crates/tui/src/worker.rs".to_string(),
                 body: String::new(),
+                tool_io: None,
                 metadata: Some(devo_protocol::SessionHistoryMetadata::Explored {
                     actions: vec![devo_protocol::parse_command::ParsedCommand::Read {
                         cmd: "read crates/tui/src/worker.rs".to_string(),
@@ -1972,6 +1976,7 @@ fn session_switch_merges_consecutive_explored_items() {
                 kind: devo_protocol::SessionHistoryItemKind::ToolCall,
                 title: "grep command_actions in crates/tui/src/worker.rs".to_string(),
                 body: String::new(),
+                tool_io: None,
                 metadata: Some(devo_protocol::SessionHistoryMetadata::Explored {
                     actions: vec![devo_protocol::parse_command::ParsedCommand::Search {
                         cmd: "grep command_actions in crates/tui/src/worker.rs".to_string(),
@@ -2032,6 +2037,7 @@ fn session_switch_restores_error_via_tool_result_cell_style() {
             kind: devo_protocol::SessionHistoryItemKind::Error,
             title: "bash error".to_string(),
             body: "permission denied".to_string(),
+            tool_io: None,
             metadata: None,
             duration_ms: None,
         }],
@@ -2093,6 +2099,7 @@ fn live_and_resume_error_share_same_rendering_chain() {
             kind: devo_protocol::SessionHistoryItemKind::Error,
             title: "bash error".to_string(),
             body: "permission denied".to_string(),
+            tool_io: None,
             metadata: None,
             duration_ms: None,
         }],
@@ -2743,6 +2750,7 @@ fn user_shell_command_renders_direct_output_and_shell_summary() {
     widget.handle_worker_event(crate::events::WorkerEvent::CommandExecutionStarted {
         tool_use_id: "user-shell-1".to_string(),
         command: "ls".to_string(),
+        input: None,
         source: devo_protocol::protocol::ExecCommandSource::UserShell,
         command_actions: vec![devo_protocol::parse_command::ParsedCommand::ListFiles {
             cmd: "ls".to_string(),
@@ -2841,6 +2849,7 @@ fn two_shell_commands_render_as_separate_prompt_cells() {
     widget.handle_worker_event(crate::events::WorkerEvent::CommandExecutionStarted {
         tool_use_id: "user-shell-1".to_string(),
         command: "pwd".to_string(),
+        input: None,
         source: devo_protocol::protocol::ExecCommandSource::UserShell,
         command_actions: Vec::new(),
     });
@@ -2862,6 +2871,7 @@ fn two_shell_commands_render_as_separate_prompt_cells() {
     widget.handle_worker_event(crate::events::WorkerEvent::CommandExecutionStarted {
         tool_use_id: "user-shell-2".to_string(),
         command: "whoami".to_string(),
+        input: None,
         source: devo_protocol::protocol::ExecCommandSource::UserShell,
         command_actions: Vec::new(),
     });
@@ -5038,6 +5048,327 @@ fn transcript_overlay_lines_include_running_tool_output_delta() {
 }
 
 #[test]
+fn transcript_overlay_lines_include_running_tool_input_and_output_delta() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "custom job".to_string(),
+        preparing: false,
+        parsed_commands: None,
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCallDetails {
+        tool_use_id: "tool-1".to_string(),
+        tool_name: "custom_tool".to_string(),
+        input: serde_json::json!({"alpha": 1, "target": "crate"}),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolOutputDelta {
+        tool_use_id: "tool-1".to_string(),
+        delta: "streamed output line".to_string(),
+    });
+
+    let transcript = line_texts(widget.transcript_overlay_lines(80)).join("\n");
+
+    assert!(
+        transcript.contains("Input") && transcript.contains("\"alpha\": 1"),
+        "transcript should include running tool input: {transcript}"
+    );
+    assert!(
+        transcript.contains("Output") && transcript.contains("streamed output line"),
+        "transcript should include running tool output deltas: {transcript}"
+    );
+}
+
+#[test]
+fn transcript_overlay_lines_include_completed_tool_input_and_full_output() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+    let output = (1..=8)
+        .map(|index| format!("line {index}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "custom job".to_string(),
+        preparing: false,
+        parsed_commands: None,
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCallDetails {
+        tool_use_id: "tool-1".to_string(),
+        tool_name: "custom_tool".to_string(),
+        input: serde_json::json!({"query": "needle", "path": "crates/tui"}),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolResultIo {
+        tool_use_id: "tool-1".to_string(),
+        tool_name: "custom_tool".to_string(),
+        title: "custom job".to_string(),
+        input: serde_json::json!({"query": "needle", "path": "crates/tui"}),
+        output: serde_json::Value::String(output),
+        display_content: None,
+        is_error: false,
+        truncated: false,
+    });
+
+    let inline = scrollback_plain_lines(&widget.drain_scrollback_lines(80)).join("\n");
+    let transcript = line_texts(widget.transcript_overlay_lines(80)).join("\n");
+
+    assert!(
+        inline.contains("line 1") && inline.contains("ctrl + t to view transcript"),
+        "inline output should stay compact and show the transcript hint: {inline}"
+    );
+    assert!(
+        transcript.contains("Input") && transcript.contains("\"query\": \"needle\""),
+        "transcript should include completed tool input: {transcript}"
+    );
+    assert!(
+        transcript.contains("line 5") && transcript.contains("line 8"),
+        "transcript should include the full completed tool output: {transcript}"
+    );
+}
+
+#[test]
+fn transcript_overlay_lines_include_completed_read_input_and_full_output() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "read src/lib.rs".to_string(),
+        preparing: false,
+        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+            cmd: "read src/lib.rs".to_string(),
+            name: "lib.rs".to_string(),
+            path: PathBuf::from("src/lib.rs"),
+        }]),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCallDetails {
+        tool_use_id: "tool-1".to_string(),
+        tool_name: "read".to_string(),
+        input: serde_json::json!({"path": "src/lib.rs", "offset": 4, "limit": 2}),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolResultIo {
+        tool_use_id: "tool-1".to_string(),
+        tool_name: "read".to_string(),
+        title: "read src/lib.rs".to_string(),
+        input: serde_json::json!({"path": "src/lib.rs", "offset": 4, "limit": 2}),
+        output: serde_json::Value::String("read output line 1\nread output line 2".to_string()),
+        display_content: None,
+        is_error: false,
+        truncated: false,
+    });
+
+    let inline = line_texts(widget.active_viewport_lines_for_test(80)).join("\n");
+    let transcript = line_texts(widget.transcript_overlay_lines(80)).join("\n");
+
+    assert!(
+        inline.contains("Explored") && inline.contains("Read lib.rs"),
+        "inline read rendering should stay as the compact explored block: {inline}"
+    );
+    assert!(
+        !inline.contains("Input") && !inline.contains("offset: 4"),
+        "inline read rendering should not expose raw transcript input: {inline}"
+    );
+    assert!(
+        transcript.contains("file: src/lib.rs")
+            && transcript.contains("offset: 4")
+            && transcript.contains("limit: 2"),
+        "transcript should include read input details: {transcript}"
+    );
+    assert!(
+        transcript.contains("read output line 1") && transcript.contains("read output line 2"),
+        "transcript should include full read output: {transcript}"
+    );
+}
+
+#[test]
+fn transcript_overlay_lines_include_patch_input_and_diff_output() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+    let mut changes = std::collections::HashMap::new();
+    changes.insert(
+        PathBuf::from("foo.txt"),
+        devo_protocol::protocol::FileChange::Update {
+            unified_diff: "--- a/foo.txt\n+++ b/foo.txt\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
+            move_path: None,
+        },
+    );
+
+    widget.handle_worker_event(crate::events::WorkerEvent::PatchAppliedIo {
+        tool_name: "apply_patch".to_string(),
+        input: serde_json::json!({
+            "patch": "*** Begin Patch\n*** Update File: foo.txt\n-old\n+new\n*** End Patch"
+        }),
+        changes,
+    });
+
+    let transcript = line_texts(widget.transcript_overlay_lines(100)).join("\n");
+
+    assert!(
+        transcript.contains("Input") && transcript.contains("patch:"),
+        "transcript should include patch input: {transcript}"
+    );
+    assert!(
+        transcript.contains("Output")
+            && (transcript.contains("Edited foo.txt") || transcript.contains("Edited 1 file")),
+        "transcript should include rendered diff output: {transcript}"
+    );
+}
+
+#[test]
+fn restored_session_transcript_overlay_preserves_paired_tool_io() {
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, cwd.clone());
+
+    widget.handle_worker_event(crate::events::WorkerEvent::SessionSwitched {
+        session_id: "session-1".to_string(),
+        cwd,
+        title: None,
+        model: Some("test-model".to_string()),
+        thinking: None,
+        reasoning_effort: None,
+        active_agent_label: None,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_cache_read_tokens: 0,
+        last_query_total_tokens: 0,
+        last_query_input_tokens: 0,
+        prompt_token_estimate: 0,
+        history_items: Vec::new(),
+        rich_history_items: vec![
+            devo_protocol::SessionHistoryItem {
+                tool_call_id: Some("call-1".to_string()),
+                kind: devo_protocol::SessionHistoryItemKind::ToolCall,
+                title: "read src/lib.rs".to_string(),
+                body: String::new(),
+                tool_io: Some(devo_protocol::SessionHistoryToolIo {
+                    tool_name: "read".to_string(),
+                    input: serde_json::json!({"path": "src/lib.rs", "offset": 10, "limit": 3}),
+                    output: None,
+                    display_content: None,
+                }),
+                metadata: None,
+                duration_ms: None,
+            },
+            devo_protocol::SessionHistoryItem {
+                tool_call_id: Some("call-1".to_string()),
+                kind: devo_protocol::SessionHistoryItemKind::ToolResult,
+                title: "read output".to_string(),
+                body: "legacy preview".to_string(),
+                tool_io: Some(devo_protocol::SessionHistoryToolIo {
+                    tool_name: "read".to_string(),
+                    input: serde_json::Value::Null,
+                    output: Some(serde_json::Value::String(
+                        "restored line 1\nrestored line 2".to_string(),
+                    )),
+                    display_content: None,
+                }),
+                metadata: None,
+                duration_ms: None,
+            },
+        ],
+        loaded_item_count: 2,
+        pending_texts: vec![],
+    });
+
+    let transcript = line_texts(widget.transcript_overlay_lines(100)).join("\n");
+
+    assert!(
+        transcript.contains("file: src/lib.rs")
+            && transcript.contains("offset: 10")
+            && transcript.contains("limit: 3"),
+        "restored transcript should include paired input: {transcript}"
+    );
+    assert!(
+        transcript.contains("restored line 1") && transcript.contains("restored line 2"),
+        "restored transcript should include paired output: {transcript}"
+    );
+}
+
+#[test]
+fn legacy_restored_session_without_tool_io_keeps_existing_tool_result_rendering() {
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, cwd.clone());
+
+    widget.handle_worker_event(crate::events::WorkerEvent::SessionSwitched {
+        session_id: "session-1".to_string(),
+        cwd,
+        title: None,
+        model: Some("test-model".to_string()),
+        thinking: None,
+        reasoning_effort: None,
+        active_agent_label: None,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_cache_read_tokens: 0,
+        last_query_total_tokens: 0,
+        last_query_input_tokens: 0,
+        prompt_token_estimate: 0,
+        history_items: Vec::new(),
+        rich_history_items: vec![
+            devo_protocol::SessionHistoryItem {
+                tool_call_id: Some("call-1".to_string()),
+                kind: devo_protocol::SessionHistoryItemKind::ToolCall,
+                title: "legacy tool".to_string(),
+                body: String::new(),
+                tool_io: None,
+                metadata: None,
+                duration_ms: None,
+            },
+            devo_protocol::SessionHistoryItem {
+                tool_call_id: Some("call-1".to_string()),
+                kind: devo_protocol::SessionHistoryItemKind::ToolResult,
+                title: "legacy tool output".to_string(),
+                body: "legacy result".to_string(),
+                tool_io: None,
+                metadata: None,
+                duration_ms: None,
+            },
+        ],
+        loaded_item_count: 2,
+        pending_texts: vec![],
+    });
+
+    let transcript = line_texts(widget.transcript_overlay_lines(100)).join("\n");
+
+    assert!(
+        transcript.contains("legacy result"),
+        "legacy restored transcript should still show the old result body: {transcript}"
+    );
+    assert!(
+        !transcript.contains("Input") && !transcript.contains("Output"),
+        "legacy restored transcript should not synthesize tool I/O sections: {transcript}"
+    );
+}
+
+#[test]
 fn read_tool_call_renders_as_explored_group_in_viewport() {
     let model = Model {
         slug: "test-model".to_string(),
@@ -6198,6 +6529,7 @@ fn session_switch_restores_added_file_content_in_edited_block() {
             kind: devo_protocol::SessionHistoryItemKind::ToolResult,
             title: "write".to_string(),
             body: String::new(),
+            tool_io: None,
             metadata: Some(devo_protocol::SessionHistoryMetadata::Edited { changes }),
             duration_ms: None,
         }],
@@ -6249,6 +6581,7 @@ fn session_switch_without_rich_edited_metadata_still_restores_edited_block() {
             kind: devo_protocol::SessionHistoryItemKind::ToolResult,
             title: "apply_patch output".to_string(),
             body: "{\"diff\":\"diff --git a/foo.txt b/foo.txt\\n--- a/foo.txt\\n+++ b/foo.txt\\n@@ -1 +1 @@\\n-old\\n+new\\n\",\"files\":[{\"path\":\"foo.txt\",\"kind\":\"update\",\"additions\":1,\"deletions\":1}]}".to_string(),
+            tool_io: None,
             metadata: None,
             duration_ms: None,
         }],

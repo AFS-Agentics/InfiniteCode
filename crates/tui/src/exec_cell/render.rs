@@ -11,6 +11,8 @@ use crate::history_cell::HistoryCell;
 use crate::render::highlight::highlight_bash_to_lines;
 use crate::render::line_utils::prefix_lines;
 use crate::render::line_utils::push_owned_lines;
+use crate::tool_io_cell::ToolIoCell;
+use crate::tool_io_cell::ToolIoCellOptions;
 use crate::wrapping::RtOptions;
 use crate::wrapping::adaptive_wrap_line;
 use crate::wrapping::adaptive_wrap_lines;
@@ -72,6 +74,10 @@ pub(crate) fn new_active_exec_command(
             start_time: Some(Instant::now()),
             duration: None,
             interaction_input,
+            tool_name: None,
+            tool_input: None,
+            tool_output: None,
+            tool_display_content: None,
         },
         animations_enabled,
     )
@@ -272,6 +278,9 @@ impl HistoryCell for ExecCell {
     }
 
     fn transcript_lines(&self, width: u16) -> Vec<Line<'static>> {
+        if let Some(lines) = self.tool_io_transcript_lines(width) {
+            return lines;
+        }
         if self.is_exploring_cell() {
             return self.exploring_display_lines(width);
         }
@@ -320,6 +329,55 @@ impl HistoryCell for ExecCell {
 }
 
 impl ExecCell {
+    fn tool_io_transcript_lines(&self, width: u16) -> Option<Vec<Line<'static>>> {
+        let mut lines = Vec::new();
+        for call in self.iter_calls() {
+            let (Some(tool_name), Some(input)) = (&call.tool_name, &call.tool_input) else {
+                continue;
+            };
+            if !lines.is_empty() {
+                lines.push(Line::from(""));
+            }
+            let command = strip_bash_lc_and_escape(&call.command);
+            let title_line = (!command.is_empty()).then(|| Line::from(format!("Ran {command}")));
+            let output = call.tool_output.clone().or_else(|| {
+                call.output.as_ref().map(|output| {
+                    let text = if output.formatted_output.is_empty() {
+                        output.aggregated_output.clone()
+                    } else {
+                        output.formatted_output.clone()
+                    };
+                    serde_json::Value::String(text)
+                })
+            });
+            let dot_prefix = Line::from(vec![
+                if call.output.is_some() {
+                    "▌".dim()
+                } else {
+                    spinner(call.start_time, self.animations_enabled())
+                },
+                " ".into(),
+            ]);
+            lines.extend(
+                ToolIoCell::new(
+                    ToolIoCellOptions {
+                        title_line,
+                        dot_prefix,
+                        subsequent_prefix: Line::from("  "),
+                        output_style: Style::default(),
+                        show_empty_ellipsis: false,
+                    },
+                    tool_name.clone(),
+                    input.clone(),
+                    output,
+                    call.tool_display_content.clone(),
+                )
+                .transcript_lines(width),
+            );
+        }
+        (!lines.is_empty()).then_some(lines)
+    }
+
     fn output_ellipsis_text(omitted: usize) -> String {
         format!("… +{omitted} lines ({TRANSCRIPT_HINT})")
     }
@@ -856,6 +914,10 @@ mod tests {
             start_time: None,
             duration: None,
             interaction_input: None,
+            tool_name: None,
+            tool_input: None,
+            tool_output: None,
+            tool_display_content: None,
         };
 
         let cell = ExecCell::new(call, /*animations_enabled*/ false);
@@ -1007,6 +1069,10 @@ mod tests {
             start_time: None,
             duration: None,
             interaction_input: None,
+            tool_name: None,
+            tool_input: None,
+            tool_output: None,
+            tool_display_content: None,
         };
 
         let cell = ExecCell::new(call, /*animations_enabled*/ false);
@@ -1044,6 +1110,10 @@ mod tests {
             start_time: None,
             duration: None,
             interaction_input: None,
+            tool_name: None,
+            tool_input: None,
+            tool_output: None,
+            tool_display_content: None,
         };
 
         let cell = ExecCell::new(call, /*animations_enabled*/ false);
@@ -1085,6 +1155,10 @@ mod tests {
             start_time: None,
             duration: None,
             interaction_input: None,
+            tool_name: None,
+            tool_input: None,
+            tool_output: None,
+            tool_display_content: None,
         };
 
         let cell = ExecCell::new(call, /*animations_enabled*/ false);
@@ -1122,6 +1196,10 @@ mod tests {
             start_time: None,
             duration: None,
             interaction_input: None,
+            tool_name: None,
+            tool_input: None,
+            tool_output: None,
+            tool_display_content: None,
         };
 
         let cell = ExecCell::new(call, /*animations_enabled*/ false);

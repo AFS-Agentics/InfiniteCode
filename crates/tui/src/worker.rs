@@ -28,7 +28,6 @@ use devo_protocol::GoalClearParams;
 use devo_protocol::GoalSetParams;
 use devo_protocol::GoalStatusParams;
 use devo_protocol::ProviderModelBinding;
-use devo_protocol::ThreadGoalStatus;
 use devo_protocol::ProviderValidateParams;
 use devo_protocol::ProviderVendor;
 use devo_protocol::ProviderVendorListParams;
@@ -39,6 +38,7 @@ use devo_protocol::ReferenceSearchStartParams;
 use devo_protocol::ReferenceSearchUpdateParams;
 use devo_protocol::SessionHistoryMetadata;
 use devo_protocol::SessionPlanStepStatus;
+use devo_protocol::ThreadGoalStatus;
 use devo_server::ApprovalDecisionPayload;
 use devo_server::ApprovalRequestPayload;
 use devo_server::ApprovalRespondParams;
@@ -254,11 +254,16 @@ fn next_shell_command_exec_start(
 ) -> ShellCommandExecStart {
     let process_id = format!("user-shell-{}", *next_shell_process_index);
     *next_shell_process_index += 1;
+    let input = serde_json::json!({
+        "cmd": command.clone(),
+        "cwd": cwd.clone(),
+    });
     ShellCommandExecStart {
         process_id: process_id.clone(),
         started_event: WorkerEvent::CommandExecutionStarted {
             tool_use_id: process_id.clone(),
             command: command.clone(),
+            input: Some(input),
             source: devo_protocol::protocol::ExecCommandSource::UserShell,
             command_actions: Vec::new(),
         },
@@ -1938,6 +1943,7 @@ async fn run_worker_inner(
                                                     WorkerEvent::CommandExecutionStarted {
                                                         tool_use_id: payload.tool_call_id,
                                                         command: payload.command,
+                                                        input: payload.input,
                                                         source: payload.source,
                                                         command_actions: payload.command_actions,
                                                     },
@@ -1950,8 +1956,14 @@ async fn run_worker_inner(
                                                     payload.item.payload,
                                                 )
                                             {
+                                                let details = WorkerEvent::ToolCallDetails {
+                                                    tool_use_id: payload.tool_call_id.clone(),
+                                                    tool_name: payload.tool_name.clone(),
+                                                    input: payload.parameters.clone(),
+                                                };
                                                 let _ =
                                                     event_tx.send(tool_call_started_event(payload));
+                                                let _ = event_tx.send(details);
                                             }
                                         }
                                         _ => {}
@@ -2621,6 +2633,11 @@ fn handle_completed_item(payload: ItemEventPayload, event_tx: &mpsc::UnboundedSe
             };
             let summary = summarize_tool_call_update(&payload);
             let parsed_commands = tool_call_updated_actions(&payload, &summary);
+            let _ = event_tx.send(WorkerEvent::ToolCallDetails {
+                tool_use_id: payload.tool_call_id.clone(),
+                tool_name: payload.tool_name.clone(),
+                input: payload.parameters.clone(),
+            });
             if !parsed_commands.is_empty() {
                 let _ = event_tx.send(WorkerEvent::ToolCallUpdated {
                     tool_use_id: payload.tool_call_id,
@@ -2642,7 +2659,15 @@ fn handle_completed_item(payload: ItemEventPayload, event_tx: &mpsc::UnboundedSe
                 .changes
                 .into_iter()
                 .collect::<std::collections::HashMap<_, _>>();
-            let _ = event_tx.send(WorkerEvent::PatchApplied { changes });
+            let event = match (payload.tool_name, payload.input) {
+                (Some(tool_name), Some(input)) => WorkerEvent::PatchAppliedIo {
+                    tool_name,
+                    input,
+                    changes,
+                },
+                _ => WorkerEvent::PatchApplied { changes },
+            };
+            let _ = event_tx.send(event);
         }
         ItemEnvelope {
             item_id,
@@ -2677,15 +2702,28 @@ fn handle_completed_item(payload: ItemEventPayload, event_tx: &mpsc::UnboundedSe
             } else {
                 payload.summary
             };
-            let _ = event_tx.send(WorkerEvent::ToolResult {
-                tool_use_id: payload.tool_call_id,
-                title,
-                preview: payload
-                    .display_content
-                    .unwrap_or_else(|| render_json_value_text(&payload.content)),
-                is_error: payload.is_error,
-                truncated: false,
-            });
+            let event = match payload.input {
+                Some(input) => WorkerEvent::ToolResultIo {
+                    tool_use_id: payload.tool_call_id,
+                    tool_name: payload.tool_name.unwrap_or_else(|| "tool".to_string()),
+                    title,
+                    input,
+                    output: payload.content,
+                    display_content: payload.display_content,
+                    is_error: payload.is_error,
+                    truncated: false,
+                },
+                None => WorkerEvent::ToolResult {
+                    tool_use_id: payload.tool_call_id,
+                    title,
+                    preview: payload
+                        .display_content
+                        .unwrap_or_else(|| render_json_value_text(&payload.content)),
+                    is_error: payload.is_error,
+                    truncated: false,
+                },
+            };
+            let _ = event_tx.send(event);
         }
         ItemEnvelope {
             item_kind: ItemKind::CommandExecution,
@@ -3366,7 +3404,14 @@ fn patch_event_from_tool_result(payload: &ToolResultPayload) -> Option<WorkerEve
     if changes.is_empty() {
         return None;
     }
-    Some(WorkerEvent::PatchApplied { changes })
+    match (payload.tool_name.clone(), payload.input.clone()) {
+        (Some(tool_name), Some(input)) => Some(WorkerEvent::PatchAppliedIo {
+            tool_name,
+            input,
+            changes,
+        }),
+        _ => Some(WorkerEvent::PatchApplied { changes }),
+    }
 }
 
 fn parse_plan_step_status(status: &str) -> Option<PlanStepStatus> {
@@ -3517,7 +3562,7 @@ mod tests {
         let mut next_shell_process_index = 1_u64;
 
         let first = next_shell_command_exec_start(
-            Some(session_id.clone()),
+            Some(session_id),
             PathBuf::from("/tmp/project"),
             "pwd".to_string(),
             &mut next_shell_process_index,
@@ -3537,6 +3582,10 @@ mod tests {
                     started_event: WorkerEvent::CommandExecutionStarted {
                         tool_use_id: "user-shell-1".to_string(),
                         command: "pwd".to_string(),
+                        input: Some(serde_json::json!({
+                            "cmd": "pwd",
+                            "cwd": PathBuf::from("/tmp/project"),
+                        })),
                         source: devo_protocol::protocol::ExecCommandSource::UserShell,
                         command_actions: Vec::new(),
                     },
@@ -3555,6 +3604,10 @@ mod tests {
                     started_event: WorkerEvent::CommandExecutionStarted {
                         tool_use_id: "user-shell-2".to_string(),
                         command: "whoami".to_string(),
+                        input: Some(serde_json::json!({
+                            "cmd": "whoami",
+                            "cwd": PathBuf::from("/tmp/project"),
+                        })),
                         source: devo_protocol::protocol::ExecCommandSource::UserShell,
                         command_actions: Vec::new(),
                     },
@@ -3692,6 +3745,7 @@ mod tests {
                     payload: serde_json::to_value(ToolResultPayload {
                         tool_call_id: "call-1".to_string(),
                         tool_name: Some("read".to_string()),
+                        input: None,
                         content: serde_json::Value::String(
                             "<content>canonical</content>".to_string(),
                         ),
@@ -3907,6 +3961,7 @@ mod tests {
                     payload: serde_json::to_value(ToolResultPayload {
                         tool_call_id: "call-1".to_string(),
                         tool_name: Some("read".to_string()),
+                        input: None,
                         content: serde_json::Value::String(
                             "<content>canonical</content>".to_string(),
                         ),
@@ -3949,6 +4004,7 @@ mod tests {
                     payload: serde_json::to_value(ToolResultPayload {
                         tool_call_id: "call-1".to_string(),
                         tool_name: Some("update_plan".to_string()),
+                        input: None,
                         content: serde_json::json!({
                             "explanation": "Working through the task",
                             "plan": [
@@ -4001,6 +4057,7 @@ mod tests {
                     payload: serde_json::to_value(ToolResultPayload {
                         tool_call_id: "call-1".to_string(),
                         tool_name: Some("apply_patch".to_string()),
+                        input: None,
                         content: serde_json::json!({
                             "diff": "--- a/foo.txt\n+++ b/foo.txt\n@@ -1 +1 @@\n-old\n+new\n",
                             "files": [
@@ -4046,6 +4103,7 @@ mod tests {
                     payload: serde_json::to_value(ToolResultPayload {
                         tool_call_id: "call-1".to_string(),
                         tool_name: Some("write".to_string()),
+                        input: None,
                         content: serde_json::json!({
                             "diff": "diff --git a/foo.txt b/foo.txt\n--- a/foo.txt\n+++ b/foo.txt\n@@ -1 +1 @@\n-old\n+new\n",
                             "files": [
@@ -4091,6 +4149,7 @@ mod tests {
                     payload: serde_json::to_value(ToolResultPayload {
                         tool_call_id: "call-1".to_string(),
                         tool_name: Some("apply_patch".to_string()),
+                        input: None,
                         content: serde_json::json!({
                             "diff": "diff --git a/update.txt b/update.txt\n--- a/update.txt\n+++ b/update.txt\n@@ -1 +1 @@\n-old\n+new\n",
                             "files": [
@@ -4141,6 +4200,7 @@ mod tests {
                     payload: serde_json::to_value(ToolResultPayload {
                         tool_call_id: "call-1".to_string(),
                         tool_name: Some("apply_patch".to_string()),
+                        input: None,
                         content: serde_json::json!({
                             "diff": "BROKEN TOP LEVEL DIFF",
                             "files": [
@@ -4189,6 +4249,9 @@ mod tests {
                 name: "chatwidget.rs".to_string(),
                 path: PathBuf::from("crates/tui/src/chatwidget.rs"),
             }],
+            input: Some(serde_json::json!({
+                "path": "crates/tui/src/chatwidget.rs",
+            })),
             output: None,
             is_error: false,
         };
@@ -4197,12 +4260,14 @@ mod tests {
             WorkerEvent::CommandExecutionStarted {
                 tool_use_id: payload.tool_call_id.clone(),
                 command: payload.command.clone(),
+                input: payload.input.clone(),
                 source: payload.source,
                 command_actions: payload.command_actions.clone(),
             },
             WorkerEvent::CommandExecutionStarted {
                 tool_use_id: payload.tool_call_id,
                 command: payload.command,
+                input: payload.input,
                 source: devo_protocol::protocol::ExecCommandSource::Agent,
                 command_actions: payload.command_actions,
             }
@@ -4390,6 +4455,7 @@ mod tests {
                 kind: SessionHistoryItemKind::ToolCall,
                 title: "Ran powershell -Command \"Get-Date\"".to_string(),
                 body: String::new(),
+                tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
@@ -4398,6 +4464,7 @@ mod tests {
                 kind: SessionHistoryItemKind::ToolResult,
                 title: "Tool output".to_string(),
                 body: "2026-04-09".to_string(),
+                tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
@@ -4420,6 +4487,7 @@ mod tests {
                 kind: SessionHistoryItemKind::ToolCall,
                 title: "Ran read a".to_string(),
                 body: String::new(),
+                tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
@@ -4428,6 +4496,7 @@ mod tests {
                 kind: SessionHistoryItemKind::ToolCall,
                 title: "Ran read b".to_string(),
                 body: String::new(),
+                tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
@@ -4436,6 +4505,7 @@ mod tests {
                 kind: SessionHistoryItemKind::ToolResult,
                 title: "Tool output".to_string(),
                 body: "B".to_string(),
+                tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
@@ -4444,6 +4514,7 @@ mod tests {
                 kind: SessionHistoryItemKind::ToolResult,
                 title: "Tool output".to_string(),
                 body: "A".to_string(),
+                tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
@@ -4466,6 +4537,7 @@ mod tests {
             title: String::new(),
             body: r#"{"explanation":"Do work","plan":[{"step":"Inspect","status":"completed"}]}"#
                 .to_string(),
+            tool_io: None,
             metadata: Some(SessionHistoryMetadata::PlanUpdate {
                 explanation: Some("Do work".to_string()),
                 steps: vec![devo_protocol::SessionPlanStep {
@@ -4489,6 +4561,7 @@ mod tests {
             kind: SessionHistoryItemKind::CommandExecution,
             title: "cargo test".to_string(),
             body: "ok".to_string(),
+            tool_io: None,
             metadata: None,
             duration_ms: None,
         }];
@@ -4506,6 +4579,7 @@ mod tests {
             kind: SessionHistoryItemKind::Reasoning,
             title: String::new(),
             body: "thinking aloud".to_string(),
+            tool_io: None,
             metadata: None,
             duration_ms: None,
         }];

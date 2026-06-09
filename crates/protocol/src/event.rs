@@ -38,6 +38,8 @@ pub struct ToolCallPayload {
 pub struct ToolResultPayload {
     pub tool_call_id: String,
     pub tool_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<serde_json::Value>,
     pub content: serde_json::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_content: Option<String>,
@@ -51,6 +53,8 @@ pub struct CommandExecutionPayload {
     pub tool_call_id: String,
     pub tool_name: String,
     pub command: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<serde_json::Value>,
     #[serde(default)]
     pub source: ExecCommandSource,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -66,6 +70,8 @@ pub struct FileChangePayload {
     pub tool_call_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<serde_json::Value>,
     pub changes: Vec<(std::path::PathBuf, FileChange)>,
     pub is_error: bool,
 }
@@ -395,11 +401,13 @@ mod tests {
         )
         .expect("deserialize legacy payload");
         assert_eq!(payload.display_content, None);
+        assert_eq!(payload.input, None);
         assert_eq!(payload.summary, "");
 
         let payload = ToolResultPayload {
             tool_call_id: "call-1".to_string(),
             tool_name: Some("read".to_string()),
+            input: Some(serde_json::json!({"filePath": "foo.txt"})),
             content: serde_json::Value::String("canonical".to_string()),
             display_content: Some("display".to_string()),
             is_error: false,
@@ -409,6 +417,10 @@ mod tests {
         assert_eq!(
             json.get("display_content"),
             Some(&serde_json::Value::String("display".to_string()))
+        );
+        assert_eq!(
+            json.get("input"),
+            Some(&serde_json::json!({"filePath": "foo.txt"}))
         );
     }
 

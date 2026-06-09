@@ -82,7 +82,7 @@ fn collect_node_ranges(
     if range.end <= range.start {
         return;
     }
-    let char_len = content[range.clone()].chars().count();
+    let char_len = count_chars(&content[range.clone()]);
     if char_len <= DESIRED_CHUNK_CHARS || depth >= RECURSION_DEPTH || node.named_child_count() == 0
     {
         ranges.push(range);
@@ -105,26 +105,54 @@ fn merge_ranges(
     content: &str,
     mut ranges: Vec<Range<usize>>,
 ) -> Vec<Chunk> {
+    if ranges.is_empty() {
+        return Vec::new();
+    }
     ranges.sort_by_key(|range| range.start);
+    let line_starts = line_start_offsets(content);
     let mut merged = Vec::new();
-    let mut current: Option<Range<usize>> = None;
+    let mut current: Option<(Range<usize>, usize)> = None;
 
     for range in ranges {
         match current.take() {
-            Some(active)
-                if content[active.start..range.end].chars().count() <= DESIRED_CHUNK_CHARS =>
-            {
-                current = Some(active.start..range.end);
+            Some((active, active_chars)) => {
+                let active_start = active.start;
+                let active_end = active.end;
+                let next_chars = if range.end >= active_end {
+                    active_chars + count_chars(&content[active_end..range.end])
+                } else {
+                    count_chars(&content[active_start..range.end])
+                };
+                if next_chars <= DESIRED_CHUNK_CHARS {
+                    current = Some((active_start..range.end, next_chars));
+                } else {
+                    push_byte_chunk(
+                        &mut merged,
+                        relative_path,
+                        language,
+                        content,
+                        &line_starts,
+                        active,
+                    );
+                    let range_chars = count_chars(&content[range.clone()]);
+                    current = Some((range, range_chars));
+                }
             }
-            Some(active) => {
-                push_byte_chunk(&mut merged, relative_path, language, content, active);
-                current = Some(range);
+            None => {
+                let range_chars = count_chars(&content[range.clone()]);
+                current = Some((range, range_chars));
             }
-            None => current = Some(range),
         }
     }
-    if let Some(active) = current {
-        push_byte_chunk(&mut merged, relative_path, language, content, active);
+    if let Some((active, _)) = current {
+        push_byte_chunk(
+            &mut merged,
+            relative_path,
+            language,
+            content,
+            &line_starts,
+            active,
+        );
     }
     merged
 }
@@ -136,6 +164,7 @@ fn push_byte_chunk(
     relative_path: &Path,
     language: &str,
     content: &str,
+    line_starts: &[usize],
     range: Range<usize>,
 ) {
     let text = content[range.clone()].trim().to_string();
@@ -145,10 +174,28 @@ fn push_byte_chunk(
     chunks.push(Chunk {
         content: text,
         file_path: relative_path.to_path_buf(),
-        start_line: byte_to_line(content, range.start),
-        end_line: byte_to_line(content, range.end),
+        start_line: byte_to_line(line_starts, content.len(), range.start),
+        end_line: byte_to_line(line_starts, content.len(), range.end),
         language: language.to_string(),
     });
+}
+
+fn line_start_offsets(content: &str) -> Vec<usize> {
+    let mut starts = vec![0];
+    for (idx, byte) in content.bytes().enumerate() {
+        if byte == b'\n' {
+            starts.push(idx + 1);
+        }
+    }
+    starts
+}
+
+fn count_chars(text: &str) -> usize {
+    if text.len() <= 256 && text.is_ascii() {
+        text.len()
+    } else {
+        text.chars().count()
+    }
 }
 
 /// Fallback chunker for unsupported languages and parser failures.
@@ -158,11 +205,13 @@ fn push_byte_chunk(
 fn chunk_by_lines(relative_path: &Path, language: &str, content: &str) -> Vec<Chunk> {
     let mut chunks = Vec::new();
     let mut current = String::new();
+    let mut current_chars = 0usize;
     let mut start_line: usize = 1;
     let mut current_line: usize = 1;
 
     for line in content.lines() {
-        let next_len = current.chars().count() + line.chars().count() + 1;
+        let line_chars = count_chars(line);
+        let next_len = current_chars + line_chars + 1;
         if !current.is_empty() && next_len > DESIRED_CHUNK_CHARS {
             chunks.push(Chunk {
                 content: current.trim_end().to_string(),
@@ -172,10 +221,12 @@ fn chunk_by_lines(relative_path: &Path, language: &str, content: &str) -> Vec<Ch
                 language: language.to_string(),
             });
             current.clear();
+            current_chars = 0;
             start_line = current_line;
         }
         current.push_str(line);
         current.push('\n');
+        current_chars += line_chars + 1;
         current_line += 1;
     }
 
@@ -192,19 +243,16 @@ fn chunk_by_lines(relative_path: &Path, language: &str, content: &str) -> Vec<Ch
 }
 
 /// Converts a byte offset to a 1-indexed line number.
-fn byte_to_line(content: &str, byte_idx: usize) -> usize {
-    content
-        .as_bytes()
-        .iter()
-        .take(byte_idx.min(content.len()))
-        .filter(|byte| **byte == b'\n')
-        .count()
-        + 1
+fn byte_to_line(line_starts: &[usize], content_len: usize, byte_idx: usize) -> usize {
+    let capped = byte_idx.min(content_len);
+    line_starts.partition_point(|start| *start <= capped)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
     use std::path::Path;
+    use std::time::Instant;
 
     use pretty_assertions::assert_eq;
 
@@ -496,5 +544,180 @@ fn second() {
         assert!(chunks[0].content.contains("fn first"));
         assert!(chunks[0].content.contains("fn second"));
         assert_eq!(chunks[0].start_line, 1);
+    }
+
+    #[test]
+    fn cached_byte_to_line_matches_original_offset_semantics() {
+        let source = "a\nbc\n";
+        let line_starts = line_start_offsets(source);
+        let lines = [0, 1, 2, 3, 4, 5, 99]
+            .into_iter()
+            .map(|byte_idx| byte_to_line(&line_starts, source.len(), byte_idx))
+            .collect::<Vec<_>>();
+
+        assert_eq!(lines, vec![1, 1, 2, 2, 2, 3, 3]);
+    }
+
+    #[test]
+    fn count_chars_preserves_unicode_semantics() {
+        let counts = [
+            count_chars("ascii text"),
+            count_chars("解析 input"),
+            count_chars(&"x".repeat(300)),
+        ];
+
+        assert_eq!(counts, [10, 8, 300]);
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_line_chunking_many_lines() {
+        let line_count = 10_000;
+        let source = (0..line_count)
+            .map(|line| {
+                format!(
+                    "line {line:05} contains enough words to resemble a documentation paragraph"
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let expected_chunks = chunk_file(Path::new("README.md"), "markdown", &source);
+        let expected_chunk_count = expected_chunks.len();
+        let expected_content_bytes = expected_chunks
+            .iter()
+            .map(|chunk| chunk.content.len())
+            .sum::<usize>();
+        let iterations = 200;
+        let started = Instant::now();
+        let mut total_chunks = 0usize;
+        let mut total_content_bytes = 0usize;
+
+        for _ in 0..iterations {
+            let chunks = chunk_file(
+                black_box(Path::new("README.md")),
+                "markdown",
+                black_box(&source),
+            );
+            total_chunks += black_box(chunks.len());
+            total_content_bytes += chunks
+                .iter()
+                .map(|chunk| black_box(chunk.content.len()))
+                .sum::<usize>();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_chunks, expected_chunk_count * iterations);
+        assert_eq!(total_content_bytes, expected_content_bytes * iterations);
+        println!(
+            "line_chunking_many_lines iterations={iterations} lines={line_count} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_merge_ranges_many_small_ranges() {
+        let range_count = 600;
+        let line = format!("{};", "x".repeat(1_398));
+        let mut source = String::new();
+        let mut ranges = Vec::new();
+        for _ in 0..range_count {
+            let start = source.len();
+            source.push_str(&line);
+            let end = source.len();
+            source.push('\n');
+            ranges.push(start..end);
+        }
+        let expected_chunks = merge_ranges(
+            Path::new("src/generated.rs"),
+            "rust",
+            &source,
+            ranges.clone(),
+        );
+        let expected_content_bytes = expected_chunks
+            .iter()
+            .map(|chunk| chunk.content.len())
+            .sum::<usize>();
+        let iterations = 50;
+        let started = Instant::now();
+        let mut total_chunks = 0usize;
+        let mut total_content_bytes = 0usize;
+
+        for _ in 0..iterations {
+            let chunks = merge_ranges(
+                black_box(Path::new("src/generated.rs")),
+                "rust",
+                black_box(&source),
+                black_box(ranges.clone()),
+            );
+            total_chunks += black_box(chunks.len());
+            total_content_bytes += chunks
+                .iter()
+                .map(|chunk| black_box(chunk.content.len()))
+                .sum::<usize>();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_chunks, expected_chunks.len() * iterations);
+        assert_eq!(total_content_bytes, expected_content_bytes * iterations);
+        println!(
+            "merge_ranges_many_small_ranges iterations={iterations} ranges={range_count} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_merge_ranges_many_tiny_ranges() {
+        let range_count = 4_000;
+        let line = "let value = value + 1;";
+        let mut source = String::new();
+        let mut ranges = Vec::new();
+        for _ in 0..range_count {
+            let start = source.len();
+            source.push_str(line);
+            let end = source.len();
+            source.push('\n');
+            ranges.push(start..end);
+        }
+        let expected_chunks = merge_ranges(
+            Path::new("src/generated.rs"),
+            "rust",
+            &source,
+            ranges.clone(),
+        );
+        let expected_content_bytes = expected_chunks
+            .iter()
+            .map(|chunk| chunk.content.len())
+            .sum::<usize>();
+        let iterations = 200;
+        let started = Instant::now();
+        let mut total_chunks = 0usize;
+        let mut total_content_bytes = 0usize;
+
+        for _ in 0..iterations {
+            let chunks = merge_ranges(
+                black_box(Path::new("src/generated.rs")),
+                "rust",
+                black_box(&source),
+                black_box(ranges.clone()),
+            );
+            total_chunks += black_box(chunks.len());
+            total_content_bytes += chunks
+                .iter()
+                .map(|chunk| black_box(chunk.content.len()))
+                .sum::<usize>();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_chunks, expected_chunks.len() * iterations);
+        assert_eq!(total_content_bytes, expected_content_bytes * iterations);
+        println!(
+            "merge_ranges_many_tiny_ranges iterations={iterations} ranges={range_count} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 }

@@ -229,7 +229,7 @@ impl SearchIndex {
         let Some(source_embedding) = self.embeddings.row(source_idx) else {
             return Vec::new();
         };
-        let mut results = (0..self.embeddings.row_count())
+        let mut candidates = (0..self.embeddings.row_count())
             .filter(|idx| *idx != source_idx)
             .filter_map(|idx| {
                 let chunk = self.chunks.get(idx)?;
@@ -238,20 +238,37 @@ impl SearchIndex {
                 }
                 let embedding = self.embeddings.row(idx)?;
                 let score = cosine_similarity(source_embedding, embedding);
-                (score > 0.0).then(|| SearchResult {
+                (score > 0.0).then_some((idx, score))
+            })
+            .collect::<Vec<_>>();
+        let mut compare_candidates = |left: &(usize, f32), right: &(usize, f32)| {
+            right
+                .1
+                .total_cmp(&left.1)
+                .then_with(|| self.chunks[left.0].cmp_location(&self.chunks[right.0]))
+        };
+        let all_scores_equal = candidates.first().is_some_and(|(_, first_score)| {
+            candidates
+                .iter()
+                .all(|(_, score)| score.total_cmp(first_score).is_eq())
+        });
+        if all_scores_equal && candidates.len() > limit {
+            let (top_candidates, _, _) =
+                candidates.select_nth_unstable_by(limit, &mut compare_candidates);
+            top_candidates.sort_by(&mut compare_candidates);
+        } else {
+            candidates.sort_by(compare_candidates);
+        }
+        candidates.truncate(limit);
+        candidates
+            .into_iter()
+            .filter_map(|(idx, score)| {
+                self.chunks.get(idx).map(|chunk| SearchResult {
                     score,
                     chunk: chunk.clone(),
                 })
             })
-            .collect::<Vec<_>>();
-        results.sort_by(|left, right| {
-            right
-                .score
-                .total_cmp(&left.score)
-                .then_with(|| left.chunk.location().cmp(&right.chunk.location()))
-        });
-        results.truncate(limit);
-        results
+            .collect()
     }
 
     /// Locates the chunk that contains a 1-indexed source line.
@@ -261,9 +278,9 @@ impl SearchIndex {
     pub fn find_source_chunk(&self, file_path: &Path, line: usize) -> Option<usize> {
         let normalized = file_path.to_string_lossy().replace('\\', "/");
         self.chunks.iter().position(|chunk| {
-            chunk.file_path.to_string_lossy().replace('\\', "/") == normalized
-                && chunk.start_line <= line
+            chunk.start_line <= line
                 && line <= chunk.end_line
+                && chunk.file_path.to_string_lossy().replace('\\', "/") == normalized
         })
     }
 
@@ -317,7 +334,9 @@ fn build_bm25(chunks: &[Chunk]) -> SearchEngine<usize, u32, CodeTokenizer> {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::hint::black_box;
     use std::sync::Arc;
+    use std::time::Instant;
 
     use pretty_assertions::assert_eq;
 
@@ -396,6 +415,229 @@ mod tests {
         assert_eq!(index.find_source_chunk(Path::new("src/lib.rs"), 13), None);
     }
 
+    #[test]
+    #[ignore]
+    fn bench_find_source_chunk_late_match() {
+        let chunk_count = 10_000;
+        let chunks = (0..chunk_count)
+            .map(|idx| {
+                (
+                    Chunk {
+                        content: format!("fn generated_{idx}() {{}}"),
+                        file_path: PathBuf::from(format!("src/generated/file_{idx}.rs")),
+                        start_line: idx * 3 + 1,
+                        end_line: idx * 3 + 2,
+                        language: "rust".to_string(),
+                    },
+                    vec![1.0, 0.0],
+                )
+            })
+            .collect::<Vec<_>>();
+        let index = index_with_chunks_and_embeddings(chunks);
+        let target_path = Path::new("src/generated/file_9999.rs");
+        let target_line = 29_999;
+        let expected = index.find_source_chunk(target_path, target_line);
+        let iterations = 5_000;
+        let started = Instant::now();
+        let mut found_sum = 0usize;
+
+        for _ in 0..iterations {
+            found_sum += black_box(&index)
+                .find_source_chunk(black_box(target_path), black_box(target_line))
+                .expect("source chunk");
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(expected, Some(chunk_count - 1));
+        assert_eq!(found_sum, (chunk_count - 1) * iterations);
+        println!(
+            "find_source_chunk_late_match iterations={iterations} chunks={chunk_count} elapsed_ms={} per_lookup_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    fn related_by_embedding_returns_top_same_language_results() {
+        let related_chunk = Chunk {
+            content: "fn parse_related() {}".to_string(),
+            file_path: PathBuf::from("src/related.rs"),
+            start_line: 5,
+            end_line: 5,
+            language: "rust".to_string(),
+        };
+        let index = index_with_chunks_and_embeddings(vec![
+            (
+                Chunk {
+                    content: "fn parse_input() {}".to_string(),
+                    file_path: PathBuf::from("src/input.rs"),
+                    start_line: 1,
+                    end_line: 1,
+                    language: "rust".to_string(),
+                },
+                vec![1.0, 0.0],
+            ),
+            (related_chunk.clone(), vec![1.0, 0.0]),
+            (
+                Chunk {
+                    content: "def parse_related(): pass".to_string(),
+                    file_path: PathBuf::from("src/related.py"),
+                    start_line: 1,
+                    end_line: 1,
+                    language: "python".to_string(),
+                },
+                vec![1.0, 0.0],
+            ),
+            (
+                Chunk {
+                    content: "fn unrelated() {}".to_string(),
+                    file_path: PathBuf::from("src/unrelated.rs"),
+                    start_line: 10,
+                    end_line: 10,
+                    language: "rust".to_string(),
+                },
+                vec![0.0, 1.0],
+            ),
+        ]);
+
+        let results = index.related_by_embedding(0, 5, &SearchFilters::empty());
+        let expected = vec![SearchResult {
+            score: 1.0,
+            chunk: related_chunk,
+        }];
+
+        assert_eq!(results, expected);
+    }
+
+    #[test]
+    fn related_by_embedding_partial_top_k_matches_full_sorted_prefix() {
+        let chunk_count = 80;
+        let chunks = (0..chunk_count)
+            .map(|idx| {
+                (
+                    Chunk {
+                        content: format!("fn generated_{idx}() {{ parse_input(); }}"),
+                        file_path: PathBuf::from(format!("src/generated/file_{idx}.rs")),
+                        start_line: idx + 1,
+                        end_line: idx + 1,
+                        language: "rust".to_string(),
+                    },
+                    vec![1.0, 0.0],
+                )
+            })
+            .collect::<Vec<_>>();
+        let index = index_with_chunks_and_embeddings(chunks);
+        let top_k = 10;
+
+        let partial = index.related_by_embedding(0, top_k, &SearchFilters::empty());
+        let mut full = index.related_by_embedding(0, chunk_count, &SearchFilters::empty());
+        full.truncate(top_k);
+
+        assert_eq!(partial, full);
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_related_by_embedding_many_candidates_small_top_k() {
+        let chunk_count = 10_000;
+        let content = "fn generated() { parse_input(); render_output(); }\n".repeat(20);
+        let chunks = (0..chunk_count)
+            .map(|idx| {
+                (
+                    Chunk {
+                        content: format!("{content}// chunk {idx}"),
+                        file_path: PathBuf::from(format!("src/generated/file_{idx}.rs")),
+                        start_line: idx * 3 + 1,
+                        end_line: idx * 3 + 2,
+                        language: "rust".to_string(),
+                    },
+                    vec![1.0, idx as f32 / chunk_count as f32],
+                )
+            })
+            .collect::<Vec<_>>();
+        let index = index_with_chunks_and_embeddings(chunks);
+        let iterations = 100;
+        let top_k = 5;
+        let expected = index.related_by_embedding(0, top_k, &SearchFilters::empty());
+        let started = Instant::now();
+        let mut total_results = 0usize;
+        let mut total_content_bytes = 0usize;
+
+        for _ in 0..iterations {
+            let results = black_box(&index).related_by_embedding(
+                black_box(0),
+                black_box(top_k),
+                black_box(&SearchFilters::empty()),
+            );
+            total_results += black_box(results.len());
+            total_content_bytes += results
+                .iter()
+                .map(|result| black_box(result.chunk.content.len()))
+                .sum::<usize>();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(expected.len(), top_k);
+        assert_eq!(total_results, top_k * iterations);
+        assert!(total_content_bytes > 0);
+        println!(
+            "related_by_embedding_many_candidates_small_top_k iterations={iterations} chunks={chunk_count} top_k={top_k} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_related_by_embedding_tie_heavy_candidates() {
+        let chunk_count = 10_000;
+        let content = "fn generated() { parse_input(); render_output(); }\n".repeat(10);
+        let chunks = (0..chunk_count)
+            .map(|idx| {
+                (
+                    Chunk {
+                        content: format!("{content}// chunk {idx}"),
+                        file_path: PathBuf::from(format!("src/generated/file_{idx}.rs")),
+                        start_line: idx * 3 + 1,
+                        end_line: idx * 3 + 2,
+                        language: "rust".to_string(),
+                    },
+                    vec![1.0, 0.0],
+                )
+            })
+            .collect::<Vec<_>>();
+        let index = index_with_chunks_and_embeddings(chunks);
+        let iterations = 100;
+        let top_k = 5;
+        let expected = index.related_by_embedding(0, top_k, &SearchFilters::empty());
+        let started = Instant::now();
+        let mut total_results = 0usize;
+        let mut total_content_bytes = 0usize;
+
+        for _ in 0..iterations {
+            let results = black_box(&index).related_by_embedding(
+                black_box(0),
+                black_box(top_k),
+                black_box(&SearchFilters::empty()),
+            );
+            total_results += black_box(results.len());
+            total_content_bytes += results
+                .iter()
+                .map(|result| black_box(result.chunk.content.len()))
+                .sum::<usize>();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(expected.len(), top_k);
+        assert_eq!(total_results, top_k * iterations);
+        assert!(total_content_bytes > 0);
+        println!(
+            "related_by_embedding_tie_heavy_candidates iterations={iterations} chunks={chunk_count} top_k={top_k} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
     /// Trace: L2-DES-TOOL-001
     /// Verifies: large-enough indexes use HNSW candidates and exact cosine reranking.
     #[test]
@@ -461,6 +703,77 @@ mod tests {
 
         assert_eq!(index.uses_hnsw_for_test(), true);
         assert_eq!(results, Vec::<(usize, f32)>::new());
+    }
+
+    #[test]
+    fn filtered_semantic_search_top_k_matches_full_sorted_prefix() {
+        let chunk_count = 80;
+        let chunks = (0..chunk_count)
+            .map(|idx| {
+                (
+                    Chunk {
+                        content: format!("fn generated_{idx}() {{}}"),
+                        file_path: PathBuf::from(format!("src/generated/file_{idx}.rs")),
+                        start_line: idx + 1,
+                        end_line: idx + 1,
+                        language: "rust".to_string(),
+                    },
+                    vec![1.0, idx as f32 / chunk_count as f32],
+                )
+            })
+            .collect();
+        let index = index_with_chunks_and_embeddings(chunks);
+        let filters = SearchFilters::normalized(Vec::new(), vec!["rust".to_string()]);
+        let mut full = index.semantic_search(&[1.0, 0.0], chunk_count, &filters);
+        full.truncate(10);
+
+        assert_eq!(index.semantic_search(&[1.0, 0.0], 10, &filters), full);
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_filtered_semantic_search_many_candidates_small_top_k() {
+        let chunk_count = 10_000;
+        let chunks = (0..chunk_count)
+            .map(|idx| {
+                (
+                    Chunk {
+                        content: format!("fn generated_{idx}() {{}}"),
+                        file_path: PathBuf::from(format!("src/generated/file_{idx}.rs")),
+                        start_line: idx + 1,
+                        end_line: idx + 1,
+                        language: "rust".to_string(),
+                    },
+                    vec![1.0, idx as f32 / chunk_count as f32],
+                )
+            })
+            .collect();
+        let index = index_with_chunks_and_embeddings(chunks);
+        let filters = SearchFilters::normalized(Vec::new(), vec!["rust".to_string()]);
+        let iterations = 100;
+        let top_k = 5;
+        let expected = index.semantic_search(&[1.0, 0.0], top_k, &filters);
+        let started = Instant::now();
+        let mut total_results = 0usize;
+
+        for _ in 0..iterations {
+            total_results += black_box(&index)
+                .semantic_search(
+                    black_box(&[1.0, 0.0]),
+                    black_box(top_k),
+                    black_box(&filters),
+                )
+                .len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(expected.len(), top_k);
+        assert_eq!(total_results, top_k * iterations);
+        println!(
+            "filtered_semantic_search_many_candidates_small_top_k iterations={iterations} chunks={chunk_count} top_k={top_k} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 
     fn index_with_chunks_and_embeddings(chunks: Vec<(Chunk, Vec<f32>)>) -> SearchIndex {

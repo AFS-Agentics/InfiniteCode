@@ -205,12 +205,20 @@ pub(crate) enum WorkerEvent {
         /// Optional parsed command semantics for command-like and exploration-like tools.
         parsed_commands: Option<Vec<ParsedCommand>>,
     },
+    /// Full input metadata for a tool call shown by the Ctrl+T transcript.
+    ToolCallDetails {
+        tool_use_id: String,
+        tool_name: String,
+        input: serde_json::Value,
+    },
     /// A command-execution item started.
     CommandExecutionStarted {
         /// Stable identifier used to match later output and result events.
         tool_use_id: String,
         /// The command text executed by the server.
         command: String,
+        /// Full command tool input for transcript rendering.
+        input: Option<serde_json::Value>,
         /// Whether this command came from the agent, Shell Mode, or unified exec.
         source: ExecCommandSource,
         /// Parsed command semantics supplied by the server.
@@ -245,6 +253,17 @@ pub(crate) enum WorkerEvent {
         /// Whether the preview was truncated for display.
         truncated: bool,
     },
+    /// Full input/output metadata for a completed generic tool call.
+    ToolResultIo {
+        tool_use_id: String,
+        tool_name: String,
+        title: String,
+        input: serde_json::Value,
+        output: serde_json::Value,
+        display_content: Option<String>,
+        is_error: bool,
+        truncated: bool,
+    },
     /// A user-shell command/process finished outside the model turn loop.
     ShellCommandFinished {
         /// Process exit code when known.
@@ -252,6 +271,12 @@ pub(crate) enum WorkerEvent {
     },
     /// A structured patch/edit summary derived from apply_patch output.
     PatchApplied {
+        changes: HashMap<PathBuf, FileChange>,
+    },
+    /// A structured patch/edit summary with paired tool input for Ctrl+T.
+    PatchAppliedIo {
+        tool_name: String,
+        input: serde_json::Value,
         changes: HashMap<PathBuf, FileChange>,
     },
     /// A structured plan or todo list update.

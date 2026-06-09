@@ -535,6 +535,7 @@ fn tool_start_item(
         ItemKind::FileChange => serde_json::to_value(FileChangePayload {
             tool_call_id: tool_call_id.to_string(),
             tool_name: Some(tool_name.to_string()),
+            input: Some(input.clone()),
             changes: Vec::new(),
             is_error: false,
         })
@@ -543,6 +544,7 @@ fn tool_start_item(
             tool_call_id: tool_call_id.to_string(),
             tool_name: tool_name.to_string(),
             command: command.to_string(),
+            input: Some(input.clone()),
             source: devo_protocol::protocol::ExecCommandSource::Agent,
             command_actions,
             output: None,
@@ -846,6 +848,7 @@ fn user_shell_exec_input(command: &str, cwd: std::path::PathBuf) -> serde_json::
 fn user_shell_command_payload(
     tool_call_id: &str,
     command: &str,
+    input: serde_json::Value,
     command_actions: Vec<devo_protocol::parse_command::ParsedCommand>,
     output: Option<serde_json::Value>,
     is_error: bool,
@@ -854,6 +857,7 @@ fn user_shell_command_payload(
         tool_call_id: tool_call_id.to_string(),
         tool_name: "exec_command".to_string(),
         command: command.to_string(),
+        input: Some(input),
         source: devo_protocol::protocol::ExecCommandSource::UserShell,
         command_actions,
         output,
@@ -885,6 +889,7 @@ impl ServerRuntime {
                 serde_json::to_value(user_shell_command_payload(
                     &tool_call_id,
                     &command,
+                    input.clone(),
                     command_actions.clone(),
                     None,
                     false,
@@ -949,13 +954,14 @@ impl ServerRuntime {
                 tool_call_id: tool_call_id.clone(),
                 tool_name: "exec_command".to_string(),
                 command: command.clone(),
-                input,
+                input: input.clone(),
                 output: output.clone(),
                 is_error,
             }),
             serde_json::to_value(user_shell_command_payload(
                 &tool_call_id,
                 &command,
+                input.clone(),
                 command_actions,
                 Some(output),
                 is_error,
@@ -1272,6 +1278,8 @@ impl ServerRuntime {
                         } else {
                             Some(final_tool_name)
                         };
+                        let mut result_input =
+                            (!final_input.is_null()).then(|| final_input.clone());
                         // First complete the pending ToolCall item so its item/completed
                         // arrives before the ToolResult item/completed.
                         if let Some(mut pending) = pending_tool_calls.remove(&tool_use_id) {
@@ -1284,6 +1292,7 @@ impl ServerRuntime {
                                     .unwrap_or_default();
                                 pending.input = final_input;
                             }
+                            result_input = Some(pending.input.clone());
                             if (pending.item_id.is_none() || pending.item_seq.is_none())
                                 && let Some(tool_name) = tool_name.clone()
                             {
@@ -1494,6 +1503,7 @@ impl ServerRuntime {
                                         serde_json::to_value(FileChangePayload {
                                             tool_call_id: tool_use_id.clone(),
                                             tool_name: Some(tool_name.clone()),
+                                            input: Some(pending.input.clone()),
                                             changes,
                                             is_error,
                                         })
@@ -1520,6 +1530,7 @@ impl ServerRuntime {
                                         tool_call_id: tool_use_id.clone(),
                                         tool_name: tool_name.clone(),
                                         command: pending.command.clone(),
+                                        input: Some(pending.input.clone()),
                                         source: devo_protocol::protocol::ExecCommandSource::Agent,
                                         command_actions: command_actions_from_tool_result(
                                             &tool_name,
@@ -1603,6 +1614,7 @@ impl ServerRuntime {
                                 serde_json::to_value(ToolResultPayload {
                                     tool_call_id: tool_use_id.clone(),
                                     tool_name,
+                                    input: result_input,
                                     content: match content {
                                         devo_core::tools::ToolContent::Text(text) => {
                                             serde_json::Value::String(text)
@@ -2534,6 +2546,7 @@ mod tests {
                 tool_call_id: "call-1".to_string(),
                 tool_name: "exec_command".to_string(),
                 command: "cargo test -p devo-server".to_string(),
+                input: Some(input),
                 source: devo_protocol::protocol::ExecCommandSource::Agent,
                 command_actions: Vec::new(),
                 output: None,
@@ -2563,8 +2576,15 @@ mod tests {
     fn user_shell_command_payload_uses_user_shell_source() {
         let output = serde_json::json!({ "output": "done" });
 
-        let payload =
-            user_shell_command_payload("call-1", "pwd", Vec::new(), Some(output.clone()), false);
+        let input = user_shell_exec_input("pwd", std::path::PathBuf::from("workspace"));
+        let payload = user_shell_command_payload(
+            "call-1",
+            "pwd",
+            input.clone(),
+            Vec::new(),
+            Some(output.clone()),
+            false,
+        );
 
         assert_eq!(
             payload,
@@ -2572,6 +2592,7 @@ mod tests {
                 tool_call_id: "call-1".to_string(),
                 tool_name: "exec_command".to_string(),
                 command: "pwd".to_string(),
+                input: Some(input),
                 source: devo_protocol::protocol::ExecCommandSource::UserShell,
                 command_actions: Vec::new(),
                 output: Some(output),

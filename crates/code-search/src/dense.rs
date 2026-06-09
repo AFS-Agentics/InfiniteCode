@@ -154,11 +154,52 @@ pub fn cosine_similarity(left: &[f32], right: &[f32]) -> f32 {
     let mut dot = 0.0;
     let mut left_norm = 0.0;
     let mut right_norm = 0.0;
-    for (left_value, right_value) in left.iter().zip(right) {
+    if left.len() == 2 {
+        let left_0 = left[0];
+        let left_1 = left[1];
+        let right_0 = right[0];
+        let right_1 = right[1];
+        return finish_cosine_similarity(
+            left_0 * right_0 + left_1 * right_1,
+            left_0 * left_0 + left_1 * left_1,
+            right_0 * right_0 + right_1 * right_1,
+        );
+    }
+    if left.len() < 4 {
+        for (left_value, right_value) in left.iter().zip(right) {
+            dot += left_value * right_value;
+            left_norm += left_value * left_value;
+            right_norm += right_value * right_value;
+        }
+        return finish_cosine_similarity(dot, left_norm, right_norm);
+    }
+    let mut idx = 0usize;
+    while idx + 4 <= left.len() {
+        let left_0 = left[idx];
+        let left_1 = left[idx + 1];
+        let left_2 = left[idx + 2];
+        let left_3 = left[idx + 3];
+        let right_0 = right[idx];
+        let right_1 = right[idx + 1];
+        let right_2 = right[idx + 2];
+        let right_3 = right[idx + 3];
+        dot += left_0 * right_0 + left_1 * right_1 + left_2 * right_2 + left_3 * right_3;
+        left_norm += left_0 * left_0 + left_1 * left_1 + left_2 * left_2 + left_3 * left_3;
+        right_norm += right_0 * right_0 + right_1 * right_1 + right_2 * right_2 + right_3 * right_3;
+        idx += 4;
+    }
+    while idx < left.len() {
+        let left_value = left[idx];
+        let right_value = right[idx];
         dot += left_value * right_value;
         left_norm += left_value * left_value;
         right_norm += right_value * right_value;
+        idx += 1;
     }
+    finish_cosine_similarity(dot, left_norm, right_norm)
+}
+
+fn finish_cosine_similarity(dot: f32, left_norm: f32, right_norm: f32) -> f32 {
     let denominator = left_norm.sqrt() * right_norm.sqrt();
     if denominator <= f32::EPSILON {
         0.0
@@ -248,6 +289,9 @@ fn hash_embedding(text: &str, dimensions: usize) -> Vec<f32> {
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -270,6 +314,33 @@ mod tests {
     fn cosine_similarity_scores_identical_vectors_highest() {
         assert_eq!(cosine_similarity(&[1.0, 0.0], &[1.0, 0.0]), 1.0);
         assert_eq!(cosine_similarity(&[1.0, 0.0], &[0.0, 1.0]), 0.0);
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_cosine_similarity_512_dimensions() {
+        let left = (0..512)
+            .map(|idx| (idx as f32 + 1.0) / 512.0)
+            .collect::<Vec<_>>();
+        let right = (0..512)
+            .map(|idx| ((512 - idx) as f32) / 512.0)
+            .collect::<Vec<_>>();
+        let iterations = 500_000;
+        let expected = cosine_similarity(&left, &right);
+        let started = Instant::now();
+        let mut total = 0.0f64;
+
+        for _ in 0..iterations {
+            total += black_box(cosine_similarity(black_box(&left), black_box(&right))) as f64;
+        }
+
+        let elapsed = started.elapsed();
+        assert!((total / iterations as f64 - f64::from(expected)).abs() < 0.0001);
+        println!(
+            "cosine_similarity_512_dimensions iterations={iterations} elapsed_ms={} per_call_ns={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000_000.0 / iterations as f64
+        );
     }
 
     #[test]

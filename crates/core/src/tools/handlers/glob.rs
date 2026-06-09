@@ -113,25 +113,97 @@ impl ToolHandler for GlobHandler {
         }
 
         let text = String::from_utf8_lossy(&output.stdout);
-        let mut count = 0usize;
-        let mut matches = String::new();
-        for line in text.lines() {
-            if count > 0 {
-                matches.push('\n');
-            }
-            matches.push_str(line);
-            count += 1;
-        }
-        if count == 0 {
+        let Some((matches, count)) = format_glob_matches(&text) else {
             return Ok(ToolResult::success(
                 ToolResultContent::Text("(no matches)".into()),
                 "No matches",
             ));
-        }
+        };
 
         Ok(ToolResult::success(
             ToolResultContent::Text(matches),
             format!("{count} matches"),
         ))
+    }
+}
+
+fn format_glob_matches(text: &str) -> Option<(String, usize)> {
+    if text.is_empty() {
+        return None;
+    }
+    if !text.as_bytes().contains(&b'\r') {
+        let newline_count = text.bytes().filter(|byte| *byte == b'\n').count();
+        let count = newline_count + usize::from(!text.ends_with('\n'));
+        let matches = text.strip_suffix('\n').unwrap_or(text).to_string();
+        return Some((matches, count));
+    }
+
+    let mut count = 0usize;
+    let mut matches = String::with_capacity(text.len());
+    for line in text.lines() {
+        if count > 0 {
+            matches.push('\n');
+        }
+        matches.push_str(line);
+        count += 1;
+    }
+    (count > 0).then_some((matches, count))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn format_glob_matches_handles_empty_output() {
+        assert_eq!(format_glob_matches(""), None);
+    }
+
+    #[test]
+    fn format_glob_matches_preserves_paths_and_count() {
+        assert_eq!(
+            format_glob_matches("src/lib.rs\nsrc/main.rs\n"),
+            Some(("src/lib.rs\nsrc/main.rs".to_string(), 2))
+        );
+    }
+
+    #[test]
+    fn format_glob_matches_preserves_crlf_behavior() {
+        assert_eq!(
+            format_glob_matches("src/lib.rs\r\nsrc/main.rs\r\n"),
+            Some(("src/lib.rs\nsrc/main.rs".to_string(), 2))
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_format_glob_matches_many_paths() {
+        let text = (0..1_000)
+            .map(|idx| format!("crates/core/src/generated/module_{idx}.rs"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let iterations = 50_000;
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            let (matches, count) =
+                black_box(format_glob_matches(black_box(&text))).expect("matches");
+            total_len += matches.len() + count;
+        }
+
+        let elapsed = started.elapsed();
+        assert!(total_len > 0);
+        println!(
+            "format_glob_matches_many_paths iterations={iterations} bytes={} elapsed_ms={} per_call_us={:.2}",
+            text.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 }

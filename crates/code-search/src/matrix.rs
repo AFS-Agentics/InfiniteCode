@@ -100,26 +100,6 @@ impl EmbeddingMatrix {
         &self.rows
     }
 
-    /// Appends one row while preserving matrix dimensionality.
-    pub fn append_row_slice(&mut self, row: &[f32]) -> Result<(), CodeSearchError> {
-        if row.is_empty() {
-            return Err(CodeSearchError::Index(
-                "cannot append zero-dimensional embedding row".to_string(),
-            ));
-        }
-        if self.dimensions == 0 {
-            self.dimensions = row.len();
-        } else if self.dimensions != row.len() {
-            return Err(CodeSearchError::Index(format!(
-                "embedding dimensions changed from {} to {}",
-                self.dimensions,
-                row.len()
-            )));
-        }
-        self.rows.extend_from_slice(row);
-        Ok(())
-    }
-
     /// Copies a range of rows from another matrix.
     ///
     /// Incremental refresh uses this for reused cache records so the new matrix
@@ -131,20 +111,43 @@ impl EmbeddingMatrix {
         start: usize,
         count: usize,
     ) -> Result<(), CodeSearchError> {
-        for row_idx in start..start + count {
-            let row = other.row(row_idx).ok_or_else(|| {
-                CodeSearchError::Index(format!(
-                    "cached embedding row {row_idx} is outside the matrix"
-                ))
-            })?;
-            self.append_row_slice(row)?;
+        if count == 0 {
+            return Ok(());
         }
+        if other.dimensions == 0 {
+            return Err(CodeSearchError::Index(
+                "cached embedding matrix has no rows".to_string(),
+            ));
+        }
+        let end = start.checked_add(count).ok_or_else(|| {
+            CodeSearchError::Index("cached embedding row range overflow".to_string())
+        })?;
+        if end > other.row_count() {
+            return Err(CodeSearchError::Index(format!(
+                "cached embedding row range {start}..{end} is outside the matrix"
+            )));
+        }
+        if self.dimensions == 0 {
+            self.dimensions = other.dimensions;
+        } else if self.dimensions != other.dimensions {
+            return Err(CodeSearchError::Index(format!(
+                "embedding dimensions changed from {} to {}",
+                self.dimensions, other.dimensions
+            )));
+        }
+        let start_value = start * other.dimensions;
+        let end_value = end * other.dimensions;
+        self.rows
+            .extend_from_slice(&other.rows[start_value..end_value]);
         Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -168,5 +171,74 @@ mod tests {
         let matrix = EmbeddingMatrix::from_vectors(vec![vec![1.0], vec![2.0, 3.0]]);
 
         assert_eq!(matrix.is_err(), true);
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_extend_rows_from_many_rows() {
+        let dimensions = 64;
+        let row_count = 512;
+        let source = EmbeddingMatrix::new(
+            dimensions,
+            (0..row_count * dimensions)
+                .map(|value| value as f32 / dimensions as f32)
+                .collect(),
+        )
+        .expect("source matrix");
+        let iterations = 20_000;
+        let started = Instant::now();
+        let mut total_rows = 0usize;
+
+        for _ in 0..iterations {
+            let mut target = EmbeddingMatrix::empty();
+            black_box(&mut target)
+                .extend_rows_from(black_box(&source), black_box(0), black_box(row_count))
+                .expect("extend rows");
+            total_rows += black_box(target.row_count());
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_rows, row_count * iterations);
+        println!(
+            "extend_rows_from_many_rows iterations={iterations} rows={row_count} dimensions={dimensions} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_row_many_accesses() {
+        let dimensions = 64;
+        let row_count = 4_096;
+        let matrix = EmbeddingMatrix::new(
+            dimensions,
+            (0..row_count)
+                .flat_map(|row| (0..dimensions).map(move |column| (row + column) as f32))
+                .collect(),
+        )
+        .expect("matrix");
+        let iterations = 20_000;
+        let expected_sum = (row_count * (row_count - 1) / 2) * iterations;
+        let started = Instant::now();
+        let mut total = 0usize;
+
+        for _ in 0..iterations {
+            for row in 0..row_count {
+                total += black_box(matrix.row(black_box(row)))
+                    .expect("row")
+                    .first()
+                    .copied()
+                    .unwrap_or_default() as usize;
+            }
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total, expected_sum);
+        println!(
+            "embedding_matrix_row_many_accesses iterations={iterations} rows={row_count} dimensions={dimensions} elapsed_ms={} per_row_ns={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000_000.0 / (iterations * row_count) as f64
+        );
     }
 }

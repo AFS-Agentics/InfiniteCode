@@ -1,3 +1,5 @@
+use serde::Serialize;
+use serde_json::ser::Formatter;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthChar;
 use unicode_width::UnicodeWidthStr;
@@ -43,52 +45,55 @@ pub(crate) fn format_and_truncate_tool_result(
 /// Relevant issue: https://github.com/ratatui/ratatui/issues/293
 pub(crate) fn format_json_compact(text: &str) -> Option<String> {
     let json = serde_json::from_str::<serde_json::Value>(text).ok()?;
-    let json_pretty = serde_json::to_string_pretty(&json).unwrap_or_else(|_| json.to_string());
+    let mut result = Vec::with_capacity(text.len() + text.len() / 8);
+    {
+        let mut serializer =
+            serde_json::Serializer::with_formatter(&mut result, SpacedCompactFormatter);
+        json.serialize(&mut serializer).ok()?;
+    }
 
-    // Convert multi-line pretty JSON to compact single-line format by removing newlines and excess whitespace
-    let mut result = String::new();
-    let mut chars = json_pretty.chars().peekable();
-    let mut in_string = false;
-    let mut escape_next = false;
+    String::from_utf8(result).ok()
+}
 
-    // Iterate over the characters in the JSON string, adding spaces after : and , but only when not in a string
-    while let Some(ch) = chars.next() {
-        match ch {
-            '"' if !escape_next => {
-                in_string = !in_string;
-                result.push(ch);
-            }
-            '\\' if in_string => {
-                escape_next = !escape_next;
-                result.push(ch);
-            }
-            '\n' | '\r' if !in_string => {
-                // Skip newlines when not in a string
-            }
-            ' ' | '\t' if !in_string => {
-                // Add a space after : and , but only when not in a string
-                if let Some(&next_ch) = chars.peek()
-                    && let Some(last_ch) = result.chars().last()
-                    && (last_ch == ':' || last_ch == ',')
-                    && !matches!(next_ch, '}' | ']')
-                {
-                    result.push(' ');
-                }
-            }
-            _ => {
-                if escape_next && in_string {
-                    escape_next = false;
-                }
-                result.push(ch);
-            }
+struct SpacedCompactFormatter;
+
+impl Formatter for SpacedCompactFormatter {
+    fn begin_array_value<W>(&mut self, writer: &mut W, first: bool) -> std::io::Result<()>
+    where
+        W: ?Sized + std::io::Write,
+    {
+        if first {
+            Ok(())
+        } else {
+            writer.write_all(b", ")
         }
     }
 
-    Some(result)
+    fn begin_object_key<W>(&mut self, writer: &mut W, first: bool) -> std::io::Result<()>
+    where
+        W: ?Sized + std::io::Write,
+    {
+        if first {
+            Ok(())
+        } else {
+            writer.write_all(b", ")
+        }
+    }
+
+    fn begin_object_value<W>(&mut self, writer: &mut W) -> std::io::Result<()>
+    where
+        W: ?Sized + std::io::Write,
+    {
+        writer.write_all(b": ")
+    }
 }
 
 /// Truncate `text` to `max_graphemes` graphemes. Using graphemes to avoid accidentally truncating in the middle of a multi-codepoint character.
 pub(crate) fn truncate_text(text: &str, max_graphemes: usize) -> String {
+    if max_graphemes >= text.len() {
+        return text.to_string();
+    }
+
     let mut graphemes = text.grapheme_indices(true);
 
     // Check if there's a grapheme at position max_graphemes (meaning there are more than max_graphemes total)
@@ -351,5 +356,147 @@ pub(crate) fn proper_join<T: AsRef<str>>(items: &[T]) -> String {
 
             format!("{result} and {last}")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn truncate_text_keeps_short_text() {
+        assert_eq!(truncate_text("short text", 20), "short text");
+    }
+
+    #[test]
+    fn truncate_text_uses_ellipsis_when_limit_allows_it() {
+        assert_eq!(truncate_text("abcdef", 5), "ab...");
+    }
+
+    #[test]
+    fn truncate_text_preserves_grapheme_boundaries() {
+        assert_eq!(truncate_text("a👨‍👩‍👧‍👦b", 2), "a👨‍👩‍👧‍👦");
+    }
+
+    #[test]
+    fn format_json_compact_formats_valid_json_on_one_line() {
+        let actual = format_json_compact(r#"{"a":"b","c":["d","e"],"empty":[]}"#);
+        assert_eq!(
+            actual,
+            Some(r#"{"a": "b", "c": ["d", "e"], "empty": []}"#.to_string())
+        );
+    }
+
+    #[test]
+    fn format_json_compact_preserves_string_punctuation() {
+        let actual = format_json_compact(r#"{"text":"a:b,c","quote":"\"x,y\""}"#);
+        assert_eq!(
+            actual,
+            Some(r#"{"quote": "\"x,y\"", "text": "a:b,c"}"#.to_string())
+        );
+    }
+
+    #[test]
+    fn format_json_compact_preserves_unicode_string_contents() {
+        let actual = format_json_compact(r#"{"text":"路径:值,emoji👨‍👩‍👧‍👦"}"#);
+        assert_eq!(actual, Some(r#"{"text": "路径:值,emoji👨‍👩‍👧‍👦"}"#.to_string()));
+    }
+
+    #[test]
+    fn format_json_compact_rejects_invalid_json() {
+        assert_eq!(format_json_compact("not json"), None);
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_truncate_text_ascii_no_truncation() {
+        let text = "search result display name";
+
+        let started = Instant::now();
+        let mut total_len = 0;
+        for _ in 0..500_000 {
+            total_len += black_box(truncate_text(black_box(text), black_box(80))).len();
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_len, 13_000_000);
+        println!(
+            "truncate_text_ascii_no_truncation iterations=500000 bytes={} max_graphemes=80 elapsed_ms={} per_call_us={:.2}",
+            text.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 500_000.0
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_truncate_text_unicode_truncates() {
+        let text = "路径/模块/文件/👨‍👩‍👧‍👦/very-long-display-name".repeat(20);
+
+        let started = Instant::now();
+        let mut total_len = 0;
+        for _ in 0..50_000 {
+            total_len += black_box(truncate_text(black_box(&text), black_box(80))).len();
+        }
+        let elapsed = started.elapsed();
+
+        assert!(total_len > 0);
+        println!(
+            "truncate_text_unicode_truncates iterations=50000 bytes={} max_graphemes=80 elapsed_ms={} per_call_us={:.2}",
+            text.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 50_000.0
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_format_json_compact_nested_tool_result() {
+        let text = serde_json::json!({
+            "results": (0..64)
+                .map(|index| {
+                    serde_json::json!({
+                        "path": format!("crates/tui/src/module_{index}/file.rs"),
+                        "line": index * 7,
+                        "preview": format!("function_{index}(\"value: {index}, next\")"),
+                        "matches": [
+                            { "start": index, "end": index + 4 },
+                            { "start": index + 12, "end": index + 20 }
+                        ]
+                    })
+                })
+                .collect::<Vec<_>>(),
+            "summary": {
+                "query": "value: needle, path",
+                "elapsed_ms": 42,
+                "truncated": false
+            }
+        })
+        .to_string();
+        let expected_len = format_json_compact(&text)
+            .expect("benchmark JSON should format")
+            .len();
+
+        let started = Instant::now();
+        let mut total_len = 0;
+        for _ in 0..5_000 {
+            total_len += black_box(format_json_compact(black_box(&text)))
+                .expect("benchmark JSON should format")
+                .len();
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_len, expected_len * 5_000);
+        println!(
+            "format_json_compact_nested_tool_result iterations=5000 bytes={} elapsed_ms={} per_call_us={:.2}",
+            text.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 5_000.0
+        );
     }
 }

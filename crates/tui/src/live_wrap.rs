@@ -112,11 +112,9 @@ impl RowBuilder {
         }
         let to_commit = display_count - max_keep;
         let commit_count = to_commit.min(self.rows.len());
-        let mut drained = Vec::with_capacity(commit_count);
-        for _ in 0..commit_count {
-            drained.push(self.rows.remove(0));
-        }
-        drained
+        let mut kept = self.rows.split_off(commit_count);
+        std::mem::swap(&mut self.rows, &mut kept);
+        kept
     }
 
     fn flush_current_line(&mut self, explicit_break: bool) {
@@ -146,6 +144,30 @@ impl RowBuilder {
     }
 
     fn wrap_current_line(&mut self) {
+        if self.current_line.len() > self.target_width {
+            let printable_prefix_len = self
+                .current_line
+                .bytes()
+                .position(|byte| byte != b' ' && !byte.is_ascii_graphic())
+                .unwrap_or(self.current_line.len());
+            if printable_prefix_len > self.target_width {
+                let wrapped_len =
+                    ((printable_prefix_len - 1) / self.target_width) * self.target_width;
+                let remainder = self.current_line.split_off(wrapped_len);
+                let wrapped = std::mem::replace(&mut self.current_line, remainder);
+                for offset in (0..wrapped.len()).step_by(self.target_width) {
+                    let end = offset + self.target_width;
+                    self.rows.push(Row {
+                        text: wrapped[offset..end].to_string(),
+                        explicit_break: false,
+                    });
+                }
+                if self.current_line.len() <= self.target_width {
+                    return;
+                }
+            }
+        }
+
         // While the current_line exceeds width, cut a prefix.
         loop {
             if self.current_line.is_empty() {
@@ -188,6 +210,18 @@ pub fn take_prefix_by_width(text: &str, max_cols: usize) -> (String, &str, usize
     if max_cols == 0 || text.is_empty() {
         return (String::new(), text, 0);
     }
+    let bytes = text.as_bytes();
+    let printable_prefix_len = bytes.len().min(max_cols);
+    if bytes[..printable_prefix_len]
+        .iter()
+        .all(|byte| *byte == b' ' || byte.is_ascii_graphic())
+    {
+        if bytes.len() > max_cols {
+            return (text[..max_cols].to_string(), &text[max_cols..], max_cols);
+        }
+        return (text.to_string(), "", bytes.len());
+    }
+
     let mut cols = 0usize;
     let mut end_idx = 0usize;
     for (i, ch) in text.char_indices() {
@@ -208,6 +242,9 @@ pub fn take_prefix_by_width(text: &str, max_cols: usize) -> (String, &str, usize
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
     use super::*;
     use pretty_assertions::assert_eq;
 
@@ -250,6 +287,46 @@ mod tests {
     }
 
     #[test]
+    fn printable_prefix_wraps_before_control_tail() {
+        let mut rb = RowBuilder::new(/*target_width*/ 4);
+        rb.push_fragment("abcdefgh\tijkl");
+
+        assert_eq!(
+            rb.display_rows(),
+            vec![
+                Row {
+                    text: "abcd".to_string(),
+                    explicit_break: false
+                },
+                Row {
+                    text: "efgh".to_string(),
+                    explicit_break: false
+                },
+                Row {
+                    text: "\tijkl".to_string(),
+                    explicit_break: false
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn take_prefix_by_width_truncates_ascii_by_columns() {
+        assert_eq!(
+            (String::from("abcd"), "efgh", 4),
+            take_prefix_by_width("abcdefgh", /*max_cols*/ 4)
+        );
+    }
+
+    #[test]
+    fn take_prefix_by_width_preserves_control_width_behavior() {
+        assert_eq!(
+            (String::from("a\tb"), "", 2),
+            take_prefix_by_width("a\tb", /*max_cols*/ 2)
+        );
+    }
+
+    #[test]
     fn fragmentation_invariance_long_token() {
         let s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; // 26 chars
         let mut rb_all = RowBuilder::new(/*target_width*/ 7);
@@ -286,5 +363,155 @@ mod tests {
         for r in rb.rows() {
             assert!(r.width() <= 5);
         }
+    }
+
+    #[test]
+    fn drain_commit_ready_preserves_order_and_keeps_tail() {
+        let mut rb = RowBuilder {
+            target_width: 80,
+            current_line: "partial".to_string(),
+            rows: (0..5)
+                .map(|index| Row {
+                    text: format!("row-{index}"),
+                    explicit_break: false,
+                })
+                .collect(),
+        };
+
+        let drained = rb.drain_commit_ready(/*max_keep*/ 2);
+
+        assert_eq!(
+            drained,
+            vec![
+                Row {
+                    text: "row-0".to_string(),
+                    explicit_break: false
+                },
+                Row {
+                    text: "row-1".to_string(),
+                    explicit_break: false
+                },
+                Row {
+                    text: "row-2".to_string(),
+                    explicit_break: false
+                },
+                Row {
+                    text: "row-3".to_string(),
+                    explicit_break: false
+                }
+            ]
+        );
+        assert_eq!(
+            rb.display_rows(),
+            vec![
+                Row {
+                    text: "row-4".to_string(),
+                    explicit_break: false
+                },
+                Row {
+                    text: "partial".to_string(),
+                    explicit_break: false
+                }
+            ]
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_drain_commit_ready_many_rows() {
+        let template = (0..20_000)
+            .map(|index| Row {
+                text: format!("streamed row {index}"),
+                explicit_break: false,
+            })
+            .collect::<Vec<_>>();
+
+        let started = Instant::now();
+        let mut total_drained = 0;
+        for _ in 0..100 {
+            let mut rb = RowBuilder {
+                target_width: 80,
+                current_line: "partial row".to_string(),
+                rows: black_box(template.clone()),
+            };
+            total_drained += black_box(rb.drain_commit_ready(/*max_keep*/ 32)).len();
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_drained, 1_996_900);
+        println!(
+            "drain_commit_ready_many_rows iterations=100 rows=20000 max_keep=32 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 100.0
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_push_fragment_wraps_long_stream() {
+        let chunk = "abcdefghijklmnopqrstuvwxyz0123456789 ".repeat(1_000);
+
+        let started = Instant::now();
+        let mut total_rows = 0;
+        for _ in 0..200 {
+            let mut rb = RowBuilder::new(/*target_width*/ 80);
+            rb.push_fragment(black_box(&chunk));
+            total_rows += black_box(rb.rows().len());
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_rows, 92_400);
+        println!(
+            "push_fragment_wraps_long_stream iterations=200 chars={} width=80 elapsed_ms={} per_call_us={:.2}",
+            chunk.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 200.0
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_take_prefix_by_width_ascii_truncates() {
+        let text = "abcdefghijklmnopqrstuvwxyz0123456789 ".repeat(8);
+
+        let started = Instant::now();
+        let mut total_width = 0;
+        for _ in 0..500_000 {
+            let (prefix, suffix, width) =
+                take_prefix_by_width(black_box(&text), black_box(/*max_cols*/ 80));
+            total_width += black_box(prefix.len() + suffix.len() + width);
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_width, 188_000_000);
+        println!(
+            "take_prefix_by_width_ascii_truncates iterations=500000 chars={} max_cols=80 elapsed_ms={} per_call_ns={:.2}",
+            text.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000_000.0 / 500_000.0
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_take_prefix_by_width_ascii_no_truncation() {
+        let text = "background terminal running /ps to view /stop to close";
+
+        let started = Instant::now();
+        let mut total_width = 0;
+        for _ in 0..1_000_000 {
+            let (prefix, suffix, width) =
+                take_prefix_by_width(black_box(text), black_box(/*max_cols*/ 200));
+            total_width += black_box(prefix.len() + suffix.len() + width);
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(total_width, 108_000_000);
+        println!(
+            "take_prefix_by_width_ascii_no_truncation iterations=1000000 chars={} max_cols=200 elapsed_ms={} per_call_ns={:.2}",
+            text.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000_000.0 / 1_000_000.0
+        );
     }
 }

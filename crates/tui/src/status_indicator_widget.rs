@@ -254,7 +254,7 @@ impl Renderable for StatusIndicatorWidget {
         let elapsed_duration = self.elapsed_duration_at(now);
         let pretty_elapsed = fmt_elapsed_compact(elapsed_duration.as_secs());
 
-        let mut spans = Vec::with_capacity(5);
+        let mut spans = Vec::with_capacity(12);
         spans.push(spinner(Some(self.last_resume_at), self.animations_enabled));
         spans.push(" ".into());
         if self.animations_enabled {
@@ -264,11 +264,9 @@ impl Renderable for StatusIndicatorWidget {
         }
         spans.push(" ".into());
         if self.show_interrupt_hint {
-            spans.extend(vec![
-                format!("({pretty_elapsed} • ").dim(),
-                key_hint::plain(KeyCode::Esc).into(),
-                " to interrupt)".dim(),
-            ]);
+            spans.push(format!("({pretty_elapsed} • ").dim());
+            spans.push(key_hint::plain(KeyCode::Esc).into());
+            spans.push(" to interrupt)".dim());
         } else {
             spans.push(format!("({pretty_elapsed})").dim());
         }
@@ -297,7 +295,8 @@ impl Renderable for StatusIndicatorWidget {
             lines.extend(details.into_iter().take(max_details));
         }
 
-        let left_padding = Span::raw(" ".repeat(LIVE_PREFIX_COLS as usize));
+        debug_assert_eq!(LIVE_PREFIX_COLS, 2);
+        let left_padding = Span::raw("  ");
         let lines = prefix_lines(lines, left_padding.clone(), left_padding);
         Paragraph::new(Text::from(lines)).render_ref(area, buf);
     }
@@ -305,6 +304,8 @@ impl Renderable for StatusIndicatorWidget {
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
+
     use super::*;
     use crate::app_event_sender::AppEventSender;
     use crate::tui::frame_requester::FrameRequester;
@@ -329,5 +330,32 @@ mod tests {
 
         assert_eq!(top_row.get(..2), Some("  "));
         assert!(top_row.contains("Working"));
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_status_indicator_render_without_details() {
+        let (app_event_tx, _app_event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut widget = StatusIndicatorWidget::new(
+            AppEventSender::new(app_event_tx),
+            FrameRequester::test_dummy(),
+            false,
+        );
+        widget.update_inline_message(Some("running shell command".to_string()));
+
+        let area = Rect::new(0, 0, 120, 1);
+        let mut buf = Buffer::empty(area);
+        let started = Instant::now();
+        for _ in 0..50_000 {
+            widget.render(black_box(area), black_box(&mut buf));
+        }
+        let elapsed = started.elapsed();
+
+        assert_eq!(buf.area, area);
+        println!(
+            "status_indicator_render_without_details iterations=50000 width=120 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 50_000.0
+        );
     }
 }

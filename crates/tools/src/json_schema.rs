@@ -117,6 +117,9 @@ impl JsonSchema {
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
     use super::*;
 
     #[test]
@@ -206,5 +209,61 @@ mod tests {
         let s = JsonSchema::default();
         let json = s.to_json_value();
         assert_eq!(json, serde_json::json!({}));
+    }
+
+    fn large_nested_schema() -> JsonSchema {
+        let leaf = JsonSchema::object(
+            BTreeMap::from([
+                (
+                    "query".into(),
+                    JsonSchema::string(Some("Search query text.")),
+                ),
+                (
+                    "limit".into(),
+                    JsonSchema::integer(Some("Maximum number of entries.")),
+                ),
+                (
+                    "include_hidden".into(),
+                    JsonSchema::boolean(Some("Whether hidden entries are included.")),
+                ),
+            ]),
+            Some(vec!["query".into()]),
+            Some(false),
+        );
+        JsonSchema::object(
+            BTreeMap::from([
+                ("request".into(), leaf.clone()),
+                (
+                    "filters".into(),
+                    JsonSchema::array(leaf.clone(), Some("Filter objects.")),
+                ),
+                ("metadata".into(), leaf),
+            ]),
+            Some(vec!["request".into(), "filters".into()]),
+            Some(false),
+        )
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_json_schema_to_json_value_large_schema() {
+        let schema = large_nested_schema();
+        let started = Instant::now();
+        let mut total_properties = 0;
+
+        for _ in 0..20_000 {
+            let value = black_box(schema.to_json_value());
+            total_properties += value["properties"]
+                .as_object()
+                .map_or(0, serde_json::Map::len);
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_properties, 60_000);
+        println!(
+            "json_schema_to_json_value_large_schema iterations=20000 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 20_000.0
+        );
     }
 }

@@ -325,6 +325,21 @@ fn merge_consecutive_same_role(messages: &mut Vec<RequestMessage>) {
     }
 }
 
+struct JsonByteCounter {
+    bytes: usize,
+}
+
+impl std::io::Write for JsonByteCounter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.bytes += buf.len();
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
 /// Estimates the byte-length-based token count for a single item.
 fn estimate_item_tokens(item: &ResponseItem) -> usize {
     let bytes = match item {
@@ -346,7 +361,12 @@ fn estimate_item_tokens(item: &ResponseItem) -> usize {
             }
             bytes
         }
-        ResponseItem::ToolCall { name, input, .. } => name.len() + 2 + input.to_string().len(),
+        ResponseItem::ToolCall { name, input, .. } => {
+            let mut counter = JsonByteCounter { bytes: 0 };
+            serde_json::to_writer(&mut counter, input)
+                .expect("serializing serde_json::Value to byte counter should not fail");
+            name.len() + 2 + counter.bytes
+        }
         ResponseItem::ToolCallOutput { content, .. } => content.len(),
     };
     // Rough estimate: ~4 bytes per token.
@@ -355,6 +375,9 @@ fn estimate_item_tokens(item: &ResponseItem) -> usize {
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
     use devo_protocol::Message;
     use devo_protocol::RequestContent;
     use pretty_assertions::assert_eq;
@@ -543,5 +566,66 @@ mod tests {
             is_error: false,
         };
         assert!(estimate_item_tokens(&tco) > 0);
+    }
+
+    #[test]
+    fn estimate_item_tokens_for_tool_call_matches_serialized_input_len() {
+        let input = serde_json::json!({
+            "cmd": "printf 'hello'",
+            "cwd": "/tmp",
+            "timeout_ms": 1000,
+            "labels": ["a", "b"]
+        });
+        let item = ResponseItem::ToolCall {
+            id: "tc-1".into(),
+            name: "shell_command".into(),
+            input: input.clone(),
+        };
+
+        let expected_bytes = "shell_command".len() + 2 + input.to_string().len();
+        assert_eq!(estimate_item_tokens(&item), expected_bytes.div_ceil(4));
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_estimate_item_tokens_for_tool_calls() {
+        let items = (0..500)
+            .map(|index| ResponseItem::ToolCall {
+                id: format!("tc-{index}"),
+                name: "shell_command".into(),
+                input: serde_json::json!({
+                    "cmd": "rg --json \"ResponseItem::ToolCall\" crates/core/src -g !target",
+                    "cwd": "/Users/tsiao/Desktop/devo-opt",
+                    "timeout_ms": 10000,
+                    "metadata": {
+                        "index": index,
+                        "capture_stdout": true,
+                        "capture_stderr": true,
+                        "labels": [
+                            "history",
+                            "compaction",
+                            "token-estimate",
+                            "tool-call"
+                        ]
+                    }
+                }),
+            })
+            .collect::<Vec<_>>();
+
+        let started = Instant::now();
+        let mut total_tokens = 0;
+        for _ in 0..2_000 {
+            for item in &items {
+                total_tokens += black_box(estimate_item_tokens(black_box(item)));
+            }
+        }
+        let elapsed = started.elapsed();
+
+        assert!(total_tokens > 0);
+        println!(
+            "estimate_item_tokens_for_tool_calls iterations=1000000 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 1_000_000.0
+        );
     }
 }

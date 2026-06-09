@@ -7,7 +7,8 @@ use devo_util_git::extract_paths_from_patch;
 use devo_util_shell_command::parse_command::parse_command;
 
 use crate::session::{
-    SessionHistoryItem, SessionHistoryItemKind, SessionMetadata, SessionRuntimeStatus,
+    SessionHistoryItem, SessionHistoryItemKind, SessionHistoryToolIo, SessionMetadata,
+    SessionRuntimeStatus,
 };
 use crate::turn::TurnMetadata;
 
@@ -53,12 +54,20 @@ impl DefaultProjection {
                         ));
                     }
                     ContentBlock::ToolUse { id, name, input } => {
-                        history.push(SessionHistoryItem::new(
-                            Some(id.clone()),
-                            SessionHistoryItemKind::ToolCall,
-                            summarize_tool_call(name, input),
-                            String::new(),
-                        ));
+                        history.push(
+                            SessionHistoryItem::new(
+                                Some(id.clone()),
+                                SessionHistoryItemKind::ToolCall,
+                                summarize_tool_call(name, input),
+                                String::new(),
+                            )
+                            .with_tool_io(SessionHistoryToolIo {
+                                tool_name: name.clone(),
+                                input: input.clone(),
+                                output: None,
+                                display_content: None,
+                            }),
+                        );
                     }
                     ContentBlock::ToolResult {
                         tool_use_id,
@@ -149,7 +158,13 @@ pub(crate) fn history_item_from_turn_item(item: &TurnItem) -> Option<SessionHist
                 SessionHistoryItemKind::ToolCall,
                 title.clone(),
                 String::new(),
-            );
+            )
+            .with_tool_io(SessionHistoryToolIo {
+                tool_name: tool_name.clone(),
+                input: input.clone(),
+                output: None,
+                display_content: None,
+            });
             if matches!(tool_name.as_str(), "read" | "find" | "glob" | "grep") {
                 let parsed = match tool_name.as_str() {
                     "read" => crate::tool_actions::read_action_from_tool_input(&title, input)
@@ -201,6 +216,14 @@ pub(crate) fn history_item_from_turn_item(item: &TurnItem) -> Option<SessionHist
                     other => other.to_string(),
                 }),
             );
+            if let Some(tool_name) = tool_name {
+                item = item.with_tool_io(SessionHistoryToolIo {
+                    tool_name: tool_name.clone(),
+                    input: serde_json::Value::Null,
+                    output: Some(output.clone()),
+                    display_content: display_content.clone(),
+                });
+            }
             if !*is_error
                 && tool_name.as_deref() == Some("update_plan")
                 && let Some(metadata) = match output {
@@ -220,10 +243,11 @@ pub(crate) fn history_item_from_turn_item(item: &TurnItem) -> Option<SessionHist
         }
         TurnItem::CommandExecution(CommandExecutionItem {
             tool_call_id,
+            tool_name,
             command,
+            input,
             output,
             is_error,
-            ..
         }) => {
             let parsed = parse_command(std::slice::from_ref(command));
             let mut item = SessionHistoryItem::new(
@@ -238,7 +262,13 @@ pub(crate) fn history_item_from_turn_item(item: &TurnItem) -> Option<SessionHist
                     serde_json::Value::String(text) => text.clone(),
                     other => other.to_string(),
                 },
-            );
+            )
+            .with_tool_io(SessionHistoryToolIo {
+                tool_name: tool_name.clone(),
+                input: input.clone(),
+                output: Some(output.clone()),
+                display_content: None,
+            });
             if !parsed.is_empty() {
                 item = item.with_metadata(SessionHistoryMetadata::Explored { actions: parsed });
             }
@@ -258,6 +288,7 @@ pub(crate) fn history_item_from_turn_item(item: &TurnItem) -> Option<SessionHist
                 kind: SessionHistoryItemKind::TurnSummary,
                 title: model_name,
                 body: String::new(),
+                tool_io: None,
                 metadata: None,
                 duration_ms: duration_secs,
             })
@@ -460,7 +491,7 @@ mod tests {
     use crate::session::SessionHistoryItemKind;
     use devo_core::TurnItem;
     use devo_core::{CommandExecutionItem, TextItem, ToolCallItem, ToolResultItem};
-    use devo_protocol::{SessionHistoryMetadata, SessionPlanStepStatus};
+    use devo_protocol::{SessionHistoryMetadata, SessionHistoryToolIo, SessionPlanStepStatus};
 
     #[test]
     fn history_projection_prefers_tool_result_display_content() {
@@ -490,6 +521,85 @@ mod tests {
 
         let history_item = history_item_from_turn_item(&item).expect("history item");
         assert_eq!(history_item.body, "<content>canonical</content>");
+    }
+
+    #[test]
+    fn tool_call_projection_preserves_tool_io_input() {
+        let input = serde_json::json!({
+            "filePath": "crates/tui/src/mod.rs",
+            "offset": 10,
+            "limit": 20
+        });
+        let item = TurnItem::ToolCall(ToolCallItem {
+            tool_call_id: "call-1".to_string(),
+            tool_name: "read".to_string(),
+            input: input.clone(),
+        });
+
+        let history_item = history_item_from_turn_item(&item).expect("history item");
+
+        assert_eq!(
+            history_item.tool_io,
+            Some(SessionHistoryToolIo {
+                tool_name: "read".to_string(),
+                input,
+                output: None,
+                display_content: None,
+            })
+        );
+    }
+
+    #[test]
+    fn tool_result_projection_preserves_tool_io_output_and_display_content() {
+        let output = serde_json::Value::String("<content>canonical</content>".to_string());
+        let item = TurnItem::ToolResult(ToolResultItem {
+            tool_call_id: "call-1".to_string(),
+            tool_name: Some("read".to_string()),
+            output: output.clone(),
+            display_content: Some("canonical".to_string()),
+            is_error: false,
+        });
+
+        let history_item = history_item_from_turn_item(&item).expect("history item");
+
+        assert_eq!(
+            history_item.tool_io,
+            Some(SessionHistoryToolIo {
+                tool_name: "read".to_string(),
+                input: serde_json::Value::Null,
+                output: Some(output),
+                display_content: Some("canonical".to_string()),
+            })
+        );
+    }
+
+    #[test]
+    fn command_execution_projection_preserves_tool_io_input_and_output() {
+        let input = serde_json::json!({
+            "cmd": "cat foo.txt",
+            "cwd": "/tmp/project"
+        });
+        let output = serde_json::Value::String("hello".to_string());
+        let item = TurnItem::CommandExecution(CommandExecutionItem {
+            tool_call_id: "call-1".to_string(),
+            tool_name: "exec_command".to_string(),
+            command: "cat foo.txt".to_string(),
+            input: input.clone(),
+            output: output.clone(),
+            is_error: false,
+        });
+
+        let history_item = history_item_from_turn_item(&item).expect("history item");
+
+        assert_eq!(
+            history_item.tool_io,
+            Some(SessionHistoryToolIo {
+                tool_name: "exec_command".to_string(),
+                input,
+                output: Some(output),
+                display_content: None,
+            })
+        );
     }
 
     #[test]

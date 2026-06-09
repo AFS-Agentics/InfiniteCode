@@ -1,11 +1,11 @@
 //! Explicit skill mention selection and `SKILL.md` loading.
 
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use crate::mention_counts::build_skill_name_counts;
 use crate::model::SkillLoadOutcome;
 use crate::model::SkillMetadata;
 use crate::model::canonicalize_for_identity;
@@ -74,7 +74,6 @@ pub fn collect_explicit_skill_mentions(
     structured: &[SkillSelection],
     outcome: &SkillLoadOutcome,
 ) -> Vec<SkillMetadata> {
-    let (skill_name_counts, _) = build_skill_name_counts(&outcome.skills, &outcome.disabled_paths);
     let mut selected = Vec::new();
     let mut seen_paths = HashSet::new();
     let mut blocked_plain_names = HashSet::new();
@@ -98,6 +97,9 @@ pub fn collect_explicit_skill_mentions(
 
     for text in texts {
         let mentions = extract_tool_mentions(text);
+        if mentions.paths.is_empty() && mentions.plain_names.is_empty() {
+            continue;
+        }
         let mention_skill_paths = mentions
             .paths
             .iter()
@@ -105,30 +107,50 @@ pub fn collect_explicit_skill_mentions(
             .map(|path| canonicalize_for_identity(Path::new(normalize_skill_path(path))))
             .collect::<HashSet<_>>();
 
-        for skill in &outcome.skills {
-            if outcome.disabled_paths.contains(&skill.path_to_skills_md)
-                || seen_paths.contains(&skill.path_to_skills_md)
-            {
-                continue;
-            }
-            if mention_skill_paths.contains(&skill.path_to_skills_md) {
-                seen_paths.insert(skill.path_to_skills_md.clone());
-                selected.push(skill.clone());
+        if !mention_skill_paths.is_empty() {
+            for skill in &outcome.skills {
+                if outcome.disabled_paths.contains(&skill.path_to_skills_md)
+                    || seen_paths.contains(&skill.path_to_skills_md)
+                {
+                    continue;
+                }
+                if mention_skill_paths.contains(&skill.path_to_skills_md) {
+                    seen_paths.insert(skill.path_to_skills_md.clone());
+                    selected.push(skill.clone());
+                }
             }
         }
 
-        for skill in &outcome.skills {
+        if mentions.plain_names.is_empty() {
+            continue;
+        }
+        let mut plain_name_matches = HashMap::<String, (usize, usize)>::new();
+        for (index, skill) in outcome.skills.iter().enumerate() {
             if outcome.disabled_paths.contains(&skill.path_to_skills_md)
-                || seen_paths.contains(&skill.path_to_skills_md)
-                || blocked_plain_names.contains(&skill.name)
                 || !mentions.plain_names.contains(&skill.name)
             {
                 continue;
             }
-            if skill_name_counts.get(&skill.name).copied().unwrap_or(0) == 1 {
-                seen_paths.insert(skill.path_to_skills_md.clone());
-                selected.push(skill.clone());
+            plain_name_matches
+                .entry(skill.name.clone())
+                .and_modify(|(count, _)| *count += 1)
+                .or_insert((1, index));
+        }
+        let mut plain_skill_indices = plain_name_matches
+            .into_values()
+            .filter_map(|(count, index)| (count == 1).then_some(index))
+            .collect::<Vec<_>>();
+        plain_skill_indices.sort_unstable();
+
+        for index in plain_skill_indices {
+            let skill = &outcome.skills[index];
+            if seen_paths.contains(&skill.path_to_skills_md)
+                || blocked_plain_names.contains(&skill.name)
+            {
+                continue;
             }
+            seen_paths.insert(skill.path_to_skills_md.clone());
+            selected.push(skill.clone());
         }
     }
 

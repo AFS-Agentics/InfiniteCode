@@ -565,7 +565,15 @@ fn assistant_token_log_max_chars() -> usize {
 
 fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
     let max_chars = max_chars.max(1);
-    let mut preview = String::new();
+    if let Some(preview) = ascii_log_preview_fast_path(text, max_chars) {
+        return preview;
+    }
+
+    let escaped_capacity = max_chars
+        .min(text.len())
+        .saturating_mul(2)
+        .saturating_add(3);
+    let mut preview = String::with_capacity(escaped_capacity);
     let mut chars = text.chars();
     for ch in chars.by_ref().take(max_chars) {
         preview.extend(ch.escape_default());
@@ -576,9 +584,31 @@ fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
     preview
 }
 
+fn ascii_log_preview_fast_path(text: &str, max_chars: usize) -> Option<String> {
+    let bytes = text.as_bytes();
+    let prefix_len = bytes.len().min(max_chars);
+    if bytes[..prefix_len]
+        .iter()
+        .any(|byte| !matches!(*byte, b' '..=b'~') || matches!(*byte, b'\\' | b'\'' | b'"'))
+    {
+        return None;
+    }
+
+    if bytes.len() <= max_chars {
+        return Some(text.to_string());
+    }
+
+    let mut preview = String::with_capacity(prefix_len + 3);
+    preview.push_str(&text[..prefix_len]);
+    preview.push_str("...");
+    Some(preview)
+}
+
 #[cfg(test)]
 mod tests {
     use pretty_assertions::assert_eq;
+    use std::hint::black_box;
+    use std::time::Instant;
 
     use crate::events::TextItemKind;
 
@@ -612,6 +642,60 @@ mod tests {
         assert_eq!(
             assistant_token_log_preview_with_enabled("token", false, 10),
             None
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_assistant_token_log_preview_ascii_no_truncation() {
+        let text = "assistant token delta text without escapes";
+        let iterations = 500_000;
+        let expected_len = format_assistant_token_log_preview(text, 128).len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(format_assistant_token_log_preview(
+                black_box(text),
+                black_box(128),
+            ))
+            .len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "assistant_token_log_preview_ascii_no_truncation iterations={iterations} bytes={} elapsed_ms={} per_call_us={:.2}",
+            text.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_assistant_token_log_preview_escaped_truncation() {
+        let text = "line\n\twith\\escapes and more text".repeat(64);
+        let iterations = 200_000;
+        let expected_len = format_assistant_token_log_preview(&text, 80).len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(format_assistant_token_log_preview(
+                black_box(&text),
+                black_box(80),
+            ))
+            .len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "assistant_token_log_preview_escaped_truncation iterations={iterations} bytes={} elapsed_ms={} per_call_us={:.2}",
+            text.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
         );
     }
 }

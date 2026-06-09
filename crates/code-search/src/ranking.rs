@@ -8,15 +8,19 @@
 //! code while still allowing tests/docs/examples to appear when their relevance
 //! is strong.
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::Path;
 
 use crate::index::SearchIndex;
-use crate::tokens::{file_stem_terms, is_symbol_query, query_terms};
-use crate::types::{SearchFilters, SearchResult};
+use crate::tokens::{is_symbol_query, query_terms};
+use crate::types::{Chunk, SearchFilters, SearchResult};
 
 const RRF_K: f32 = 60.0;
 const CANDIDATE_MULTIPLIER: usize = 5;
+const SYMBOL_DEFINITION_KEYWORDS: &[&str] = &[
+    "fn", "struct", "enum", "trait", "impl", "mod", "const", "static", "class", "def", "function",
+];
 
 /// Runs hybrid ranking for a query and returns the final top_k chunks.
 ///
@@ -33,7 +37,7 @@ pub fn rank_search(
     let semantic = index.semantic_search(query_embedding, candidate_limit, filters);
     let sparse = index.sparse_search(query, candidate_limit, filters);
     let alpha = resolve_alpha(query);
-    let mut scores = HashMap::<usize, f32>::new();
+    let mut scores = HashMap::<usize, f32>::with_capacity(candidate_limit.saturating_mul(2));
 
     for (rank, (chunk_id, _)) in semantic.into_iter().enumerate() {
         *scores.entry(chunk_id).or_default() += alpha * reciprocal_rank(rank);
@@ -66,12 +70,13 @@ fn rerank(
     scores: HashMap<usize, f32>,
     top_k: usize,
 ) -> Vec<SearchResult> {
-    let mut file_counts = HashMap::<String, usize>::new();
-    for chunk_id in scores.keys() {
-        if let Some(chunk) = index.chunk(*chunk_id) {
-            *file_counts
-                .entry(chunk.file_path.to_string_lossy().replace('\\', "/"))
-                .or_default() += 1;
+    let mut file_counts = HashMap::<String, usize>::with_capacity(scores.len());
+    let mut contexts = Vec::with_capacity(scores.len());
+    for (chunk_id, base_score) in scores {
+        if let Some(chunk) = index.chunk(chunk_id) {
+            let path = normalized_path(&chunk.file_path);
+            *file_counts.entry(path.clone()).or_default() += 1;
+            contexts.push((chunk_id, base_score, path, chunk));
         }
     }
 
@@ -81,58 +86,88 @@ fn rerank(
         .trim_end_matches("()")
         .rsplit("::")
         .next()
-        .unwrap_or(query)
-        .to_string();
+        .unwrap_or(query);
     let terms = query_terms(query);
-    let mut candidates = scores
+    let all_files_unique = file_counts.len() == contexts.len();
+    let mut candidates = contexts
         .into_iter()
-        .filter_map(|(chunk_id, base_score)| {
-            let chunk = index.chunk(chunk_id)?;
-            let path = chunk.file_path.to_string_lossy().replace('\\', "/");
+        .map(|(chunk_id, base_score, path, chunk)| {
+            let lowercase_path = lowercase_path(&path);
             let mut score = base_score;
-            score *= multi_chunk_file_boost(file_counts.get(&path).copied().unwrap_or(1));
-            if symbol_query && contains_symbol_definition(&chunk.content, &symbol) {
+            if !all_files_unique {
+                score *= multi_chunk_file_boost(file_counts.get(&path).copied().unwrap_or(1));
+            }
+            if symbol_query && contains_symbol_definition(&chunk.content, symbol) {
                 score *= 1.35;
             }
-            score *= path_keyword_boost(&chunk.file_path, &path, &terms);
-            score *= path_penalty(&path);
-            Some((chunk_id, score))
+            score *= path_keyword_boost(lowercase_path.as_ref(), &terms);
+            score *= path_penalty(lowercase_path.as_ref());
+            (chunk_id, score, path, chunk)
         })
         .collect::<Vec<_>>();
 
-    candidates.sort_by(|left, right| {
-        right
-            .1
-            .total_cmp(&left.1)
-            .then_with(|| left.0.cmp(&right.0))
-    });
+    let mut saturated = if all_files_unique {
+        candidates
+            .into_iter()
+            .map(|(_chunk_id, score, _path, chunk)| (score, chunk))
+            .collect::<Vec<_>>()
+    } else {
+        candidates.sort_by(|left, right| {
+            right
+                .1
+                .total_cmp(&left.1)
+                .then_with(|| left.0.cmp(&right.0))
+        });
 
-    let mut seen_per_file = HashMap::<String, usize>::new();
-    // Saturation prevents one file with many adjacent chunks from crowding out
-    // other relevant files while preserving deterministic ordering within ties.
-    let mut saturated = candidates
-        .into_iter()
-        .filter_map(|(chunk_id, score)| {
-            let chunk = index.chunk(chunk_id)?;
-            let path = chunk.file_path.to_string_lossy().replace('\\', "/");
-            let seen = seen_per_file.entry(path).or_default();
-            let saturated_score = score / (1.0 + 0.2 * *seen as f32);
-            *seen += 1;
-            Some(SearchResult {
-                score: saturated_score,
-                chunk: chunk.clone(),
+        let mut seen_per_file = HashMap::<String, usize>::new();
+        // Saturation prevents one file with many adjacent chunks from crowding out
+        // other relevant files while preserving deterministic ordering within ties.
+        candidates
+            .into_iter()
+            .map(|(_chunk_id, score, path, chunk)| {
+                let seen = seen_per_file.entry(path).or_default();
+                let saturated_score = score / (1.0 + 0.2 * *seen as f32);
+                *seen += 1;
+                (saturated_score, chunk)
             })
-        })
-        .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+    };
 
-    saturated.sort_by(|left, right| {
+    let mut compare_results = |left: &(f32, &Chunk), right: &(f32, &Chunk)| {
         right
-            .score
-            .total_cmp(&left.score)
-            .then_with(|| left.chunk.location().cmp(&right.chunk.location()))
-    });
-    saturated.truncate(top_k);
+            .0
+            .total_cmp(&left.0)
+            .then_with(|| left.1.cmp_location(right.1))
+    };
+    if saturated.len() > top_k {
+        let (top_results, _, _) = saturated.select_nth_unstable_by(top_k, &mut compare_results);
+        top_results.sort_by(&mut compare_results);
+        saturated.truncate(top_k);
+    } else {
+        saturated.sort_by(compare_results);
+    }
     saturated
+        .into_iter()
+        .map(|(score, chunk)| SearchResult {
+            score,
+            chunk: chunk.clone(),
+        })
+        .collect()
+}
+
+fn normalized_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+
+fn lowercase_path(path: &str) -> Cow<'_, str> {
+    if path
+        .bytes()
+        .all(|byte| byte.is_ascii() && !byte.is_ascii_uppercase())
+    {
+        Cow::Borrowed(path)
+    } else {
+        Cow::Owned(path.to_lowercase())
+    }
 }
 
 /// Gives a small lift when independent chunks from the same file agree.
@@ -145,23 +180,23 @@ fn contains_symbol_definition(content: &str, symbol: &str) -> bool {
     if symbol.is_empty() {
         return false;
     }
-    [
-        "fn", "struct", "enum", "trait", "impl", "mod", "const", "static", "class", "def",
-        "function",
-    ]
-    .iter()
-    .any(|keyword| content.contains(&format!("{keyword} {symbol}")))
+    content.match_indices(symbol).any(|(symbol_start, _)| {
+        symbol_start > 0
+            && content[..symbol_start].ends_with(' ')
+            && SYMBOL_DEFINITION_KEYWORDS
+                .iter()
+                .any(|keyword| content[..symbol_start - 1].ends_with(keyword))
+    })
 }
 
 /// Rewards query terms that appear in the file stem or recent path context.
-fn path_keyword_boost(file_path: &Path, normalized_path: &str, terms: &[String]) -> f32 {
+fn path_keyword_boost(lowercase_path: &str, terms: &[String]) -> f32 {
     if terms.is_empty() {
         return 1.0;
     }
-    let stem_terms = file_stem_terms(file_path);
     let mut boost: f32 = 1.0;
     for term in terms {
-        if stem_terms.contains(term) || normalized_path.to_lowercase().contains(term) {
+        if lowercase_path.contains(term) {
             boost += 0.05;
         }
     }
@@ -172,8 +207,7 @@ fn path_keyword_boost(file_path: &Path, normalized_path: &str, terms: &[String])
 ///
 /// The penalties are soft so a test/doc/compat chunk can still win when the
 /// retrieval signals are much stronger than nearby production-code candidates.
-fn path_penalty(normalized_path: &str) -> f32 {
-    let path = normalized_path.to_lowercase();
+fn path_penalty(path: &str) -> f32 {
     let mut penalty = 1.0;
     if path.starts_with("tests/")
         || path.contains("/tests/")
@@ -211,7 +245,9 @@ fn path_penalty(normalized_path: &str) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
     use std::path::PathBuf;
+    use std::time::Instant;
 
     use pretty_assertions::assert_eq;
 
@@ -328,5 +364,187 @@ mod tests {
         );
 
         assert_eq!(results[0].chunk.file_path, PathBuf::from("src/parser.rs"));
+    }
+
+    #[test]
+    fn rerank_partial_top_k_matches_full_sorted_prefix() {
+        let chunk_count = 80;
+        let chunks = (0..chunk_count)
+            .map(|idx| Chunk {
+                content: format!("fn parse_input_{idx}() {{ parser(); }}"),
+                file_path: PathBuf::from(format!("src/parser/module_{}.rs", idx % 17)),
+                start_line: idx + 1,
+                end_line: idx + 1,
+                language: "rust".to_string(),
+            })
+            .collect();
+        let index = index_with_chunks(chunks);
+        let scores = (0..chunk_count)
+            .map(|idx| (idx, 1.0f32 / ((idx % 13) + 1) as f32))
+            .collect::<HashMap<_, _>>();
+
+        let top_k = 10;
+        let partial = rerank(&index, "parse_input", scores.clone(), top_k);
+        let mut full = rerank(&index, "parse_input", scores, chunk_count);
+        full.truncate(top_k);
+
+        assert_eq!(partial, full);
+    }
+
+    #[test]
+    fn rerank_unique_file_fast_path_matches_full_sorted_prefix() {
+        let chunk_count = 80;
+        let chunks = (0..chunk_count)
+            .map(|idx| Chunk {
+                content: format!("fn unique_symbol_{idx}() {{ parser(); }}"),
+                file_path: PathBuf::from(format!("src/unique/module_{idx}.rs")),
+                start_line: idx + 1,
+                end_line: idx + 1,
+                language: "rust".to_string(),
+            })
+            .collect();
+        let index = index_with_chunks(chunks);
+        let scores = (0..chunk_count)
+            .map(|idx| (idx, 1.0f32 / ((idx % 11) + 1) as f32))
+            .collect::<HashMap<_, _>>();
+
+        let top_k = 10;
+        let partial = rerank(&index, "unique_symbol", scores.clone(), top_k);
+        let mut full = rerank(&index, "unique_symbol", scores, chunk_count);
+        full.truncate(top_k);
+
+        assert_eq!(partial, full);
+    }
+
+    #[test]
+    fn path_keyword_boost_uses_lowercase_path_terms() {
+        assert_eq!(
+            path_keyword_boost("src/parse_input.rs", &["parse".to_string()]),
+            1.05
+        );
+        assert_eq!(
+            path_keyword_boost("src/other.rs", &["parse".to_string()]),
+            1.0
+        );
+    }
+
+    #[test]
+    fn lowercase_path_borrows_ascii_lowercase_paths() {
+        assert!(matches!(
+            lowercase_path("src/parser/module.rs"),
+            std::borrow::Cow::Borrowed(_)
+        ));
+        let uppercase = lowercase_path("SRC/Parser/Module.rs");
+        assert!(matches!(uppercase, std::borrow::Cow::Owned(_)));
+        assert_eq!(uppercase.as_ref(), "src/parser/module.rs");
+    }
+
+    #[test]
+    fn contains_symbol_definition_matches_keyword_prefix() {
+        assert_eq!(
+            vec![
+                contains_symbol_definition("pub fn parse_input() {}", "parse_input"),
+                contains_symbol_definition("let parse_input = value;", "parse_input"),
+            ],
+            vec![true, false]
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_rank_search_many_candidates() {
+        let chunks = (0..512)
+            .map(|idx| {
+                let file_path = if idx % 7 == 0 {
+                    PathBuf::from(format!("tests/parser_{idx}_test.rs"))
+                } else if idx % 11 == 0 {
+                    PathBuf::from(format!("docs/parser_{idx}.md"))
+                } else {
+                    PathBuf::from(format!("src/parser/module_{idx}.rs"))
+                };
+                Chunk {
+                    content: format!(
+                        "fn parse_input_{idx}() {{ parser(); let value = parse_token_{idx}; }}"
+                    ),
+                    file_path,
+                    start_line: idx + 1,
+                    end_line: idx + 1,
+                    language: "rust".to_string(),
+                }
+            })
+            .collect();
+        let index = index_with_chunks(chunks);
+        let iterations = 10_000;
+        let expected_len = rank_search(
+            &index,
+            "parse_input",
+            &[1.0, 0.0],
+            20,
+            &SearchFilters::empty(),
+        )
+        .len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(rank_search(
+                black_box(&index),
+                black_box("parse_input"),
+                black_box(&[1.0, 0.0]),
+                black_box(20),
+                black_box(&SearchFilters::empty()),
+            ))
+            .len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "rank_search_many_candidates iterations={iterations} chunks=512 top_k=20 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_rerank_tie_heavy_scores() {
+        let chunk_count = 2_000;
+        let chunks = (0..chunk_count)
+            .map(|idx| Chunk {
+                content: format!("fn generated_{idx}() {{ value(); }}"),
+                file_path: PathBuf::from(format!("src/generated/file_{idx}.rs")),
+                start_line: idx + 1,
+                end_line: idx + 1,
+                language: "rust".to_string(),
+            })
+            .collect();
+        let index = index_with_chunks(chunks);
+        let scores = (0..chunk_count)
+            .map(|idx| (idx, 1.0f32))
+            .collect::<HashMap<_, _>>();
+        let iterations = 1_000;
+        let top_k = 20;
+        let expected_len = rerank(&index, "lookup", scores.clone(), top_k).len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(rerank(
+                black_box(&index),
+                black_box("lookup"),
+                black_box(scores.clone()),
+                black_box(top_k),
+            ))
+            .len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "rerank_tie_heavy_scores iterations={iterations} chunks={chunk_count} top_k={top_k} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 }

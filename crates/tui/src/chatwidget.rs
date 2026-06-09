@@ -184,8 +184,11 @@ enum OnboardingStep {
 #[derive(Debug, Clone)]
 struct ActiveToolCall {
     tool_use_id: String,
+    tool_name: Option<String>,
+    input: Option<serde_json::Value>,
     title: String,
     lines: Vec<Line<'static>>,
+    output: String,
     exec_like: bool,
     start_time: Option<Instant>,
 }

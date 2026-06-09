@@ -30,8 +30,7 @@ const TOOL_SEARCH_DEFAULT_LIMIT: usize = 8;
 
 #[derive(Clone)]
 pub struct ToolSearchEntry {
-    definition: ToolDefinition,
-    search_text: String,
+    name: String,
 }
 
 pub struct ToolSearchHandler {
@@ -49,25 +48,23 @@ impl ToolSearchHandler {
         loaded_tools: Arc<Mutex<LoadedDeferredTools>>,
         config: DeferredLoadingConfig,
     ) -> Self {
-        let all_definitions = definitions
-            .iter()
-            .map(|(definition, _)| definition.clone())
-            .collect::<Vec<_>>();
-        let entries = definitions
-            .into_iter()
-            .filter(|(definition, _)| {
-                resolve_tool_policy(&definition.name, &config) == PromptLoadingPolicy::Deferred
-            })
-            .map(|(definition, search_text)| ToolSearchEntry {
-                search_text: search_text.unwrap_or_else(|| default_search_text(&definition)),
-                definition,
-            })
-            .collect::<Vec<_>>();
-        let documents = entries
-            .iter()
-            .enumerate()
-            .map(|(idx, entry)| Document::new(idx, entry.search_text.clone()))
-            .collect::<Vec<_>>();
+        let mut all_definitions = Vec::with_capacity(definitions.len());
+        let mut entries = Vec::with_capacity(definitions.len());
+        let mut documents = Vec::with_capacity(definitions.len());
+        for (definition, search_text) in definitions {
+            let is_deferred =
+                resolve_tool_policy(&definition.name, &config) == PromptLoadingPolicy::Deferred;
+            if is_deferred {
+                let search_text = search_text.unwrap_or_else(|| default_search_text(&definition));
+                let name = definition.name.clone();
+                all_definitions.push(definition);
+                let document_id = entries.len();
+                entries.push(ToolSearchEntry { name });
+                documents.push(Document::new(document_id, search_text));
+            } else {
+                all_definitions.push(definition);
+            }
+        }
         let search_engine =
             SearchEngineBuilder::<usize>::with_documents(Language::English, documents).build();
 
@@ -155,12 +152,12 @@ impl ToolHandler for ToolSearchHandler {
 }
 
 impl ToolSearchHandler {
-    fn search(&self, query: &str, limit: usize) -> Vec<String> {
+    fn search(&self, query: &str, limit: usize) -> Vec<&str> {
         self.search_engine
             .search(query, limit)
             .into_iter()
             .filter_map(|result| self.entries.get(result.document.id))
-            .map(|entry| entry.definition.name.clone())
+            .map(|entry| entry.name.as_str())
             .collect()
     }
 }
@@ -205,16 +202,40 @@ fn default_search_text(definition: &ToolDefinition) -> String {
         .input_schema
         .get("properties")
         .and_then(serde_json::Value::as_object)
-        .map(|properties| properties.keys().cloned().collect::<Vec<_>>())
+        .map(|properties| properties.keys().map(String::as_str).collect::<Vec<_>>())
         .unwrap_or_default();
-    schema_properties.sort();
-    let mut parts = vec![definition.name.clone(), definition.description.clone()];
-    parts.extend(schema_properties);
-    parts.join(" ")
+    schema_properties.sort_unstable();
+
+    let part_count = 2 + schema_properties.len();
+    let mut text = String::with_capacity(
+        definition.name.len()
+            + definition.description.len()
+            + schema_properties
+                .iter()
+                .map(|property| property.len())
+                .sum::<usize>()
+            + part_count.saturating_sub(1),
+    );
+    let mut push_part = |part: &str| {
+        if !text.is_empty() {
+            text.push(' ');
+        }
+        text.push_str(part);
+    };
+
+    push_part(&definition.name);
+    push_part(&definition.description);
+    for property in schema_properties {
+        push_part(property);
+    }
+    text
 }
 
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
+    use std::time::Instant;
+
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -226,6 +247,166 @@ mod tests {
             input_schema: schema,
             output_schema: None,
         }
+    }
+
+    fn many_tool_search_handler(tool_count: usize) -> ToolSearchHandler {
+        let definitions = (0..tool_count)
+            .map(|index| {
+                (
+                    definition(
+                        &format!("tool_{index}"),
+                        &format!("Search workspace database records for shard {index}"),
+                        serde_json::json!({
+                            "type": "object",
+                            "properties": {
+                                "query": { "type": "string" },
+                                "limit": { "type": "number" }
+                            }
+                        }),
+                    ),
+                    None,
+                )
+            })
+            .collect::<Vec<_>>();
+        ToolSearchHandler::new(
+            definitions,
+            Arc::new(Mutex::new(LoadedDeferredTools::default())),
+            DeferredLoadingConfig::default(),
+        )
+    }
+
+    fn many_tool_definitions_with_properties(
+        tool_count: usize,
+        property_count: usize,
+    ) -> Vec<(ToolDefinition, Option<String>)> {
+        (0..tool_count)
+            .map(|tool_index| {
+                let mut properties = serde_json::Map::new();
+                for property_index in 0..property_count {
+                    properties.insert(
+                        format!("field_{property_index:02}"),
+                        serde_json::json!({ "type": "string" }),
+                    );
+                }
+                let mut schema = serde_json::Map::new();
+                schema.insert("type".to_string(), serde_json::json!("object"));
+                schema.insert(
+                    "properties".to_string(),
+                    serde_json::Value::Object(properties),
+                );
+
+                (
+                    definition(
+                        &format!("tool_{tool_index}"),
+                        &format!("Search workspace database records for shard {tool_index}"),
+                        serde_json::Value::Object(schema),
+                    ),
+                    None,
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_tool_search_handler_new_many_tool_schemas() {
+        let definitions = many_tool_definitions_with_properties(256, 32);
+        let iterations = 1_000;
+        let started = Instant::now();
+        let mut total_entries = 0usize;
+
+        for _ in 0..iterations {
+            let handler = ToolSearchHandler::new(
+                black_box(definitions.clone()),
+                Arc::new(Mutex::new(LoadedDeferredTools::default())),
+                DeferredLoadingConfig::default(),
+            );
+            total_entries += black_box(handler.entries.len());
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_entries, iterations * 256);
+        println!(
+            "tool_search_handler_new_many_tool_schemas iterations={iterations} tools=256 properties=32 elapsed_ms={} per_build_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    fn default_search_text_sorts_schema_properties() {
+        let text = default_search_text(&definition(
+            "tool",
+            "Search files",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "zeta": { "type": "string" },
+                    "alpha": { "type": "string" }
+                }
+            }),
+        ));
+
+        assert_eq!(text, "tool Search files alpha zeta");
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_default_search_text_many_properties() {
+        let mut properties = serde_json::Map::new();
+        for index in 0..64 {
+            properties.insert(
+                format!("field_{index:02}"),
+                serde_json::json!({ "type": "string" }),
+            );
+        }
+        let mut schema = serde_json::Map::new();
+        schema.insert("type".to_string(), serde_json::json!("object"));
+        schema.insert(
+            "properties".to_string(),
+            serde_json::Value::Object(properties),
+        );
+        let definition = definition(
+            "mcp__docs_server__search_docs",
+            "Search workspace documentation and issue history.",
+            serde_json::Value::Object(schema),
+        );
+        let expected = default_search_text(&definition);
+        let iterations = 100_000;
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(default_search_text(black_box(&definition))).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, iterations * expected.len());
+        println!(
+            "default_search_text_many_properties iterations={iterations} properties=64 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_tool_search_collects_result_names() {
+        let handler = many_tool_search_handler(256);
+        let started = Instant::now();
+        let mut total_results = 0;
+
+        for _ in 0..20_000 {
+            total_results += black_box(handler.search(black_box("workspace database"), 8)).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_results, 160_000);
+        println!(
+            "tool_search_collects_result_names iterations=20000 tools=256 limit=8 elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / 20_000.0
+        );
     }
 
     #[tokio::test]

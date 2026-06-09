@@ -133,11 +133,23 @@ pub enum SessionHistoryMetadata {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SessionHistoryToolIo {
+    pub tool_name: String,
+    pub input: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_content: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SessionHistoryItem {
     pub tool_call_id: Option<String>,
     pub kind: SessionHistoryItemKind,
     pub title: String,
     pub body: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_io: Option<SessionHistoryToolIo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<SessionHistoryMetadata>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -156,9 +168,15 @@ impl SessionHistoryItem {
             kind,
             title,
             body,
+            tool_io: None,
             metadata: None,
             duration_ms: None,
         }
+    }
+
+    pub fn with_tool_io(mut self, tool_io: SessionHistoryToolIo) -> Self {
+        self.tool_io = Some(tool_io);
+        self
     }
 
     pub fn with_metadata(mut self, metadata: SessionHistoryMetadata) -> Self {
@@ -362,5 +380,37 @@ mod tests {
         let json = serde_json::to_string(&metadata).expect("serialize");
         let restored: SessionMetadata = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(restored, metadata);
+    }
+
+    #[test]
+    fn session_history_tool_io_is_optional_and_roundtrips() {
+        let legacy: SessionHistoryItem = serde_json::from_str(
+            r#"{
+                "tool_call_id": "call-1",
+                "kind": "tool_call",
+                "title": "read foo.txt",
+                "body": ""
+            }"#,
+        )
+        .expect("deserialize legacy history item");
+        assert_eq!(legacy.tool_io, None);
+
+        let item = SessionHistoryItem::new(
+            Some("call-1".to_string()),
+            SessionHistoryItemKind::ToolCall,
+            "read foo.txt".to_string(),
+            String::new(),
+        )
+        .with_tool_io(SessionHistoryToolIo {
+            tool_name: "read".to_string(),
+            input: serde_json::json!({"filePath": "foo.txt"}),
+            output: None,
+            display_content: None,
+        });
+
+        let json = serde_json::to_string(&item).expect("serialize history item");
+        let restored: SessionHistoryItem =
+            serde_json::from_str(&json).expect("deserialize history item");
+        assert_eq!(restored, item);
     }
 }

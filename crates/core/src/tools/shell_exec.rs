@@ -16,6 +16,7 @@ const MAX_METADATA_LENGTH: usize = 30_000;
 const DEFAULT_TIMEOUT_MS: u64 = 120_000;
 const DEFAULT_YIELD_TIME_MS: u64 = 1_000;
 const DEFAULT_MAX_OUTPUT_TOKENS: usize = 16_000;
+const TRUNCATED_SUFFIX: &str = "\n\n... [truncated]";
 
 pub(crate) struct ShellExecRequest {
     pub command: String,
@@ -296,9 +297,12 @@ pub(crate) fn truncate_output(text: &str, max_output_tokens: usize) -> String {
         return String::new();
     }
     let max_chars = max_output_tokens.saturating_mul(4);
+    if text.len() <= max_chars {
+        return text.to_string();
+    }
     let mut out: String = text.chars().take(max_chars).collect();
     if out.len() < text.len() {
-        out.push_str("\n\n... [truncated]");
+        out.push_str(TRUNCATED_SUFFIX);
     }
     out
 }
@@ -486,6 +490,8 @@ mod tests {
     use super::*;
     use crate::ToolContent;
     use pretty_assertions::assert_eq;
+    use std::hint::black_box;
+    use std::time::Instant;
 
     #[tokio::test]
     async fn execute_shell_command_non_tty_sends_progress() {
@@ -719,6 +725,60 @@ mod tests {
         let result = truncate_output(&input, 10);
         assert!(result.ends_with("\n\n... [truncated]"));
         assert!(result.len() < input.len());
+    }
+
+    #[test]
+    fn truncate_output_preserves_utf8_boundaries() {
+        assert_eq!(truncate_output("😀😀😀", 1), "😀😀😀");
+        assert_eq!(
+            truncate_output("😀😀😀😀😀", 1),
+            "😀😀😀😀\n\n... [truncated]"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_truncate_output_ascii_no_truncation() {
+        let input = "shell output line\n".repeat(256);
+        let iterations = 200_000;
+        let expected_len = input.len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(truncate_output(black_box(&input), black_box(2_000))).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "truncate_output_ascii_no_truncation iterations={iterations} bytes={expected_len} elapsed_ms={} per_call_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_truncate_output_ascii_large_truncation() {
+        let input = "shell output line\n".repeat(8_192);
+        let iterations = 50_000;
+        let expected_len = truncate_output(&input, 1_000).len();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(truncate_output(black_box(&input), black_box(1_000))).len();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "truncate_output_ascii_large_truncation iterations={iterations} bytes={} elapsed_ms={} per_call_us={:.2}",
+            input.len(),
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / iterations as f64
+        );
     }
 
     #[test]

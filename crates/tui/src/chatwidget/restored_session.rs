@@ -8,14 +8,19 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::events::TranscriptItem;
+use crate::exec_cell::CommandOutput;
 use crate::exec_cell::ExecCell;
 use crate::exec_cell::new_active_exec_command;
 use crate::history_cell;
+use crate::tool_io_cell::FileChangeToolIoCell;
+use crate::tool_io_cell::ToolIoCell;
+use crate::tool_io_cell::ToolIoCellOptions;
 use crate::tool_result_cell::ToolResultCell;
 use devo_protocol::SessionHistoryItem;
 use devo_protocol::SessionHistoryMetadata;
 use devo_protocol::SessionPlanStepStatus;
 use ratatui::text::Line;
+use serde_json::Value;
 
 use super::ChatWidget;
 use super::DotStatus;
@@ -113,11 +118,14 @@ impl ChatWidget {
             }
 
             if let Some(metadata) = &item.metadata {
-                if let Some(tool_call_id) = item.tool_call_id.as_deref()
+                let paired_result_index = if let Some(tool_call_id) = item.tool_call_id.as_deref()
                     && let Some(result_index) = paired_result_by_call_id.get(tool_call_id).copied()
                 {
                     consumed_indexes.insert(result_index);
-                }
+                    Some(result_index)
+                } else {
+                    None
+                };
                 match metadata {
                     SessionHistoryMetadata::PlanUpdate { explanation, steps } => {
                         self.on_plan_updated(
@@ -145,22 +153,24 @@ impl ChatWidget {
                         );
                     }
                     SessionHistoryMetadata::Edited { changes } => {
-                        self.add_history_entry_without_redraw(Box::new(
-                            history_cell::new_patch_event(changes.clone(), &self.session.cwd),
-                        ));
+                        self.add_restored_file_change_item(item, changes.clone());
                     }
                     SessionHistoryMetadata::Explored { actions } => {
                         self.restore_explored_history_item(item, actions.clone());
+                        let result_item = paired_result_index
+                            .map(|result_index| &history_items[result_index])
+                            .or_else(|| {
+                                (item.kind != devo_protocol::SessionHistoryItemKind::ToolCall)
+                                    .then_some(item)
+                            });
+                        self.apply_restored_exec_tool_io(item, result_item);
                     }
                 }
                 continue;
             }
 
             if let Some(changes) = Self::edited_changes_from_history_item(item) {
-                self.add_history_entry_without_redraw(Box::new(history_cell::new_patch_event(
-                    changes,
-                    &self.session.cwd,
-                )));
+                self.add_restored_file_change_item(item, changes);
                 continue;
             }
 
@@ -173,6 +183,9 @@ impl ChatWidget {
                 if let Some(result_index) = paired_result_by_call_id.get(tool_call_id).copied() {
                     consumed_indexes.insert(result_index);
                     let result_item = &history_items[result_index];
+                    if self.add_restored_tool_io_result_item(item, result_item) {
+                        continue;
+                    }
                     let title_line =
                         (!item.title.is_empty()).then(|| Self::ran_tool_line(&item.title));
                     self.add_history_entry_without_redraw(Box::new(ToolResultCell::new(
@@ -215,6 +228,9 @@ impl ChatWidget {
                 }
                 devo_protocol::SessionHistoryItemKind::ToolResult
                 | devo_protocol::SessionHistoryItemKind::CommandExecution => {
+                    if self.add_restored_tool_io_result_item(item, item) {
+                        continue;
+                    }
                     self.add_history_entry_without_redraw(Box::new(ToolResultCell::new(
                         (!item.title.is_empty()).then(|| Self::ran_tool_line(&item.title)),
                         item.body.clone(),
@@ -248,6 +264,173 @@ impl ChatWidget {
 
         self.frame_requester.schedule_frame();
         true
+    }
+
+    fn add_restored_file_change_item(
+        &mut self,
+        item: &SessionHistoryItem,
+        changes: HashMap<PathBuf, devo_protocol::protocol::FileChange>,
+    ) {
+        if let (Some(tool_name), Some(input)) = (
+            Self::restored_tool_io_name(item, None),
+            Self::restored_tool_io_input(item, None),
+        ) {
+            self.add_history_entry_without_redraw(Box::new(FileChangeToolIoCell::new(
+                (!item.title.is_empty()).then(|| Self::ran_tool_line(&item.title)),
+                tool_name,
+                input,
+                changes,
+                self.session.cwd.clone(),
+            )));
+        } else {
+            self.add_history_entry_without_redraw(Box::new(history_cell::new_patch_event(
+                changes,
+                &self.session.cwd,
+            )));
+        }
+    }
+
+    fn add_restored_tool_io_result_item(
+        &mut self,
+        call_item: &SessionHistoryItem,
+        result_item: &SessionHistoryItem,
+    ) -> bool {
+        let (Some(tool_name), Some(input)) = (
+            Self::restored_tool_io_name(call_item, Some(result_item)),
+            Self::restored_tool_io_input(call_item, Some(result_item)),
+        ) else {
+            return false;
+        };
+        if result_item.kind == devo_protocol::SessionHistoryItemKind::ToolResult
+            && let Some(changes) = Self::edited_changes_from_history_item(result_item)
+        {
+            self.add_history_entry_without_redraw(Box::new(FileChangeToolIoCell::new(
+                (!call_item.title.is_empty()).then(|| Self::ran_tool_line(&call_item.title)),
+                tool_name,
+                input,
+                changes,
+                self.session.cwd.clone(),
+            )));
+            return true;
+        }
+        self.add_history_entry_without_redraw(Box::new(ToolIoCell::new(
+            ToolIoCellOptions {
+                title_line: (!call_item.title.is_empty())
+                    .then(|| Self::ran_tool_line(&call_item.title)),
+                dot_prefix: if result_item.kind == devo_protocol::SessionHistoryItemKind::Error {
+                    self.failed_dot_prefix()
+                } else {
+                    Self::tool_dot_prefix()
+                },
+                subsequent_prefix: Line::from("  "),
+                output_style: Self::tool_text_style(),
+                show_empty_ellipsis: false,
+            },
+            tool_name,
+            input,
+            Self::restored_tool_io_output(result_item),
+            Self::restored_tool_io_display_content(result_item),
+        )));
+        true
+    }
+
+    fn apply_restored_exec_tool_io(
+        &mut self,
+        call_item: &SessionHistoryItem,
+        result_item: Option<&SessionHistoryItem>,
+    ) {
+        let (Some(tool_call_id), Some(tool_name), Some(input)) = (
+            call_item.tool_call_id.as_deref(),
+            Self::restored_tool_io_name(call_item, result_item),
+            Self::restored_tool_io_input(call_item, result_item),
+        ) else {
+            return;
+        };
+        let output = result_item.and_then(Self::restored_tool_io_output);
+        let display_content = result_item.and_then(Self::restored_tool_io_display_content);
+        for cell in self
+            .history
+            .iter_mut()
+            .rev()
+            .filter_map(|cell| cell.as_any_mut().downcast_mut::<ExecCell>())
+        {
+            if !cell.set_tool_io_input(tool_call_id, tool_name.clone(), input.clone()) {
+                continue;
+            }
+            if let Some(output) = output.clone() {
+                let output_text = display_content
+                    .clone()
+                    .unwrap_or_else(|| Self::value_text(&output));
+                cell.complete_tool_io(tool_call_id, output, display_content.clone());
+                cell.complete_call(
+                    tool_call_id,
+                    CommandOutput {
+                        exit_code: if result_item.is_some_and(|item| {
+                            item.kind == devo_protocol::SessionHistoryItemKind::Error
+                        }) {
+                            1
+                        } else {
+                            0
+                        },
+                        aggregated_output: output_text.clone(),
+                        formatted_output: output_text,
+                    },
+                    std::time::Duration::from_millis(0),
+                );
+            }
+            return;
+        }
+    }
+
+    fn restored_tool_io_name(
+        item: &SessionHistoryItem,
+        result_item: Option<&SessionHistoryItem>,
+    ) -> Option<String> {
+        item.tool_io
+            .as_ref()
+            .map(|tool_io| tool_io.tool_name.clone())
+            .or_else(|| {
+                result_item
+                    .and_then(|item| item.tool_io.as_ref())
+                    .map(|tool_io| tool_io.tool_name.clone())
+            })
+            .filter(|tool_name| !tool_name.is_empty())
+    }
+
+    fn restored_tool_io_input(
+        item: &SessionHistoryItem,
+        result_item: Option<&SessionHistoryItem>,
+    ) -> Option<Value> {
+        item.tool_io
+            .as_ref()
+            .map(|tool_io| tool_io.input.clone())
+            .filter(|input| !input.is_null())
+            .or_else(|| {
+                result_item
+                    .and_then(|item| item.tool_io.as_ref())
+                    .map(|tool_io| tool_io.input.clone())
+                    .filter(|input| !input.is_null())
+            })
+    }
+
+    fn restored_tool_io_output(item: &SessionHistoryItem) -> Option<Value> {
+        item.tool_io
+            .as_ref()
+            .and_then(|tool_io| tool_io.output.clone())
+            .or_else(|| (!item.body.is_empty()).then(|| Value::String(item.body.clone())))
+    }
+
+    fn restored_tool_io_display_content(item: &SessionHistoryItem) -> Option<String> {
+        item.tool_io
+            .as_ref()
+            .and_then(|tool_io| tool_io.display_content.clone())
+    }
+
+    fn value_text(value: &Value) -> String {
+        match value {
+            Value::String(text) => text.clone(),
+            other => other.to_string(),
+        }
     }
 
     pub(super) fn edited_changes_from_history_item(

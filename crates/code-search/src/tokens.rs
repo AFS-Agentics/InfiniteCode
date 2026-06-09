@@ -5,9 +5,6 @@
 //! raw lowercase identifier as a token, and enrich BM25 documents with file/path
 //! terms so short symbol queries can still find the right module.
 
-use std::collections::BTreeSet;
-use std::path::Path;
-
 use crate::types::Chunk;
 
 /// Builds the BM25 document text for a chunk.
@@ -16,23 +13,33 @@ use crate::types::Chunk;
 /// chunk content remains dominant, but filename/module matches get enough signal
 /// to help identifier-heavy queries.
 pub fn enrich_for_bm25(chunk: &Chunk) -> String {
-    let mut parts = vec![chunk.content.clone()];
+    let mut enriched = String::with_capacity(chunk.content.len() + 96);
+    enriched.push_str(&chunk.content);
     if let Some(stem) = chunk.file_path.file_stem().and_then(|stem| stem.to_str()) {
-        parts.push(stem.to_string());
-        parts.push(stem.to_string());
+        enriched.push(' ');
+        enriched.push_str(stem);
+        enriched.push(' ');
+        enriched.push_str(stem);
     }
-    let path_parts = chunk
+    let mut tail_parts = [None; 4];
+    let mut part_count = 0usize;
+    for part in chunk
         .file_path
         .components()
         .filter_map(|component| component.as_os_str().to_str())
-        .collect::<Vec<_>>();
-    let tail_start = path_parts.len().saturating_sub(4);
-    parts.extend(
-        path_parts[tail_start..path_parts.len().saturating_sub(1)]
-            .iter()
-            .map(|part| part.to_string()),
-    );
-    parts.join(" ")
+    {
+        tail_parts[part_count % tail_parts.len()] = Some(part);
+        part_count += 1;
+    }
+    let tail_start = part_count.saturating_sub(4);
+    let tail_end = part_count.saturating_sub(1);
+    for index in tail_start..tail_end {
+        if let Some(part) = tail_parts[index % tail_parts.len()] {
+            enriched.push(' ');
+            enriched.push_str(part);
+        }
+    }
+    enriched
 }
 
 /// Returns normalized query terms used by path reranking.
@@ -61,72 +68,52 @@ pub fn is_symbol_query(query: &str) -> bool {
             .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | ':' | '.'))
 }
 
-/// Splits a file stem into terms for path-aware boosts.
-pub fn file_stem_terms(path: &Path) -> BTreeSet<String> {
-    path.file_stem()
-        .and_then(|stem| stem.to_str())
-        .map(split_identifier_tokens)
-        .unwrap_or_default()
-        .into_iter()
-        .collect()
-}
-
 /// Splits arbitrary code/query text into stable lowercase identifier tokens.
 ///
 /// The returned set includes both the full lowercase identifier and its
 /// camel/snake pieces. Sorting and deduplication keep BM25 input deterministic.
 pub fn split_identifier_tokens(input: &str) -> Vec<String> {
-    let mut tokens = Vec::new();
+    let mut tokens = Vec::with_capacity(16);
     for raw in input
         .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
         .filter(|part| !part.is_empty())
     {
-        let lower = raw.to_lowercase();
-        tokens.push(lower);
-        tokens.extend(split_camel_and_snake(raw));
+        tokens.push(raw.to_ascii_lowercase());
+        for part in raw.split('_').filter(|part| !part.is_empty()) {
+            let mut chars = part.char_indices();
+            let Some((_, mut previous)) = chars.next() else {
+                continue;
+            };
+            let mut chars = chars.peekable();
+            let mut start = 0;
+            while let Some((byte_idx, current)) = chars.next() {
+                let next_is_lower = chars
+                    .peek()
+                    .map(|(_, next)| next.is_ascii_lowercase())
+                    .unwrap_or(false);
+                let boundary = (current.is_ascii_uppercase() && previous.is_ascii_lowercase())
+                    || (current.is_ascii_uppercase()
+                        && previous.is_ascii_uppercase()
+                        && next_is_lower);
+                if boundary {
+                    tokens.push(part[start..byte_idx].to_ascii_lowercase());
+                    start = byte_idx;
+                }
+                previous = current;
+            }
+            tokens.push(part[start..].to_ascii_lowercase());
+        }
     }
     tokens.sort();
     tokens.dedup();
     tokens
 }
 
-/// Splits one identifier token on snake and camel/Pascal boundaries.
-fn split_camel_and_snake(input: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for part in input.split('_').filter(|part| !part.is_empty()) {
-        let mut start = 0;
-        let chars = part.char_indices().collect::<Vec<_>>();
-        for idx in 1..chars.len() {
-            let (_, current) = chars[idx];
-            let (_, previous) = chars[idx - 1];
-            let next_is_lower = chars
-                .get(idx + 1)
-                .map(|(_, next)| next.is_ascii_lowercase())
-                .unwrap_or(false);
-            let boundary = (current.is_ascii_uppercase() && previous.is_ascii_lowercase())
-                || (current.is_ascii_uppercase() && previous.is_ascii_uppercase() && next_is_lower);
-            if boundary {
-                let byte_idx = chars[idx].0;
-                push_part(&mut out, &part[start..byte_idx]);
-                start = byte_idx;
-            }
-        }
-        push_part(&mut out, &part[start..]);
-    }
-    out.sort();
-    out.dedup();
-    out
-}
-
-fn push_part(out: &mut Vec<String>, part: &str) {
-    if !part.is_empty() {
-        out.push(part.to_lowercase());
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use std::hint::black_box;
     use std::path::PathBuf;
+    use std::time::Instant;
 
     use pretty_assertions::assert_eq;
 
@@ -136,16 +123,19 @@ mod tests {
     /// Verifies: sparse code search tokenization splits identifiers into queryable terms.
     #[test]
     fn split_identifier_tokens_handles_camel_and_snake() {
-        let tokens = split_identifier_tokens("CodeSearchHandler parse_JSONInput");
+        let tokens = split_identifier_tokens("CodeSearchHandler parse_JSONInput HTTPServer");
         let expected = vec![
             "code".to_string(),
             "codesearchhandler".to_string(),
             "handler".to_string(),
+            "http".to_string(),
+            "httpserver".to_string(),
             "input".to_string(),
             "json".to_string(),
             "parse".to_string(),
             "parse_jsoninput".to_string(),
             "search".to_string(),
+            "server".to_string(),
         ];
         assert_eq!(tokens, expected);
     }
@@ -164,6 +154,78 @@ mod tests {
         assert_eq!(
             enrich_for_bm25(&chunk),
             "fn parse_input() {} parser parser crates core src"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_enrich_for_bm25_rust_chunks() {
+        let chunks = (0..512)
+            .map(|idx| Chunk {
+                content: format!(
+                    "pub fn parse_input_{idx}() {{ let rendered_output = parser.parse(value_{idx}); }}"
+                ),
+                file_path: PathBuf::from(format!(
+                    "crates/core/src/parser/module_{idx}/parse_input_{idx}.rs"
+                )),
+                start_line: idx + 1,
+                end_line: idx + 1,
+                language: "rust".to_string(),
+            })
+            .collect::<Vec<_>>();
+        let iterations = 2_000;
+        let expected_len = chunks
+            .iter()
+            .map(enrich_for_bm25)
+            .map(|text| text.len())
+            .sum::<usize>();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(&chunks)
+                .iter()
+                .map(enrich_for_bm25)
+                .map(|text| text.len())
+                .sum::<usize>();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "enrich_for_bm25_rust_chunks iterations={iterations} chunks=512 elapsed_ms={} per_chunk_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / (iterations * chunks.len()) as f64
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn bench_split_identifier_tokens_many_symbols() {
+        let identifiers = (0..512)
+            .map(|idx| format!("CodeSearchHandler{idx} parse_JSONInput_{idx} HTTPServerConfig"))
+            .collect::<Vec<_>>();
+        let iterations = 5_000;
+        let expected_len = identifiers
+            .iter()
+            .map(|identifier| split_identifier_tokens(identifier).len())
+            .sum::<usize>();
+        let started = Instant::now();
+        let mut total_len = 0usize;
+
+        for _ in 0..iterations {
+            total_len += black_box(&identifiers)
+                .iter()
+                .map(|identifier| split_identifier_tokens(identifier).len())
+                .sum::<usize>();
+        }
+
+        let elapsed = started.elapsed();
+        assert_eq!(total_len, expected_len * iterations);
+        println!(
+            "split_identifier_tokens_many_symbols iterations={iterations} identifiers=512 elapsed_ms={} per_identifier_us={:.2}",
+            elapsed.as_secs_f64() * 1_000.0,
+            elapsed.as_secs_f64() * 1_000_000.0 / (iterations * identifiers.len()) as f64
         );
     }
 }

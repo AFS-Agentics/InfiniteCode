@@ -593,6 +593,7 @@ pub async fn query(
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn query_with_interaction_mode(
     session: &mut SessionState,
     turn_config: &TurnConfig,

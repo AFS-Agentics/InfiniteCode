@@ -866,10 +866,13 @@ fn handle_worker_event(
         | WorkerEvent::AssistantMessageCompleted(_)
         | WorkerEvent::ReasoningCompleted(_)
         | WorkerEvent::ToolCall { .. }
+        | WorkerEvent::ToolCallDetails { .. }
         | WorkerEvent::ToolCallUpdated { .. }
         | WorkerEvent::ToolResult { .. }
+        | WorkerEvent::ToolResultIo { .. }
         | WorkerEvent::ShellCommandFinished { .. }
         | WorkerEvent::PatchApplied { .. }
+        | WorkerEvent::PatchAppliedIo { .. }
         | WorkerEvent::PlanUpdated { .. }
         | WorkerEvent::ProviderVendorsListed { .. }
         | WorkerEvent::SessionsListed { .. }
