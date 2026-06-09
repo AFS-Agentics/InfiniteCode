@@ -276,8 +276,9 @@ impl History {
     /// 1. Normalizing tool-call / tool-call-output pairing
     /// 2. Filtering items according to the model's supported modalities
     /// 3. Converting to `Vec<RequestMessage>`
-    /// 4. Merging consecutive messages with the same role (prevents orphan
-    ///    tool-call messages that violate provider protocol requirements)
+    /// 4. Merging consecutive assistant messages split from one assistant turn
+    ///    (prevents orphan tool-call messages that violate provider protocol
+    ///    requirements)
     pub fn for_prompt(&self, modalities: &[InputModality]) -> Vec<RequestMessage> {
         if modalities.contains(&InputModality::Text)
             && normalize::text_modality_keeps_all_items(&self.items)
@@ -324,14 +325,14 @@ impl History {
                     }
                 }
             }
-            merge_consecutive_same_role(&mut messages);
+            merge_consecutive_assistant_messages(&mut messages);
             return messages;
         }
 
         let mut items = normalize::filter_by_modality(&self.items, modalities);
         normalize::pair_tool_call_items(&mut items);
         let mut messages: Vec<RequestMessage> = items.into_iter().map(Into::into).collect();
-        merge_consecutive_same_role(&mut messages);
+        merge_consecutive_assistant_messages(&mut messages);
         messages
     }
 
@@ -367,8 +368,8 @@ pub fn insert_context_diff_message(messages: &mut Vec<Message>, diff: Message) {
 
 /// Converts locked prefix `UserInput`s into request messages and prepends them
 /// ahead of the existing prompt-visible history.
-/// Merges consecutive `RequestMessage`s that share the same role into a single
-/// message by concatenating their content arrays.
+/// Merges consecutive assistant `RequestMessage`s into a single message by
+/// concatenating their content arrays.
 ///
 /// This is necessary because `message_to_response_items` can split a single
 /// assistant `Message` (containing both text and `ToolUse` blocks) into
@@ -378,12 +379,15 @@ pub fn insert_context_diff_message(messages: &mut Vec<Message>, diff: Message) {
 /// provider protocol requirements (e.g. OpenAI requires that an assistant
 /// message with `tool_calls` be immediately followed by tool-result messages,
 /// not by another assistant message).
-fn merge_consecutive_same_role(messages: &mut Vec<RequestMessage>) {
+fn merge_consecutive_assistant_messages(messages: &mut Vec<RequestMessage>) {
+    let assistant_role = Role::Assistant.as_str();
     let capacity = messages.len();
     let previous = std::mem::replace(messages, Vec::with_capacity(capacity));
     for mut message in previous {
         match messages.last_mut() {
-            Some(last) if last.role == message.role => last.content.append(&mut message.content),
+            Some(last) if last.role == assistant_role && message.role == assistant_role => {
+                last.content.append(&mut message.content);
+            }
             _ => messages.push(message),
         }
     }
@@ -712,7 +716,7 @@ mod tests {
     }
 
     #[test]
-    fn for_prompt_merges_consecutive_same_role_messages() {
+    fn for_prompt_merges_consecutive_assistant_messages_only() {
         let mut h = History::new(test_context());
 
         // User message
@@ -747,8 +751,8 @@ mod tests {
 
         let msgs = h.for_prompt(&[InputModality::Text]);
 
-        // Should produce: user, assistant(merged), user(merged)
-        assert_eq!(msgs.len(), 3);
+        // Should produce: user, assistant(merged), user, user.
+        assert_eq!(msgs.len(), 4);
 
         // Second message: assistant with text + both tool calls merged
         assert_eq!(msgs[1].role, "assistant");
@@ -761,14 +765,34 @@ mod tests {
             matches!(&msgs[1].content[2], RequestContent::ToolUse { id, .. } if id == "call-2")
         );
 
-        // Third message: user with both tool results merged
+        // Third and fourth messages: user tool results stay distinct.
         assert_eq!(msgs[2].role, "user");
-        assert_eq!(msgs[2].content.len(), 2);
+        assert_eq!(msgs[2].content.len(), 1);
         assert!(
             matches!(&msgs[2].content[0], RequestContent::ToolResult { tool_use_id, .. } if tool_use_id == "call-1")
         );
+        assert_eq!(msgs[3].role, "user");
+        assert_eq!(msgs[3].content.len(), 1);
         assert!(
-            matches!(&msgs[2].content[1], RequestContent::ToolResult { tool_use_id, .. } if tool_use_id == "call-2")
+            matches!(&msgs[3].content[0], RequestContent::ToolResult { tool_use_id, .. } if tool_use_id == "call-2")
+        );
+    }
+
+    #[test]
+    fn for_prompt_preserves_consecutive_user_messages() {
+        let mut h = History::new(test_context());
+        h.push(ResponseItem::Message(Message::user("first")));
+        h.push(ResponseItem::Message(Message::user("second")));
+
+        let msgs = h.for_prompt(&[InputModality::Text]);
+        let expected = vec![
+            Message::user("first").to_request_message(),
+            Message::user("second").to_request_message(),
+        ];
+
+        assert_eq!(
+            serde_json::to_value(&msgs).unwrap(),
+            serde_json::to_value(&expected).unwrap()
         );
     }
 }

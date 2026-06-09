@@ -39,7 +39,7 @@ use devo_core::history::compaction::CompactionKind;
 use devo_core::history::compaction::compact_history;
 use devo_core::history::summarizer::DefaultHistorySummarizer;
 use devo_core::message_to_response_items;
-use devo_core::query_with_interaction_mode;
+use devo_core::query;
 use devo_core::tools::AgentToolCoordinator;
 use devo_core::tools::PermissionChecker;
 use devo_core::tools::ToolAgentScope;
@@ -151,6 +151,7 @@ mod agents;
 mod approval;
 mod command_exec;
 mod connection;
+mod goal_continuation;
 mod goal_handlers;
 mod handlers;
 mod items;
@@ -167,6 +168,7 @@ pub(crate) use connection::CONNECTION_NOTIFICATION_CHANNEL_CAPACITY;
 pub(crate) use connection::ConnectionRuntime;
 pub(crate) use connection::SubscriptionFilter;
 pub(crate) use items::render_input_items;
+use turn_exec::ExecuteTurnRequest;
 
 pub struct ServerRuntime {
     metadata: InitializeResult,
@@ -191,6 +193,18 @@ pub struct ServerRuntime {
         Mutex<HashMap<devo_protocol::ReferenceSearchId, reference_search::ReferenceSearchState>>,
     /// Live client-owned shell/process sessions.
     command_exec_manager: command_exec::CommandExecManager,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TurnInputMode {
+    VisibleUserMessage,
+    HiddenGoalContinuation { goal: devo_protocol::ThreadGoal },
+}
+
+impl TurnInputMode {
+    fn emits_user_message(&self) -> bool {
+        matches!(self, Self::VisibleUserMessage)
+    }
 }
 
 impl ServerRuntime {

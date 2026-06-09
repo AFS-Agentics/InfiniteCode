@@ -194,7 +194,7 @@ Skill instructions are lower priority than:
 - Safety and permission policy.
 - The user's current request.
 - Explicit project instruction files.
-- Current interaction mode instructions.
+- Current collaboration mode instructions.
 - Active configuration and permission posture.
 
 Skill instructions may specialize how work is performed only inside those boundaries. A skill cannot grant tool permissions, disable approval, override user constraints, change privacy policy, or require the assistant to hide its use.

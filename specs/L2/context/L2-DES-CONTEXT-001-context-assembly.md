@@ -13,11 +13,11 @@ last_updated: 2026-05-22
 
 ## Purpose
 
-Refine the context assembly step of the agent execution engine. Define how the immutable context prefix, metadata-derived instructions, interaction-mode prompt sets, and consolidated change-signal messages compose into model-visible context while preserving token efficiency and provider cache friendliness.
+Refine the context assembly step of the agent execution engine. Define how the immutable context prefix, metadata-derived instructions, collaboration-mode prompt sets, and consolidated change-signal messages compose into model-visible context while preserving token efficiency and provider cache friendliness.
 
 ## Background / Context
 
-`L2-DES-AGENT-001` defines context assembly as a phase of the execution engine but does not specify how metadata-derived content (persona, interaction mode, interrupt state) is ordered, deduplicated, or inserted relative to the user message. `L2-DES-CONV-001` defines session metadata fields including `persona`, `interaction_mode`, `instruction_set`, and `agent_mode`, but does not define the context assembly rules that translate those fields into model-visible content.
+`L2-DES-AGENT-001` defines context assembly as a phase of the execution engine but does not specify how metadata-derived content (persona, collaboration mode, interrupt state) is ordered, deduplicated, or inserted relative to the user message. `L2-DES-CONV-001` defines session metadata fields including `persona`, `collaboration_mode`, `instruction_set`, and `agent_mode`, but does not define the context assembly rules that translate those fields into model-visible content.
 
 Four L1 requirements converge on this problem:
 
@@ -26,18 +26,18 @@ Four L1 requirements converge on this problem:
 - Plan Mode (`L1-REQ-AGENT-005`) requires mode-specific behavior and instruction sets that change during a session.
 - Code Review (`L1-REQ-REVIEW-001`) requires a review-oriented instruction set that changes during a session.
 
-The user has directed that Plan Mode and Review Mode share a single `interaction_mode` field with distinct prompt sets per mode, and that all pre-user-message signals (mode changes, persona changes, interruption) be consolidated into one message.
+The user has directed that Plan Mode and Review Mode share a single `collaboration_mode` field with distinct prompt sets per mode, and that all pre-user-message signals (mode changes, persona changes, interruption) be consolidated into one message.
 
 ## Source Requirements
 
 - `L1-REQ-LLM-001` requires stable context prefixes and append-only runtime configuration changes.
 - `L1-REQ-LLM-004` requires persona instructions to influence model behavior.
-- `L1-REQ-AGENT-005` requires Plan Mode as a session-local interaction mode with mode-specific behavior.
+- `L1-REQ-AGENT-005` requires Plan Mode as a session-local collaboration mode with mode-specific behavior.
 - `L1-REQ-GOAL-001` requires autonomous goal continuation without polluting the user-visible transcript.
 - `L1-REQ-REVIEW-001` requires code review as a first-class workflow with review-specific behavior.
 - `L1-REQ-CONTEXT-001` requires useful model context management across long-running sessions.
 - `L1-REQ-AGENT-002` requires that interrupted work be visible as prior state when the user resumes.
-- `L2-DES-CONV-001` defines the `persona`, `interaction_mode`, `agent_mode`, and `instruction_set` session metadata fields.
+- `L2-DES-CONV-001` defines the `persona`, `collaboration_mode`, `agent_mode`, and `instruction_set` session metadata fields.
 - `L2-DES-AGENT-001` defines the context assembly phase within the execution engine.
 - `L2-DES-AGENT-002` defines interrupt and resume control, including the interrupt state used to assemble the resume signal.
 - `L2-DES-GOAL-001` defines hidden goal context for Ralph Loop continuation.
@@ -47,15 +47,15 @@ The user has directed that Plan Mode and Review Mode share a single `interaction
 The program should assemble model-visible context from four layers:
 
 1. **Immutable prefix**: Stable content that must not be rewritten in-place, including base instructions, tool definitions, and prior transcript turns.
-2. **Metadata-derived content**: Persona instructions and interaction-mode instructions assembled from session metadata for every turn.
+2. **Metadata-derived content**: Persona instructions and collaboration-mode instructions assembled from session metadata for every turn.
 3. **Hidden goal context**: Active Ralph Loop goal context inserted only when goal continuation is eligible for the current turn.
-4. **Consolidated change-signal message**: A single message inserted before the user input when persona, interaction mode, goal state, or interrupt state changed since the prior turn.
+4. **Consolidated change-signal message**: A single message inserted before the user input when persona, collaboration mode, goal state, or interrupt state changed since the prior turn.
 
 These layers compose into the final model context. The immutable prefix preserves provider cache reuse. Metadata-derived content allows dynamic configuration without prefix mutation. Hidden goal context keeps Ralph Loop continuation out of the visible transcript. The consolidated signal avoids redundant messages while keeping the model informed of changed circumstances.
 
-## Interaction Mode
+## Collaboration Mode
 
-The session carries an `interaction_mode` field that represents the current session-local interaction mode. Values are:
+The session carries a `collaboration_mode` field that represents the current session-local collaboration mode. Values are:
 
 | Value | Behavior |
 |---|---|
@@ -63,9 +63,9 @@ The session carries an `interaction_mode` field that represents the current sess
 | `plan` | File mutation blocked. Question tool available. Agent produces strategic analysis and plans. Non-mutating inspection tools available. |
 | `review` | File mutation blocked. Agent inspects code and produces prioritized findings. Code-location and reasoning required per finding. |
 
-`interaction_mode` is distinct from the session-level `agent_mode` field (Coding Mode, Security Mode) defined by `L2-DES-CONV-001`. The session-level agent mode is locked at session creation. `interaction_mode` may change during a session.
+`collaboration_mode` is distinct from the session-level `agent_mode` field (Coding Mode, Security Mode) defined by `L2-DES-CONV-001`. The session-level agent mode is locked at session creation. `collaboration_mode` may change during a session.
 
-Each `interaction_mode` value maps to a distinct prompt set that defines mode-specific instructions, constraints, and output expectations. The prompt set is metadata-owned and is not a user transcript item.
+Each `collaboration_mode` value maps to a distinct prompt set that defines mode-specific instructions, constraints, and output expectations. The prompt set is metadata-owned and is not a user transcript item.
 
 The mode prompt set for `plan` should include:
 - Prohibition on file creation, editing, deletion, renaming, or other mutation.
@@ -109,7 +109,7 @@ Each turn, the context assembler derives model-visible content from session meta
 The metadata-derived content includes:
 
 - **Persona instructions**: The instruction text associated with the current persona selection, such as concise style, detailed style, or other configured communication-style instructions.
-- **Interaction-mode instructions**: The mode-specific prompt set for the current `interaction_mode` value.
+- **Collaboration-mode instructions**: The mode-specific prompt set for the current `collaboration_mode` value.
 - **Goal context**: The active Ralph Loop objective, status, budget, and progress summary when the current turn is eligible for goal continuation.
 
 These instructions are assembled from the `instruction_set` and related metadata fields defined by `L2-DES-CONV-001`. They are included in the model-visible context for every turn.
@@ -128,12 +128,12 @@ Rules:
 
 ## Consolidated Change-Signal Message
 
-When the state of persona, interaction mode, goal context, or interrupt condition changes between turns, the context assembler generates one consolidated change-signal message inserted before the user input. This message bundles all active changes into a single model-visible signal.
+When the state of persona, collaboration mode, goal context, or interrupt condition changes between turns, the context assembler generates one consolidated change-signal message inserted before the user input. This message bundles all active changes into a single model-visible signal.
 
 The change-signal message is generated when any of the following differ from the prior turn's context state:
 
 - `persona` has changed.
-- `interaction_mode` has changed.
+- `collaboration_mode` has changed.
 - Active goal state relevant to model-visible context has changed.
 - The prior turn was interrupted by the user.
 
@@ -142,7 +142,7 @@ If none of these changed, no change-signal message is generated. The metadata-de
 The change-signal message should be concise and factual:
 
 - State which persona is now active.
-- State which interaction mode is now active.
+- State which collaboration mode is now active.
 - State that the active goal changed, paused, resumed, completed, blocked, or stopped by budget, if applicable.
 - State that the prior turn was interrupted, if applicable.
 
@@ -152,11 +152,11 @@ Example shape:
 [SYSTEM — change signal]
 
 The persona is now: concise.
-The interaction mode is now: plan.
+The collaboration mode is now: plan.
 The active goal was paused by the user.
 The previous turn was interrupted by the user.
 
-All subsequent responses should use the current persona, interaction mode, and goal state.
+All subsequent responses should use the current persona, collaboration mode, and goal state.
 ```
 
 All active changes are stated in one message. The program must not emit separate messages for the persona change, the mode change, and the interruption.
@@ -170,7 +170,7 @@ When a change-signal message is generated, the ordering within the model-visible
 ```text
 [Immutable prefix]
 [Metadata-derived: persona instructions (current)]
-[Metadata-derived: interaction-mode instructions (current)]
+[Metadata-derived: collaboration-mode instructions (current)]
 [Hidden goal context, if eligible]
 [Consolidated change-signal message, if applicable]
 [User input — the current turn's accepted user message]
@@ -195,9 +195,9 @@ When a turn is interrupted and the user immediately submits a new message, the c
 For each new turn, the context assembler:
 
 1. Load the immutable prefix from the current context snapshot.
-2. Detect whether persona, interaction mode, active goal context, or interrupt condition changed since the prior turn's assembled context.
+2. Detect whether persona, collaboration mode, active goal context, or interrupt condition changed since the prior turn's assembled context.
 3. Assemble the metadata-derived persona instructions from current session metadata.
-4. Assemble the metadata-derived interaction-mode instructions from current session metadata.
+4. Assemble the metadata-derived collaboration-mode instructions from current session metadata.
 5. Assemble hidden goal context when the current turn is eligible for goal-guided execution.
 6. If a change is detected, generate one consolidated change-signal message.
 7. Insert the accepted user input after the metadata-derived content, optional hidden goal context, and optional change signal.
@@ -221,10 +221,10 @@ Provider prefix caching should benefit from stable base instructions, tool defin
 
 ## Persona, Mode, and Review as Metadata
 
-This design treats persona, interaction mode, and review behavior as metadata-derived instructions, not as transcript items. This satisfies:
+This design treats persona, collaboration mode, and review behavior as metadata-derived instructions, not as transcript items. This satisfies:
 
 - Persona changes influence model behavior without creating user-visible transcript turns.
-- Plan Mode and Review Mode share the `interaction_mode` field with distinct prompt sets.
+- Plan Mode and Review Mode share the `collaboration_mode` field with distinct prompt sets.
 - Review findings and plan output are normal assistant response items within the transcript. The mode instructions that produce those findings are metadata-derived, not user-authored transcript content.
 - Users can switch between normal, plan, and review modes within a session without creating synthetic transcript items just to represent the mode change.
 - Active goal context can guide autonomous continuation without creating synthetic user transcript items.
@@ -235,12 +235,12 @@ This design treats persona, interaction mode, and review behavior as metadata-de
 |---|---:|---|---|---|
 | refines | L1-REQ-LLM-001 | 1 | specs/L1/L1-REQ-LLM-001-token-efficiency.md | Defines immutable prefix, append-only metadata changes, and consolidated change-signal for cache-friendly context. |
 | refines | L1-REQ-LLM-004 | 1 | specs/L1/L1-REQ-LLM-004-persona.md | Defines persona as metadata-derived instruction with append-only change signaling. |
-| refines | L1-REQ-AGENT-005 | 1 | specs/L1/L1-REQ-AGENT-005-plan-mode.md | Defines plan as an interaction_mode value with a mode-specific prompt set and consolidate change signal. |
+| refines | L1-REQ-AGENT-005 | 1 | specs/L1/L1-REQ-AGENT-005-plan-mode.md | Defines plan as a collaboration_mode value with a mode-specific prompt set and consolidated change signal. |
 | related-to | L1-REQ-GOAL-001 | 1 | specs/L1/L1-REQ-GOAL-001-ralph-loop.md | Defines hidden goal context as model-visible metadata-derived content rather than a user-visible transcript turn. |
-| refines | L1-REQ-REVIEW-001 | 1 | specs/L1/L1-REQ-REVIEW-001-code-review.md | Defines review as an interaction_mode value with a mode-specific prompt set sharing the mode field. |
+| refines | L1-REQ-REVIEW-001 | 1 | specs/L1/L1-REQ-REVIEW-001-code-review.md | Defines review as a collaboration_mode value with a mode-specific prompt set sharing the mode field. |
 | related-to | L1-REQ-CONTEXT-001 | 1 | specs/L1/L1-REQ-CONTEXT-001-management.md | Context assembly produces the model-visible context managed by the context management system. |
 | related-to | L1-REQ-AGENT-002 | 1 | specs/L1/L1-REQ-AGENT-002-interrupt-resume.md | Interrupt state informs the consolidated change-signal message before the next user input. |
-| related-to | L2-DES-CONV-001 | 1 | specs/L2/conv/L2-DES-CONV-001-session-jsonl-data-model.md | Session metadata fields (persona, interaction_mode, instruction_set) provide the source data for context assembly. |
+| related-to | L2-DES-CONV-001 | 1 | specs/L2/conv/L2-DES-CONV-001-session-jsonl-data-model.md | Session metadata fields (persona, collaboration_mode, instruction_set) provide the source data for context assembly. |
 | related-to | L2-DES-AGENT-001 | 1 | specs/L2/agent/L2-DES-AGENT-001-execution-engine.md | Refines the context assembly phase of the execution engine. |
 | related-to | L2-DES-AGENT-002 | 1 | specs/L2/agent/L2-DES-AGENT-002-interrupt-resume-control.md | Interrupt state feeds the consolidated change-signal when resuming after interruption. |
 | related-to | L2-DES-GOAL-001 | 1 | specs/L2/goal/L2-DES-GOAL-001-ralph-loop-goals.md | Defines goal context content, eligibility, and persistence expectations. |

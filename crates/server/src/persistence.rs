@@ -1471,6 +1471,7 @@ mod tests {
             thinking_selection: Some("enabled".into()),
             reasoning_effort: None,
             observed_agents_snapshot: None,
+            collaboration_mode: devo_core::CollaborationMode::Build,
         };
         let mut replay = ReplayState::default();
 

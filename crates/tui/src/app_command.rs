@@ -2,8 +2,8 @@ use std::path::PathBuf;
 
 use devo_protocol::ApprovalDecisionValue;
 use devo_protocol::ApprovalScopeValue;
+use devo_protocol::CollaborationMode;
 use devo_protocol::InputItem;
-use devo_protocol::InteractionMode;
 use devo_protocol::RequestUserInputResponse;
 use devo_protocol::SessionId;
 use devo_protocol::ThreadGoalStatus;
@@ -61,7 +61,7 @@ pub(crate) enum AppCommand {
         thinking: Option<String>,
         sandbox: Option<String>,
         approval_policy: Option<String>,
-        interaction_mode: InteractionMode,
+        collaboration_mode: CollaborationMode,
     },
     OverrideTurnContext {
         cwd: Option<PathBuf>,
@@ -137,7 +137,7 @@ pub(crate) enum AppCommandView<'a> {
         thinking: &'a Option<String>,
         sandbox: &'a Option<String>,
         approval_policy: &'a Option<String>,
-        interaction_mode: InteractionMode,
+        collaboration_mode: CollaborationMode,
     },
     SteerTurn {
         input: &'a [InputItem],
@@ -204,26 +204,26 @@ impl AppCommand {
         sandbox: Option<String>,
         approval_policy: Option<String>,
     ) -> Self {
-        Self::user_turn_with_interaction_mode(
+        Self::user_turn_with_collaboration_mode(
             input,
             cwd,
             model,
             thinking,
             sandbox,
             approval_policy,
-            InteractionMode::Build,
+            CollaborationMode::Build,
         )
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn user_turn_with_interaction_mode(
+    pub(crate) fn user_turn_with_collaboration_mode(
         input: Vec<InputItem>,
         cwd: Option<PathBuf>,
         model: Option<String>,
         thinking: Option<String>,
         sandbox: Option<String>,
         approval_policy: Option<String>,
-        interaction_mode: InteractionMode,
+        collaboration_mode: CollaborationMode,
     ) -> Self {
         Self::UserTurn {
             input,
@@ -232,7 +232,7 @@ impl AppCommand {
             thinking,
             sandbox,
             approval_policy,
-            interaction_mode,
+            collaboration_mode,
         }
     }
 
@@ -363,7 +363,7 @@ impl AppCommand {
                 thinking,
                 sandbox,
                 approval_policy,
-                interaction_mode,
+                collaboration_mode,
             } => AppCommandView::UserTurn {
                 input,
                 cwd,
@@ -371,7 +371,7 @@ impl AppCommand {
                 thinking,
                 sandbox,
                 approval_policy,
-                interaction_mode: *interaction_mode,
+                collaboration_mode: *collaboration_mode,
             },
             Self::OverrideTurnContext {
                 cwd,
@@ -432,7 +432,7 @@ impl AppCommand {
             thinking,
             sandbox,
             approval_policy,
-            interaction_mode,
+            collaboration_mode,
         } = self
         else {
             return None;
@@ -446,7 +446,7 @@ impl AppCommand {
             sandbox: sandbox.clone(),
             approval_policy: approval_policy.clone(),
             cwd: cwd.clone(),
-            interaction_mode: *interaction_mode,
+            collaboration_mode: *collaboration_mode,
         })
     }
 }

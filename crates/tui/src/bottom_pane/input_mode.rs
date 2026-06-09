@@ -2,7 +2,7 @@ use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::text::Span;
 
-use devo_protocol::InteractionMode;
+use devo_protocol::CollaborationMode;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum InputMode {
@@ -41,17 +41,17 @@ impl InputMode {
         }
     }
 
-    pub(crate) fn interaction_mode(self) -> InteractionMode {
+    pub(crate) fn collaboration_mode(self) -> CollaborationMode {
         match self {
-            Self::Build | Self::Shell => InteractionMode::Build,
-            Self::Plan => InteractionMode::Plan,
+            Self::Build | Self::Shell => CollaborationMode::Build,
+            Self::Plan => CollaborationMode::Plan,
         }
     }
 
-    pub(crate) fn from_interaction_mode(interaction_mode: InteractionMode) -> Self {
-        match interaction_mode {
-            InteractionMode::Build => Self::Build,
-            InteractionMode::Plan => Self::Plan,
+    pub(crate) fn from_collaboration_mode(collaboration_mode: CollaborationMode) -> Self {
+        match collaboration_mode {
+            CollaborationMode::Build => Self::Build,
+            CollaborationMode::Plan => Self::Plan,
         }
     }
 }
@@ -79,15 +79,24 @@ mod tests {
             InputMode::Shell.styled_span(false),
             Span::styled("SHELL", Style::default().fg(Color::Rgb(245, 142, 53)))
         );
-        assert_eq!(InputMode::Build.interaction_mode(), InteractionMode::Build);
-        assert_eq!(InputMode::Plan.interaction_mode(), InteractionMode::Plan);
-        assert_eq!(InputMode::Shell.interaction_mode(), InteractionMode::Build);
         assert_eq!(
-            InputMode::from_interaction_mode(InteractionMode::Build),
+            InputMode::Build.collaboration_mode(),
+            CollaborationMode::Build
+        );
+        assert_eq!(
+            InputMode::Plan.collaboration_mode(),
+            CollaborationMode::Plan
+        );
+        assert_eq!(
+            InputMode::Shell.collaboration_mode(),
+            CollaborationMode::Build
+        );
+        assert_eq!(
+            InputMode::from_collaboration_mode(CollaborationMode::Build),
             InputMode::Build
         );
         assert_eq!(
-            InputMode::from_interaction_mode(InteractionMode::Plan),
+            InputMode::from_collaboration_mode(CollaborationMode::Plan),
             InputMode::Plan
         );
     }

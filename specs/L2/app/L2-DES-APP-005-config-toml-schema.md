@@ -225,7 +225,7 @@ Fields:
 
 - `model_binding`: optional binding id from `[model_bindings]`.
 - `reasoning_effort`: optional logical reasoning effort string for the default model selection.
-- `mode`: optional default interaction mode id.
+- `mode`: optional default collaboration mode id.
 - `theme`: optional UI theme id.
 - `permission_policy`: optional default permission posture.
 

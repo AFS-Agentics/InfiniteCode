@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use devo_protocol::InteractionMode;
+use devo_protocol::CollaborationMode;
 use serde_json::json;
 
 use crate::contracts::{
@@ -79,7 +79,7 @@ impl ToolHandler for PlanHandler {
         input: serde_json::Value,
         _progress: Option<ToolProgressSender>,
     ) -> Result<ToolResult, ToolCallError> {
-        if ctx.interaction_mode == InteractionMode::Plan {
+        if ctx.collaboration_mode == CollaborationMode::Plan {
             return Err(ToolCallError::BlockedByMode("plan mode".to_string()));
         }
 

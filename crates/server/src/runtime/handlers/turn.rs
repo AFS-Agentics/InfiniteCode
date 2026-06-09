@@ -1,10 +1,10 @@
 use super::super::*;
 
-fn pending_interaction_mode_metadata(
-    interaction_mode: devo_protocol::InteractionMode,
+fn pending_collaboration_mode_metadata(
+    collaboration_mode: devo_protocol::CollaborationMode,
 ) -> Option<serde_json::Value> {
-    (interaction_mode != devo_protocol::InteractionMode::Build)
-        .then(|| serde_json::json!({ "interaction_mode": interaction_mode }))
+    (collaboration_mode != devo_protocol::CollaborationMode::Build)
+        .then(|| serde_json::json!({ "collaboration_mode": collaboration_mode }))
 }
 
 impl ServerRuntime {
@@ -93,7 +93,7 @@ impl ServerRuntime {
                 drop(session);
 
                 {
-                    let interaction_mode = params.interaction_mode;
+                    let collaboration_mode = params.collaboration_mode;
                     let mut guard = pending_turn_queue
                         .lock()
                         .expect("pending turn queue mutex should not be poisoned");
@@ -103,7 +103,7 @@ impl ServerRuntime {
                             display_text: display_input.clone(),
                             prompt_text: input_text.clone(),
                         },
-                        metadata: pending_interaction_mode_metadata(interaction_mode),
+                        metadata: pending_collaboration_mode_metadata(collaboration_mode),
                         created_at: chrono::Utc::now(),
                     };
                     guard.push_back(item.clone());
@@ -200,14 +200,15 @@ impl ServerRuntime {
                 .insert(params.session_id, cancel_token);
             let task = tokio::spawn(async move {
                 runtime
-                    .execute_turn(
-                        params.session_id,
-                        turn_for_task,
-                        turn_config_for_task,
-                        display_input_for_task,
-                        input_for_task,
-                        params.interaction_mode,
-                    )
+                    .execute_turn(ExecuteTurnRequest {
+                        session_id: params.session_id,
+                        turn: turn_for_task,
+                        turn_config: turn_config_for_task,
+                        display_input: display_input_for_task,
+                        input: input_for_task,
+                        collaboration_mode: params.collaboration_mode,
+                        input_mode: TurnInputMode::VisibleUserMessage,
+                    })
                     .await;
             });
             self.active_tasks

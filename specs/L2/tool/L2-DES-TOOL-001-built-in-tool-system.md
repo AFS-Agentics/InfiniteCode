@@ -278,7 +278,7 @@ The tool result is program state. It should produce durable goal records and cli
 
 ## Mode Gating
 
-Tools must respect session-local interaction mode and session-level agent mode.
+Tools must respect session-local collaboration mode and session-level agent mode.
 
 Plan Mode constraints:
 

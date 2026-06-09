@@ -204,7 +204,7 @@ pub async fn compact_history(
         for item in &to_compact {
             messages.push(RequestMessage::from(item));
         }
-        merge_consecutive_same_role(&mut messages);
+        merge_consecutive_assistant_messages(&mut messages);
 
         let summary = match summarizer.summarize(messages).await {
             Ok(s) => s,
@@ -307,19 +307,22 @@ fn preserve_suffix_from_latest_user_message(items: &[ResponseItem]) -> Vec<Respo
     items[latest_user_index..].to_vec()
 }
 
-/// Merges consecutive `RequestMessage`s that share the same role into a single
-/// message by concatenating their content arrays.
+/// Merges consecutive assistant `RequestMessage`s into a single message by
+/// concatenating their content arrays.
 ///
 /// This mirrors the same logic in `history/mod.rs` and is needed because
 /// `ResponseItem` → `RequestMessage` conversion can split a single assistant
 /// turn (text + tool calls) into multiple consecutive assistant messages,
 /// which provider APIs reject.
-fn merge_consecutive_same_role(messages: &mut Vec<RequestMessage>) {
+fn merge_consecutive_assistant_messages(messages: &mut Vec<RequestMessage>) {
+    let assistant_role = "assistant";
     let capacity = messages.len();
     let previous = std::mem::replace(messages, Vec::with_capacity(capacity));
     for mut message in previous {
         match messages.last_mut() {
-            Some(last) if last.role == message.role => last.content.append(&mut message.content),
+            Some(last) if last.role == assistant_role && message.role == assistant_role => {
+                last.content.append(&mut message.content);
+            }
             _ => messages.push(message),
         }
     }
@@ -423,10 +426,10 @@ mod tests {
         for item in &items {
             messages.push(RequestMessage::from(item));
         }
-        merge_consecutive_same_role(&mut messages);
+        merge_consecutive_assistant_messages(&mut messages);
 
-        // system, user, assistant(merged), user(merged)
-        assert_eq!(messages.len(), 4);
+        // system, user, assistant(merged), user, user
+        assert_eq!(messages.len(), 5);
         assert_eq!(messages[0].role, "system");
 
         assert_eq!(messages[1].role, "user");
@@ -446,12 +449,14 @@ mod tests {
         );
 
         assert_eq!(messages[3].role, "user");
-        assert_eq!(messages[3].content.len(), 2);
+        assert_eq!(messages[3].content.len(), 1);
         assert!(
             matches!(&messages[3].content[0], RequestContent::ToolResult { tool_use_id, .. } if tool_use_id == "call-1")
         );
+        assert_eq!(messages[4].role, "user");
+        assert_eq!(messages[4].content.len(), 1);
         assert!(
-            matches!(&messages[3].content[1], RequestContent::ToolResult { tool_use_id, .. } if tool_use_id == "call-2")
+            matches!(&messages[4].content[0], RequestContent::ToolResult { tool_use_id, .. } if tool_use_id == "call-2")
         );
     }
 

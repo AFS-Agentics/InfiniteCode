@@ -19,7 +19,7 @@ Allow users to request analysis and strategic planning without allowing the agen
 
 Some tasks require careful codebase analysis before implementation. Users may want the agent to inspect the repository, reason about constraints, and produce a plan without making changes. Plan Mode provides that behavior.
 
-Plan Mode is not a session-level agent mode such as Coding Mode or Security Mode. It is a session-local agent interaction mode that may be entered during a session. Normal Mode is the ordinary non-Plan agent interaction mode.
+Plan Mode is not a session-level agent mode such as Coding Mode or Security Mode. It is a session-local agent collaboration mode that may be entered during a session. Normal Mode is the ordinary non-Plan agent collaboration mode.
 
 Because asking the user a question can interrupt active execution, the dedicated question tool is reserved for Plan Mode. In Normal Mode, the agent must not invoke the question tool.
 
@@ -35,7 +35,7 @@ The program must support Plan Mode, where the agent can analyze the codebase and
 
 ## Functional Requirements
 
-- The program must support Plan Mode as a session-local agent interaction mode.
+- The program must support Plan Mode as a session-local agent collaboration mode.
 - In Plan Mode, the agent must not create, edit, delete, rename, or otherwise modify files.
 - In Plan Mode, the agent may read files, search the codebase, inspect project context, and use other non-mutating analysis capabilities where permitted.
 - In Plan Mode, the agent must produce a strategic plan based on user input and codebase analysis.

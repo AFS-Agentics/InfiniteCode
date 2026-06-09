@@ -578,22 +578,15 @@ pub async fn prepare_model_invocation(
     // Collect tool definitions from registry
     let tool_definitions = registry.list_definitions();
 
-    // Build tool schemas for context assembly
-    let tool_schemas: Vec<(String, serde_json::Value)> = tool_definitions
-        .iter()
-        .map(|def| (def.name.clone(), def.input_schema.clone()))
-        .collect();
-
     // Assemble context using the context pipeline
     let assembler = ContextAssembler::new(ContextConfig::default());
     let assembled = assembler.assemble(
         session.session_id,
         turn.turn_id,
         base_instructions,
-        &tool_schemas,
         &[],  // prior_transcript (empty for now; populated by replay)
         None, // persona
-        None, // interaction_mode
+        None, // collaboration_mode
         project_instructions,
         active_skills,
         memory_context,
@@ -607,25 +600,22 @@ pub async fn prepare_model_invocation(
         .entries
         .iter()
         .map(|entry| match entry {
-            PipelineContextEntry::InstructionRef { content, .. } => {
+            PipelineContextEntry::Instruction { content, .. } => {
                 ContextEntry::SystemPrompt(content.clone())
             }
-            PipelineContextEntry::ToolSchema { name, schema } => {
-                ContextEntry::ToolDefinition(format!("{}: {}", name, schema))
-            }
-            PipelineContextEntry::TranscriptItemRef { turn_id, item_id } => {
+            PipelineContextEntry::TranscriptItem { turn_id, item_id } => {
                 ContextEntry::TranscriptItem {
                     turn_id: *turn_id,
                     item_id: *item_id,
                 }
             }
-            PipelineContextEntry::TranscriptRangeRef { from, to } => {
+            PipelineContextEntry::TranscriptRange { from, to } => {
                 ContextEntry::ContextSummary(format!("transcript range {}..{}", from, to))
             }
-            PipelineContextEntry::ContextSummaryRef { summary_id } => {
+            PipelineContextEntry::ContextSummary { summary_id } => {
                 ContextEntry::ContextSummary(summary_id.clone())
             }
-            PipelineContextEntry::ArtifactRef { artifact_id } => ContextEntry::InstructionFile {
+            PipelineContextEntry::Artifact { artifact_id } => ContextEntry::InstructionFile {
                 path: artifact_id.clone(),
                 content: String::new(),
             },

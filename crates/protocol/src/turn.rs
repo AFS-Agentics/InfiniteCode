@@ -75,7 +75,7 @@ impl<'de> Deserialize<'de> for InputItem {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum InteractionMode {
+pub enum CollaborationMode {
     #[default]
     Build,
     Plan,
@@ -90,8 +90,8 @@ pub struct TurnStartParams {
     pub sandbox: Option<String>,
     pub approval_policy: Option<String>,
     pub cwd: Option<PathBuf>,
-    #[serde(default)]
-    pub interaction_mode: InteractionMode,
+    #[serde(default, alias = "interaction_mode")]
+    pub collaboration_mode: CollaborationMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -220,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn turn_start_params_default_to_build_interaction_mode() {
+    fn turn_start_params_default_to_build_collaboration_mode() {
         let json = serde_json::json!({
             "session_id": SessionId::new(),
             "input": [{ "type": "text", "text": "hello" }],
@@ -233,7 +233,25 @@ mod tests {
 
         let restored: TurnStartParams = serde_json::from_value(json).expect("deserialize");
 
-        assert_eq!(restored.interaction_mode, InteractionMode::Build);
+        assert_eq!(restored.collaboration_mode, CollaborationMode::Build);
+    }
+
+    #[test]
+    fn turn_start_params_accept_legacy_interaction_mode_alias() {
+        let json = serde_json::json!({
+            "session_id": SessionId::new(),
+            "input": [{ "type": "text", "text": "hello" }],
+            "model": null,
+            "thinking": null,
+            "sandbox": null,
+            "approval_policy": null,
+            "cwd": null,
+            "interaction_mode": "plan"
+        });
+
+        let restored: TurnStartParams = serde_json::from_value(json).expect("deserialize");
+
+        assert_eq!(restored.collaboration_mode, CollaborationMode::Plan);
     }
 
     #[test]

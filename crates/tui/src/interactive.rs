@@ -922,17 +922,17 @@ fn handle_app_command(
             model,
             thinking,
             approval_policy,
-            interaction_mode,
+            collaboration_mode,
             ..
         } => {
             if let Some(model) = model {
                 worker.set_model(model.clone())?;
             }
             worker.set_thinking(thinking.clone())?;
-            worker.submit_input_with_interaction_mode(
+            worker.submit_input_with_collaboration_mode(
                 input.clone(),
                 approval_policy.clone(),
-                *interaction_mode,
+                *collaboration_mode,
             )?;
         }
         AppCommand::ExecuteShellCommand { command } => {

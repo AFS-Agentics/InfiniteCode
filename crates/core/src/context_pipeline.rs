@@ -51,19 +51,18 @@ impl Default for ContextAssembler {
 impl ContextAssembler {
     /// Assemble context for a model invocation (L3-BEH-CORE-005 §1).
     ///
-    /// 9-step assembly: base instructions → tool schemas → prior transcript →
-    /// metadata instructions → project instructions → skills/memory →
-    /// goal context → change signal → current user input.
+    /// Assembly order: base instructions → prior transcript → metadata
+    /// instructions → project instructions → skills/memory → goal context →
+    /// change signal → current user input.
     #[allow(clippy::too_many_arguments)]
     pub fn assemble(
         &self,
         session_id: SessionId,
         turn_id: TurnId,
         base_instructions: &str,
-        tool_schemas: &[(String, serde_json::Value)],
         prior_transcript: &[(TurnId, ItemId)],
         persona: Option<&str>,
-        interaction_mode: Option<&str>,
+        collaboration_mode: Option<&str>,
         project_instructions: &[String],
         active_skills: &[String],
         memory_context: Option<&str>,
@@ -75,84 +74,76 @@ impl ContextAssembler {
         let context_id = format!("ctx-{}", uuid::Uuid::new_v4());
 
         // Step 1: Base instructions (immutable prefix)
-        entries.push(ContextEntry::InstructionRef {
+        entries.push(ContextEntry::Instruction {
             source: InstructionSource::BaseInstruction,
             content: base_instructions.to_string(),
         });
 
-        // Step 2: Tool schemas
-        for (name, schema) in tool_schemas {
-            entries.push(ContextEntry::ToolSchema {
-                name: name.clone(),
-                schema: schema.clone(),
-            });
-        }
-
-        // Step 3: Prior transcript references
+        // Step 2: Prior transcript references
         for (turn_id, item_id) in prior_transcript {
-            entries.push(ContextEntry::TranscriptItemRef {
+            entries.push(ContextEntry::TranscriptItem {
                 turn_id: *turn_id,
                 item_id: *item_id,
             });
         }
 
-        // Step 4: Metadata-derived instructions (persona, interaction mode)
+        // Step 3: Metadata-derived instructions (persona, collaboration mode)
         if let Some(persona_text) = persona {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::Persona("default".into()),
                 content: persona_text.to_string(),
             });
         }
-        if let Some(mode_text) = interaction_mode {
-            entries.push(ContextEntry::InstructionRef {
-                source: InstructionSource::InteractionMode("default".into()),
+        if let Some(mode_text) = collaboration_mode {
+            entries.push(ContextEntry::Instruction {
+                source: InstructionSource::CollaborationMode("default".into()),
                 content: mode_text.to_string(),
             });
         }
 
-        // Step 5: Project instructions
+        // Step 4: Project instructions
         for instr in project_instructions {
             if instr.len() <= self.config.max_total_instruction_bytes {
-                entries.push(ContextEntry::InstructionRef {
+                entries.push(ContextEntry::Instruction {
                     source: InstructionSource::ProjectInstruction(std::path::PathBuf::from(".")),
                     content: instr.clone(),
                 });
             }
         }
 
-        // Step 6: Activated skills & persistent memory
+        // Step 5: Activated skills & persistent memory
         for skill in active_skills {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::SkillActivation(skill.clone()),
                 content: format!("Active skill: {}", skill),
             });
         }
         if let Some(mem) = memory_context {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::MemoryContext,
                 content: mem.to_string(),
             });
         }
 
-        // Step 7: Hidden goal context
+        // Step 6: Hidden goal context
         if let Some(goal) = goal_context {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::HiddenGoalContext,
                 content: goal.to_string(),
             });
         }
 
-        // Step 8: Change signal
+        // Step 7: Change signal
         if let Some(signal) = change_signal {
-            entries.push(ContextEntry::InstructionRef {
+            entries.push(ContextEntry::Instruction {
                 source: InstructionSource::ChangeSignal,
                 content: signal.to_string(),
             });
         }
 
-        // Step 9: Current user input
+        // Step 8: Current user input
         if let Some((uturn_id, item_id)) = user_input {
-            entries.push(ContextEntry::TranscriptItemRef {
+            entries.push(ContextEntry::TranscriptItem {
                 turn_id: uturn_id,
                 item_id,
             });
@@ -162,10 +153,7 @@ impl ContextAssembler {
         let token_estimate = entries
             .iter()
             .map(|e| match e {
-                ContextEntry::InstructionRef { content, .. } => content.len() as u64 / 4,
-                ContextEntry::ToolSchema { name, schema } => {
-                    (name.len() + schema.to_string().len()) as u64 / 4
-                }
+                ContextEntry::Instruction { content, .. } => content.len() as u64 / 4,
                 _ => 0,
             })
             .sum();
@@ -200,26 +188,22 @@ pub struct AssembledContext {
 /// One entry in the assembled context.
 #[derive(Debug, Clone)]
 pub enum ContextEntry {
-    InstructionRef {
+    Instruction {
         source: InstructionSource,
         content: String,
     },
-    ToolSchema {
-        name: String,
-        schema: serde_json::Value,
-    },
-    TranscriptItemRef {
+    TranscriptItem {
         turn_id: TurnId,
         item_id: ItemId,
     },
-    TranscriptRangeRef {
+    TranscriptRange {
         from: TurnId,
         to: TurnId,
     },
-    ContextSummaryRef {
+    ContextSummary {
         summary_id: String,
     },
-    ArtifactRef {
+    Artifact {
         artifact_id: String,
     },
 }
@@ -231,7 +215,7 @@ pub enum InstructionSource {
     BaseInstruction,
     AgentMode(String),
     Persona(String),
-    InteractionMode(String),
+    CollaborationMode(String),
     ProjectInstruction(std::path::PathBuf),
     GlobalInstruction(std::path::PathBuf),
     SkillActivation(String),
@@ -433,7 +417,7 @@ impl ContextNormalizer {
         // Build messages from context entries
         for entry in &context.entries {
             match entry {
-                ContextEntry::InstructionRef { source, content } => {
+                ContextEntry::Instruction { source, content } => {
                     let msg = match source {
                         InstructionSource::BaseInstruction => {
                             ProviderMessage::System(content.clone())
@@ -450,10 +434,7 @@ impl ContextNormalizer {
                     };
                     messages.push(msg);
                 }
-                ContextEntry::ToolSchema { .. } => {
-                    // Tool schemas are rendered inline by the caller
-                }
-                ContextEntry::TranscriptItemRef { turn_id, item_id } => {
+                ContextEntry::TranscriptItem { turn_id, item_id } => {
                     // Find matching transcript content
                     if let Some((_, _, content)) = transcript_items
                         .iter()
@@ -661,7 +642,7 @@ mod tests {
             InstructionSource::BaseInstruction,
             InstructionSource::AgentMode("code-review".into()),
             InstructionSource::Persona("senior-engineer".into()),
-            InstructionSource::InteractionMode("plan".into()),
+            InstructionSource::CollaborationMode("plan".into()),
             InstructionSource::ProjectInstruction("/tmp/proj".into()),
             InstructionSource::GlobalInstruction("/home/user".into()),
             InstructionSource::SkillActivation("my-skill".into()),
@@ -815,21 +796,15 @@ mod tests {
             context_id: "ctx-1".into(),
             session_id: SessionId::new(),
             created_for_turn: TurnId::new(),
-            entries: vec![
-                ContextEntry::InstructionRef {
-                    source: InstructionSource::BaseInstruction,
-                    content: "You are helpful.".into(),
-                },
-                ContextEntry::ToolSchema {
-                    name: "read".into(),
-                    schema: serde_json::json!({}),
-                },
-            ],
+            entries: vec![ContextEntry::Instruction {
+                source: InstructionSource::BaseInstruction,
+                content: "You are helpful.".into(),
+            }],
             token_estimate: 1000,
             immutable_prefix_hash: "abc123".into(),
             created_at: chrono::Utc::now(),
         };
-        assert_eq!(ctx.entries.len(), 2);
+        assert_eq!(ctx.entries.len(), 1);
         assert_eq!(ctx.token_estimate, 1000);
     }
 
@@ -842,7 +817,6 @@ mod tests {
             SessionId::new(),
             TurnId::new(),
             "You are helpful.",
-            &[],
             &[],
             None,
             None,
@@ -859,14 +833,12 @@ mod tests {
     }
 
     #[test]
-    fn assemble_includes_tool_schemas() {
+    fn assemble_excludes_tool_schemas_from_context() {
         let assembler = ContextAssembler::default();
-        let tools = vec![("read".into(), serde_json::json!({"type": "object"}))];
         let ctx = assembler.assemble(
             SessionId::new(),
             TurnId::new(),
             "base",
-            &tools,
             &[],
             None,
             None,
@@ -877,12 +849,14 @@ mod tests {
             None,
             None,
         );
-        let tool_count = ctx
-            .entries
-            .iter()
-            .filter(|e| matches!(e, ContextEntry::ToolSchema { .. }))
-            .count();
-        assert_eq!(tool_count, 1);
+        assert_eq!(ctx.entries.len(), 1);
+        assert!(matches!(
+            &ctx.entries[0],
+            ContextEntry::Instruction {
+                source: InstructionSource::BaseInstruction,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -894,7 +868,6 @@ mod tests {
             SessionId::new(),
             turn_id,
             "base",
-            &[],
             &[],
             None,
             None,
@@ -908,7 +881,7 @@ mod tests {
         let has_input = ctx
             .entries
             .iter()
-            .any(|e| matches!(e, ContextEntry::TranscriptItemRef { .. }));
+            .any(|e| matches!(e, ContextEntry::TranscriptItem { .. }));
         assert!(has_input);
     }
 
@@ -993,7 +966,7 @@ mod tests {
             context_id: "test".into(),
             session_id: SessionId::new(),
             created_for_turn: TurnId::new(),
-            entries: vec![ContextEntry::InstructionRef {
+            entries: vec![ContextEntry::Instruction {
                 source: InstructionSource::BaseInstruction,
                 content: "You are helpful.".into(),
             }],

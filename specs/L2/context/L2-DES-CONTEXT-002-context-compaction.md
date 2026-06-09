@@ -164,7 +164,7 @@ The active context snapshot after compaction should reference:
 ```text
 [Immutable prefix — same as before compaction]
 [Metadata-derived: persona instructions (current)]
-[Metadata-derived: interaction-mode instructions (current)]
+[Metadata-derived: collaboration-mode instructions (current)]
 [Summary record — replacing compacted eligible turns]
 [Preserved recent turns — uncompressed, as full transcript items]
 [Consolidated change-signal message, if applicable]

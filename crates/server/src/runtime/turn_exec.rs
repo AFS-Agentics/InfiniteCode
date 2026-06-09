@@ -51,6 +51,16 @@ struct ToolStartItem {
     payload: serde_json::Value,
 }
 
+pub(super) struct ExecuteTurnRequest {
+    pub(super) session_id: SessionId,
+    pub(super) turn: TurnMetadata,
+    pub(super) turn_config: TurnConfig,
+    pub(super) display_input: String,
+    pub(super) input: String,
+    pub(super) collaboration_mode: devo_protocol::CollaborationMode,
+    pub(super) input_mode: TurnInputMode,
+}
+
 #[derive(Clone)]
 struct BoundedQueryEventSender {
     tx: std_mpsc::SyncSender<QueryEvent>,
@@ -816,11 +826,15 @@ fn command_actions_from_tool_result(
     }
 }
 
-fn interaction_mode_from_pending_metadata(
+fn collaboration_mode_from_pending_metadata(
     metadata: Option<&serde_json::Value>,
-) -> devo_protocol::InteractionMode {
+) -> devo_protocol::CollaborationMode {
     metadata
-        .and_then(|metadata| metadata.get("interaction_mode"))
+        .and_then(|metadata| {
+            metadata
+                .get("collaboration_mode")
+                .or_else(|| metadata.get("interaction_mode"))
+        })
         .cloned()
         .and_then(|value| serde_json::from_value(value).ok())
         .unwrap_or_default()
@@ -922,7 +936,7 @@ impl ServerRuntime {
                 turn_id: Some(turn.turn_id.to_string()),
                 cwd,
                 agent_scope: ToolAgentScope::Parent,
-                interaction_mode: devo_protocol::InteractionMode::Build,
+                collaboration_mode: devo_protocol::CollaborationMode::Build,
                 agent_coordinator: None,
             },
         );
@@ -1025,31 +1039,34 @@ impl ServerRuntime {
 
     /// Execute one turn end-to-end, including streaming query events,
     /// persisting turn state, and draining queued follow-up inputs.
-    pub(super) async fn execute_turn(
-        self: Arc<Self>,
-        session_id: SessionId,
-        turn: TurnMetadata,
-        turn_config: TurnConfig,
-        display_input: String,
-        input: String,
-        interaction_mode: devo_protocol::InteractionMode,
-    ) {
+    pub(super) async fn execute_turn(self: Arc<Self>, request: ExecuteTurnRequest) {
+        let ExecuteTurnRequest {
+            session_id,
+            turn,
+            turn_config,
+            display_input,
+            input,
+            collaboration_mode,
+            input_mode,
+        } = request;
         if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
             session_arc.lock().await.turn_approval_cache =
                 crate::execution::ApprovalGrantCache::default();
         }
-        // Record the user's message immediately so the UI can show it even if
-        // the model call or event stream takes a moment to start.
-        self.emit_turn_item(
-            session_id,
-            turn.turn_id,
-            ItemKind::UserMessage,
-            TurnItem::UserMessage(TextItem {
-                text: display_input.clone(),
-            }),
-            serde_json::json!({ "title": "You", "text": display_input.clone() }),
-        )
-        .await;
+        if input_mode.emits_user_message() {
+            // Record the user's message immediately so the UI can show it even if
+            // the model call or event stream takes a moment to start.
+            self.emit_turn_item(
+                session_id,
+                turn.turn_id,
+                ItemKind::UserMessage,
+                TurnItem::UserMessage(TextItem {
+                    text: display_input.clone(),
+                }),
+                serde_json::json!({ "title": "You", "text": display_input.clone() }),
+            )
+            .await;
+        }
 
         let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() else {
             return;
@@ -1080,8 +1097,8 @@ impl ServerRuntime {
             let mut reasoning_text = String::new();
             let mut tool_names_by_id = HashMap::new();
             let mut pending_tool_calls: HashMap<String, PendingToolCall> = HashMap::new();
-            let mut proposed_plan_parser = (interaction_mode
-                == devo_protocol::InteractionMode::Plan)
+            let mut proposed_plan_parser = (collaboration_mode
+                == devo_protocol::CollaborationMode::Plan)
                 .then(ProposedPlanParser::default);
             let mut proposed_plan_item = ProposedPlanStreamItem::default();
             let mut proposed_plan_leading_normal = String::new();
@@ -1856,15 +1873,26 @@ impl ServerRuntime {
                 };
                 (Arc::clone(&session.core_session), agent_scope)
             };
-            let goal_context = {
-                let stores = self.goal_stores.lock().await;
-                stores
-                    .get(&session_id)
-                    .and_then(GoalStore::get)
-                    .and_then(crate::goal::Goal::continuation_prompt)
+            let turn_goal = match &input_mode {
+                TurnInputMode::VisibleUserMessage => {
+                    let stores = self.goal_stores.lock().await;
+                    stores
+                        .get(&session_id)
+                        .and_then(GoalStore::get)
+                        .map(crate::goal::Goal::to_thread_goal)
+                }
+                TurnInputMode::HiddenGoalContinuation { goal } => Some(goal.clone()),
             };
             let mut core_session = core_session.lock().await;
-            core_session.push_message(Message::user(input.clone()));
+            core_session.collaboration_mode = collaboration_mode;
+            if let Some(goal) = turn_goal {
+                core_session.set_active_goal(goal);
+            } else {
+                core_session.clear_active_goal();
+            }
+            if input_mode.emits_user_message() {
+                core_session.push_message(Message::user(input.clone()));
+            }
             let event_callback_tx = event_tx.clone();
             let callback = std::sync::Arc::new(move |event: QueryEvent| {
                 event_callback_tx.send(event);
@@ -1892,7 +1920,7 @@ impl ServerRuntime {
                     turn_id: Some(turn_for_events.turn_id.to_string()),
                     cwd: core_session.cwd.clone(),
                     agent_scope,
-                    interaction_mode,
+                    collaboration_mode,
                     agent_coordinator: Some(Arc::clone(&self) as Arc<dyn AgentToolCoordinator>),
                 },
                 ToolExecutionOptions {
@@ -1900,7 +1928,7 @@ impl ServerRuntime {
                     ..ToolExecutionOptions::default()
                 },
             );
-            let result = query_with_interaction_mode(
+            let result = query(
                 &mut core_session,
                 &turn_config,
                 self.deps
@@ -1908,8 +1936,6 @@ impl ServerRuntime {
                 registry,
                 &runtime,
                 Some(callback),
-                interaction_mode,
-                goal_context.as_deref(),
             )
             .await;
             (
@@ -2084,7 +2110,7 @@ impl ServerRuntime {
         .await;
 
         // After the turn completes, check for queued inputs and start the next turn.
-        let (display_input, input_text, queued_interaction_mode) = {
+        let queued_input = {
             let session_arc = match self.sessions.lock().await.get(&session_id).cloned() {
                 Some(s) => s,
                 None => return,
@@ -2104,11 +2130,11 @@ impl ServerRuntime {
                     kind: devo_core::PendingInputKind::UserText { text },
                     metadata,
                     ..
-                }) => (
+                }) => Some((
                     text.clone(),
                     text,
-                    interaction_mode_from_pending_metadata(metadata.as_ref()),
-                ),
+                    collaboration_mode_from_pending_metadata(metadata.as_ref()),
+                )),
                 Some(devo_core::PendingInputItem {
                     kind:
                         devo_core::PendingInputKind::UserInput {
@@ -2118,13 +2144,17 @@ impl ServerRuntime {
                         },
                     metadata,
                     ..
-                }) => (
+                }) => Some((
                     display_text,
                     prompt_text,
-                    interaction_mode_from_pending_metadata(metadata.as_ref()),
-                ),
-                _ => return,
+                    collaboration_mode_from_pending_metadata(metadata.as_ref()),
+                )),
+                _ => None,
             }
+        };
+        let Some((display_input, input_text, queued_collaboration_mode)) = queued_input else {
+            self.maybe_start_goal_continuation_turn(session_id).await;
+            return;
         };
         // Update clients before starting the next turn so dequeued input is
         // removed from any pending queue display.
@@ -2190,14 +2220,15 @@ impl ServerRuntime {
         .await;
         // Chain directly instead of spawning so this drain loop can keep
         // consuming queued input until the queue is empty.
-        Box::pin(Arc::clone(&self).execute_turn(
+        Box::pin(Arc::clone(&self).execute_turn(ExecuteTurnRequest {
             session_id,
             turn,
             turn_config,
             display_input,
-            input_text,
-            queued_interaction_mode,
-        ))
+            input: input_text,
+            collaboration_mode: queued_collaboration_mode,
+            input_mode: TurnInputMode::VisibleUserMessage,
+        }))
         .await;
     }
 
@@ -2206,7 +2237,7 @@ impl ServerRuntime {
     /// its response immediately.
     pub(super) async fn spawn_next_turn_from_queue(self: &Arc<Self>, session_id: SessionId) {
         // Pop one queued input.
-        let (display_input, input_text, queued_interaction_mode) = {
+        let (display_input, input_text, queued_collaboration_mode) = {
             let session_arc = match self.sessions.lock().await.get(&session_id).cloned() {
                 Some(s) => s,
                 None => return,
@@ -2226,7 +2257,7 @@ impl ServerRuntime {
                 }) => (
                     text.clone(),
                     text,
-                    interaction_mode_from_pending_metadata(metadata.as_ref()),
+                    collaboration_mode_from_pending_metadata(metadata.as_ref()),
                 ),
                 Some(devo_core::PendingInputItem {
                     kind:
@@ -2240,7 +2271,7 @@ impl ServerRuntime {
                 }) => (
                     display_text,
                     prompt_text,
-                    interaction_mode_from_pending_metadata(metadata.as_ref()),
+                    collaboration_mode_from_pending_metadata(metadata.as_ref()),
                 ),
                 _ => return,
             }
@@ -2312,14 +2343,15 @@ impl ServerRuntime {
         let runtime = Arc::clone(self);
         tokio::spawn(async move {
             runtime
-                .execute_turn(
+                .execute_turn(ExecuteTurnRequest {
                     session_id,
                     turn,
                     turn_config,
                     display_input,
-                    input_text,
-                    queued_interaction_mode,
-                )
+                    input: input_text,
+                    collaboration_mode: queued_collaboration_mode,
+                    input_mode: TurnInputMode::VisibleUserMessage,
+                })
                 .await;
         });
     }

@@ -79,7 +79,7 @@ pub(crate) async fn run_prompt(
             turn_id: None,
             cwd: cwd.clone(),
             agent_scope: devo_core::tools::ToolAgentScope::Parent,
-            interaction_mode: devo_protocol::InteractionMode::Build,
+            collaboration_mode: devo_protocol::CollaborationMode::Build,
             agent_coordinator: None,
         },
     );

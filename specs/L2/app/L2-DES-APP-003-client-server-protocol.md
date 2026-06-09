@@ -157,7 +157,7 @@ Representative client-to-server JSON-RPC request methods and response results:
 | `session/export` | Export session history and allowed related data for user data portability. | `session_id`, `include_inherited_history`, `redaction_level`, `format`. | `export_id`, `accepted`, `status`, optional `download_ref`, `latest_sequence`. |
 | `session/subscribe` | Start receiving ordered events for a session from a given sequence or from the current state. | `session_id`, `from_sequence`, `event_filter`, `projection`. | `subscription_id`, optional `session_snapshot`, `next_sequence`. |
 | `session/unsubscribe` | Stop a previous session subscription. | `subscription_id`, `session_id`. | `subscription_id`, `closed`. |
-| `turn/start` | Submit user input, content parts, and mentions for agent execution. If a turn is active, the client must state whether the message is normal, steer, or queue. | `session_id` or `new_session`, `submission_mode`, `active_turn_id` where applicable, `content_parts`, `mentions`, `client_message_id`, `interaction_mode` defaulting to `build`, optional `mode_overrides`. | `session_id`, `turn_id` or `queue_item_id` or `steer_item_id`, `accepted`, `classification`, `latest_sequence`. |
+| `turn/start` | Submit user input, content parts, and mentions for agent execution. If a turn is active, the client must state whether the message is normal, steer, or queue. | `session_id` or `new_session`, `submission_mode`, `active_turn_id` where applicable, `content_parts`, `mentions`, `client_message_id`, `collaboration_mode` defaulting to `build`, optional `mode_overrides`. | `session_id`, `turn_id` or `queue_item_id` or `steer_item_id`, `accepted`, `classification`, `latest_sequence`. |
 | `command/exec` | Start a client-owned PTY process for Shell Mode or one-shot shell execution. | optional `session_id`, `process_id`, `program`, optional `cwd`, optional `size`. `cwd` is required when `session_id` is omitted. | `process_id`. |
 | `command/exec/write` | Write base64-encoded stdin bytes to a running client-owned PTY process. | optional `session_id`, `process_id`, optional `delta_base64`, `close_stdin`. | empty success. |
 | `command/exec/resize` | Resize a running PTY process. | optional `session_id`, `process_id`, `size`. | empty success. |
@@ -190,13 +190,13 @@ Request methods should return explicit success or structured error results.
 
 ## Turn Input Mode Protocol Rules
 
-The `turn/start` request carries the client-selected `interaction_mode` for the submitted turn. Missing `interaction_mode` must be interpreted as `build` so older clients continue to submit normal build turns.
+The `turn/start` request carries the client-selected `collaboration_mode` for the submitted turn. Missing `collaboration_mode` must be interpreted as `build` so older clients continue to submit normal build turns.
 
 Rules:
 
-- `build` is the default interaction mode and does not add mode-specific context.
+- `build` is the default collaboration mode and does not add mode-specific context.
 - `plan` marks the submitted turn as Plan Mode. In the v1 protocol/runtime integration, the server appends hidden model context instructing the agent not to modify files or perform implementation work. This is prompt-level behavior, not a hard per-tool runtime gate.
-- Queued user turns must preserve their submitted interaction mode when they later start.
+- Queued user turns must preserve their submitted collaboration mode when they later start.
 - Shell Mode commands are not encoded as `turn/start` user text.
 - The TUI starts each Shell Mode submission through a one-shot `command/exec` process and receives output through `command/exec/outputDelta`.
 - `command/exec` returns a start acknowledgement immediately. Process completion is reported by `command/exec/exited`.
@@ -559,4 +559,4 @@ If a client disconnects, the server continues owning active work subject to user
 | 1 | 2026-05-25 | Assistant | Refinement | Linked approval protocol behavior to `L1-REQ-APP-003` application safety. |
 | 1 | 2026-05-26 | Assistant | Refinement | Added parallel tool parent/child event identity fields for `multi_tool_use`. |
 | 2 | 2026-05-27 | Human | Refinement | Changed JSON-RPC method names from dot separators to slash separators and aligned server notification method names with existing protocol event names where available. |
-| 2 | 2026-06-08 | Assistant | Refinement | Added `interaction_mode` to `turn/start`, defined `command/exec` dynamic PTY process control for Shell Mode, allowed sessionless startup shell commands with explicit `cwd`, and retained `turn/shell_command` as a legacy compatibility path. |
+| 2 | 2026-06-08 | Assistant | Refinement | Added `collaboration_mode` to `turn/start`, defined `command/exec` dynamic PTY process control for Shell Mode, allowed sessionless startup shell commands with explicit `cwd`, and retained `turn/shell_command` as a legacy compatibility path. |

@@ -42,9 +42,9 @@ use devo_protocol::ThreadGoalStatus;
 use devo_server::ApprovalDecisionPayload;
 use devo_server::ApprovalRequestPayload;
 use devo_server::ApprovalRespondParams;
+use devo_server::CollaborationMode;
 use devo_server::CommandExecutionPayload;
 use devo_server::InputItem;
-use devo_server::InteractionMode;
 use devo_server::ItemEnvelope;
 use devo_server::ItemEventPayload;
 use devo_server::ItemKind;
@@ -126,7 +126,7 @@ enum OperationCommand {
     SubmitInput {
         input: Vec<InputItem>,
         approval_policy: Option<String>,
-        interaction_mode: InteractionMode,
+        collaboration_mode: CollaborationMode,
     },
     ExecuteShellCommand {
         command: String,
@@ -314,20 +314,20 @@ impl QueryWorkerHandle {
         input: Vec<InputItem>,
         approval_policy: Option<String>,
     ) -> Result<()> {
-        self.submit_input_with_interaction_mode(input, approval_policy, InteractionMode::Build)
+        self.submit_input_with_collaboration_mode(input, approval_policy, CollaborationMode::Build)
     }
 
-    pub(crate) fn submit_input_with_interaction_mode(
+    pub(crate) fn submit_input_with_collaboration_mode(
         &self,
         input: Vec<InputItem>,
         approval_policy: Option<String>,
-        interaction_mode: InteractionMode,
+        collaboration_mode: CollaborationMode,
     ) -> Result<()> {
         self.command_tx
             .send(OperationCommand::SubmitInput {
                 input,
                 approval_policy,
-                interaction_mode,
+                collaboration_mode,
             })
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
     }
@@ -748,7 +748,7 @@ async fn run_worker_inner(
                     Some(OperationCommand::SubmitInput {
                         input,
                         approval_policy,
-                        interaction_mode,
+                        collaboration_mode,
                     }) => {
                         let session_start = ensure_session_started(
                             &mut client,
@@ -784,7 +784,7 @@ async fn run_worker_inner(
                             sandbox: None,
                             approval_policy,
                             cwd: None,
-                            interaction_mode,
+                            collaboration_mode,
                         }).await;
                         match start_result {
                             Ok(result) => {
