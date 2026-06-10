@@ -574,8 +574,19 @@ pub async fn query(
         info!("starting turn");
 
         // Build model request from the session-locked prefix.
-        let request_system =
-            Some(session_context.build_system_prompt()).filter(|system| !system.trim().is_empty());
+        let request_system = {
+            let mut system = session_context.build_system_prompt();
+            if !matches!(
+                &turn_config.web_search,
+                devo_config::ResolvedWebSearchConfig::Disabled
+            ) {
+                if !system.trim().is_empty() {
+                    system.push_str("\n\n");
+                }
+                system.push_str(&crate::tools::websearch_prompt::web_search_prompt());
+            }
+            Some(system).filter(|system| !system.trim().is_empty())
+        };
 
         // resolve thinking request parameter
         let ResolvedThinkingRequest {
@@ -1867,6 +1878,7 @@ mod tests {
         let mode_prompt = crate::collaboration_mode_prompts::mode_introductions_prompt();
         assert!(system.contains("base system"));
         assert!(system.contains(&mode_prompt));
+        assert!(system.contains("Sources:"));
         assert!(
             !request
                 .system
@@ -1897,6 +1909,56 @@ mod tests {
                 .messages
                 .iter()
                 .any(|message| message_contains(message, "<context_changes>"))
+        );
+    }
+
+    #[tokio::test]
+    async fn query_adds_web_search_prompt_for_provider_hosted_search() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
+            requests: Arc::clone(&requests),
+        });
+        let registry = Arc::new(ToolRegistry::new());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("search current docs"));
+        let mut turn_config = TurnConfig::new(
+            Model {
+                base_instructions: "base system".to_string(),
+                ..Model::default()
+            },
+            None,
+        );
+        turn_config.web_search = devo_config::ResolvedWebSearchConfig::Provider;
+
+        query(
+            &mut session,
+            &turn_config,
+            provider,
+            registry,
+            &runtime,
+            None,
+        )
+        .await
+        .expect("query should complete");
+
+        let captured = requests.lock().expect("lock requests");
+        assert_eq!(captured.len(), 1);
+        let request = &captured[0];
+        let system = request.system.as_deref().expect("system prompt");
+
+        assert!(system.contains("base system"));
+        assert!(system.contains("Sources:"));
+        assert!(system.contains("The current month is "));
+        assert!(matches!(
+            request.hosted_tools.as_slice(),
+            [devo_protocol::HostedToolDefinition::WebSearch(_)]
+        ));
+        assert!(
+            request
+                .tools
+                .as_ref()
+                .is_none_or(|tools| tools.iter().all(|tool| tool.name != "web_search"))
         );
     }
 

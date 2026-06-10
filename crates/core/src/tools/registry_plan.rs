@@ -5,6 +5,7 @@ use crate::json_schema::JsonSchema;
 use crate::tool_spec::{
     ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, ToolPreparationFeedback, ToolSpec,
 };
+use crate::tools::websearch_prompt::web_search_prompt;
 use devo_config::AppConfig;
 
 const BASH_DESCRIPTION: &str = include_str!("bash.txt");
@@ -800,7 +801,7 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
         plan.push(
             ToolSpec {
                 name: "web_search".to_string(),
-                description: "Search the web for information.".to_string(),
+                description: web_search_prompt(),
                 input_schema: websearch_schema(),
                 output_mode: ToolOutputMode::Text,
                 execution_mode: ToolExecutionMode::ReadOnly,
@@ -1021,6 +1022,12 @@ mod tests {
             .collect();
         assert!(local_spec_names.contains(&"web_search"));
         assert!(!local_spec_names.contains(&"websearch"));
+        let web_search_spec = local_plan
+            .specs
+            .iter()
+            .find(|spec| spec.name == "web_search")
+            .expect("web_search spec");
+        assert!(web_search_spec.description.contains("Sources:"));
     }
 
     #[test]

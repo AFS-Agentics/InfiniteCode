@@ -10,6 +10,7 @@ use crate::contracts::{
 use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
 use crate::tool_spec::{ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, ToolSpec};
+use crate::tools::websearch_prompt::web_search_prompt;
 
 const LOCAL_CONFIG_KEY: &str = "__devo_local_web_search";
 const DEFAULT_EXA_BASE_URL: &str = "https://api.exa.ai/search";
@@ -31,7 +32,7 @@ impl WebSearchHandler {
         Self {
             spec: ToolSpec {
                 name: "web_search".into(),
-                description: "Search the web using the configured local search provider.".into(),
+                description: web_search_prompt(),
                 input_schema: JsonSchema::object(
                     std::collections::BTreeMap::from([(
                         "query".to_string(),
@@ -279,9 +280,10 @@ fn format_results(query: &str, results: impl IntoIterator<Item = SearchResultLin
         let title = result
             .title
             .unwrap_or_else(|| "Untitled result".to_string());
-        output.push_str(&format!("\n{}. {title}\n", index + 1));
         if let Some(url) = result.url.filter(|url| !url.trim().is_empty()) {
-            output.push_str(&format!("URL: {}\n", url.trim()));
+            output.push_str(&format!("\n{}. [{title}]({})\n", index + 1, url.trim()));
+        } else {
+            output.push_str(&format!("\n{}. {title}\n", index + 1));
         }
         if let Some(snippet) = result.snippet.filter(|snippet| !snippet.trim().is_empty()) {
             output.push_str("Snippet: ");
@@ -329,7 +331,7 @@ mod tests {
 
         assert_eq!(
             text,
-            "Search results for: rust async\n\n1. Async Rust\nURL: https://example.com/rust\nSnippet: A concise summary.\n"
+            "Search results for: rust async\n\n1. [Async Rust](https://example.com/rust)\nSnippet: A concise summary.\n"
         );
     }
 
@@ -351,8 +353,16 @@ mod tests {
 
         assert_eq!(
             text,
-            "Search results for: search api\n\n1. Search API\nURL: https://example.com/search\nSnippet: Result content.\n\nAnswer:\nShort answer."
+            "Search results for: search api\n\n1. [Search API](https://example.com/search)\nSnippet: Result content.\n\nAnswer:\nShort answer."
         );
+    }
+
+    #[test]
+    fn web_search_handler_description_uses_sources_prompt() {
+        let handler = WebSearchHandler::new();
+
+        assert!(handler.spec().description.contains("Sources:"));
+        assert!(handler.spec().description.contains("The current month is "));
     }
 
     #[tokio::test]
@@ -383,7 +393,7 @@ mod tests {
 
         assert_eq!(
             text,
-            "Search results for: who is Leo Messi?\n\n1. Lionel Messi\nURL: https://example.com/messi\nSnippet: Lionel Messi is an Argentine footballer.\n"
+            "Search results for: who is Leo Messi?\n\n1. [Lionel Messi](https://example.com/messi)\nSnippet: Lionel Messi is an Argentine footballer.\n"
         );
         assert_eq!(
             request.headers.lines().next(),
@@ -439,7 +449,7 @@ mod tests {
             .expect("Exa live search should succeed");
 
         assert!(text.contains("Search results for: Rust programming language official website"));
-        assert!(text.contains("URL:"));
+        assert!(text.contains("]("));
     }
 
     #[tokio::test]
@@ -461,7 +471,7 @@ mod tests {
             .expect("Tavily live search should succeed");
 
         assert!(text.contains("Search results for: who is Leo Messi?"));
-        assert!(text.contains("URL:"));
+        assert!(text.contains("]("));
     }
 
     struct CapturedHttpRequest {
