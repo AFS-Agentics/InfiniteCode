@@ -6,12 +6,26 @@ use serde::Serialize;
 use crate::SessionId;
 use crate::TurnId;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentToolPolicy {
+    #[default]
+    Inherit,
+    DenyAll,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpawnAgentParams {
     pub session_id: SessionId,
     pub message: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fork_turns: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_turns: Option<u32>,
+    #[serde(default)]
+    pub tool_policy: AgentToolPolicy,
+    #[serde(default)]
+    pub ephemeral: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -137,6 +151,9 @@ mod tests {
                 session_id,
                 message: "review this".to_string(),
                 fork_turns: Some("all".to_string()),
+                max_turns: None,
+                tool_policy: AgentToolPolicy::Inherit,
+                ephemeral: false,
             },
             "result": SpawnAgentResult {
                 child_session_id,

@@ -33,6 +33,10 @@ pub(super) struct SessionHeaderParams<'a> {
     pub mascot_frame_index: usize,
 }
 
+pub(super) fn is_web_search_title(title: &str) -> bool {
+    title.starts_with("Web Search(")
+}
+
 impl ChatWidget {
     pub(super) fn is_blank_line(line: &Line<'_>) -> bool {
         line.spans.iter().all(|span| span.content.trim().is_empty())
@@ -160,6 +164,12 @@ impl ChatWidget {
             .strip_prefix("Running ")
             .or_else(|| title.strip_prefix("Ran "))
             .unwrap_or(title);
+        if is_web_search_title(normalized) {
+            return Line::from(Span::styled(
+                normalized.to_string(),
+                Self::tool_text_style(),
+            ));
+        }
         Line::from(vec![
             Span::styled("Running ", Self::tool_status_running_style()),
             Span::styled(normalized.to_string(), Self::tool_text_style()),
@@ -171,6 +181,12 @@ impl ChatWidget {
             .strip_prefix("Running ")
             .or_else(|| title.strip_prefix("Ran "))
             .unwrap_or(title);
+        if is_web_search_title(normalized) {
+            return Line::from(Span::styled(
+                normalized.to_string(),
+                Self::tool_text_style(),
+            ));
+        }
         Line::from(vec![
             Span::styled("Ran ", Self::tool_status_done_style()),
             Span::styled(normalized.to_string(), Self::tool_text_style()),

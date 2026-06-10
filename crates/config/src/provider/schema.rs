@@ -4,6 +4,8 @@ use devo_protocol::ProviderWireApi;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::WebSearchConfig;
+
 pub(crate) const AUTH_CONFIG_VERSION: u32 = 1;
 
 /// The preferred authentication method for the active provider.
@@ -54,6 +56,8 @@ pub struct ProviderVendorConfig {
     pub headers: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub wire_apis: Vec<ProviderWireApi>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_search: Option<WebSearchConfig>,
     #[serde(default = "default_true")]
     pub enabled: bool,
 }
@@ -66,6 +70,7 @@ impl ProviderVendorConfig {
             && self.credential.is_none()
             && self.headers.is_none()
             && self.wire_apis.is_empty()
+            && self.web_search.is_none()
             && self.enabled
     }
 }
@@ -85,6 +90,8 @@ pub struct ModelBindingConfig {
     pub invocation_method: ProviderWireApi,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default_reasoning_effort: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub web_search: Option<WebSearchConfig>,
     #[serde(default = "default_true")]
     pub enabled: bool,
 }
@@ -98,6 +105,7 @@ impl Default for ModelBindingConfig {
             display_name: None,
             invocation_method: default_provider_wire_api(),
             default_reasoning_effort: None,
+            web_search: None,
             enabled: true,
         }
     }
@@ -240,6 +248,9 @@ impl ProviderConfigSection {
             if !overlay_provider.wire_apis.is_empty() {
                 provider.wire_apis = overlay_provider.wire_apis;
             }
+            if overlay_provider.web_search.is_some() {
+                provider.web_search = overlay_provider.web_search;
+            }
             provider.enabled = overlay_provider.enabled;
         }
         for (binding_id, overlay_binding) in overlay.model_bindings {
@@ -259,6 +270,9 @@ impl ProviderConfigSection {
             binding.invocation_method = overlay_binding.invocation_method;
             if overlay_binding.default_reasoning_effort.is_some() {
                 binding.default_reasoning_effort = overlay_binding.default_reasoning_effort;
+            }
+            if overlay_binding.web_search.is_some() {
+                binding.web_search = overlay_binding.web_search;
             }
             binding.enabled = overlay_binding.enabled;
         }

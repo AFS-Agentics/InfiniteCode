@@ -166,7 +166,7 @@ pub fn tool_search_spec() -> ToolSpec {
     ToolSpec {
         name: "ToolSearch".to_string(),
         description: format!(
-            "Searches tool metadata with BM25 and returns matching available tool names. Use natural-language queries, or `select:<name>[,<name>...]` for exact compatibility. Defaults to {TOOL_SEARCH_DEFAULT_LIMIT} results."
+            "Fetches full schema definitions for deferred tools so they can be called.\n\nDeferred tools appear by name in system reminder or available-deferred-tools messages. Until fetched, only the name is known; there is no parameter schema, so the tool cannot be invoked. This tool takes a query, matches it against the deferred tool list, and returns the matched tools' complete schema definitions. Once a tool's schema appears in that result, it is callable exactly like any initially available tool.\n\nQuery forms:\n- `select:Read,Edit,Grep` - fetch these exact tools by name\n- `notebook jupyter` - keyword search, up to the best matching results\n- `+slack send` - require `slack` in the name and rank by remaining terms\n\nDefaults to {TOOL_SEARCH_DEFAULT_LIMIT} results."
         ),
         input_schema: JsonSchema::object(
             std::collections::BTreeMap::from([

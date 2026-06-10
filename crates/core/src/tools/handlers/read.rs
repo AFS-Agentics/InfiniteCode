@@ -10,6 +10,8 @@ use crate::read::{is_binary_file, missing_file_message, read_directory, read_fil
 use crate::tool_handler::ToolHandler;
 use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolSpec};
 
+const READ_DESCRIPTION: &str = include_str!("../read.txt");
+
 pub struct ReadHandler {
     spec: ToolSpec,
 }
@@ -25,7 +27,7 @@ impl ReadHandler {
         Self {
             spec: ToolSpec {
                 name: "read".into(),
-                description: "Read a file or directory from the local filesystem.".into(),
+                description: READ_DESCRIPTION.into(),
                 input_schema: JsonSchema::object(
                     std::collections::BTreeMap::from([
                         (

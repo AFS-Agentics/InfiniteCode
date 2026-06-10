@@ -9,6 +9,15 @@ pub enum ResponseContent {
         name: String,
         input: serde_json::Value,
     },
+    HostedToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        output: Option<serde_json::Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        status: Option<String>,
+    },
 }
 
 /// Token usage statistics.
@@ -84,6 +93,25 @@ pub enum StreamEvent {
         id: String,
         name: String,
         input: serde_json::Value,
+    },
+    /// A provider-hosted tool call started. These calls are surfaced for
+    /// client visibility, but must not be routed to local tool execution.
+    HostedToolCallStart {
+        index: usize,
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    /// A provider-hosted tool call completed.
+    HostedToolCallDone {
+        index: usize,
+        id: String,
+        name: String,
+        input: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        output: Option<serde_json::Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        status: Option<String>,
     },
     /// Incremental JSON delta for tool input.
     ToolCallInputDelta { index: usize, partial_json: String },
@@ -183,6 +211,21 @@ mod tests {
     }
 
     #[test]
+    fn response_content_hosted_tool_use_serde() {
+        let content = ResponseContent::HostedToolUse {
+            id: "ws-1".into(),
+            name: "web_search".into(),
+            input: json!({"query": "rust"}),
+            output: Some(json!({"results": ["Rust docs"]})),
+            status: Some("completed".into()),
+        };
+        let json = serde_json::to_string(&content).expect("serialize content");
+        let deserialized: ResponseContent =
+            serde_json::from_str(&json).expect("deserialize content");
+        assert_eq!(deserialized, content);
+    }
+
+    #[test]
     fn response_extra_reasoning_text_roundtrip() {
         let extra = ResponseExtra::ReasoningText {
             text: "internal reasoning".into(),
@@ -200,6 +243,22 @@ mod tests {
             id: "call_123".into(),
             name: "get_weather".into(),
             input: json!({}),
+        };
+        let json = serde_json::to_string(&event).expect("serialize stream event");
+        let deserialized: StreamEvent =
+            serde_json::from_str(&json).expect("deserialize stream event");
+        assert_eq!(deserialized, event);
+    }
+
+    #[test]
+    fn stream_event_hosted_tool_call_roundtrip() {
+        let event = StreamEvent::HostedToolCallDone {
+            index: 1,
+            id: "ws_123".into(),
+            name: "web_search".into(),
+            input: json!({"query": "rust"}),
+            output: Some(json!({"results": ["Rust docs"]})),
+            status: Some("completed".into()),
         };
         let json = serde_json::to_string(&event).expect("serialize stream event");
         let deserialized: StreamEvent =

@@ -10,6 +10,8 @@ use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
 use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolSpec};
 
+const SKILL_DESCRIPTION: &str = include_str!("../skill.txt");
+
 pub struct SkillHandler {
     spec: ToolSpec,
 }
@@ -25,8 +27,7 @@ impl SkillHandler {
         Self {
             spec: ToolSpec {
                 name: "skill".into(),
-                description:
-                    "Load a specialized skill when the task at hand matches its description.".into(),
+                description: SKILL_DESCRIPTION.into(),
                 input_schema: JsonSchema::object(
                     std::collections::BTreeMap::from([(
                         "name".to_string(),

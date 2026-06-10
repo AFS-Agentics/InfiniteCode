@@ -12,6 +12,8 @@ use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
 use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolSpec};
 
+const GLOB_DESCRIPTION: &str = include_str!("../glob.txt");
+
 pub struct GlobHandler {
     spec: ToolSpec,
 }
@@ -27,8 +29,7 @@ impl GlobHandler {
         Self {
             spec: ToolSpec {
                 name: "find".into(),
-                description: "Fast filename and path search backed by ripgrep. Use only for literal file/path discovery. When code_search is available, prefer it for codebase investigation."
-                    .into(),
+                description: GLOB_DESCRIPTION.into(),
                 input_schema: JsonSchema::object(
                     std::collections::BTreeMap::from([
                         (

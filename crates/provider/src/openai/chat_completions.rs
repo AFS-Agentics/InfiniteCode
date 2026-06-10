@@ -35,6 +35,7 @@ use crate::ModelProviderSDK;
 use crate::ProviderAdapter;
 use crate::ProviderCapabilities;
 use crate::ProviderHttpOptions;
+use crate::hosted_tools::apply_openai_chat_completions_hosted_tools;
 use crate::merge_extra_body;
 use crate::text_normalization::split_tagged_text;
 
@@ -695,6 +696,8 @@ fn build_request(request: &ModelRequest, stream: bool) -> Value {
         root["stream_options"] = json!({ "include_usage": true });
     }
 
+    apply_openai_chat_completions_hosted_tools(&mut root, &request.hosted_tools);
+
     merge_extra_body(&mut root, request.extra_body.as_ref());
 
     root
@@ -1209,6 +1212,7 @@ mod tests {
                 }),
                 output_schema: None,
             }]),
+            hosted_tools: Vec::new(),
             sampling: SamplingControls {
                 temperature: Some(0.2),
                 ..SamplingControls::default()
@@ -1253,6 +1257,7 @@ mod tests {
             }],
             max_tokens: 64,
             tools: None,
+            hosted_tools: Vec::new(),
             sampling: SamplingControls::default(),
             thinking: Some("disabled".to_string()),
             reasoning_effort: None,
@@ -1278,6 +1283,7 @@ mod tests {
             }],
             max_tokens: 64,
             tools: None,
+            hosted_tools: Vec::new(),
             sampling: SamplingControls {
                 temperature: Some(0.3),
                 top_p: Some(0.9),
@@ -1309,6 +1315,7 @@ mod tests {
             }],
             max_tokens: 8192,
             tools: None,
+            hosted_tools: Vec::new(),
             sampling: SamplingControls {
                 temperature: Some(1.0),
                 top_p: Some(0.95),
@@ -1536,6 +1543,7 @@ mod tests {
             }],
             max_tokens: 64,
             tools: None,
+            hosted_tools: Vec::new(),
             sampling: SamplingControls::default(),
             thinking: Some("enabled".to_string()),
             reasoning_effort: Some(devo_protocol::ReasoningEffort::Max),
@@ -1561,6 +1569,7 @@ mod tests {
             }],
             max_tokens: 64,
             tools: None,
+            hosted_tools: Vec::new(),
             sampling: SamplingControls::default(),
             thinking: Some("enabled".to_string()),
             reasoning_effort: Some(devo_protocol::ReasoningEffort::High),

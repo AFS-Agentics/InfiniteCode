@@ -31,7 +31,9 @@ impl SlashCommand {
             SlashCommand::Permissions => "choose what Devo is allowed to do",
             SlashCommand::Clear => "clear the current transcript",
             SlashCommand::Diff => "show git diff (including untracked files)",
-            SlashCommand::Btw => "inject text into the current turn immediately",
+            SlashCommand::Btw => {
+                "Ask a quick side question without interrupting the main conversation"
+            }
             SlashCommand::Goal => "set or view the goal for a long-running task",
             SlashCommand::Exit => "exit Devo",
         }

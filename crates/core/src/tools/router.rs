@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use devo_config::ResolvedLocalWebSearchConfig;
 use devo_safety::ResourceKind;
 use devo_tools::contracts::ToolBudgets;
 use devo_tools::contracts::ToolProgress;
@@ -287,7 +288,8 @@ impl ToolRuntime {
             None => (None, None),
         };
 
-        let result = tool.handle(ctx, call.input.clone(), progress_sender).await;
+        let input = self.input_for_tool_call(tool_name, &call.input);
+        let result = tool.handle(ctx, input, progress_sender).await;
         if let Some(progress_task) = progress_task
             && tokio::time::timeout(
                 Duration::from_millis(PROGRESS_DRAIN_GRACE_MS),
@@ -327,6 +329,20 @@ impl ToolRuntime {
             }
             Err(e) => ToolCallResult::error(&call.id, &e.to_string()),
         }
+    }
+
+    fn input_for_tool_call(&self, tool_name: &str, input: &serde_json::Value) -> serde_json::Value {
+        if tool_name != "web_search" {
+            return input.clone();
+        }
+        let mut input = input.clone();
+        if let Some(config) = &self.context.local_web_search
+            && let Some(object) = input.as_object_mut()
+            && let Ok(value) = serde_json::to_value(config)
+        {
+            object.insert("__devo_local_web_search".to_string(), value);
+        }
+        input
     }
 
     fn permission_request_for_call(
@@ -376,6 +392,7 @@ fn canonical_tool_name<'a>(registry: &ToolRegistry, tool_name: &'a str) -> &'a s
     match tool_name {
         "bash" if registry.spec("shell_command").is_some() => "shell_command",
         "glob" if registry.spec("find").is_some() => "find",
+        "websearch" | "web-search" if registry.spec("web_search").is_some() => "web_search",
         _ => tool_name,
     }
 }
@@ -412,6 +429,7 @@ pub struct ToolRuntimeContext {
     pub agent_scope: ToolAgentScope,
     pub collaboration_mode: devo_protocol::CollaborationMode,
     pub agent_coordinator: Option<Arc<dyn AgentToolCoordinator>>,
+    pub local_web_search: Option<ResolvedLocalWebSearchConfig>,
 }
 
 impl std::fmt::Debug for ToolRuntimeContext {
@@ -425,6 +443,13 @@ impl std::fmt::Debug for ToolRuntimeContext {
             .field(
                 "agent_coordinator",
                 &self.agent_coordinator.as_ref().map(|_| "<configured>"),
+            )
+            .field(
+                "local_web_search",
+                &self
+                    .local_web_search
+                    .as_ref()
+                    .map(|config| &config.provider_id),
             )
             .finish()
     }
@@ -523,10 +548,10 @@ fn host_for_tool_input(tool_name: &str, input: &serde_json::Value) -> Option<Str
             .get("url")
             .and_then(serde_json::Value::as_str)
             .and_then(host_from_url),
-        "websearch" => input
+        "web_search" | "websearch" | "web-search" => input
             .get("query")
             .and_then(serde_json::Value::as_str)
-            .map(|_| "websearch".to_string()),
+            .map(|_| "web_search".to_string()),
         _ => None,
     }
 }
@@ -555,7 +580,7 @@ fn target_for_tool_input(tool_name: &str, input: &serde_json::Value) -> Option<S
             .get("url")
             .and_then(serde_json::Value::as_str)
             .map(str::to_string),
-        "websearch" => input
+        "web_search" | "websearch" | "web-search" => input
             .get("query")
             .and_then(serde_json::Value::as_str)
             .map(str::to_string),
@@ -1039,6 +1064,7 @@ mod tests {
                 agent_scope: ToolAgentScope::Parent,
                 collaboration_mode: devo_protocol::CollaborationMode::Build,
                 agent_coordinator: None,
+                local_web_search: None,
             },
         );
         let call = ToolCall {

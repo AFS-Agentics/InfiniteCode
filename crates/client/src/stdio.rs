@@ -15,6 +15,8 @@ use devo_protocol::ApprovalRespondParams;
 use devo_protocol::ClientNotification;
 use devo_protocol::ClientRequest;
 use devo_protocol::ClientTransportKind;
+use devo_protocol::CloseAgentParams;
+use devo_protocol::CloseAgentResult;
 use devo_protocol::CommandExecParams;
 use devo_protocol::CommandExecResizeParams;
 use devo_protocol::CommandExecResizeResult;
@@ -82,6 +84,8 @@ use devo_protocol::SkillListParams;
 use devo_protocol::SkillListResult;
 use devo_protocol::SkillSetEnabledParams;
 use devo_protocol::SkillSetEnabledResult;
+use devo_protocol::SpawnAgentParams;
+use devo_protocol::SpawnAgentResult;
 use devo_protocol::SuccessResponse;
 use devo_protocol::TurnInterruptParams;
 use devo_protocol::TurnInterruptResult;
@@ -217,6 +221,14 @@ impl StdioServerClient {
 
     pub async fn agent_list(&mut self, params: AgentListParams) -> Result<AgentListResult> {
         self.request("agent/list", params).await
+    }
+
+    pub async fn agent_spawn(&mut self, params: SpawnAgentParams) -> Result<SpawnAgentResult> {
+        self.request("agent/spawn", params).await
+    }
+
+    pub async fn agent_close(&mut self, params: CloseAgentParams) -> Result<CloseAgentResult> {
+        self.request("agent/close", params).await
     }
 
     pub async fn session_title_update(

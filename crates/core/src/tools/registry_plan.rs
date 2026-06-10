@@ -5,10 +5,15 @@ use crate::json_schema::JsonSchema;
 use crate::tool_spec::{
     ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, ToolPreparationFeedback, ToolSpec,
 };
+use crate::tools::websearch_prompt::web_search_prompt;
 use devo_config::AppConfig;
 
 const BASH_DESCRIPTION: &str = include_str!("bash.txt");
 const READ_DESCRIPTION: &str = include_str!("read.txt");
+const WRITE_DESCRIPTION: &str = include_str!("write.txt");
+const GLOB_DESCRIPTION: &str = include_str!("glob.txt");
+const GREP_DESCRIPTION: &str = include_str!("grep.txt");
+const WEBFETCH_DESCRIPTION: &str = include_str!("webfetch.txt");
 const APPLY_PATCH_DESCRIPTION: &str = include_str!("apply_patch.txt");
 
 #[derive(Debug, Clone)]
@@ -43,11 +48,13 @@ pub struct ToolPlanConfig {
     pub use_shell_command: bool,
     pub use_unified_exec: bool,
     pub code_search: bool,
+    pub web_search: bool,
 }
 
 impl ToolPlanConfig {
     pub fn from_app_config(config: &AppConfig) -> Self {
         Self {
+            web_search: app_config_uses_local_web_search(config),
             code_search: config.experimental.code_search,
             ..Self::default()
         }
@@ -68,6 +75,7 @@ impl Default for ToolPlanConfig {
             use_shell_command: true,
             use_unified_exec: true,
             code_search: true,
+            web_search: false,
         }
     }
 }
@@ -464,6 +472,22 @@ fn webfetch_schema() -> JsonSchema {
     )
 }
 
+fn app_config_uses_local_web_search(config: &AppConfig) -> bool {
+    config.tools.web_search.mode == devo_config::WebSearchMode::Local
+        || config.provider.providers.values().any(|provider| {
+            provider
+                .web_search
+                .as_ref()
+                .is_some_and(|web_search| web_search.mode == devo_config::WebSearchMode::Local)
+        })
+        || config.provider.model_bindings.values().any(|binding| {
+            binding
+                .web_search
+                .as_ref()
+                .is_some_and(|web_search| web_search.mode == devo_config::WebSearchMode::Local)
+        })
+}
+
 fn websearch_schema() -> JsonSchema {
     JsonSchema::object(
         BTreeMap::from([(
@@ -642,7 +666,7 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
     plan.push(
         ToolSpec {
             name: "write".to_string(),
-            description: "Write content to a file. Creates the file if it does not exist, or overwrites the existing file.".to_string(),
+            description: WRITE_DESCRIPTION.to_string(),
             input_schema: write_schema(),
             output_mode: ToolOutputMode::Mixed,
             execution_mode: ToolExecutionMode::Mutating,
@@ -656,11 +680,7 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
         ToolHandlerKind::Write,
     );
 
-    let find_description = if config.code_search {
-        "Fast filename and path search backed by ripgrep. Use only for literal file/path discovery; prefer code_search for codebase investigation."
-    } else {
-        "Fast filename and path search backed by ripgrep. Use only for literal file/path discovery."
-    };
+    let find_description = GLOB_DESCRIPTION;
 
     plan.push(
         ToolSpec {
@@ -679,11 +699,7 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
         ToolHandlerKind::Glob,
     );
 
-    let grep_description = if config.code_search {
-        "Fast exact text and regex content search backed by ripgrep. Use grep for known strings or regexes; prefer code_search for codebase investigation."
-    } else {
-        "Fast exact text and regex content search backed by ripgrep. Use grep for known strings or regexes."
-    };
+    let grep_description = GREP_DESCRIPTION;
 
     plan.push(
         ToolSpec {
@@ -761,9 +777,7 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
     plan.push(
         ToolSpec {
             name: "webfetch".to_string(),
-            description:
-                "Fetches content from a specified URL and returns it in the requested format."
-                    .to_string(),
+            description: WEBFETCH_DESCRIPTION.to_string(),
             input_schema: webfetch_schema(),
             output_mode: ToolOutputMode::Mixed,
             execution_mode: ToolExecutionMode::ReadOnly,
@@ -777,22 +791,24 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
         ToolHandlerKind::WebFetch,
     );
 
-    plan.push(
-        ToolSpec {
-            name: "websearch".to_string(),
-            description: "Search the web for information.".to_string(),
-            input_schema: websearch_schema(),
-            output_mode: ToolOutputMode::Text,
-            execution_mode: ToolExecutionMode::ReadOnly,
-            capability_tags: vec![ToolCapabilityTag::NetworkAccess],
-            supports_parallel: true,
-            preparation_feedback: ToolPreparationFeedback::None,
-            display_name: None,
-            supports_cancellation: None,
-            supports_streaming: None,
-        },
-        ToolHandlerKind::WebSearch,
-    );
+    if config.web_search {
+        plan.push(
+            ToolSpec {
+                name: "web_search".to_string(),
+                description: web_search_prompt(),
+                input_schema: websearch_schema(),
+                output_mode: ToolOutputMode::Text,
+                execution_mode: ToolExecutionMode::ReadOnly,
+                capability_tags: vec![ToolCapabilityTag::NetworkAccess],
+                supports_parallel: true,
+                preparation_feedback: ToolPreparationFeedback::None,
+                display_name: None,
+                supports_cancellation: None,
+                supports_streaming: None,
+            },
+            ToolHandlerKind::WebSearch,
+        );
+    }
 
     plan.push(
         ToolSpec {
@@ -977,6 +993,35 @@ mod tests {
                 .iter()
                 .any(|(kind, name)| *kind == ToolHandlerKind::Bash && name == "shell_command")
         );
+    }
+
+    #[test]
+    fn plan_builder_registers_web_search_only_when_local_enabled() {
+        let default_plan = build_tool_registry_plan(&ToolPlanConfig::default());
+        let default_spec_names: Vec<&str> = default_plan
+            .specs
+            .iter()
+            .map(|spec| spec.name.as_str())
+            .collect();
+        assert!(!default_spec_names.contains(&"web_search"));
+
+        let local_plan = build_tool_registry_plan(&ToolPlanConfig {
+            web_search: true,
+            ..ToolPlanConfig::default()
+        });
+        let local_spec_names: Vec<&str> = local_plan
+            .specs
+            .iter()
+            .map(|spec| spec.name.as_str())
+            .collect();
+        assert!(local_spec_names.contains(&"web_search"));
+        assert!(!local_spec_names.contains(&"websearch"));
+        let web_search_spec = local_plan
+            .specs
+            .iter()
+            .find(|spec| spec.name == "web_search")
+            .expect("web_search spec");
+        assert!(web_search_spec.description.contains("Sources:"));
     }
 
     #[test]

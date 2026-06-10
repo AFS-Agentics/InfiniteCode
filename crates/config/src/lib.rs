@@ -7,6 +7,7 @@ mod oauth;
 mod provider;
 mod server;
 mod skills;
+mod tools;
 
 pub use app::*;
 pub use error::*;
@@ -17,6 +18,7 @@ pub use oauth::*;
 pub use provider::*;
 pub use server::*;
 pub use skills::*;
+pub use tools::*;
 
 pub(crate) use provider::read_provider_config_document;
 pub(crate) use provider::write_atomic;

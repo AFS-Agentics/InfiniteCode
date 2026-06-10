@@ -34,6 +34,7 @@ use crate::ModelProviderSDK;
 use crate::ProviderAdapter;
 use crate::ProviderCapabilities;
 use crate::ProviderHttpOptions;
+use crate::hosted_tools::append_anthropic_hosted_tools;
 use crate::merge_extra_body;
 
 /// <https://platform.claude.com/docs/en/api/messages>
@@ -246,6 +247,8 @@ struct AnthropicResponseContentBlock {
     tool_use_id: Option<String>,
     #[serde(default)]
     content: Option<Value>,
+    #[serde(default)]
+    status: Option<String>,
     #[serde(flatten)]
     extra: serde_json::Map<String, Value>,
 }
@@ -357,7 +360,7 @@ impl ModelProviderSDK for AnthropicProvider {
                                             index: index as usize,
                                         };
                                     }
-                                    "tool_use" | "server_tool_use" => {
+                                    "tool_use" => {
                                         let Some(id) = block.id.clone() else {
                                             continue;
                                         };
@@ -382,6 +385,70 @@ impl ModelProviderSDK for AnthropicProvider {
                                             id,
                                             name,
                                             input,
+                                        };
+                                    }
+                                    "server_tool_use" => {
+                                        let Some(id) = block.id.clone() else {
+                                            continue;
+                                        };
+                                        let name = block
+                                            .name
+                                            .clone()
+                                            .unwrap_or_else(|| "web_search".to_string());
+                                        let input = block
+                                            .input
+                                            .clone()
+                                            .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+                                        content_blocks.insert(
+                                            index as usize,
+                                            ResponseContent::HostedToolUse {
+                                                id: id.clone(),
+                                                name: name.clone(),
+                                                input: input.clone(),
+                                                output: None,
+                                                status: None,
+                                            },
+                                        );
+                                        tool_json.insert(index as usize, String::new());
+                                        yield StreamEvent::HostedToolCallStart {
+                                            index: index as usize,
+                                            id,
+                                            name,
+                                            input,
+                                        };
+                                    }
+                                    "web_search_tool_result" => {
+                                        let id = block
+                                            .tool_use_id
+                                            .clone()
+                                            .or_else(|| block.id.clone())
+                                            .unwrap_or_default();
+                                        let name = "web_search".to_string();
+                                        let input = Value::Object(serde_json::Map::new());
+                                        let output = block.content.clone();
+                                        let status = Some(
+                                            block
+                                                .status
+                                                .clone()
+                                                .unwrap_or_else(|| "completed".to_string()),
+                                        );
+                                        content_blocks.insert(
+                                            index as usize,
+                                            ResponseContent::HostedToolUse {
+                                                id: id.clone(),
+                                                name: name.clone(),
+                                                input: input.clone(),
+                                                output: output.clone(),
+                                                status: status.clone(),
+                                            },
+                                        );
+                                        yield StreamEvent::HostedToolCallDone {
+                                            index: index as usize,
+                                            id,
+                                            name,
+                                            input,
+                                            output,
+                                            status,
                                         };
                                     }
                                     "thinking" => {
@@ -452,11 +519,16 @@ impl ModelProviderSDK for AnthropicProvider {
                                 let index = data.get("index").and_then(Value::as_u64).unwrap_or(0) as usize;
                                 if let Some(json_str) = tool_json.remove(&index)
                                     && let Ok(parsed) = serde_json::from_str(&json_str)
-                                        && let Some(ResponseContent::ToolUse { input, .. }) =
-                                            content_blocks.get_mut(&index)
-                                        {
+                                    && let Some(block) = content_blocks.get_mut(&index)
+                                {
+                                    match block {
+                                        ResponseContent::ToolUse { input, .. }
+                                        | ResponseContent::HostedToolUse { input, .. } => {
                                             *input = parsed;
                                         }
+                                        ResponseContent::Text(_) => {}
+                                    }
+                                }
                             }
                             "message_delta" => {
                                 if let Some(delta) = data.get("delta").and_then(Value::as_object)
@@ -665,6 +737,8 @@ fn build_request(request: &ModelRequest, stream: bool) -> Value {
     let mut root =
         serde_json::to_value(body).expect("anthropic request body serialization should succeed");
 
+    append_anthropic_hosted_tools(&mut root, &request.hosted_tools);
+
     merge_extra_body(&mut root, request.extra_body.as_ref());
 
     root
@@ -864,13 +938,38 @@ fn parse_response_content_block(
         "text" => Some(ResponseContent::Text(
             block.text.clone().unwrap_or_default(),
         )),
-        "tool_use" | "server_tool_use" => Some(ResponseContent::ToolUse {
+        "tool_use" => Some(ResponseContent::ToolUse {
             id: block.id.clone()?,
             name: block.name.clone()?,
             input: block
                 .input
                 .clone()
                 .unwrap_or_else(|| Value::Object(serde_json::Map::new())),
+        }),
+        "server_tool_use" => Some(ResponseContent::HostedToolUse {
+            id: block.id.clone()?,
+            name: block
+                .name
+                .clone()
+                .unwrap_or_else(|| "web_search".to_string()),
+            input: block
+                .input
+                .clone()
+                .unwrap_or_else(|| Value::Object(serde_json::Map::new())),
+            output: None,
+            status: None,
+        }),
+        "web_search_tool_result" => Some(ResponseContent::HostedToolUse {
+            id: block.tool_use_id.clone().or_else(|| block.id.clone())?,
+            name: "web_search".to_string(),
+            input: Value::Object(serde_json::Map::new()),
+            output: block.content.clone(),
+            status: Some(
+                block
+                    .status
+                    .clone()
+                    .unwrap_or_else(|| "completed".to_string()),
+            ),
         }),
         "thinking" => {
             if let Some(thinking) = &block.thinking
@@ -1012,6 +1111,7 @@ mod tests {
                 }),
                 output_schema: None,
             }]),
+            hosted_tools: Vec::new(),
             sampling: SamplingControls {
                 temperature: Some(0.2),
                 top_p: Some(0.9),
@@ -1093,12 +1193,20 @@ mod tests {
             other => panic!("expected text block, got {other:?}"),
         }
         match &response.content[1] {
-            ResponseContent::ToolUse { id, name, input } => {
+            ResponseContent::HostedToolUse {
+                id,
+                name,
+                input,
+                output,
+                status,
+            } => {
                 assert_eq!(id, "srvtool_1");
                 assert_eq!(name, "web_search");
                 assert_eq!(input, &json!({"query": "Boston weather"}));
+                assert_eq!(output, &None);
+                assert_eq!(status, &None);
             }
-            other => panic!("expected tool use block, got {other:?}"),
+            other => panic!("expected hosted tool use block, got {other:?}"),
         }
         assert!(response.metadata.extras.iter().any(|extra| matches!(
             extra,
@@ -1109,6 +1217,63 @@ mod tests {
             extra,
             ResponseExtra::ProviderSpecific { provider, .. } if provider == "anthropic"
         )));
+    }
+
+    #[test]
+    fn parse_response_extracts_web_search_tool_result_as_hosted_completion() {
+        let response = parse_response(json!({
+            "id": "msg_456",
+            "type": "message",
+            "role": "assistant",
+            "model": "claude-sonnet-4-6",
+            "content": [
+                {
+                    "type": "web_search_tool_result",
+                    "tool_use_id": "srvtool_1",
+                    "content": [
+                        {
+                            "type": "web_search_result",
+                            "title": "Boston weather",
+                            "url": "https://example.test/weather"
+                        }
+                    ],
+                    "status": "completed"
+                }
+            ],
+            "stop_reason": "end_turn",
+            "usage": {
+                "input_tokens": 4,
+                "output_tokens": 2
+            }
+        }))
+        .expect("parse response");
+
+        assert_eq!(response.content.len(), 1);
+        match &response.content[0] {
+            ResponseContent::HostedToolUse {
+                id,
+                name,
+                input,
+                output,
+                status,
+            } => {
+                assert_eq!(id, "srvtool_1");
+                assert_eq!(name, "web_search");
+                assert_eq!(input, &json!({}));
+                assert_eq!(
+                    output,
+                    &Some(json!([
+                        {
+                            "type": "web_search_result",
+                            "title": "Boston weather",
+                            "url": "https://example.test/weather"
+                        }
+                    ]))
+                );
+                assert_eq!(status.as_deref(), Some("completed"));
+            }
+            other => panic!("expected hosted tool completion, got {other:?}"),
+        }
     }
 
     #[test]

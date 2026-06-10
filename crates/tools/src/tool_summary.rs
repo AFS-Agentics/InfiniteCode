@@ -111,9 +111,9 @@ pub fn tool_summary(name: &str, input: &serde_json::Value, cwd: &Path) -> String
             let url = input["url"].as_str().unwrap_or("");
             format!("webfetch: {url}")
         }
-        "websearch" => {
+        "web_search" | "websearch" | "web-search" => {
             let q = input["query"].as_str().unwrap_or("");
-            format!("websearch: {q}")
+            format!("web_search: {q}")
         }
         "skill" => {
             let name = input["name"].as_str().unwrap_or("");

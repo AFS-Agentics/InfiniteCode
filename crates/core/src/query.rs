@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
+use devo_protocol::HostedToolDefinition;
+use devo_protocol::HostedWebSearchTool;
 use devo_protocol::ModelRequest;
 use devo_protocol::RequestContent;
 use devo_protocol::RequestMessage;
@@ -54,6 +56,18 @@ use crate::response_item::message_to_response_items;
 
 const SUBAGENT_MODE_REMINDER: &str = "<system-reminder>\nYou are running as a sub-agent. Complete the delegated task using the available non-agent tools. Do not call agent coordination tools such as spawn_agent, send_message, wait_agent, list_agents, or close_agent; report progress and final results through assistant output.\n</system-reminder>";
 
+fn hosted_tools_for_web_search(
+    web_search: &devo_config::ResolvedWebSearchConfig,
+) -> Vec<HostedToolDefinition> {
+    match web_search {
+        devo_config::ResolvedWebSearchConfig::Provider => {
+            vec![HostedToolDefinition::WebSearch(HostedWebSearchTool::new())]
+        }
+        devo_config::ResolvedWebSearchConfig::Disabled
+        | devo_config::ResolvedWebSearchConfig::Local(_) => Vec::new(),
+    }
+}
+
 fn estimate_request_prompt_tokens(request: &ModelRequest) -> usize {
     let system_bytes = request.system.as_ref().map_or(0, String::len);
     let message_bytes = request
@@ -66,7 +80,9 @@ fn estimate_request_prompt_tokens(request: &ModelRequest) -> usize {
         .as_ref()
         .map(|tools| serde_json::to_string(tools).map_or(0, |json| json.len()))
         .unwrap_or(0);
-    (system_bytes + message_bytes + tool_bytes).div_ceil(4)
+    let hosted_tool_bytes =
+        serde_json::to_string(&request.hosted_tools).map_or(0, |json| json.len());
+    (system_bytes + message_bytes + tool_bytes + hosted_tool_bytes).div_ceil(4)
 }
 
 /// Events emitted during a query for the caller (CLI/UI) to observe.
@@ -343,7 +359,7 @@ fn insert_subagent_request_reminders(messages: &mut Vec<RequestMessage>) {
 }
 
 fn insert_goal_context_message(messages: &mut Vec<RequestMessage>, goal_context: &str) {
-    let insert_at = if messages.last().is_some_and(is_user_text_message) {
+    let insert_at = if messages.last().is_some_and(is_visible_user_text_message) {
         messages.len().saturating_sub(1)
     } else {
         messages.len()
@@ -369,6 +385,26 @@ fn is_user_text_message(message: &RequestMessage) -> bool {
             .any(|content| matches!(content, RequestContent::Text { .. }))
 }
 
+fn is_visible_user_text_message(message: &RequestMessage) -> bool {
+    is_user_text_message(message) && !is_injected_context_message(message)
+}
+
+fn is_injected_context_message(message: &RequestMessage) -> bool {
+    message.role == Role::User.as_str()
+        && message.content.iter().any(|content| match content {
+            RequestContent::Text { text } => {
+                let trimmed = text.trim_start();
+                trimmed.starts_with("<environment_context>")
+                    || trimmed.starts_with("<context_changes>")
+                    || trimmed.starts_with("<user_instructions_updates>")
+                    || trimmed.starts_with("<user_instructions>")
+            }
+            RequestContent::Reasoning { .. }
+            | RequestContent::ToolUse { .. }
+            | RequestContent::ToolResult { .. } => false,
+        })
+}
+
 fn compact_tool_content(content: ToolContent) -> ToolContent {
     match content {
         ToolContent::Text(text) => ToolContent::Text(micro_compact(text)),
@@ -389,6 +425,108 @@ fn tool_content_model_bytes(content: &ToolContent) -> usize {
                 + json.as_ref().map_or(0, |json| json.to_string().len())
         }
     }
+}
+
+fn normalize_hosted_tool_id(index: usize, id: String) -> String {
+    if id.is_empty() {
+        format!("hosted_web_search_{index}")
+    } else {
+        id
+    }
+}
+
+fn normalize_hosted_tool_name(name: String) -> String {
+    if name.is_empty() {
+        "web_search".to_string()
+    } else {
+        name
+    }
+}
+
+fn hosted_tool_input_or_previous(
+    input: serde_json::Value,
+    previous: Option<&serde_json::Value>,
+) -> serde_json::Value {
+    if matches!(&input, serde_json::Value::Object(map) if map.is_empty()) {
+        previous.cloned().unwrap_or(input)
+    } else {
+        input
+    }
+}
+
+fn emit_hosted_tool_start<F>(
+    emit: &F,
+    emitted_tool_use_starts: &mut HashSet<String>,
+    id: &str,
+    name: &str,
+    input: &serde_json::Value,
+) where
+    F: Fn(QueryEvent),
+{
+    if emitted_tool_use_starts.insert(id.to_string()) {
+        emit(QueryEvent::ToolUseStart {
+            id: id.to_string(),
+            name: name.to_string(),
+            input: input.clone(),
+        });
+    }
+}
+
+struct HostedToolResultEvent<'a> {
+    id: &'a str,
+    name: &'a str,
+    input: &'a serde_json::Value,
+    output: Option<serde_json::Value>,
+    status: Option<String>,
+}
+
+fn emit_hosted_tool_result<F>(
+    emit: &F,
+    emitted_tool_results: &mut HashSet<String>,
+    session_cwd: &std::path::Path,
+    event: HostedToolResultEvent<'_>,
+) where
+    F: Fn(QueryEvent),
+{
+    let HostedToolResultEvent {
+        id,
+        name,
+        input,
+        output,
+        status,
+    } = event;
+    if !emitted_tool_results.insert(id.to_string()) {
+        return;
+    }
+
+    let text = hosted_tool_result_text(name, input, output.as_ref(), status.as_deref());
+    let summary = crate::tools::tool_summary::tool_summary(name, input, session_cwd);
+    emit(QueryEvent::ToolResult {
+        tool_use_id: id.to_string(),
+        tool_name: name.to_string(),
+        input: input.clone(),
+        content: ToolContent::Text(text.clone()),
+        display_content: Some(micro_compact(text)),
+        is_error: hosted_tool_status_is_error(status.as_deref()),
+        summary,
+    });
+}
+
+fn hosted_tool_result_text(
+    _name: &str,
+    _input: &serde_json::Value,
+    _output: Option<&serde_json::Value>,
+    status: Option<&str>,
+) -> String {
+    let status = status
+        .filter(|status| !status.is_empty())
+        .unwrap_or("completed");
+    format!("└ status: {status}")
+}
+fn hosted_tool_status_is_error(status: Option<&str>) -> bool {
+    status
+        .map(str::to_ascii_lowercase)
+        .is_some_and(|status| matches!(status.as_str(), "error" | "errored" | "failed"))
 }
 
 // ---------------------------------------------------------------------------
@@ -436,6 +574,9 @@ pub async fn query(
     let mut request_tools = registry.tool_definitions();
     if agent_scope == ToolAgentScope::Subagent {
         request_tools.retain(|tool| !is_subagent_agent_coordination_tool(&tool.name));
+    }
+    if !turn_config.web_search.is_local() {
+        request_tools.retain(|tool| tool.name != "web_search");
     }
 
     if session.session_context.is_none() {
@@ -555,8 +696,19 @@ pub async fn query(
         info!("starting turn");
 
         // Build model request from the session-locked prefix.
-        let request_system =
-            Some(session_context.build_system_prompt()).filter(|system| !system.trim().is_empty());
+        let request_system = {
+            let mut system = session_context.build_system_prompt();
+            if !matches!(
+                &turn_config.web_search,
+                devo_config::ResolvedWebSearchConfig::Disabled
+            ) {
+                if !system.trim().is_empty() {
+                    system.push_str("\n\n");
+                }
+                system.push_str(&crate::tools::websearch_prompt::web_search_prompt());
+            }
+            Some(system).filter(|system| !system.trim().is_empty())
+        };
 
         // resolve thinking request parameter
         let ResolvedThinkingRequest {
@@ -614,6 +766,7 @@ pub async fn query(
                     value as usize
                 }),
             tools: Some(request_tools.clone()),
+            hosted_tools: hosted_tools_for_web_search(&turn_config.web_search),
             sampling: SamplingControls {
                 temperature: turn_config.model.temperature,
                 top_p: turn_config.model.top_p,
@@ -685,7 +838,11 @@ pub async fn query(
         let mut reasoning_text = String::new();
         let mut tool_uses: Vec<(usize, String, String, serde_json::Value, String, bool)> =
             Vec::new();
+        let mut hosted_tool_inputs: HashMap<String, (usize, String, serde_json::Value)> =
+            HashMap::new();
         let mut emitted_tool_use_starts: HashSet<String> = HashSet::new();
+        let mut emitted_hosted_tool_starts: HashSet<String> = HashSet::new();
+        let mut emitted_hosted_tool_results: HashSet<String> = HashSet::new();
         let mut final_response = None;
         let mut stop_reason = None;
 
@@ -711,6 +868,58 @@ pub async fn query(
                     input,
                 }) => {
                     tool_uses.push((index, id, name, input, String::new(), false));
+                }
+                Ok(StreamEvent::HostedToolCallStart {
+                    index,
+                    id,
+                    name,
+                    input,
+                }) => {
+                    let id = normalize_hosted_tool_id(index, id);
+                    let name = normalize_hosted_tool_name(name);
+                    hosted_tool_inputs.insert(id.clone(), (index, name.clone(), input.clone()));
+                    emit_hosted_tool_start(
+                        &emit,
+                        &mut emitted_hosted_tool_starts,
+                        &id,
+                        &name,
+                        &input,
+                    );
+                }
+                Ok(StreamEvent::HostedToolCallDone {
+                    index,
+                    id,
+                    name,
+                    input,
+                    output,
+                    status,
+                }) => {
+                    let id = normalize_hosted_tool_id(index, id);
+                    let name = normalize_hosted_tool_name(name);
+                    let previous_input = hosted_tool_inputs
+                        .get(&id)
+                        .map(|(_, _, previous_input)| previous_input);
+                    let input = hosted_tool_input_or_previous(input, previous_input);
+                    hosted_tool_inputs.insert(id.clone(), (index, name.clone(), input.clone()));
+                    emit_hosted_tool_start(
+                        &emit,
+                        &mut emitted_hosted_tool_starts,
+                        &id,
+                        &name,
+                        &input,
+                    );
+                    emit_hosted_tool_result(
+                        &emit,
+                        &mut emitted_hosted_tool_results,
+                        &session.cwd,
+                        HostedToolResultEvent {
+                            id: &id,
+                            name: &name,
+                            input: &input,
+                            output,
+                            status,
+                        },
+                    );
                 }
                 Ok(StreamEvent::ToolCallInputDelta {
                     index,
@@ -764,6 +973,7 @@ pub async fn query(
                     if !assistant_text.is_empty()
                         || !reasoning_text.is_empty()
                         || !tool_uses.is_empty()
+                        || !hosted_tool_inputs.is_empty()
                         || final_response.is_some()
                     {
                         return Err(AgentError::Provider(e));
@@ -810,7 +1020,9 @@ pub async fn query(
                     .iter()
                     .filter_map(|block| match block {
                         ResponseContent::Text(text) => Some(text.as_str()),
-                        ResponseContent::ToolUse { .. } => None,
+                        ResponseContent::ToolUse { .. } | ResponseContent::HostedToolUse { .. } => {
+                            None
+                        }
                     })
                     .collect();
             }
@@ -828,9 +1040,48 @@ pub async fn query(
                             String::new(),
                             false,
                         )),
-                        ResponseContent::Text(_) => None,
+                        ResponseContent::Text(_) | ResponseContent::HostedToolUse { .. } => None,
                     })
                     .collect();
+            }
+            for (index, block) in response.content.iter().enumerate() {
+                if let ResponseContent::HostedToolUse {
+                    id,
+                    name,
+                    input,
+                    output,
+                    status,
+                } = block
+                {
+                    let id = normalize_hosted_tool_id(index, id.clone());
+                    let name = normalize_hosted_tool_name(name.clone());
+                    let previous_input = hosted_tool_inputs
+                        .get(&id)
+                        .map(|(_, _, previous_input)| previous_input);
+                    let input = hosted_tool_input_or_previous(input.clone(), previous_input);
+                    hosted_tool_inputs.insert(id.clone(), (index, name.clone(), input.clone()));
+                    emit_hosted_tool_start(
+                        &emit,
+                        &mut emitted_hosted_tool_starts,
+                        &id,
+                        &name,
+                        &input,
+                    );
+                    if output.is_some() || status.is_some() {
+                        emit_hosted_tool_result(
+                            &emit,
+                            &mut emitted_hosted_tool_results,
+                            &session.cwd,
+                            HostedToolResultEvent {
+                                id: &id,
+                                name: &name,
+                                input: &input,
+                                output: output.clone(),
+                                status: status.clone(),
+                            },
+                        );
+                    }
+                }
             }
             if reasoning_text.is_empty() {
                 let final_reasoning = response
@@ -847,6 +1098,26 @@ pub async fn query(
                     reasoning_text = final_reasoning;
                 }
             }
+        }
+
+        let pending_hosted_tools = hosted_tool_inputs
+            .iter()
+            .map(|(id, (_index, name, input))| (id.clone(), name.clone(), input.clone()))
+            .collect::<Vec<_>>();
+        for (id, name, input) in pending_hosted_tools {
+            emit_hosted_tool_start(&emit, &mut emitted_hosted_tool_starts, &id, &name, &input);
+            emit_hosted_tool_result(
+                &emit,
+                &mut emitted_hosted_tool_results,
+                &session.cwd,
+                HostedToolResultEvent {
+                    id: &id,
+                    name: &name,
+                    input: &input,
+                    output: None,
+                    status: Some("completed".to_string()),
+                },
+            );
         }
 
         // Build assistant message
@@ -874,7 +1145,7 @@ pub async fn query(
                         ResponseContent::ToolUse { id, input, .. } => {
                             Some((id.clone(), input.clone()))
                         }
-                        ResponseContent::Text(_) => None,
+                        ResponseContent::Text(_) | ResponseContent::HostedToolUse { .. } => None,
                     })
                     .collect()
             })
@@ -1052,6 +1323,7 @@ pub async fn test_model_connection(
         }],
         max_tokens: model.max_tokens.map_or(64, |value| value as usize),
         tools: None,
+        hosted_tools: Vec::new(),
         sampling: SamplingControls {
             temperature: model.temperature,
             top_p: model.top_p,
@@ -1107,6 +1379,7 @@ mod tests {
     use std::sync::atomic::Ordering;
 
     use crate::tools::ToolAgentScope;
+    use crate::tools::ToolContent;
     use crate::tools::ToolPreparationFeedback;
     use crate::tools::ToolRegistry;
     use crate::tools::ToolRuntime;
@@ -1141,6 +1414,7 @@ mod tests {
     use serde_json::json;
 
     use super::QueryEvent;
+    use super::hosted_tools_for_web_search;
     use super::insert_subagent_request_reminders;
     use super::query;
     use super::test_model_connection;
@@ -1149,6 +1423,33 @@ mod tests {
     use crate::Model;
     use crate::ReasoningEffort;
     use crate::Role;
+
+    #[test]
+    fn hosted_tools_follow_resolved_web_search_mode() {
+        let hosted = hosted_tools_for_web_search(&devo_config::ResolvedWebSearchConfig::Provider);
+        assert_eq!(hosted.len(), 1);
+        assert!(matches!(
+            hosted.as_slice(),
+            [devo_protocol::HostedToolDefinition::WebSearch(_)]
+        ));
+
+        assert_eq!(
+            hosted_tools_for_web_search(&devo_config::ResolvedWebSearchConfig::Disabled),
+            Vec::new()
+        );
+        assert_eq!(
+            hosted_tools_for_web_search(&devo_config::ResolvedWebSearchConfig::Local(
+                devo_config::ResolvedLocalWebSearchConfig {
+                    provider_id: "test".to_string(),
+                    kind: devo_config::LocalWebSearchProviderKind::Exa,
+                    api_key: "secret".to_string(),
+                    base_url: None,
+                    max_results: None,
+                },
+            )),
+            Vec::new()
+        );
+    }
     use crate::SessionConfig;
     use crate::SessionState;
     use crate::ThinkingCapability;
@@ -1405,6 +1706,10 @@ mod tests {
         requests: Arc<Mutex<Vec<ModelRequest>>>,
     }
 
+    struct HostedWebSearchProvider {
+        requests: Arc<Mutex<Vec<ModelRequest>>>,
+    }
+
     struct TransientStreamCreateProvider {
         attempts: AtomicUsize,
     }
@@ -1468,6 +1773,65 @@ mod tests {
 
         fn name(&self) -> &str {
             "openai"
+        }
+    }
+
+    #[async_trait]
+    impl devo_provider::ModelProviderSDK for HostedWebSearchProvider {
+        async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
+            unreachable!("tests stream responses only")
+        }
+
+        async fn completion_stream(
+            &self,
+            request: ModelRequest,
+        ) -> Result<Pin<Box<dyn Stream<Item = Result<StreamEvent>> + Send>>> {
+            self.requests.lock().expect("lock requests").push(request);
+            let input = json!({ "query": "current Rust docs" });
+            let output = Some(json!({
+                "results": [
+                    {
+                        "title": "Rust documentation",
+                        "url": "https://example.test/rust"
+                    }
+                ]
+            }));
+            Ok(Box::pin(futures::stream::iter(vec![
+                Ok(StreamEvent::HostedToolCallStart {
+                    index: 0,
+                    id: "hosted_ws_1".into(),
+                    name: "web_search".into(),
+                    input: input.clone(),
+                }),
+                Ok(StreamEvent::MessageDone {
+                    response: ModelResponse {
+                        id: "resp".into(),
+                        content: vec![
+                            ResponseContent::HostedToolUse {
+                                id: "hosted_ws_1".into(),
+                                name: "web_search".into(),
+                                input: input.clone(),
+                                output: None,
+                                status: None,
+                            },
+                            ResponseContent::HostedToolUse {
+                                id: "hosted_ws_1".into(),
+                                name: "web_search".into(),
+                                input,
+                                output,
+                                status: Some("completed".into()),
+                            },
+                        ],
+                        stop_reason: Some(StopReason::ToolUse),
+                        usage: Usage::default(),
+                        metadata: Default::default(),
+                    },
+                }),
+            ])))
+        }
+
+        fn name(&self) -> &str {
+            "hosted-web-search-provider"
         }
     }
 
@@ -1565,6 +1929,35 @@ mod tests {
     }
 
     struct DisplayContentTool;
+
+    struct CountingWebSearchTool {
+        executions: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl ToolHandler for CountingWebSearchTool {
+        fn spec(&self) -> &crate::tools::tool_spec::ToolSpec {
+            Box::leak(Box::new(crate::tools::tool_spec::ToolSpec::new(
+                "web_search",
+                "Search the web.",
+                crate::tools::JsonSchema::object(Default::default(), None, None),
+            )))
+        }
+
+        async fn handle(
+            &self,
+            _ctx: crate::tools::contracts::ToolContext,
+            _input: serde_json::Value,
+            _progress: Option<crate::tools::contracts::ToolProgressSender>,
+        ) -> Result<crate::tools::contracts::ToolResult, crate::tools::contracts::ToolCallError>
+        {
+            self.executions.fetch_add(1, Ordering::SeqCst);
+            Ok(crate::tools::contracts::ToolResult::success(
+                crate::tools::contracts::ToolResultContent::Text("local search".into()),
+                "local search",
+            ))
+        }
+    }
 
     #[async_trait]
     impl ToolHandler for DisplayContentTool {
@@ -1775,15 +2168,26 @@ mod tests {
             }
         }
 
+        let mut turn_config = TurnConfig::new(
+            Model {
+                base_instructions: "base system".to_string(),
+                ..Model::default()
+            },
+            None,
+        );
+        turn_config.web_search = devo_config::ResolvedWebSearchConfig::Local(
+            devo_config::ResolvedLocalWebSearchConfig {
+                provider_id: "test".to_string(),
+                kind: devo_config::LocalWebSearchProviderKind::Exa,
+                api_key: "secret".to_string(),
+                base_url: None,
+                max_results: None,
+            },
+        );
+
         query(
             &mut session,
-            &TurnConfig::new(
-                Model {
-                    base_instructions: "base system".to_string(),
-                    ..Model::default()
-                },
-                None,
-            ),
+            &turn_config,
             provider,
             registry,
             &runtime,
@@ -1807,6 +2211,7 @@ mod tests {
         let mode_prompt = crate::collaboration_mode_prompts::mode_introductions_prompt();
         assert!(system.contains("base system"));
         assert!(system.contains(&mode_prompt));
+        assert!(system.contains("Sources:"));
         assert!(
             !request
                 .system
@@ -1838,6 +2243,186 @@ mod tests {
                 .iter()
                 .any(|message| message_contains(message, "<context_changes>"))
         );
+    }
+
+    #[tokio::test]
+    async fn query_adds_web_search_prompt_for_provider_hosted_search() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
+            requests: Arc::clone(&requests),
+        });
+        let registry = Arc::new(ToolRegistry::new());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("search current docs"));
+        let mut turn_config = TurnConfig::new(
+            Model {
+                base_instructions: "base system".to_string(),
+                ..Model::default()
+            },
+            None,
+        );
+        turn_config.web_search = devo_config::ResolvedWebSearchConfig::Provider;
+
+        query(
+            &mut session,
+            &turn_config,
+            provider,
+            registry,
+            &runtime,
+            None,
+        )
+        .await
+        .expect("query should complete");
+
+        let captured = requests.lock().expect("lock requests");
+        assert_eq!(captured.len(), 1);
+        let request = &captured[0];
+        let system = request.system.as_deref().expect("system prompt");
+
+        assert!(system.contains("base system"));
+        assert!(system.contains("Sources:"));
+        assert!(system.contains("The current month is "));
+        assert!(matches!(
+            request.hosted_tools.as_slice(),
+            [devo_protocol::HostedToolDefinition::WebSearch(_)]
+        ));
+        assert!(
+            request
+                .tools
+                .as_ref()
+                .is_none_or(|tools| tools.iter().all(|tool| tool.name != "web_search"))
+        );
+    }
+
+    #[tokio::test]
+    async fn provider_hosted_web_search_emits_tool_events_without_local_execution() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(HostedWebSearchProvider {
+            requests: Arc::clone(&requests),
+        });
+        let executions = Arc::new(AtomicUsize::new(0));
+        let mut builder = ToolRegistryBuilder::new();
+        builder.register_handler(
+            "web_search",
+            Arc::new(CountingWebSearchTool {
+                executions: Arc::clone(&executions),
+            }),
+        );
+        builder.push_spec(ToolSpec {
+            name: "web_search".into(),
+            description: "Search the web.".into(),
+            input_schema: JsonSchema::object(Default::default(), None, None),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: None,
+            supports_cancellation: None,
+            supports_streaming: None,
+        });
+        let registry = Arc::new(builder.build());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("search current docs"));
+        let mut turn_config = TurnConfig::new(Model::default(), None);
+        turn_config.web_search = devo_config::ResolvedWebSearchConfig::Provider;
+
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let seen_clone = Arc::clone(&seen);
+        let callback = Arc::new(move |event: QueryEvent| {
+            seen_clone.lock().unwrap().push(event);
+        });
+
+        query(
+            &mut session,
+            &turn_config,
+            provider,
+            registry,
+            &runtime,
+            Some(callback),
+        )
+        .await
+        .expect("query should complete");
+
+        assert_eq!(executions.load(Ordering::SeqCst), 0);
+        let captured = requests.lock().expect("lock requests");
+        assert_eq!(captured.len(), 1);
+        let request = &captured[0];
+        assert!(matches!(
+            request.hosted_tools.as_slice(),
+            [devo_protocol::HostedToolDefinition::WebSearch(_)]
+        ));
+        assert!(
+            request
+                .tools
+                .as_ref()
+                .is_none_or(|tools| tools.iter().all(|tool| tool.name != "web_search"))
+        );
+
+        let events = seen.lock().unwrap();
+        let starts = events
+            .iter()
+            .filter_map(|event| match event {
+                QueryEvent::ToolUseStart { id, name, input } => {
+                    Some((id.as_str(), name.as_str(), input.clone()))
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            starts,
+            vec![(
+                "hosted_ws_1",
+                "web_search",
+                json!({ "query": "current Rust docs" })
+            )]
+        );
+        let results = events
+            .iter()
+            .filter_map(|event| match event {
+                QueryEvent::ToolResult {
+                    tool_use_id,
+                    tool_name,
+                    input,
+                    content,
+                    is_error,
+                    ..
+                } => Some((
+                    tool_use_id.as_str(),
+                    tool_name.as_str(),
+                    input.clone(),
+                    content,
+                    *is_error,
+                )),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(results.len(), 1);
+        let (tool_use_id, tool_name, input, content, is_error) = &results[0];
+        assert_eq!(*tool_use_id, "hosted_ws_1");
+        assert_eq!(*tool_name, "web_search");
+        assert_eq!(input, &json!({ "query": "current Rust docs" }));
+        assert!(!*is_error);
+        assert!(matches!(
+            *content,
+            ToolContent::Text(text) if text == "└ status: completed"
+        ));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            QueryEvent::TurnComplete {
+                stop_reason: StopReason::ToolUse
+            }
+        )));
+        assert!(session.messages.iter().all(|message| {
+            message.content.iter().all(|block| {
+                !matches!(
+                    block,
+                    ContentBlock::ToolUse { .. } | ContentBlock::ToolResult { .. }
+                )
+            })
+        }));
     }
 
     #[test]
@@ -2237,6 +2822,7 @@ mod tests {
 
     #[tokio::test]
     async fn query_inserts_goal_context_before_latest_user_request() {
+        // Trace: L2-DES-GOAL-001
         let requests = Arc::new(Mutex::new(Vec::new()));
         let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
             requests: Arc::clone(&requests),
@@ -2286,6 +2872,7 @@ mod tests {
 
     #[tokio::test]
     async fn autonomous_goal_context_is_latest_request_after_completed_turn() {
+        // Trace: L2-DES-GOAL-001
         let requests = Arc::new(Mutex::new(Vec::new()));
         let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
             requests: Arc::clone(&requests),
@@ -2325,6 +2912,7 @@ mod tests {
             .position(|message| message_contains(message, "older assistant reply"))
             .expect("assistant history message");
         assert!(goal_index > assistant_index);
+        assert_eq!(goal_index, messages.len() - 1);
     }
 
     #[tokio::test]

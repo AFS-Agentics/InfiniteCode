@@ -28,6 +28,7 @@ use crate::ProviderHttpConfig;
 use crate::ResolvedProviderSettings;
 use crate::ServerConfig;
 use crate::SkillsConfig;
+use crate::ToolsConfig;
 use crate::non_empty_string;
 use crate::provider_vendor_from_config;
 use crate::read_provider_config;
@@ -61,6 +62,9 @@ pub struct AppConfig {
     /// MCP server discovery and runtime configuration.
     #[serde(default)]
     pub mcp: McpConfig,
+    /// Tool-specific runtime configuration.
+    #[serde(default, skip_serializing_if = "ToolsConfig::is_empty")]
+    pub tools: ToolsConfig,
     /// Provider, model, and active model defaults.
     #[serde(flatten)]
     pub provider: ProviderConfigSection,
@@ -149,6 +153,7 @@ impl Default for AppConfig {
             experimental: ExperimentalConfig::default(),
             mcp_oauth_credentials_store: Some(OAuthCredentialsStoreMode::default()),
             mcp: McpConfig::default(),
+            tools: ToolsConfig::default(),
             provider: ProviderConfigSection::default(),
             provider_http: ProviderHttpConfig::default(),
             updates: UpdatesConfig {
@@ -197,6 +202,12 @@ impl AppConfigStore {
     /// Returns the effective app config currently visible to the runtime.
     pub fn effective_config(&self) -> &AppConfig {
         &self.config
+    }
+
+    pub fn user_config_dir(&self) -> &Path {
+        self.user_config_file
+            .parent()
+            .expect("user config file should have a parent directory")
     }
 
     /// Returns the configured provider vendors from the effective config.
@@ -274,6 +285,7 @@ impl AppConfigStore {
                         .default_reasoning_effort
                         .as_deref()
                         .and_then(non_empty_string),
+                    web_search: None,
                     enabled: binding.enabled,
                 },
             );

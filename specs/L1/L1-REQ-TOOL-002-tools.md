@@ -41,7 +41,7 @@ The program must provide a baseline set of built-in tools for coding-agent workf
 - The program must support planning, approval requests, Plan Mode clarification questions, web fetch, web search, and subagent coordination where enabled.
 - The question tool must be reserved for Plan Mode and must not be invoked during Normal Mode.
 - The program should support explicit parallel tool orchestration through `multi_tool_use` where enabled.
-- Tools that require user or environment configuration, including web search, must expose clear configuration and unavailable-state behavior.
+- Tools that require user or environment configuration must expose clear configuration behavior. If such a tool is enabled but unavailable or misconfigured, it must expose clear unavailable-state behavior.
 
 ## Non-Functional Requirements
 

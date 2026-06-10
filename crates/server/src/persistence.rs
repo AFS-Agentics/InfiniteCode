@@ -610,6 +610,8 @@ impl ReplayState {
             latest_compaction_snapshot: self.latest_compaction_snapshot,
             pending_turn_queue,
             btw_input_queue,
+            agent_tool_policy: Default::default(),
+            max_turns: None,
             deferred_assistant: None,
             deferred_reasoning: None,
             next_item_seq: self.next_item_seq.max(1),

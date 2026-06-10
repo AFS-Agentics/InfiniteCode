@@ -938,6 +938,7 @@ impl ServerRuntime {
                 agent_scope: ToolAgentScope::Parent,
                 collaboration_mode: devo_protocol::CollaborationMode::Build,
                 agent_coordinator: None,
+                local_web_search: None,
             },
         );
         let result = runtime
@@ -1864,14 +1865,18 @@ impl ServerRuntime {
         ) = {
             // Run the model query only after the event pipeline is ready so
             // streamed deltas can be consumed and persisted immediately.
-            let (core_session, agent_scope) = {
+            let (core_session, agent_scope, agent_tool_policy) = {
                 let session = session_arc.lock().await;
                 let agent_scope = if session.summary.parent_session_id.is_some() {
                     ToolAgentScope::Subagent
                 } else {
                     ToolAgentScope::Parent
                 };
-                (Arc::clone(&session.core_session), agent_scope)
+                (
+                    Arc::clone(&session.core_session),
+                    agent_scope,
+                    session.agent_tool_policy,
+                )
             };
             let turn_goal = match &input_mode {
                 TurnInputMode::VisibleUserMessage => {
@@ -1897,7 +1902,12 @@ impl ServerRuntime {
             let callback = std::sync::Arc::new(move |event: QueryEvent| {
                 event_callback_tx.send(event);
             });
-            let registry = Arc::clone(&self.deps.registry);
+            let registry = match agent_tool_policy {
+                devo_protocol::AgentToolPolicy::Inherit => Arc::clone(&self.deps.registry),
+                devo_protocol::AgentToolPolicy::DenyAll => {
+                    Arc::new(devo_core::tools::ToolRegistry::new())
+                }
+            };
             let permission_mode = core_session.config.permission_mode;
             let permission_profile = core_session.config.permission_profile.clone();
             let turn_cancel_token = self
@@ -1922,6 +1932,11 @@ impl ServerRuntime {
                     agent_scope,
                     collaboration_mode,
                     agent_coordinator: Some(Arc::clone(&self) as Arc<dyn AgentToolCoordinator>),
+                    local_web_search: match &turn_config.web_search {
+                        devo_core::ResolvedWebSearchConfig::Local(config) => Some(config.clone()),
+                        devo_core::ResolvedWebSearchConfig::Disabled
+                        | devo_core::ResolvedWebSearchConfig::Provider => None,
+                    },
                 },
                 ToolExecutionOptions {
                     cancel_token: turn_cancel_token,

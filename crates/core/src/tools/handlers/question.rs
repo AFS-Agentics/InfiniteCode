@@ -25,7 +25,7 @@ impl QuestionHandler {
     pub fn new() -> Self {
         let mut spec = ToolSpec::new(
             "request_user_input",
-            "Ask the user one or more Plan Mode questions and wait for the response.",
+            "Use this tool when you need to ask the user questions during execution. This allows you to gather user preferences or requirements, clarify ambiguous instructions, get decisions on implementation choices as you work, or offer choices to the user about what direction to take.\n\nUsage notes:\n- Users will always be able to select Other to provide custom text input when the UI supports it.\n- If you recommend a specific option, make that the first option in the list and add \"(Recommended)\" at the end of the label.\n- In Plan Mode, use this tool to clarify requirements or choose between approaches BEFORE finalizing your plan.\n- Do NOT use this tool to ask \"Is my plan ready?\" or \"Should I proceed?\".\n- IMPORTANT: Do not reference \"the plan\" in your questions because the user cannot see the plan in the UI until plan approval is requested through the appropriate Plan Mode flow.",
             JsonSchema::object(
                 std::collections::BTreeMap::from([("questions".to_string(), questions_schema())]),
                 Some(vec!["questions".to_string()]),

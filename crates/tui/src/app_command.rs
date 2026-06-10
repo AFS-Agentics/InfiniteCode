@@ -74,6 +74,9 @@ pub(crate) enum AppCommand {
         input: Vec<InputItem>,
         expected_turn_id: TurnId,
     },
+    RunBtwQuestion {
+        question: String,
+    },
     ApprovalRespond {
         session_id: SessionId,
         turn_id: TurnId,
@@ -141,6 +144,9 @@ pub(crate) enum AppCommandView<'a> {
     },
     SteerTurn {
         input: &'a [InputItem],
+    },
+    RunBtwQuestion {
+        question: &'a str,
     },
     ApprovalRespond {
         approval_id: &'a str,
@@ -327,6 +333,7 @@ impl AppCommand {
             Self::UserTurn { .. } => "user_turn",
             Self::OverrideTurnContext { .. } => "override_turn_context",
             Self::SteerTurn { .. } => "steer_turn",
+            Self::RunBtwQuestion { .. } => "run_btw_question",
             Self::ApprovalRespond { .. } => "approval_respond",
             Self::RequestUserInputRespond { .. } => "request_user_input_respond",
             Self::UpdatePermissions { .. } => "update_permissions",
@@ -387,6 +394,7 @@ impl AppCommand {
                 approval_policy,
             },
             Self::SteerTurn { input, .. } => AppCommandView::SteerTurn { input },
+            Self::RunBtwQuestion { question } => AppCommandView::RunBtwQuestion { question },
             Self::ApprovalRespond {
                 approval_id,
                 decision,

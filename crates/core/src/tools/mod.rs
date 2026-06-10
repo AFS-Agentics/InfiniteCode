@@ -36,6 +36,7 @@ pub mod unified_exec;
 pub(crate) mod apply_patch;
 pub(crate) mod read;
 pub(crate) mod shell_exec;
+pub(crate) mod websearch_prompt;
 
 pub use contracts::{
     RedactionState, SessionMode, ToolAgentScope, ToolCallError, ToolContext, ToolPermissionProfile,

@@ -1682,6 +1682,17 @@ fn goal_slash_command_emits_set_goal_objective() {
     );
 
     widget.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(widget.composer_is_empty());
+    let rendered_after_submit = widget
+        .transcript_overlay_lines(100)
+        .into_iter()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        rendered_after_submit.contains("/goal improve benchmark coverage"),
+        "expected submitted /goal command in history:\n{rendered_after_submit}"
+    );
 
     assert_eq!(
         app_event_rx.try_recv().expect("goal command event"),
@@ -1719,6 +1730,96 @@ fn goal_control_slash_commands_emit_goal_app_commands() {
     assert_eq!(
         event_for_slash("/goal clear"),
         AppEvent::Command(AppCommand::ClearGoal)
+    );
+}
+
+#[test]
+fn btw_slash_command_clears_composer_and_records_history() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, mut app_event_rx) = widget_with_model(model, PathBuf::from("."));
+    let turn_id = TurnId::new();
+
+    widget.handle_worker_event(crate::events::WorkerEvent::TurnStarted {
+        model: "test-model".to_string(),
+        thinking: None,
+        reasoning_effort: None,
+        turn_id,
+    });
+    widget.handle_paste("/btw check the failing edge case".to_string());
+    widget.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    assert!(widget.composer_is_empty());
+    let rendered_after_submit = widget
+        .transcript_overlay_lines(100)
+        .into_iter()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        rendered_after_submit.contains("/btw check the failing edge case"),
+        "expected submitted /btw command in history:\n{rendered_after_submit}"
+    );
+    assert_eq!(
+        app_event_rx.try_recv().expect("btw command event"),
+        AppEvent::Command(AppCommand::RunBtwQuestion {
+            question: "check the failing edge case".to_string(),
+        })
+    );
+}
+
+#[test]
+fn empty_btw_slash_command_shows_usage() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, mut app_event_rx) = widget_with_model(model, PathBuf::from("."));
+
+    widget.handle_paste("/btw ".to_string());
+    widget.handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+
+    assert!(widget.composer_is_empty());
+    assert!(app_event_rx.try_recv().is_err());
+    let transcript = widget
+        .transcript_overlay_lines(100)
+        .into_iter()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        transcript.contains("Usage: /btw <your question>"),
+        "expected /btw usage in transcript:\n{transcript}"
+    );
+}
+
+#[test]
+fn btw_completed_renders_temporary_answer() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+
+    widget.handle_worker_event(crate::events::WorkerEvent::BtwCompleted {
+        question: "what changed?".to_string(),
+        answer: "Only the side answer is shown here.".to_string(),
+    });
+
+    let transcript = widget
+        .transcript_overlay_lines(100)
+        .into_iter()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        transcript.contains("BTW") && transcript.contains("Only the side answer is shown here."),
+        "expected temporary /btw answer in transcript:\n{transcript}"
     );
 }
 
@@ -3509,6 +3610,74 @@ fn tool_call_start_and_finish_are_both_visible_in_history() {
     assert!(
         ran.contains("2026-05-09"),
         "expected tool output, got:\n{ran}"
+    );
+}
+
+#[test]
+fn web_search_tool_call_renders_title_and_status_without_running_prefix() {
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, cwd);
+    let _ = widget.drain_scrollback_lines(80);
+
+    widget.handle_worker_event(crate::events::WorkerEvent::TurnStarted {
+        model: "test-model".to_string(),
+        thinking: None,
+        reasoning_effort: None,
+        turn_id: Default::default(),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "Web Search(\"latest OpenAI API docs\")".to_string(),
+        preparing: false,
+        parsed_commands: None,
+    });
+
+    let running = rendered_rows(&widget, 80, 12).join(
+        "
+",
+    );
+    assert!(
+        running.contains("Web Search(\"latest OpenAI API docs\")"),
+        "expected web search title, got:
+{running}"
+    );
+    assert!(
+        !running.contains("Running Web Search"),
+        "web search should not render a Running prefix, got:
+{running}"
+    );
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
+        tool_use_id: "tool-1".to_string(),
+        title: "Web Search(\"latest OpenAI API docs\")".to_string(),
+        preview: "└ status: completed".to_string(),
+        is_error: false,
+        truncated: false,
+    });
+
+    let rendered = scrollback_plain_lines(&widget.drain_scrollback_lines(80)).join(
+        "
+",
+    );
+    assert!(
+        rendered.contains("Web Search(\"latest OpenAI API docs\")"),
+        "expected completed web search title, got:
+{rendered}"
+    );
+    assert!(
+        rendered.contains("└ status: completed"),
+        "expected completed status line, got:
+{rendered}"
+    );
+    assert!(
+        !rendered.contains("Ran Web Search") && !rendered.contains("Running Web Search"),
+        "web search should not render Ran/Running prefix, got:
+{rendered}"
     );
 }
 

@@ -406,8 +406,8 @@ fn alias_map(registered: &HashSet<&str>) -> HashMap<String, String> {
     insert_alias(&mut aliases, registered, "semble", "code_search");
     insert_alias(&mut aliases, registered, "fetch-url", "fetch_url");
     insert_alias(&mut aliases, registered, "urlfetch", "fetch_url");
-    insert_alias(&mut aliases, registered, "web_search", "websearch");
-    insert_alias(&mut aliases, registered, "web-search", "websearch");
+    insert_alias(&mut aliases, registered, "websearch", "web_search");
+    insert_alias(&mut aliases, registered, "web-search", "web_search");
     insert_alias(&mut aliases, registered, "fetch_url", "webfetch");
     insert_alias(&mut aliases, registered, "fetch-url", "webfetch");
     insert_alias(&mut aliases, registered, "tool-search", "ToolSearch");
@@ -464,7 +464,6 @@ fn default_preloaded_tools() -> BTreeSet<String> {
 fn default_deferred_tools() -> BTreeSet<String> {
     [
         "web_search",
-        "websearch",
         "fetch_url",
         "webfetch",
         "multi_tool_use",

@@ -1,7 +1,12 @@
-- Fast content search tool that works with any codebase size
-- Searches file contents using ripgrep regular expressions
+A powerful search tool built on ripgrep
+
+Usage:
+- ALWAYS use this tool for search tasks. NEVER invoke `grep` or `rg` as a shell command unless explicitly instructed or after you have verified this tool cannot accomplish your task. This tool has been optimized for correct permissions and access.
 - Supports full regex syntax (eg. "log.*Error", "function\s+\w+", etc.)
-- Filter files by pattern with the include parameter (eg. "*.js", "*.{ts,tsx}")
+- Filter files with the include parameter (eg. "*.js", "**/*.tsx", "*.{ts,tsx}")
 - Returns file paths, line numbers, and matching lines
 - Use this tool when you need to search for an exact string or regex pattern
+- Use the Agent tool for open-ended searches requiring multiple rounds when an Agent tool is available
+- Pattern syntax: Uses ripgrep (not grep) - literal braces need escaping (use `interface\{\}` to find `interface{}` in Go code)
+- Multiline matching: By default patterns match within single lines only. If a multiline option exists and you need cross-line patterns like `struct \{[\s\S]*?field`, use it.
 - When code_search is available, prefer it for codebase investigation, architecture questions, related-code lookup, symbol/module discovery, and natural-language intent searches

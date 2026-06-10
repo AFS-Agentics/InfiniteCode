@@ -12,6 +12,7 @@ use crate::tool_spec::{ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, Too
 const MAX_RESPONSE_SIZE: usize = 5 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS: u64 = 30_000;
 const MAX_TIMEOUT_MS: u64 = 120_000;
+const WEBFETCH_DESCRIPTION: &str = include_str!("../webfetch.txt");
 
 pub struct WebFetchHandler {
     spec: ToolSpec,
@@ -28,7 +29,7 @@ impl WebFetchHandler {
         Self {
             spec: ToolSpec {
                 name: "webfetch".into(),
-                description: "Fetches content from a specified URL.".into(),
+                description: WEBFETCH_DESCRIPTION.into(),
                 input_schema: JsonSchema::object(
                     std::collections::BTreeMap::from([
                         (

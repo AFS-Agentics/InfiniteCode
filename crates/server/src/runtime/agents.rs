@@ -32,6 +32,11 @@ impl ServerRuntime {
                 "fork_turns must be \"none\" or \"all\"".to_string(),
             ));
         }
+        if params.max_turns == Some(0) {
+            return Err(ToolCallError::InvalidInput(
+                "max_turns must be positive when provided".to_string(),
+            ));
+        }
 
         let parent_arc = self.session_arc(parent_session_id).await?;
         let parent_snapshot = {
@@ -82,9 +87,14 @@ impl ServerRuntime {
         record.agent_nickname = Some(nickname.clone());
         record.agent_role = Some(role.clone());
         record.first_user_message = Some(params.message.clone());
-        self.rollout_store
-            .append_session_meta(&record)
-            .map_err(|error| ToolCallError::InternalError(error.to_string()))?;
+        let record = if params.ephemeral {
+            None
+        } else {
+            self.rollout_store
+                .append_session_meta(&record)
+                .map_err(|error| ToolCallError::InternalError(error.to_string()))?;
+            Some(record)
+        };
 
         let mut core_session = self
             .deps
@@ -127,7 +137,7 @@ impl ServerRuntime {
             agent_path: Some(agent_path.clone()),
             agent_nickname: Some(nickname.clone()),
             agent_role: Some(role.clone()),
-            ephemeral: false,
+            ephemeral: params.ephemeral,
             model: model.clone(),
             thinking,
             reasoning_effort: None,
@@ -140,7 +150,7 @@ impl ServerRuntime {
             status: SessionRuntimeStatus::Idle,
         };
         let child_session = RuntimeSession {
-            record: Some(record),
+            record,
             summary: summary.clone(),
             config: parent_config,
             core_session: Arc::new(Mutex::new(core_session)),
@@ -152,6 +162,8 @@ impl ServerRuntime {
             latest_compaction_snapshot: None,
             pending_turn_queue,
             btw_input_queue,
+            agent_tool_policy: params.tool_policy,
+            max_turns: params.max_turns,
             deferred_assistant: None,
             deferred_reasoning: None,
             next_item_seq: 1,
@@ -197,7 +209,9 @@ impl ServerRuntime {
             },
         )
         .await;
-        if let Err(error) = self.deps.db.upsert_session(&summary) {
+        if !summary.ephemeral
+            && let Err(error) = self.deps.db.upsert_session(&summary)
+        {
             tracing::warn!(
                 session_id = %child_session_id,
                 error = %error,
@@ -347,6 +361,21 @@ impl ServerRuntime {
         };
         let queued_active_turn = {
             let session = session_arc.lock().await;
+            if session.max_turns.is_some_and(|max_turns| {
+                max_turns == 0
+                    || session
+                        .active_turn
+                        .as_ref()
+                        .is_some_and(|turn| turn.sequence >= max_turns)
+                    || session
+                        .latest_turn
+                        .as_ref()
+                        .is_some_and(|turn| turn.sequence >= max_turns)
+            }) {
+                return Err(ToolCallError::InvalidInput(
+                    "agent maximum turn count reached".to_string(),
+                ));
+            }
             session.active_turn.as_ref().map(|turn| {
                 (
                     turn.clone(),

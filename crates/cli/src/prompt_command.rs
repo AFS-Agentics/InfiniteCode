@@ -81,6 +81,7 @@ pub(crate) async fn run_prompt(
             agent_scope: devo_core::tools::ToolAgentScope::Parent,
             collaboration_mode: devo_protocol::CollaborationMode::Build,
             agent_coordinator: None,
+            local_web_search: None,
         },
     );
     let model_catalog = PresetModelCatalog::load_from_config(&home_dir, Some(&cwd))?;

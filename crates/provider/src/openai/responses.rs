@@ -13,6 +13,7 @@ use reqwest_eventsource::{Event, EventSource};
 use serde_json::{Value, json};
 use tracing::debug;
 
+use crate::hosted_tools::append_openai_responses_hosted_tools;
 use crate::text_normalization::{TaggedTextFragment, TaggedTextParser, split_tagged_text};
 use crate::{ModelProviderSDK, ProviderHttpOptions, merge_extra_body};
 
@@ -114,6 +115,8 @@ fn build_request(request: &ModelRequest, stream: bool) -> Value {
     if stream {
         root["stream_options"] = json!({ "include_usage": true });
     }
+
+    append_openai_responses_hosted_tools(&mut root, &request.hosted_tools);
 
     merge_extra_body(&mut root, request.extra_body.as_ref());
 
@@ -269,6 +272,7 @@ fn parse_output_item(item: &Value) -> Vec<ResponseContent> {
                 .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
             vec![ResponseContent::ToolUse { id, name, input }]
         }
+        Some("web_search_call") => vec![parse_hosted_web_search_call(item)],
         Some("reasoning") => Vec::new(),
         _ => Vec::new(),
     }
@@ -303,8 +307,50 @@ fn parse_message_content(item: &Value) -> Option<ResponseContent> {
                 .cloned()
                 .unwrap_or_else(|| Value::Object(serde_json::Map::new())),
         }),
+        Some("web_search_call") => Some(parse_hosted_web_search_call(item)),
         _ => None,
     }
+}
+
+fn parse_hosted_web_search_call(item: &Value) -> ResponseContent {
+    ResponseContent::HostedToolUse {
+        id: item
+            .get("call_id")
+            .or_else(|| item.get("id"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        name: "web_search".to_string(),
+        input: hosted_web_search_input(item),
+        output: hosted_web_search_output(item),
+        status: item
+            .get("status")
+            .and_then(Value::as_str)
+            .map(ToString::to_string),
+    }
+}
+
+fn hosted_web_search_input(item: &Value) -> Value {
+    if let Some(query) = item
+        .get("action")
+        .and_then(|action| action.get("query"))
+        .and_then(Value::as_str)
+    {
+        return json!({ "query": query });
+    }
+    if let Some(query) = item.get("query").and_then(Value::as_str) {
+        return json!({ "query": query });
+    }
+    item.get("action")
+        .cloned()
+        .unwrap_or_else(|| Value::Object(serde_json::Map::new()))
+}
+
+fn hosted_web_search_output(item: &Value) -> Option<Value> {
+    item.get("results")
+        .or_else(|| item.get("result"))
+        .or_else(|| item.get("content"))
+        .cloned()
 }
 
 fn parse_usage(value: &Value) -> Option<Usage> {
@@ -397,6 +443,7 @@ impl ModelProviderSDK for OpenAIResponsesProvider {
             let mut text_parser = TaggedTextParser::default();
             let mut response_id = String::new();
             let mut tool_calls: HashMap<String, (String, String, String)> = HashMap::new();
+            let mut hosted_tool_calls: HashMap<String, (usize, String, String, Value, Option<Value>, Option<String>)> = HashMap::new();
             let mut usage: Option<Usage> = None;
             let mut reasoning_started = false;
             let mut text_started = false;
@@ -496,17 +543,72 @@ impl ModelProviderSDK for OpenAIResponsesProvider {
                                                 text: reasoning_content.to_string(),
                                             };
                                         }
-                                    if let Some(ResponseContent::ToolUse { id, name, input }) = parse_output_item(item).into_iter().next() {
-                                        let key = id.clone();
-                                        tool_calls.insert(key.clone(), (id.clone(), name.clone(), input.to_string()));
-                                        let index = tool_calls.len();
-                                        yield StreamEvent::ToolCallStart {
-                                            index,
-                                            id,
-                                            name,
-                                            input,
-                                        };
+                                    if let Some(content) = parse_output_item(item).into_iter().next() {
+                                        match content {
+                                            ResponseContent::ToolUse { id, name, input } => {
+                                                let key = id.clone();
+                                                tool_calls.insert(key.clone(), (id.clone(), name.clone(), input.to_string()));
+                                                let index = tool_calls.len();
+                                                yield StreamEvent::ToolCallStart {
+                                                    index,
+                                                    id,
+                                                    name,
+                                                    input,
+                                                };
+                                            }
+                                            ResponseContent::HostedToolUse { id, name, input, output, status } => {
+                                                let index = tool_calls.len() + hosted_tool_calls.len() + 1;
+                                                let key = id.clone();
+                                                hosted_tool_calls.insert(
+                                                    key,
+                                                    (index, id.clone(), name.clone(), input.clone(), output.clone(), status.clone()),
+                                                );
+                                                yield StreamEvent::HostedToolCallStart {
+                                                    index,
+                                                    id: id.clone(),
+                                                    name: name.clone(),
+                                                    input: input.clone(),
+                                                };
+                                                if output.is_some() {
+                                                    yield StreamEvent::HostedToolCallDone {
+                                                        index,
+                                                        id,
+                                                        name,
+                                                        input,
+                                                        output,
+                                                        status,
+                                                    };
+                                                }
+                                            }
+                                            ResponseContent::Text(_) => {}
+                                        }
                                     }
+                                }
+                            }
+                            "response.output_item.done" => {
+                                if let Some(item) = chunk.get("item")
+                                    && let Some(ResponseContent::HostedToolUse { id, name, input, output, status }) =
+                                        parse_output_item(item).into_iter().next()
+                                {
+                                    let key = id.clone();
+                                    let index = if let Some((index, ..)) = hosted_tool_calls.get(&key) {
+                                        *index
+                                    } else {
+                                        let index = tool_calls.len() + hosted_tool_calls.len() + 1;
+                                        hosted_tool_calls.insert(
+                                            key,
+                                            (index, id.clone(), name.clone(), input.clone(), output.clone(), status.clone()),
+                                        );
+                                        index
+                                    };
+                                    yield StreamEvent::HostedToolCallDone {
+                                        index,
+                                        id,
+                                        name,
+                                        input,
+                                        output,
+                                        status,
+                                    };
                                 }
                             }
                             "response.function_call_arguments.delta" | "response.output_item.delta" => {
@@ -581,6 +683,15 @@ impl ModelProviderSDK for OpenAIResponsesProvider {
                                                     input: parsed_input,
                                                 });
                                             }
+                                            for (_, id, name, input, output, status) in hosted_tool_calls.values() {
+                                                content.push(ResponseContent::HostedToolUse {
+                                                    id: id.clone(),
+                                                    name: name.clone(),
+                                                    input: input.clone(),
+                                                    output: output.clone(),
+                                                    status: status.clone(),
+                                                });
+                                            }
                                             content
                                         },
                                         stop_reason: Some(StopReason::EndTurn),
@@ -626,6 +737,15 @@ impl ModelProviderSDK for OpenAIResponsesProvider {
                             id: id.clone(),
                             name: name.clone(),
                             input: parsed_input,
+                        });
+                    }
+                    for (_, id, name, input, output, status) in hosted_tool_calls.values() {
+                        content.push(ResponseContent::HostedToolUse {
+                            id: id.clone(),
+                            name: name.clone(),
+                            input: input.clone(),
+                            output: output.clone(),
+                            status: status.clone(),
                         });
                     }
                     content
@@ -684,6 +804,7 @@ mod tests {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
             }]),
+            hosted_tools: Vec::new(),
             sampling: SamplingControls {
                 temperature: Some(0.4),
                 top_p: Some(0.7),
@@ -739,6 +860,52 @@ mod tests {
             response.content[1],
             ResponseContent::ToolUse { .. }
         ));
+    }
+
+    #[test]
+    fn parse_response_extracts_web_search_call_as_hosted_tool_use() {
+        let response = parse_response(json!({
+            "id": "resp_789",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "web_search_call",
+                    "id": "ws_1",
+                    "status": "completed",
+                    "action": {
+                        "type": "search",
+                        "query": "Rust async docs"
+                    },
+                    "results": [
+                        {
+                            "title": "Async Programming in Rust",
+                            "url": "https://example.test/rust-async"
+                        }
+                    ]
+                }
+            ],
+            "usage": {
+                "input_tokens": 10,
+                "output_tokens": 5
+            }
+        }))
+        .expect("parse response");
+
+        assert_eq!(
+            response.content,
+            vec![ResponseContent::HostedToolUse {
+                id: "ws_1".to_string(),
+                name: "web_search".to_string(),
+                input: json!({"query": "Rust async docs"}),
+                output: Some(json!([
+                    {
+                        "title": "Async Programming in Rust",
+                        "url": "https://example.test/rust-async"
+                    }
+                ])),
+                status: Some("completed".to_string()),
+            }]
+        );
     }
 
     #[test]

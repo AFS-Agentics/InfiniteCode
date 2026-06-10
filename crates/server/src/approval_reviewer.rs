@@ -28,6 +28,7 @@ pub(crate) fn build_approval_review_request(
         }],
         max_tokens: 128,
         tools: None,
+        hosted_tools: Vec::new(),
         sampling: SamplingControls {
             temperature: Some(0.0),
             ..SamplingControls::default()
@@ -41,7 +42,7 @@ pub(crate) fn build_approval_review_request(
 pub(crate) fn parse_reviewer_decision(content: &[ResponseContent]) -> Option<ReviewerDecision> {
     let raw = content.iter().find_map(|block| match block {
         ResponseContent::Text(text) => Some(text.as_str()),
-        ResponseContent::ToolUse { .. } => None,
+        ResponseContent::ToolUse { .. } | ResponseContent::HostedToolUse { .. } => None,
     })?;
     parse_reviewer_text(raw)
 }

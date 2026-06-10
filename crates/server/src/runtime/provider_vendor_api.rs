@@ -249,6 +249,7 @@ fn resolve_validation_api_key(
         credential: params.provider_vendor.credential.clone(),
         headers: params.provider_vendor.headers.clone(),
         wire_apis: params.provider_vendor.wire_apis.clone(),
+        web_search: None,
         enabled: params.provider_vendor.enabled,
     };
     resolve_provider_api_key(

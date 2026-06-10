@@ -13,6 +13,8 @@ use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
 use crate::tool_spec::{ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, ToolSpec};
 
+const WRITE_DESCRIPTION: &str = include_str!("../write.txt");
+
 pub struct WriteHandler {
     spec: ToolSpec,
 }
@@ -28,7 +30,7 @@ impl WriteHandler {
         Self {
             spec: ToolSpec {
                 name: "write".into(),
-                description: "Write a file to the local filesystem.".into(),
+                description: WRITE_DESCRIPTION.into(),
                 input_schema: JsonSchema::object(
                     std::collections::BTreeMap::from([
                         (

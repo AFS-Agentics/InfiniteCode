@@ -21,6 +21,7 @@ use super::ProviderDefaultsConfig;
 use super::ProviderHttpConfig;
 use super::ProviderVendorConfig;
 use super::SummaryModelSelection;
+use super::ToolsConfig;
 use super::UpdatesConfig;
 use crate::BundledSkillsConfig;
 use crate::SkillsConfig;
@@ -120,6 +121,7 @@ check_interval_hours = 48
             experimental: ExperimentalConfig { code_search: true },
             mcp_oauth_credentials_store: Some(OAuthCredentialsStoreMode::default()),
             mcp: super::McpConfig::default(),
+            tools: ToolsConfig::default(),
             provider: ProviderConfigSection::default(),
             provider_http: super::ProviderHttpConfig::default(),
             updates: UpdatesConfig {
@@ -294,6 +296,7 @@ invocation_method = "openai_responses"
                     credential: Some("user_api_key".to_string()),
                     headers: Some(r#"{"X-User":"yes"}"#.to_string()),
                     wire_apis: vec![ProviderWireApi::OpenAIResponses],
+                    web_search: None,
                     enabled: true,
                 },
             )]),

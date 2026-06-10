@@ -98,6 +98,9 @@ impl ToolHandler for AgentToolHandler {
                         session_id,
                         message: input.message,
                         fork_turns: input.fork_turns,
+                        max_turns: None,
+                        tool_policy: Default::default(),
+                        ephemeral: false,
                     })
                     .await?;
                 json_result(result, "agent spawned")
@@ -231,19 +234,19 @@ fn spec(name: &str, description: &str, schema: JsonSchema) -> ToolSpec {
 fn spawn_spec() -> ToolSpec {
     spec(
         "spawn_agent",
-        "Create a child agent for a bounded delegated task. Use this from a parent session to parallelize independent work, then use wait_agent to poll the generated child path or nickname for output.",
+        "Launch a new Devo agent to handle complex, multi-step tasks autonomously.\n\nUse this from a parent session to parallelize independent research or implementation work, then use wait_agent to collect child output. Launch multiple agents concurrently whenever possible when the work is independent.\n\nWriting the prompt:\n- Brief the agent like a smart colleague who just walked into the room: it has not seen this conversation, does not know what you have tried, and does not understand why the task matters unless you tell it.\n- Explain what you are trying to accomplish and why.\n- Describe what you have already learned or ruled out.\n- Give enough context about the surrounding problem that the agent can make judgment calls rather than just following narrow instructions.\n- If you need a short response, say so, for example \"report in under 200 words\".\n- Lookups: hand over the exact command. Investigations: hand over the question; prescribed steps become dead weight when the premise is wrong.\n- Terse command-style prompts produce shallow, generic work.\n- Never delegate understanding. Do not write \"based on your findings, fix the bug\" or \"based on the research, implement it.\" Those phrases push synthesis onto the agent instead of doing it yourself. Write prompts that prove you understood: include file paths, line numbers, and what specifically to change.\n\nWhen not to use an agent:\n- If you want to read a specific file path, use the read tool or file search instead.\n- If you are searching for a specific class, symbol, or string, use grep/code search instead when available.\n- If you are searching within a specific file or a small set of files, read those files directly.\n- Do not use an agent for tasks unrelated to available agent descriptions or the current request.\n\nThe agent's result is not visible to the user. To show the user the result, send a concise summary after wait_agent returns.",
         JsonSchema::object(
             BTreeMap::from([
                 (
                     "message".to_string(),
                     JsonSchema::string(Some(
-                        "Initial task message for the child agent. Include the goal, scope, files or subsystems to inspect, and the expected result.",
+                        "Initial task message for the child agent. Include the goal, scope, files or subsystems to inspect, context needed for judgment calls, and the expected result.",
                     )),
                 ),
                 (
                     "fork_turns".to_string(),
                     JsonSchema::string(Some(
-                        "Optional history fork mode. Use \"all\" (default) when the child needs stable completed parent history; it excludes the active parent turn. Use \"none\" for a clean child context containing only the task message.",
+                        "Optional history fork mode. Use \"all\" (default) when the child needs stable completed parent history; it excludes the active parent turn. Use \"none\" for a clean child context containing only the task message. Do not assume the child sees your active turn unless you include needed context in message.",
                     )),
                 ),
             ]),
@@ -256,7 +259,7 @@ fn spawn_spec() -> ToolSpec {
 fn send_message_spec() -> ToolSpec {
     spec(
         "send_message",
-        "Parent-only tool that sends additional user input to an existing child agent. If the child is idle, the message starts a child turn; if active, it queues for the next turn.",
+        "Parent-only tool that sends additional user input to an existing child agent. If the child is idle, the message starts a child turn; if active, it queues for the next turn. Use this to continue a previously spawned agent with the agent's full context preserved. Each newly spawned agent starts from its configured fork context, so provide a complete task description when spawning rather than relying on hidden assumptions.",
         message_schema(),
     )
 }
@@ -264,7 +267,7 @@ fn send_message_spec() -> ToolSpec {
 fn wait_agent_spec() -> ToolSpec {
     spec(
         "wait_agent",
-        "Parent-only tool that polls child assistant output and terminal status events. Use after spawn_agent or send_message to collect incremental child results.",
+        "Parent-only tool that polls child assistant output and terminal status events. Use after spawn_agent or send_message to collect incremental child results.\n\nDo not peek at generated transcript files or tail child output unless the user explicitly asks for a progress check. Reading a transcript mid-flight pulls the child agent's tool noise into your context and defeats the point of delegation.\n\nDo not race. After launching a child agent, you know nothing about what it found. Never fabricate or predict child results in any format: not as prose, summary, or structured output. If the user asks a follow-up before output lands, tell them the child agent is still running and give status, not a guess.",
         JsonSchema::object(
             BTreeMap::from([
                 (
@@ -480,6 +483,9 @@ mod tests {
                 session_id,
                 message: "review this".to_string(),
                 fork_turns: Some("all".to_string()),
+                max_turns: None,
+                tool_policy: Default::default(),
+                ephemeral: false,
             }]
         );
     }
