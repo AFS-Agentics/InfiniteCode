@@ -11,6 +11,10 @@ use chrono::{DateTime, Utc};
 use devo_protocol::{ItemId, SessionId, TurnId, TurnKind, TurnStatus, TurnUsage};
 
 use crate::durable_record::DurableRecord;
+use crate::durable_record::GoalBudget;
+use crate::durable_record::GoalId as DurableGoalId;
+use crate::durable_record::GoalProgressType;
+use crate::durable_record::GoalStatus as DurableGoalStatus;
 
 // ── Projection Types ────────────────────────────────────────────────
 
@@ -22,6 +26,8 @@ pub struct ReplayProjection {
     pub turns: Vec<TurnProjection>,
     pub pending_items: Vec<PendingItemProjection>,
     pub usage_totals: UsageTotals,
+    pub current_goal: Option<GoalReplayProjection>,
+    pub goal_context_snapshots: Vec<GoalContextSnapshotProjection>,
 }
 
 /// Session-level metadata from replay.
@@ -75,6 +81,34 @@ pub struct UsageTotals {
     pub total_reasoning_tokens: i64,
 }
 
+/// Current goal projection reconstructed from durable goal records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GoalReplayProjection {
+    pub goal_id: DurableGoalId,
+    pub session_id: SessionId,
+    pub prompt: String,
+    pub description: Option<String>,
+    pub status: DurableGoalStatus,
+    pub budget: Option<GoalBudget>,
+    pub tokens_used: i64,
+    pub turns_used: u32,
+    pub time_used_seconds: u64,
+    pub progress_summary: Option<String>,
+    pub blocker_summary: Option<String>,
+    pub verification_summary: Option<String>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Hidden goal context snapshot metadata reconstructed from durable records.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GoalContextSnapshotProjection {
+    pub goal_id: DurableGoalId,
+    pub session_id: SessionId,
+    pub snapshot_id: String,
+    pub summary: String,
+    pub recorded_at: DateTime<Utc>,
+}
+
 // ── Builder ─────────────────────────────────────────────────────────
 
 /// Builds a ReplayProjection from a sequence of DurableRecords.
@@ -94,6 +128,8 @@ pub fn build_replay_projection(
     let mut turn_map: HashMap<TurnId, TurnProjection> = HashMap::new();
     let mut pending_items: HashMap<ItemId, PendingItemProjection> = HashMap::new();
     let mut usage_totals = UsageTotals::default();
+    let mut current_goal: Option<GoalReplayProjection> = None;
+    let mut goal_context_snapshots = Vec::new();
 
     for record in records {
         match record {
@@ -231,6 +267,117 @@ pub fn build_replay_projection(
                 }
             }
 
+            DurableRecord::GoalCreated(r) => {
+                current_goal = Some(GoalReplayProjection {
+                    goal_id: r.goal_id,
+                    session_id: r.session_id,
+                    prompt: r.prompt.clone(),
+                    description: r.description.clone(),
+                    status: DurableGoalStatus::Active,
+                    budget: r.budget.clone(),
+                    tokens_used: 0,
+                    turns_used: 0,
+                    time_used_seconds: 0,
+                    progress_summary: None,
+                    blocker_summary: None,
+                    verification_summary: None,
+                    updated_at: r.created_at,
+                });
+            }
+
+            DurableRecord::GoalReplaced(r) => {
+                current_goal = Some(GoalReplayProjection {
+                    goal_id: r.goal_id,
+                    session_id: r.session_id,
+                    prompt: r.prompt.clone(),
+                    description: r.description.clone(),
+                    status: DurableGoalStatus::Active,
+                    budget: None,
+                    tokens_used: 0,
+                    turns_used: 0,
+                    time_used_seconds: 0,
+                    progress_summary: None,
+                    blocker_summary: None,
+                    verification_summary: None,
+                    updated_at: r.replaced_at,
+                });
+            }
+
+            DurableRecord::GoalStatusChanged(r) => {
+                if let Some(goal) = current_goal
+                    .as_mut()
+                    .filter(|goal| goal.goal_id == r.goal_id)
+                {
+                    goal.status = r.new_status;
+                    goal.updated_at = r.changed_at;
+                    if let Some(reason) = r.reason.clone() {
+                        match r.new_status {
+                            DurableGoalStatus::Completed => {
+                                goal.verification_summary = Some(reason);
+                            }
+                            DurableGoalStatus::Blocked | DurableGoalStatus::Failed => {
+                                goal.blocker_summary = Some(reason);
+                            }
+                            DurableGoalStatus::Active
+                            | DurableGoalStatus::Paused
+                            | DurableGoalStatus::Canceled
+                            | DurableGoalStatus::Cleared => {}
+                        }
+                    }
+                }
+            }
+
+            DurableRecord::GoalBudgetAccounted(r) => {
+                if let Some(goal) = current_goal
+                    .as_mut()
+                    .filter(|goal| goal.goal_id == r.goal_id)
+                {
+                    goal.tokens_used += r.budget_delta.max_tokens.unwrap_or_default();
+                    goal.turns_used += r.budget_delta.max_turns.unwrap_or_default();
+                    goal.time_used_seconds +=
+                        r.budget_delta.max_duration_seconds.unwrap_or_default();
+                    goal.updated_at = r.recorded_at;
+                }
+            }
+
+            DurableRecord::GoalProgressRecorded(r) => {
+                if let Some(goal) = current_goal
+                    .as_mut()
+                    .filter(|goal| goal.goal_id == r.goal_id)
+                {
+                    match r.progress_type {
+                        GoalProgressType::Blocked => {
+                            goal.blocker_summary = Some(r.summary.clone());
+                        }
+                        GoalProgressType::Milestone
+                        | GoalProgressType::PhaseComplete
+                        | GoalProgressType::Note => {
+                            goal.progress_summary = Some(r.summary.clone());
+                        }
+                    }
+                    goal.updated_at = r.recorded_at;
+                }
+            }
+
+            DurableRecord::GoalContextSnapshotRecorded(r) => {
+                goal_context_snapshots.push(GoalContextSnapshotProjection {
+                    goal_id: r.goal_id,
+                    session_id: r.session_id,
+                    snapshot_id: r.snapshot_id.clone(),
+                    summary: r.summary.clone(),
+                    recorded_at: r.recorded_at,
+                });
+            }
+
+            DurableRecord::GoalCleared(r) => {
+                if current_goal
+                    .as_ref()
+                    .is_some_and(|goal| goal.goal_id == r.goal_id)
+                {
+                    current_goal = None;
+                }
+            }
+
             _ => { /* other records don't affect core projection */ }
         }
     }
@@ -256,6 +403,8 @@ pub fn build_replay_projection(
         turns: all_turns,
         pending_items: pending,
         usage_totals,
+        current_goal,
+        goal_context_snapshots,
     }
 }
 
@@ -276,6 +425,7 @@ mod tests {
     use crate::durable_record::*;
     use chrono::Utc;
     use devo_protocol::TurnId;
+    use pretty_assertions::assert_eq;
 
     fn now() -> DateTime<Utc> {
         Utc::now()
@@ -478,5 +628,132 @@ mod tests {
         let projection = build_replay_projection(sid, &records);
         assert_eq!(projection.usage_totals.total_input_tokens, 200);
         assert_eq!(projection.usage_totals.total_reasoning_tokens, 30);
+    }
+
+    #[test]
+    fn goal_durable_records_roundtrip_and_replay_projection() {
+        // Trace: L2-DES-GOAL-001
+        let sid = SessionId::new();
+        let goal_id = GoalId::new();
+        let turn_id = TurnId::new();
+        let created_at = now();
+        let records = vec![
+            DurableRecord::GoalCreated(GoalCreatedRecord {
+                schema_version: 1,
+                goal_id,
+                session_id: sid,
+                turn_id,
+                prompt: "finish goal".into(),
+                description: Some("verify fully".into()),
+                max_iterations: None,
+                budget: Some(GoalBudget {
+                    max_turns: Some(3),
+                    max_tokens: Some(100),
+                    max_duration_seconds: Some(30),
+                }),
+                created_at,
+            }),
+            DurableRecord::GoalBudgetAccounted(GoalBudgetAccountedRecord {
+                schema_version: 1,
+                goal_id,
+                session_id: sid,
+                turn_id,
+                budget_delta: GoalBudget {
+                    max_turns: Some(1),
+                    max_tokens: Some(12),
+                    max_duration_seconds: Some(4),
+                },
+                remaining_budget: GoalBudget {
+                    max_turns: Some(2),
+                    max_tokens: Some(88),
+                    max_duration_seconds: Some(26),
+                },
+                recorded_at: created_at + chrono::Duration::seconds(1),
+            }),
+            DurableRecord::GoalProgressRecorded(GoalProgressRecordedRecord {
+                schema_version: 1,
+                goal_id,
+                session_id: sid,
+                summary: "tests pass".into(),
+                progress_type: GoalProgressType::Milestone,
+                recorded_at: created_at + chrono::Duration::seconds(2),
+            }),
+            DurableRecord::GoalContextSnapshotRecorded(GoalContextSnapshotRecordedRecord {
+                schema_version: 1,
+                goal_id,
+                session_id: sid,
+                snapshot_id: "snapshot-1".into(),
+                summary: "continuation prompt".into(),
+                recorded_at: created_at + chrono::Duration::seconds(3),
+            }),
+            DurableRecord::GoalStatusChanged(GoalStatusChangedRecord {
+                schema_version: 1,
+                goal_id,
+                session_id: sid,
+                previous_status: GoalStatus::Active,
+                new_status: GoalStatus::Completed,
+                reason: Some("verified".into()),
+                changed_at: created_at + chrono::Duration::seconds(4),
+            }),
+        ];
+        let serialized = serde_json::to_string(&records[0]).expect("serialize");
+        let restored: DurableRecord = serde_json::from_str(&serialized).expect("deserialize");
+        let DurableRecord::GoalCreated(restored) = restored else {
+            panic!("expected goal created record");
+        };
+        let DurableRecord::GoalCreated(expected) = &records[0] else {
+            panic!("expected goal created record");
+        };
+        assert_eq!(&restored, expected);
+
+        let projection = build_replay_projection(sid, &records);
+        let goal = projection.current_goal.expect("goal projection");
+
+        assert_eq!(goal.goal_id, goal_id);
+        assert_eq!(goal.prompt, "finish goal");
+        assert_eq!(goal.description.as_deref(), Some("verify fully"));
+        assert_eq!(goal.status, GoalStatus::Completed);
+        assert_eq!(goal.tokens_used, 12);
+        assert_eq!(goal.turns_used, 1);
+        assert_eq!(goal.time_used_seconds, 4);
+        assert_eq!(goal.progress_summary.as_deref(), Some("tests pass"));
+        assert_eq!(goal.verification_summary.as_deref(), Some("verified"));
+        assert_eq!(projection.goal_context_snapshots.len(), 1);
+        assert_eq!(
+            projection.goal_context_snapshots[0].snapshot_id,
+            "snapshot-1"
+        );
+    }
+
+    #[test]
+    fn goal_cleared_removes_current_goal_projection() {
+        // Trace: L2-DES-GOAL-001
+        let sid = SessionId::new();
+        let goal_id = GoalId::new();
+        let created_at = now();
+        let records = vec![
+            DurableRecord::GoalCreated(GoalCreatedRecord {
+                schema_version: 1,
+                goal_id,
+                session_id: sid,
+                turn_id: TurnId::new(),
+                prompt: "finish goal".into(),
+                description: None,
+                max_iterations: None,
+                budget: None,
+                created_at,
+            }),
+            DurableRecord::GoalCleared(GoalClearedRecord {
+                schema_version: 1,
+                goal_id,
+                session_id: sid,
+                reason: Some("user clear".into()),
+                cleared_at: created_at + chrono::Duration::seconds(1),
+            }),
+        ];
+
+        let projection = build_replay_projection(sid, &records);
+
+        assert_eq!(projection.current_goal, None);
     }
 }

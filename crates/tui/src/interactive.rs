@@ -894,7 +894,10 @@ fn handle_worker_event(
         | WorkerEvent::GoalReplaceConfirmationRequested { .. }
         | WorkerEvent::GoalEditLoaded { .. }
         | WorkerEvent::GoalCleared { .. }
-        | WorkerEvent::GoalOperationFailed { .. } => {}
+        | WorkerEvent::GoalOperationFailed { .. }
+        | WorkerEvent::BtwStarted { .. }
+        | WorkerEvent::BtwCompleted { .. }
+        | WorkerEvent::BtwFailed { .. } => {}
     }
     if matches!(&worker_event, WorkerEvent::SessionsListed { .. }) {
         loop_state.resume_browser_pending = false;
@@ -946,6 +949,9 @@ fn handle_app_command(
             expected_turn_id,
         } => {
             worker.submit_steer(input.clone(), *expected_turn_id)?;
+        }
+        AppCommand::RunBtwQuestion { question } => {
+            worker.run_btw_question(question.clone())?;
         }
         AppCommand::ApprovalRespond {
             session_id,

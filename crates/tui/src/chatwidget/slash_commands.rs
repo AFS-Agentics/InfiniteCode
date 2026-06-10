@@ -138,24 +138,28 @@ impl ChatWidget {
                 self.set_status_message("Loading sessions");
             }
             SlashCommand::Btw => {
-                if let Some(turn_id) = self.active_turn_id {
-                    self.add_to_history(history_cell::new_user_prompt(
-                        format!("/btw {argument}"),
-                        Vec::new(),
-                        Vec::new(),
-                        Vec::new(),
-                        self.active_accent_color(),
-                        self.current_turn_mode,
+                let trimmed = argument.trim();
+                if trimmed.is_empty() {
+                    self.add_to_history(history_cell::new_info_event(
+                        "Usage: /btw <your question>".to_string(),
+                        None,
                     ));
-                    self.app_event_tx
-                        .send(AppEvent::Command(AppCommand::SteerTurn {
-                            input: vec![devo_protocol::InputItem::Text { text: argument }],
-                            expected_turn_id: turn_id,
-                        }));
-                    self.set_status_message("Steer sent");
-                } else {
-                    self.set_status_message("No active turn to steer");
+                    self.set_status_message("Usage: /btw <your question>");
+                    return;
                 }
+                self.add_to_history(history_cell::new_user_prompt(
+                    format!("/btw {trimmed}"),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    self.active_accent_color(),
+                    self.current_turn_mode,
+                ));
+                self.app_event_tx
+                    .send(AppEvent::Command(AppCommand::RunBtwQuestion {
+                        question: trimmed.to_string(),
+                    }));
+                self.set_status_message("Asking side question");
             }
             SlashCommand::Goal => {
                 self.handle_goal_slash_command(argument);
@@ -220,6 +224,14 @@ impl ChatWidget {
             return;
         }
 
+        self.add_to_history(history_cell::new_user_prompt(
+            format!("/goal {trimmed}"),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            self.active_accent_color(),
+            self.current_turn_mode,
+        ));
         self.app_event_tx
             .send(AppEvent::Command(AppCommand::set_goal_objective(
                 trimmed.to_string(),

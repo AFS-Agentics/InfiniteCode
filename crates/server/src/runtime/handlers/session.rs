@@ -132,6 +132,8 @@ impl ServerRuntime {
                 latest_compaction_snapshot: None,
                 pending_turn_queue,
                 btw_input_queue,
+                agent_tool_policy: Default::default(),
+                max_turns: None,
                 deferred_assistant: None,
                 deferred_reasoning: None,
                 next_item_seq: 1,
@@ -789,6 +791,8 @@ impl ServerRuntime {
             latest_compaction_snapshot: None,
             pending_turn_queue,
             btw_input_queue,
+            agent_tool_policy: Default::default(),
+            max_turns: None,
             deferred_assistant: None,
             deferred_reasoning: None,
             next_item_seq: u64::try_from(source.persisted_turn_items.len().saturating_add(1))

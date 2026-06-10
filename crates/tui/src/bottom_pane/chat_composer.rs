@@ -2480,6 +2480,7 @@ impl ChatComposer {
             Self::slash_command_args_elements(rest, rest_offset, &self.textarea.text_elements());
         let trimmed_rest = rest.trim();
         args_elements = Self::trim_text_elements(rest, trimmed_rest, args_elements);
+        self.textarea.set_text_clearing_elements("");
         Some(InputResult::CommandWithArgs(
             cmd,
             trimmed_rest.to_string(),

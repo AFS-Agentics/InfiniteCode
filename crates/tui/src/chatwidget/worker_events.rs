@@ -1148,6 +1148,23 @@ impl ChatWidget {
             WorkerEvent::GoalOperationFailed { message } => {
                 self.show_goal_operation_failed(message);
             }
+            WorkerEvent::BtwStarted { question } => {
+                self.set_status_message(format!("Asking side question: {question}"));
+            }
+            WorkerEvent::BtwCompleted {
+                question: _,
+                answer,
+            } => {
+                self.add_markdown_history("BTW", &answer);
+                self.set_status_message("Side question answered");
+            }
+            WorkerEvent::BtwFailed { message } => {
+                self.add_to_history(history_cell::new_error_event_with_hint(
+                    message,
+                    Some("BTW failed".to_string()),
+                ));
+                self.set_status_message("Side question failed");
+            }
             WorkerEvent::SessionRenamed { session_id, title } => {
                 self.add_to_history(history_cell::new_info_event(
                     format!("renamed {session_id} to {title}"),

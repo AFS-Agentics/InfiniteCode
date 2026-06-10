@@ -20,6 +20,8 @@ use devo_core::ReasoningEffort;
 use devo_core::SessionId;
 use devo_core::TurnId;
 use devo_core::TurnStatus;
+use devo_protocol::AgentToolPolicy;
+use devo_protocol::CloseAgentParams;
 use devo_protocol::CommandExecExitedPayload;
 use devo_protocol::CommandExecOutputDeltaPayload;
 use devo_protocol::CommandExecParams;
@@ -38,6 +40,7 @@ use devo_protocol::ReferenceSearchStartParams;
 use devo_protocol::ReferenceSearchUpdateParams;
 use devo_protocol::SessionHistoryMetadata;
 use devo_protocol::SessionPlanStepStatus;
+use devo_protocol::SpawnAgentParams;
 use devo_protocol::ThreadGoalStatus;
 use devo_server::ApprovalDecisionPayload;
 use devo_server::ApprovalRequestPayload;
@@ -217,6 +220,10 @@ enum OperationCommand {
         input: Vec<InputItem>,
         expected_turn_id: TurnId,
     },
+    /// Ask a side question in a one-turn forked agent.
+    RunBtwQuestion {
+        question: String,
+    },
     ApprovalRespond {
         session_id: SessionId,
         turn_id: TurnId,
@@ -244,6 +251,13 @@ struct ShellCommandExecStart {
     process_id: String,
     started_event: WorkerEvent,
     params: CommandExecParams,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BtwQuestionState {
+    parent_session_id: SessionId,
+    question: String,
+    latest_answer: Option<String>,
 }
 
 fn next_shell_command_exec_start(
@@ -545,6 +559,13 @@ impl QueryWorkerHandle {
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
     }
 
+    /// Ask a quick side question without interrupting the active turn.
+    pub(crate) fn run_btw_question(&self, question: String) -> Result<()> {
+        self.command_tx
+            .send(OperationCommand::RunBtwQuestion { question })
+            .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
+    }
+
     pub(crate) fn approval_respond(
         &self,
         session_id: SessionId,
@@ -678,6 +699,7 @@ async fn run_worker_inner(
     let mut latest_completed_agent_message: Option<String> = None;
     let mut child_agent_sessions: HashSet<SessionId> = HashSet::new();
     let mut latest_completed_agent_messages_by_child: HashMap<SessionId, String> = HashMap::new();
+    let mut btw_agent_sessions: HashMap<SessionId, BtwQuestionState> = HashMap::new();
     let mut input_history_cursor: Option<usize> = None;
     let mut active_reference_search_id: Option<ReferenceSearchId> = None;
     let mut active_shell_process_ids: HashSet<String> = HashSet::new();
@@ -987,6 +1009,7 @@ async fn run_worker_inner(
                         client.initialize().await?;
                         session_id = None;
                         child_agent_sessions.clear();
+                        btw_agent_sessions.clear();
                         latest_completed_agent_messages_by_child.clear();
                         active_turn_id = None;
                         active_reference_search_id = None;
@@ -1397,6 +1420,7 @@ async fn run_worker_inner(
                                 active_turn_id = None;
                                 session_id = Some(next_session_id);
                                 child_agent_sessions.clear();
+                                btw_agent_sessions.clear();
                                 latest_completed_agent_messages_by_child.clear();
                                 session_cwd = result.session.cwd.clone();
                                 input_history_cursor = None;
@@ -1604,6 +1628,7 @@ async fn run_worker_inner(
                                         active_turn_id = None;
                                         session_id = Some(next_session_id);
                                         child_agent_sessions.clear();
+                                        btw_agent_sessions.clear();
                                         latest_completed_agent_messages_by_child.clear();
                                         session_cwd = resumed.session.cwd.clone();
                                         input_history_cursor = None;
@@ -1688,6 +1713,43 @@ async fn run_worker_inner(
                                 last_query_input_tokens,
                             });
                             }
+                    }
+                    Some(OperationCommand::RunBtwQuestion { question }) => {
+                        let Some(active_session_id) = session_id else {
+                            let _ = event_tx.send(WorkerEvent::BtwFailed {
+                                message: "No active session exists yet; send a message first, then try /btw.".to_string(),
+                            });
+                            continue;
+                        };
+                        let prompt = btw_agent_prompt(&question);
+                        match client
+                            .agent_spawn(SpawnAgentParams {
+                                session_id: active_session_id,
+                                message: prompt,
+                                fork_turns: Some("all".to_string()),
+                                max_turns: Some(1),
+                                tool_policy: AgentToolPolicy::DenyAll,
+                                ephemeral: true,
+                            })
+                            .await
+                        {
+                            Ok(result) => {
+                                btw_agent_sessions.insert(
+                                    result.child_session_id,
+                                    BtwQuestionState {
+                                        parent_session_id: active_session_id,
+                                        question: question.clone(),
+                                        latest_answer: None,
+                                    },
+                                );
+                                let _ = event_tx.send(WorkerEvent::BtwStarted { question });
+                            }
+                            Err(error) => {
+                                let _ = event_tx.send(WorkerEvent::BtwFailed {
+                                    message: error.to_string(),
+                                });
+                            }
+                        }
                     }
                     Some(OperationCommand::SteerTurn {
                         input,
@@ -1866,6 +1928,17 @@ async fn run_worker_inner(
             notification = client.recv_event() => {
                 match notification? {
                     Some((method, event)) => {
+                        if handle_btw_agent_event(
+                            &method,
+                            &event,
+                            &mut client,
+                            event_tx,
+                            &mut btw_agent_sessions,
+                        )
+                        .await
+                        {
+                            continue;
+                        }
                         match subagent_events::route_server_event(
                             session_id,
                             &child_agent_sessions,
@@ -2569,6 +2642,91 @@ fn completed_agent_message_text(payload: &ItemEventPayload) -> Option<String> {
             .map(ToOwned::to_owned),
         _ => None,
     }
+}
+
+fn btw_agent_prompt(question: &str) -> String {
+    format!(
+        "You are answering a /btw side question in a lightweight forked agent.\n\
+         The inherited conversation is reference context only. Do not continue or modify the \
+         main session task. Answer only this side question.\n\
+         You cannot use tools in this fork: do not read files, run commands, search, or modify code. \
+         Produce one concise answer and stop.\n\n\
+         Side question:\n{question}"
+    )
+}
+
+async fn handle_btw_agent_event(
+    method: &str,
+    event: &ServerEvent,
+    client: &mut StdioServerClient,
+    event_tx: &mpsc::UnboundedSender<WorkerEvent>,
+    btw_agent_sessions: &mut HashMap<SessionId, BtwQuestionState>,
+) -> bool {
+    let Some(child_session_id) = event.session_id() else {
+        return false;
+    };
+    if !btw_agent_sessions.contains_key(&child_session_id) {
+        return false;
+    }
+
+    match method {
+        "item/completed" => {
+            if let ServerEvent::ItemCompleted(payload) = event
+                && let Some(text) = completed_agent_message_text(payload)
+                && let Some(state) = btw_agent_sessions.get_mut(&child_session_id)
+            {
+                state.latest_answer = Some(text);
+            }
+        }
+        "turn/completed" => {
+            let Some(state) = btw_agent_sessions.remove(&child_session_id) else {
+                return true;
+            };
+            let answer = state
+                .latest_answer
+                .unwrap_or_else(|| "Side question finished without an answer.".to_string());
+            let completed = matches!(
+                event,
+                ServerEvent::TurnCompleted(TurnEventPayload { turn, .. })
+                    if turn.status == TurnStatus::Completed
+            );
+            let _ = if completed {
+                event_tx.send(WorkerEvent::BtwCompleted {
+                    question: state.question,
+                    answer,
+                })
+            } else {
+                event_tx.send(WorkerEvent::BtwFailed { message: answer })
+            };
+            close_btw_agent(client, state.parent_session_id, child_session_id).await;
+        }
+        "turn/failed" => {
+            let Some(state) = btw_agent_sessions.remove(&child_session_id) else {
+                return true;
+            };
+            let message = state
+                .latest_answer
+                .unwrap_or_else(|| "Side question failed.".to_string());
+            let _ = event_tx.send(WorkerEvent::BtwFailed { message });
+            close_btw_agent(client, state.parent_session_id, child_session_id).await;
+        }
+        _ => {}
+    }
+
+    true
+}
+
+async fn close_btw_agent(
+    client: &mut StdioServerClient,
+    parent_session_id: SessionId,
+    child_session_id: SessionId,
+) {
+    let _ = client
+        .agent_close(CloseAgentParams {
+            session_id: parent_session_id,
+            target: child_session_id.to_string(),
+        })
+        .await;
 }
 
 fn handle_completed_item(payload: ItemEventPayload, event_tx: &mpsc::UnboundedSender<WorkerEvent>) {

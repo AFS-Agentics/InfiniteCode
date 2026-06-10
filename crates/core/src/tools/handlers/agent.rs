@@ -98,6 +98,9 @@ impl ToolHandler for AgentToolHandler {
                         session_id,
                         message: input.message,
                         fork_turns: input.fork_turns,
+                        max_turns: None,
+                        tool_policy: Default::default(),
+                        ephemeral: false,
                     })
                     .await?;
                 json_result(result, "agent spawned")
@@ -480,6 +483,9 @@ mod tests {
                 session_id,
                 message: "review this".to_string(),
                 fork_turns: Some("all".to_string()),
+                max_turns: None,
+                tool_policy: Default::default(),
+                ephemeral: false,
             }]
         );
     }

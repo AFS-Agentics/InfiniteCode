@@ -1,12 +1,15 @@
 pub mod compaction;
+mod context_insertion;
 pub mod normalize;
 pub mod summarizer;
+
+pub use context_insertion::insert_context_diff_message;
 
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use devo_protocol::{InputModality, Message, RequestContent, RequestMessage, Role, UserInput};
+use devo_protocol::{InputModality, RequestContent, RequestMessage, Role, UserInput};
 
 use crate::context::ContextualUserFragment;
 use crate::response_item::ResponseItem;
@@ -354,16 +357,6 @@ impl History {
         prepend_user_inputs(&mut messages, prefix_user_inputs);
         messages
     }
-}
-
-/// Inserts one context-diff message immediately before the most recent user
-/// message so that turn-local config changes are scoped to the next request.
-pub fn insert_context_diff_message(messages: &mut Vec<Message>, diff: Message) {
-    let insert_at = messages
-        .iter()
-        .rposition(|message| message.role == Role::User)
-        .unwrap_or(messages.len());
-    messages.insert(insert_at, diff);
 }
 
 /// Converts locked prefix `UserInput`s into request messages and prepends them

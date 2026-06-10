@@ -159,9 +159,6 @@ impl GoalStore {
         let Some(goal) = self.active_goal.as_mut() else {
             return Err(GoalError::NotFound("current".to_string()));
         };
-        if goal.status.is_terminal() && status != ThreadGoalStatus::Active {
-            return Err(GoalError::InvalidTransition);
-        }
         goal.status = GoalStatus::from_thread_goal_status(status);
         goal.updated_at = chrono::Utc::now();
         Ok(goal.clone())
@@ -362,6 +359,27 @@ mod tests {
     }
 
     #[test]
+    fn set_status_can_update_terminal_goal() {
+        // Trace: L2-DES-GOAL-001
+        let mut store = GoalStore::new();
+        let params = GoalCreateParams {
+            session_id: SessionId::new(),
+            ..make_params()
+        };
+        store.create(params).expect("create");
+        store
+            .set_status(ThreadGoalStatus::Complete)
+            .expect("complete");
+
+        let goal = store
+            .set_status(ThreadGoalStatus::Active)
+            .expect("reactivate");
+
+        assert_eq!(goal.status, GoalStatus::Active);
+        assert_eq!(store.get(), Some(&goal));
+    }
+
+    #[test]
     fn goal_clear_removes() {
         let mut store = GoalStore::new();
         let params = GoalCreateParams {
@@ -430,8 +448,10 @@ mod tests {
 
     #[test]
     fn goal_projection_from_goal() {
+        let durable_goal_id = devo_core::GoalId::new();
         let goal = Goal {
-            goal_id: GoalId::new(),
+            goal_id: GoalId::from_durable(durable_goal_id),
+            durable_goal_id,
             session_id: SessionId::new(),
             prompt: "test".into(),
             description: None,

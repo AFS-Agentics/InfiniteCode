@@ -628,6 +628,10 @@ pub(crate) struct RuntimeSession {
     pub(crate) pending_turn_queue: Arc<StdMutex<VecDeque<PendingInputItem>>>,
     /// Shared handle to the `/btw` queue owned by `core_session`.
     pub(crate) btw_input_queue: Arc<StdMutex<VecDeque<PendingInputItem>>>,
+    /// Tool exposure policy for turns run in this session.
+    pub(crate) agent_tool_policy: devo_protocol::AgentToolPolicy,
+    /// Optional maximum number of turns allowed in this session.
+    pub(crate) max_turns: Option<u32>,
     /// Deferred completion info for in-progress assistant text item.
     /// Cleared when the item is completed; used for crash/interrupt recovery.
     pub(crate) deferred_assistant: Option<(devo_core::ItemId, u64, String)>,

@@ -420,6 +420,23 @@ pub(crate) enum WorkerEvent {
         /// Human-readable failure message.
         message: String,
     },
+    /// A `/btw` side question has started in a forked lightweight agent.
+    BtwStarted {
+        /// The question submitted through `/btw`.
+        question: String,
+    },
+    /// A `/btw` side question completed with a temporary answer.
+    BtwCompleted {
+        /// The original side question.
+        question: String,
+        /// Assistant answer from the side agent.
+        answer: String,
+    },
+    /// A `/btw` side question failed before producing an answer.
+    BtwFailed {
+        /// Human-readable failure message.
+        message: String,
+    },
     /// A new child agent session was observed from server metadata.
     SubagentDiscovered { agent: SubagentMonitorAgent },
     /// A live child-agent event should update the read-only monitor.

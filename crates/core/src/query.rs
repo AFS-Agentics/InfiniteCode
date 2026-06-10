@@ -359,7 +359,7 @@ fn insert_subagent_request_reminders(messages: &mut Vec<RequestMessage>) {
 }
 
 fn insert_goal_context_message(messages: &mut Vec<RequestMessage>, goal_context: &str) {
-    let insert_at = if messages.last().is_some_and(is_user_text_message) {
+    let insert_at = if messages.last().is_some_and(is_visible_user_text_message) {
         messages.len().saturating_sub(1)
     } else {
         messages.len()
@@ -383,6 +383,26 @@ fn is_user_text_message(message: &RequestMessage) -> bool {
             .content
             .iter()
             .any(|content| matches!(content, RequestContent::Text { .. }))
+}
+
+fn is_visible_user_text_message(message: &RequestMessage) -> bool {
+    is_user_text_message(message) && !is_injected_context_message(message)
+}
+
+fn is_injected_context_message(message: &RequestMessage) -> bool {
+    message.role == Role::User.as_str()
+        && message.content.iter().any(|content| match content {
+            RequestContent::Text { text } => {
+                let trimmed = text.trim_start();
+                trimmed.starts_with("<environment_context>")
+                    || trimmed.starts_with("<context_changes>")
+                    || trimmed.starts_with("<user_instructions_updates>")
+                    || trimmed.starts_with("<user_instructions>")
+            }
+            RequestContent::Reasoning { .. }
+            | RequestContent::ToolUse { .. }
+            | RequestContent::ToolResult { .. } => false,
+        })
 }
 
 fn compact_tool_content(content: ToolContent) -> ToolContent {
@@ -2785,6 +2805,7 @@ mod tests {
 
     #[tokio::test]
     async fn query_inserts_goal_context_before_latest_user_request() {
+        // Trace: L2-DES-GOAL-001
         let requests = Arc::new(Mutex::new(Vec::new()));
         let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
             requests: Arc::clone(&requests),
@@ -2834,6 +2855,7 @@ mod tests {
 
     #[tokio::test]
     async fn autonomous_goal_context_is_latest_request_after_completed_turn() {
+        // Trace: L2-DES-GOAL-001
         let requests = Arc::new(Mutex::new(Vec::new()));
         let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
             requests: Arc::clone(&requests),
@@ -2873,6 +2895,7 @@ mod tests {
             .position(|message| message_contains(message, "older assistant reply"))
             .expect("assistant history message");
         assert!(goal_index > assistant_index);
+        assert_eq!(goal_index, messages.len() - 1);
     }
 
     #[tokio::test]

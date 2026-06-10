@@ -584,6 +584,76 @@ async fn invalid_agent_requests_return_invalid_params() -> Result<()> {
 }
 
 #[tokio::test]
+async fn ephemeral_deny_all_child_agent_has_no_tools_and_one_turn() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let provider = Arc::new(ScriptedProvider::new([
+        ScriptedProvider::completed("side answer"),
+        ScriptedProvider::completed("should not run"),
+    ]));
+    let runtime = build_runtime(data_root.path(), provider.clone() as _)?;
+    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
+    let parent_session_id = start_parent_session(&runtime, connection_id, data_root.path()).await?;
+
+    let response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 20,
+                "method": "agent/spawn",
+                "params": {
+                    "session_id": parent_session_id,
+                    "message": "answer this side question",
+                    "fork_turns": "all",
+                    "max_turns": 1,
+                    "tool_policy": "deny_all",
+                    "ephemeral": true
+                }
+            }),
+        )
+        .await
+        .context("agent/spawn")?;
+    let child = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_protocol::SpawnAgentResult>,
+    >(response)?
+    .result;
+    wait_for_child_turn_started(&mut notifications_rx, child.child_session_id).await?;
+    wait_for_stream_calls(&provider, 1).await?;
+
+    let requests = provider.requests();
+    assert_eq!(requests.len(), 1);
+    assert_eq!(requests[0].tools.as_ref().map(Vec::len), Some(0));
+
+    let response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 21,
+                "method": "agent/send_message",
+                "params": {
+                    "session_id": parent_session_id,
+                    "target": child.child_session_id.to_string(),
+                    "message": "try a second turn"
+                }
+            }),
+        )
+        .await
+        .context("agent/send_message")?;
+    let error = serde_json::from_value::<ErrorResponse>(response)?;
+    assert_eq!(error.error.code, ProtocolErrorCode::InvalidParams);
+    assert!(
+        error
+            .error
+            .message
+            .contains("agent maximum turn count reached"),
+        "unexpected error: {}",
+        error.error.message
+    );
+    assert_eq!(provider.stream_calls(), 1);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn fork_all_inherits_stable_parent_context() -> Result<()> {
     let data_root = TempDir::new()?;
     let provider = Arc::new(ScriptedProvider::new([
