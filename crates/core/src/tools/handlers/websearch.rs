@@ -118,8 +118,9 @@ async fn search_exa(
         .header("x-api-key", &config.api_key)
         .json(&serde_json::json!({
             "query": query,
+            "type": "auto",
             "numResults": max_results,
-            "contents": { "text": true, "highlights": true, "summary": true }
+            "contents": { "highlights": true }
         }))
         .send()
         .await
@@ -332,5 +333,32 @@ mod tests {
             text,
             "Search results for: search api\n\n1. Search API\nURL: https://example.com/search\nSnippet: Result content.\n\nAnswer:\nShort answer."
         );
+    }
+
+    #[tokio::test]
+    async fn exa_live_search_works_when_api_key_is_configured() {
+        let Ok(api_key) = std::env::var("EXA_API_KEY") else {
+            eprintln!("skipping Exa live search test because EXA_API_KEY is not set");
+            return;
+        };
+        if api_key.trim().is_empty() {
+            eprintln!("skipping Exa live search test because EXA_API_KEY is empty");
+            return;
+        }
+
+        let config = ResolvedLocalWebSearchConfig {
+            provider_id: "exa".to_string(),
+            kind: LocalWebSearchProviderKind::Exa,
+            api_key,
+            base_url: None,
+            max_results: Some(2),
+        };
+
+        let text = search_exa(&config, "Rust programming language official website", 2)
+            .await
+            .expect("Exa live search should succeed");
+
+        assert!(text.contains("Search results for: Rust programming language official website"));
+        assert!(text.contains("URL:"));
     }
 }
