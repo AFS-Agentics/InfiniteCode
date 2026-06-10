@@ -142,9 +142,24 @@ async fn search_tavily(
     let response = reqwest::Client::new()
         .post(url)
         .bearer_auth(&config.api_key)
+        .header(reqwest::header::CONTENT_TYPE, "application/json")
         .json(&serde_json::json!({
             "query": query,
-            "max_results": max_results
+            "auto_parameters": false,
+            "topic": "general",
+            "search_depth": "basic",
+            "chunks_per_source": 3,
+            "max_results": max_results,
+            "time_range": null,
+            "include_answer": false,
+            "include_raw_content": false,
+            "include_images": false,
+            "include_image_descriptions": false,
+            "include_favicon": false,
+            "include_domains": [],
+            "exclude_domains": [],
+            "country": null,
+            "include_usage": false
         }))
         .send()
         .await
@@ -287,8 +302,13 @@ fn tool_error(message: &str) -> ToolResult {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+
     use pretty_assertions::assert_eq;
     use serde_json::json;
+    use tokio::io::AsyncReadExt;
+    use tokio::io::AsyncWriteExt;
+    use tokio::net::TcpListener;
 
     use super::*;
 
@@ -336,15 +356,75 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn tavily_search_request_matches_api_shape() {
+        let (base_url, capture) = spawn_tavily_server(json!({
+            "results": [
+                {
+                    "title": "Lionel Messi",
+                    "url": "https://example.com/messi",
+                    "content": "Lionel Messi is an Argentine footballer."
+                }
+            ]
+        }))
+        .await;
+        let config = ResolvedLocalWebSearchConfig {
+            provider_id: "tavily".to_string(),
+            kind: LocalWebSearchProviderKind::Tavily,
+            api_key: "tavily-key".to_string(),
+            base_url: Some(base_url),
+            max_results: Some(1),
+        };
+
+        let text = search_tavily(&config, "who is Leo Messi?", 1)
+            .await
+            .expect("Tavily search should succeed");
+        let request = capture.await.expect("capture request");
+        let body: Value = serde_json::from_str(&request.body).expect("request body JSON");
+
+        assert_eq!(
+            text,
+            "Search results for: who is Leo Messi?\n\n1. Lionel Messi\nURL: https://example.com/messi\nSnippet: Lionel Messi is an Argentine footballer.\n"
+        );
+        assert_eq!(
+            request.headers.lines().next(),
+            Some("POST /search HTTP/1.1")
+        );
+        assert_eq!(
+            header_value(&request.headers, "authorization"),
+            Some("Bearer tavily-key")
+        );
+        assert_eq!(
+            header_value(&request.headers, "content-type"),
+            Some("application/json")
+        );
+        assert_eq!(
+            body,
+            json!({
+                "query": "who is Leo Messi?",
+                "auto_parameters": false,
+                "topic": "general",
+                "search_depth": "basic",
+                "chunks_per_source": 3,
+                "max_results": 1,
+                "time_range": null,
+                "include_answer": false,
+                "include_raw_content": false,
+                "include_images": false,
+                "include_image_descriptions": false,
+                "include_favicon": false,
+                "include_domains": [],
+                "exclude_domains": [],
+                "country": null,
+                "include_usage": false
+            })
+        );
+    }
+
+    #[tokio::test]
     async fn exa_live_search_works_when_api_key_is_configured() {
-        let Ok(api_key) = std::env::var("EXA_API_KEY") else {
-            eprintln!("skipping Exa live search test because EXA_API_KEY is not set");
+        let Some(api_key) = live_api_key("EXA_API_KEY", "Exa") else {
             return;
         };
-        if api_key.trim().is_empty() {
-            eprintln!("skipping Exa live search test because EXA_API_KEY is empty");
-            return;
-        }
 
         let config = ResolvedLocalWebSearchConfig {
             provider_id: "exa".to_string(),
@@ -360,5 +440,112 @@ mod tests {
 
         assert!(text.contains("Search results for: Rust programming language official website"));
         assert!(text.contains("URL:"));
+    }
+
+    #[tokio::test]
+    async fn tavily_live_search_works_when_api_key_is_configured() {
+        let Some(api_key) = live_api_key("TAVILY_API_KEY", "Tavily") else {
+            return;
+        };
+
+        let config = ResolvedLocalWebSearchConfig {
+            provider_id: "tavily".to_string(),
+            kind: LocalWebSearchProviderKind::Tavily,
+            api_key,
+            base_url: None,
+            max_results: Some(1),
+        };
+
+        let text = search_tavily(&config, "who is Leo Messi?", 1)
+            .await
+            .expect("Tavily live search should succeed");
+
+        assert!(text.contains("Search results for: who is Leo Messi?"));
+        assert!(text.contains("URL:"));
+    }
+
+    struct CapturedHttpRequest {
+        headers: String,
+        body: String,
+    }
+
+    async fn spawn_tavily_server(
+        response_body: Value,
+    ) -> (String, tokio::task::JoinHandle<CapturedHttpRequest>) {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test server");
+        let addr = listener.local_addr().expect("local addr");
+        let handle = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept request");
+            let request = read_http_request(&mut socket).await.expect("read request");
+            let response_body = response_body.to_string();
+            let response = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                response_body.len(),
+                response_body
+            );
+            socket
+                .write_all(response.as_bytes())
+                .await
+                .expect("write response");
+            request
+        });
+
+        (format!("http://{addr}/search"), handle)
+    }
+
+    async fn read_http_request(
+        socket: &mut tokio::net::TcpStream,
+    ) -> io::Result<CapturedHttpRequest> {
+        let mut bytes = Vec::new();
+        let mut buffer = [0; 1024];
+        let header_end = loop {
+            let count = socket.read(&mut buffer).await?;
+            if count == 0 {
+                break bytes.len();
+            }
+            bytes.extend_from_slice(&buffer[..count]);
+            if let Some(position) = bytes.windows(4).position(|window| window == b"\r\n\r\n") {
+                break position + 4;
+            }
+        };
+        let headers = String::from_utf8_lossy(&bytes[..header_end]).to_string();
+        let content_length = content_length(&headers).unwrap_or_default();
+        while bytes.len() < header_end + content_length {
+            let count = socket.read(&mut buffer).await?;
+            if count == 0 {
+                break;
+            }
+            bytes.extend_from_slice(&buffer[..count]);
+        }
+        let body =
+            String::from_utf8_lossy(&bytes[header_end..header_end + content_length]).to_string();
+
+        Ok(CapturedHttpRequest { headers, body })
+    }
+
+    fn content_length(headers: &str) -> Option<usize> {
+        header_value(headers, "content-length")?.parse().ok()
+    }
+
+    fn header_value<'a>(request: &'a str, name: &str) -> Option<&'a str> {
+        request.lines().skip(1).find_map(|line| {
+            let (header_name, value) = line.split_once(':')?;
+            header_name.eq_ignore_ascii_case(name).then(|| value.trim())
+        })
+    }
+
+    fn live_api_key(env_name: &str, provider: &str) -> Option<String> {
+        let Ok(api_key) = std::env::var(env_name) else {
+            eprintln!("skipping {provider} live search test because {env_name} is not set");
+            return None;
+        };
+        let api_key = api_key.trim().to_string();
+        if api_key.is_empty() {
+            eprintln!("skipping {provider} live search test because {env_name} is empty");
+            return None;
+        }
+        Some(api_key)
     }
 }
