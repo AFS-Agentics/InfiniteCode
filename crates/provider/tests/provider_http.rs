@@ -1,8 +1,12 @@
 use std::io;
 
+use devo_protocol::HostedToolDefinition;
+use devo_protocol::HostedWebSearchTool;
 use devo_protocol::ModelRequest;
+use devo_protocol::ModelResponse;
 use devo_protocol::RequestContent;
 use devo_protocol::RequestMessage;
+use devo_protocol::ResponseContent;
 use devo_provider::ModelProviderSDK;
 use devo_provider::ProviderHttpOptions;
 use devo_provider::anthropic::AnthropicProvider;
@@ -139,6 +143,43 @@ async fn provider_proxy_routes_openai_chat_completions_request() {
     );
 }
 
+#[tokio::test]
+async fn deepseek_chat_completions_provider_hosted_web_search_live_when_api_key_is_configured() {
+    let Some(api_key) = deepseek_api_key() else {
+        eprintln!(
+            "skipping DeepSeek Chat Completions hosted web_search live test: DEEPSEEK_API_KEY is not set"
+        );
+        return;
+    };
+    let provider = OpenAIProvider::new("https://api.deepseek.com").with_api_key(api_key);
+
+    let response = provider
+        .completion(deepseek_provider_hosted_web_search_request())
+        .await
+        .expect("DeepSeek Chat Completions hosted web_search response");
+
+    assert_response_includes_source_url(&response);
+}
+
+#[tokio::test]
+async fn deepseek_anthropic_messages_provider_hosted_web_search_live_when_api_key_is_configured() {
+    let Some(api_key) = deepseek_api_key() else {
+        eprintln!(
+            "skipping DeepSeek Anthropic Messages hosted web_search live test: DEEPSEEK_API_KEY is not set"
+        );
+        return;
+    };
+    let provider =
+        AnthropicProvider::new("https://api.deepseek.com/anthropic").with_api_key(api_key);
+
+    let response = provider
+        .completion(deepseek_provider_hosted_web_search_request())
+        .await
+        .expect("DeepSeek Anthropic Messages hosted web_search response");
+
+    assert_response_includes_source_url(&response);
+}
+
 async fn spawn_json_server(
     response_body: &'static str,
 ) -> (String, tokio::task::JoinHandle<String>) {
@@ -205,6 +246,57 @@ fn minimal_request() -> ModelRequest {
         reasoning_effort: None,
         extra_body: None,
     }
+}
+
+fn deepseek_api_key() -> Option<String> {
+    std::env::var("DEEPSEEK_API_KEY")
+        .ok()
+        .map(|key| key.trim().to_string())
+        .filter(|key| !key.is_empty())
+}
+
+fn deepseek_provider_hosted_web_search_request() -> ModelRequest {
+    ModelRequest {
+        model: "deepseek-v4-flash".to_string(),
+        system: None,
+        messages: vec![RequestMessage {
+            role: "user".to_string(),
+            content: vec![RequestContent::Text {
+                text: "Use web search to find the current official DeepSeek website domain. Reply with one sentence and include the full https:// source URL.".to_string(),
+            }],
+        }],
+        max_tokens: 256,
+        tools: None,
+        hosted_tools: vec![HostedToolDefinition::WebSearch(HostedWebSearchTool {
+            search_context_size: Some("low".to_string()),
+            max_uses: Some(2),
+            anthropic_tool_type: None,
+        })],
+        sampling: Default::default(),
+        thinking: None,
+        reasoning_effort: None,
+        extra_body: None,
+    }
+}
+
+fn assert_response_includes_source_url(response: &ModelResponse) {
+    let text = response_text(response);
+    assert!(
+        text.contains("https://") || text.contains("http://"),
+        "response should include a source URL: {response:?}"
+    );
+}
+
+fn response_text(response: &ModelResponse) -> String {
+    response
+        .content
+        .iter()
+        .filter_map(|content| match content {
+            ResponseContent::Text(text) => Some(text.as_str()),
+            ResponseContent::ToolUse { .. } => None,
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn openai_chat_response() -> &'static str {
