@@ -141,9 +141,15 @@ invocation_method = "openai_chat_completions"
 default_reasoning_effort = "high"
 
 [tools.web_search]
-enabled = true
 mode = "provider"
-provider_search_binding = "gpt55-openrouter"
+
+[providers.openai.web_search]
+mode = "provider"
+
+[tools.web_search.local_providers.exa]
+kind = "exa"
+credential = "exa_api_key"
+max_results = 5
 
 [mcp.servers.github]
 enabled = true
@@ -503,21 +509,33 @@ Rules:
 
 Tool configuration should be grouped by tool family.
 
-Initial web search shape:
+Web search shape:
 
 ```toml
 [tools.web_search]
-enabled = true
+mode = "local" # disabled, provider, or local
+local_provider = "exa"
+
+[tools.web_search.local_providers.exa]
+kind = "exa" # exa or tavily
+credential = "exa_api_key"
+max_results = 5
+
+[providers.openai.web_search]
 mode = "provider"
-provider_search_binding = "gpt55-openrouter"
+
+[model_bindings.gpt55-openrouter.web_search]
+mode = "disabled"
 ```
 
 Rules:
 
-- `mode = "disabled"` means web search should be unavailable with a clear disabled-state message.
-- `mode = "provider"` uses a cloud/provider-backed search path where the selected provider binding supports it.
-- `mode = "local"` uses `local_provider` or later local search configuration.
-- If the configured search path is invalid or unavailable, the runtime must report the configuration gap rather than fabricating results.
+- Effective mode priority is model binding > provider > global `[tools.web_search]`.
+- `mode = "disabled"` means the runtime does not provide any web search tool to the model.
+- `mode = "provider"` uses the active provider adapter's hosted search shape.
+- `mode = "local"` exposes canonical function tool `web_search` and calls the configured Exa or Tavily local provider.
+- Local provider `credential` values are references to user-scoped `auth.json`; API keys must not be written into project config.
+- Only one web search path may be active for a turn.
 
 ## Workspace Instructions
 

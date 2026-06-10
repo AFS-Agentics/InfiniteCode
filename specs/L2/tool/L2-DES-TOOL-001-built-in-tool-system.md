@@ -71,7 +71,7 @@ Conceptual `ToolDefinition` fields:
 - `supports_cancellation`
 - `supports_parallel_execution`
 
-The registry should expose only tools available to the current session mode, permission posture, configuration, and model capability. A tool that is disabled or misconfigured should fail explicitly with a structured unavailable result rather than fabricating output.
+The registry should expose only tools available to the current session mode, permission posture, configuration, and model capability. Disabled tools should be omitted from the model-facing tool list. A stale or misconfigured tool call should fail explicitly with a structured unavailable result rather than fabricating output.
 
 ## Permission Policy And Sandbox
 
@@ -370,7 +370,7 @@ Live server-client events may be more frequent than durable records, but replay 
 - Mutating tools report file changes to the core-owned workspace change set where supported.
 - Tool outputs are bounded and redacted before model or client exposure.
 - Tool outputs include natural-language status summaries alongside structured status fields.
-- A tool unavailable due to configuration returns a clear unavailable result.
+- A stale or misconfigured tool call returns a clear unavailable result; a disabled tool is omitted from the model-facing tool list.
 
 ## Traceability
 

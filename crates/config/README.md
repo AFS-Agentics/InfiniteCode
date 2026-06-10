@@ -84,6 +84,7 @@ without clearing every omitted provider field from user config.
 - `skills.include_instructions = true`
 - `skills.config = []`
 - `experimental.code_search = true`
+- `tools.web_search.mode = "disabled"`
 - `updates.enabled = true`
 - `updates.check_on_startup = true`
 - `updates.check_interval_hours = 24`
@@ -136,6 +137,15 @@ enabled = true
 
 [experimental]
 code-search = true
+
+[tools.web_search]
+mode = "local" # disabled, provider, or local
+local_provider = "exa"
+
+[tools.web_search.local_providers.exa]
+kind = "exa" # exa or tavily
+credential = "exa_api_key"
+max_results = 5
 
 [updates]
 enabled = true
@@ -237,6 +247,33 @@ with `credential = "main_api_key"`.
 Only `api_key` credentials are currently supported. Reading `auth.json` fails if
 the schema version is unsupported or a credential value is empty. Missing
 `auth.json` is treated as an empty credential file.
+
+## Web Search
+
+`[tools.web_search]` controls whether a turn exposes web search to the model.
+The effective value is resolved with this priority:
+
+1. `[model_bindings.<id>.web_search]`
+2. `[providers.<id>.web_search]`
+3. `[tools.web_search]`
+
+Supported modes:
+
+- `disabled`: do not provide provider-hosted web search and do not expose the
+  local `web_search` function tool.
+- `provider`: let the active provider adapter inject provider-hosted search into
+  the request. OpenAI Responses uses hosted tool `{"type":"web_search"}`;
+  OpenAI Chat Completions uses `web_search_options`; Anthropic Messages uses
+  server tool `{"type":"web_search_20250305","name":"web_search"}`.
+- `local`: expose canonical function tool `web_search`, backed by a configured
+  local provider under `[tools.web_search.local_providers.<id>]`.
+
+Local providers currently support `kind = "exa"` and `kind = "tavily"`. Their
+`credential` field is a credential id only; the secret value must live in
+`<DEVO_HOME>/auth.json`. Optional `base_url` and `max_results` fields override
+the provider default endpoint and result count. Compatibility aliases
+`websearch` and `web-search` route to `web_search`, but aliases are not exposed
+to the model.
 
 ## Provider Resolution
 

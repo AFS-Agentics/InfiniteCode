@@ -32,7 +32,7 @@ The program must support configurable web search execution so the user can choos
 - Web search configuration must support cloud-based provider search where available, such as search services exposed by model providers.
 - Web search configuration should support local or independently configured search paths where available, such as DuckDuckGo, Tavily, Google, or another search provider.
 - The program must make the currently effective web search configuration visible to the user.
-- If web search is unavailable, disabled, or misconfigured, the program must report that state clearly instead of pretending search results exist.
+- If web search is disabled, the program must not expose a web search capability to the model. If web search is enabled but unavailable or misconfigured, the program must report that state clearly instead of pretending search results exist.
 - Web search execution must respect the same safety, permission, privacy, and observability requirements as other tools.
 
 ## Non-Functional Requirements
@@ -47,7 +47,8 @@ The program must support configurable web search execution so the user can choos
 - Given web search is enabled through a cloud-based model provider search service, when the program needs current web information, then it can use that configured search path.
 - Given web search is configured through a local or independently configured search provider, when the program needs current web information, then it can use that configured search path where available.
 - Given multiple web search paths are available, when the user inspects configuration, then the user can identify which path is active.
-- Given web search is disabled, unavailable, or missing required credentials, when a task requires web search, then the program reports the configuration gap rather than fabricating results.
+- Given web search is disabled, when a task runs, then the program does not provide web search capability to the model.
+- Given web search is enabled but unavailable or missing required credentials, when a task requires web search, then the program reports the configuration gap rather than fabricating results.
 - Given a web search result is used in a task, when the user reviews tool activity or diagnostics, then the program can identify the search path used.
 
 ## Out of Scope
