@@ -262,6 +262,9 @@ impl SessionState {
     }
 
     pub fn goal_context_prompt(&self) -> Option<String> {
+        if self.collaboration_mode == CollaborationMode::Plan {
+            return None;
+        }
         self.active_goal
             .as_ref()
             .and_then(SessionGoalState::context_prompt)
@@ -385,6 +388,16 @@ mod tests {
 
         assert!(prompt.contains("- Token budget: none"));
         assert!(prompt.contains("- Tokens remaining: unlimited"));
+    }
+
+    #[test]
+    fn plan_mode_session_suppresses_goal_context_prompt() {
+        // Trace: L2-DES-GOAL-001
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.set_active_goal(active_thread_goal("plan should not pursue goal", None));
+        session.collaboration_mode = CollaborationMode::Plan;
+
+        assert_eq!(session.goal_context_prompt(), None);
     }
 
     #[test]
