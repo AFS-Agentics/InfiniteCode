@@ -122,4 +122,35 @@ impl AgentToolCoordinator for ServerRuntime {
         self.request_user_input_for_tool(session_id, turn_id, tool_call_id, args)
             .await
     }
+
+    async fn update_goal(
+        self: Arc<Self>,
+        session_id: String,
+        status: String,
+    ) -> Result<serde_json::Value, ToolCallError> {
+        if status != "complete" {
+            return Err(ToolCallError::InvalidInput(
+                "update_goal only accepts status='complete'".to_string(),
+            ));
+        }
+        let session_id = SessionId::try_from(session_id.as_str())
+            .map_err(|error| ToolCallError::InvalidInput(error.to_string()))?;
+
+        let mut stores = self.goal_stores.lock().await;
+        let store = stores.get_mut(&session_id).ok_or_else(|| {
+            ToolCallError::InvalidInput("no active goal exists for this session".to_string())
+        })?;
+        let goal = store
+            .set_status(devo_protocol::ThreadGoalStatus::Complete)
+            .map_err(|error| ToolCallError::ExecutionFailed(error.to_string()))?;
+        let thread_goal = goal.to_thread_goal();
+        drop(stores);
+
+        self.sync_core_session_goal(session_id, None).await;
+        Ok(serde_json::json!({
+            "status": "complete",
+            "tokens_used": thread_goal.tokens_used,
+            "time_used_seconds": thread_goal.time_used_seconds,
+        }))
+    }
 }

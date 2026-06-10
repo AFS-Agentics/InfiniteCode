@@ -344,7 +344,7 @@ impl ServerRuntime {
         .expect("serialize goal status result")
     }
 
-    async fn sync_core_session_goal(
+    pub(super) async fn sync_core_session_goal(
         &self,
         session_id: SessionId,
         goal: Option<devo_protocol::ThreadGoal>,

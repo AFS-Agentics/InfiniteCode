@@ -29,6 +29,7 @@ use support::wait_for_request_count;
 
 #[tokio::test]
 async fn goal_set_starts_hidden_continuation_turn() -> Result<()> {
+    // Trace: L2-DES-GOAL-001
     let data_root = TempDir::new()?;
     let provider = Arc::new(CapturingProvider::default());
     let runtime = build_runtime(data_root.path(), provider.clone())?;
@@ -104,12 +105,12 @@ async fn goal_set_starts_hidden_continuation_turn() -> Result<()> {
     let requests = provider.requests.lock().expect("lock requests");
     assert_eq!(requests.len(), 2);
     assert!(
-        request_contains_text(&requests[1], "<goal_context>")
+        request_contains_text(&requests[1], "Completion audit:")
             && request_contains_text(&requests[1], "write a benchmark note"),
         "goal continuation request should include hidden goal context"
     );
     assert!(
-        request_last_message_contains_text(&requests[1], "<goal_context>"),
+        request_last_message_contains_text(&requests[1], "Completion audit:"),
         "autonomous goal context should be the latest request message"
     );
 

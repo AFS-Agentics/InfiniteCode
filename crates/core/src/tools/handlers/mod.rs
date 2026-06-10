@@ -5,6 +5,7 @@ mod code_search;
 mod exec_command;
 mod file_write;
 mod glob;
+mod goal_update;
 mod grep;
 mod invalid;
 mod lsp;
@@ -26,6 +27,7 @@ pub use code_search::CodeSearchHandler;
 pub use exec_command::{ExecCommandHandler, WriteStdinHandler};
 pub use file_write::WriteHandler;
 pub use glob::GlobHandler;
+pub use goal_update::{GoalUpdateHandler, goal_update_spec};
 pub use grep::GrepHandler;
 pub use invalid::InvalidHandler;
 pub use lsp::LspHandler;
@@ -116,12 +118,14 @@ fn build_registry_from_builder(
     mcp_handlers: Vec<(String, Arc<dyn ToolHandler>)>,
 ) -> crate::registry::ToolRegistry {
     register_agent_tools(&mut builder);
+    builder.push_spec(goal_update_spec());
     builder.push_spec(tool_search_spec());
 
     let process_store = Arc::new(ProcessStore::new());
     let loaded_deferred_tools = Arc::new(std::sync::Mutex::new(LoadedDeferredTools::default()));
     builder.set_unified_exec_store(Arc::clone(&process_store));
     builder.set_loaded_deferred_tools(Arc::clone(&loaded_deferred_tools));
+    builder.register_handler("update_goal", Arc::new(GoalUpdateHandler::new()));
 
     for (kind, name) in handlers {
         let handler: Arc<dyn ToolHandler> = match kind {
@@ -190,5 +194,14 @@ mod tests {
         assert!(registry.spec("bash").is_none());
         assert!(registry.get("shell_command").is_some());
         assert!(registry.get("bash").is_some());
+    }
+
+    #[test]
+    fn default_registry_exposes_update_goal_tool() {
+        // Trace: L2-DES-GOAL-001
+        let registry = build_registry_from_plan(&ToolPlanConfig::default());
+
+        assert!(registry.spec("update_goal").is_some());
+        assert!(registry.get("update_goal").is_some());
     }
 }

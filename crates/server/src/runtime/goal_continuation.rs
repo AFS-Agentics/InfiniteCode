@@ -5,6 +5,7 @@
 //! turn without adding a synthetic user message to the transcript.
 
 use super::*;
+use crate::goal::GoalStatus;
 use futures::future::BoxFuture;
 
 struct GoalContinuationCandidate {
@@ -21,6 +22,12 @@ impl ServerRuntime {
             let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() else {
                 return;
             };
+            if self
+                .pause_goal_continuation_after_failed_turn(session_id, &session_arc)
+                .await
+            {
+                return;
+            }
             if !session_allows_goal_continuation(&session_arc).await {
                 return;
             }
@@ -158,6 +165,42 @@ impl ServerRuntime {
         })
     }
 
+    async fn pause_goal_continuation_after_failed_turn(
+        &self,
+        session_id: SessionId,
+        session_arc: &Arc<Mutex<RuntimeSession>>,
+    ) -> bool {
+        let latest_turn = {
+            let session = session_arc.lock().await;
+            session.latest_turn.clone()
+        };
+
+        let mut stores = self.goal_stores.lock().await;
+        let Some(goal) = stores.get_mut(&session_id).and_then(GoalStore::get_mut) else {
+            return false;
+        };
+        if goal.status != GoalStatus::Active
+            || !failed_turn_should_suppress_goal(goal.updated_at, latest_turn.as_ref())
+        {
+            return false;
+        }
+
+        goal.status = GoalStatus::Paused;
+        goal.blocker_summary = Some(
+            "Goal continuation paused because the previous turn failed before the goal could continue."
+                .to_string(),
+        );
+        goal.updated_at = Utc::now();
+        drop(stores);
+
+        self.sync_core_session_goal(session_id, None).await;
+        tracing::warn!(
+            session_id = %session_id,
+            "paused active goal continuation after failed turn"
+        );
+        true
+    }
+
     async fn append_goal_continuation_turn_start(
         &self,
         session_id: SessionId,
@@ -236,4 +279,83 @@ fn session_allows_goal_continuation_locked(session: &RuntimeSession) -> bool {
         .lock()
         .expect("pending turn queue mutex should not be poisoned")
         .is_empty()
+}
+
+fn failed_turn_should_suppress_goal(
+    goal_updated_at: chrono::DateTime<Utc>,
+    latest_turn: Option<&TurnMetadata>,
+) -> bool {
+    let Some(turn) = latest_turn else {
+        return false;
+    };
+    if turn.status != TurnStatus::Failed {
+        return false;
+    }
+    turn.completed_at.unwrap_or(turn.started_at) > goal_updated_at
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn turn(status: TurnStatus, completed_at: chrono::DateTime<Utc>) -> TurnMetadata {
+        TurnMetadata {
+            turn_id: TurnId::new(),
+            session_id: SessionId::new(),
+            sequence: 1,
+            status,
+            kind: devo_core::TurnKind::Regular,
+            model: "model-a".into(),
+            thinking: None,
+            reasoning_effort: None,
+            request_model: "provider/model-a".into(),
+            request_thinking: None,
+            started_at: completed_at - chrono::Duration::seconds(1),
+            completed_at: Some(completed_at),
+            usage: None,
+        }
+    }
+
+    #[test]
+    fn failed_turn_after_goal_update_suppresses_continuation() {
+        // Trace: L2-DES-GOAL-001
+        let goal_updated_at = Utc::now();
+        let latest_turn = turn(
+            TurnStatus::Failed,
+            goal_updated_at + chrono::Duration::seconds(1),
+        );
+
+        assert!(failed_turn_should_suppress_goal(
+            goal_updated_at,
+            Some(&latest_turn)
+        ));
+    }
+
+    #[test]
+    fn failed_turn_before_goal_update_allows_manual_resume() {
+        // Trace: L2-DES-GOAL-001
+        let latest_turn_completed_at = Utc::now();
+        let goal_updated_at = latest_turn_completed_at + chrono::Duration::seconds(1);
+        let latest_turn = turn(TurnStatus::Failed, latest_turn_completed_at);
+
+        assert!(!failed_turn_should_suppress_goal(
+            goal_updated_at,
+            Some(&latest_turn)
+        ));
+    }
+
+    #[test]
+    fn completed_turn_does_not_suppress_continuation() {
+        // Trace: L2-DES-GOAL-001
+        let goal_updated_at = Utc::now();
+        let latest_turn = turn(
+            TurnStatus::Completed,
+            goal_updated_at + chrono::Duration::seconds(1),
+        );
+
+        assert!(!failed_turn_should_suppress_goal(
+            goal_updated_at,
+            Some(&latest_turn)
+        ));
+    }
 }

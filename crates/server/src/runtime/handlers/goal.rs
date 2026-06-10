@@ -159,7 +159,7 @@ impl GoalStore {
         let Some(goal) = self.active_goal.as_mut() else {
             return Err(GoalError::NotFound("current".to_string()));
         };
-        if goal.status.is_terminal() && status != ThreadGoalStatus::Active {
+        if goal.status.is_terminal() {
             return Err(GoalError::InvalidTransition);
         }
         goal.status = GoalStatus::from_thread_goal_status(status);
@@ -359,6 +359,25 @@ mod tests {
             })
             .expect("cancel");
         assert_eq!(store.get().unwrap().status, GoalStatus::Canceled);
+    }
+
+    #[test]
+    fn set_status_cannot_reactivate_terminal_goal() {
+        // Trace: L2-DES-GOAL-001
+        let mut store = GoalStore::new();
+        let params = GoalCreateParams {
+            session_id: SessionId::new(),
+            ..make_params()
+        };
+        store.create(params).expect("create");
+        store
+            .set_status(ThreadGoalStatus::Complete)
+            .expect("complete");
+
+        let result = store.set_status(ThreadGoalStatus::Active);
+
+        assert!(result.is_err());
+        assert_eq!(store.get().unwrap().status, GoalStatus::Completed);
     }
 
     #[test]
