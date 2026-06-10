@@ -199,6 +199,7 @@ fn minimal_request() -> ModelRequest {
         }],
         max_tokens: 16,
         tools: None,
+        hosted_tools: Vec::new(),
         sampling: Default::default(),
         thinking: None,
         reasoning_effort: None,

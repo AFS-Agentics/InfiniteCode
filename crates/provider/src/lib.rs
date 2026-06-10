@@ -1,5 +1,6 @@
 pub mod anthropic;
 pub mod error;
+mod hosted_tools;
 mod http;
 pub mod openai;
 mod provider;

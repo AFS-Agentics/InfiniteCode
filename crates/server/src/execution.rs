@@ -14,10 +14,13 @@ use futures::Stream;
 use tokio::sync::Mutex;
 use tokio::sync::oneshot;
 
+use devo_core::AUTH_CONFIG_FILE_NAME;
 use devo_core::AgentsMdConfig;
+use devo_core::AppConfig;
 use devo_core::Model;
 use devo_core::ModelCatalog;
 use devo_core::ResolvedSkill;
+use devo_core::ResolvedWebSearchConfig;
 use devo_core::SessionConfig;
 use devo_core::SessionId;
 use devo_core::SessionRecord;
@@ -27,10 +30,13 @@ use devo_core::SkillError;
 use devo_core::SkillSelector;
 use devo_core::TurnConfig;
 use devo_core::TurnId;
+use devo_core::WebSearchConfig;
 use devo_core::default_base_instructions;
 use devo_core::normalize_canonical_path;
 use devo_core::provider_request_model_map_for_binding;
+use devo_core::read_user_auth_config;
 use devo_core::resolve_enabled_model_binding;
+use devo_core::resolve_web_search_config;
 use devo_core::tools::ToolRegistry;
 use devo_protocol::ApprovalDecisionValue;
 use devo_protocol::ModelRequest;
@@ -246,15 +252,27 @@ impl ServerRuntimeDependencies {
         requested_model: Option<&str>,
         thinking_selection: Option<String>,
     ) -> TurnConfig {
-        let provider_config = self
-            .config_store
-            .lock()
-            .expect("app config store mutex should not be poisoned")
-            .effective_config()
-            .provider
-            .clone();
+        let (config, user_config_dir) = {
+            let config_store = self
+                .config_store
+                .lock()
+                .expect("app config store mutex should not be poisoned");
+            (
+                config_store.effective_config().clone(),
+                config_store.user_config_dir().to_path_buf(),
+            )
+        };
+        let provider_config = config.provider.clone();
 
         if let Some(binding) = resolve_enabled_model_binding(&provider_config, requested_model) {
+            let provider = provider_config.providers.get(&binding.provider_id);
+            let binding_config = provider_config.model_bindings.get(&binding.binding_id);
+            let web_search = self.resolve_turn_web_search(
+                &config,
+                &user_config_dir,
+                provider.and_then(|provider| provider.web_search.as_ref()),
+                binding_config.and_then(|binding| binding.web_search.as_ref()),
+            );
             // Variant request models are scoped to the selected provider. If
             // both OpenRouter and a custom provider configure
             // `model_slug = "kimi-k2.5-thinking"`, a turn selected through
@@ -262,17 +280,49 @@ impl ServerRuntimeDependencies {
             let provider_request_models = ProviderRequestModelMap::new(
                 provider_request_model_map_for_binding(&provider_config, &binding),
             );
-            return TurnConfig::with_provider_route(
+            return TurnConfig::with_provider_route_and_web_search(
                 self.catalog_model_or_fallback(&binding.model_slug),
                 binding.model_name,
                 provider_request_models,
                 ProviderRoute::binding(binding.provider_id, binding.invocation_method),
+                web_search,
                 thinking_selection,
             );
         }
 
         let model = self.resolve_turn_model(requested_model);
-        TurnConfig::new(model, thinking_selection)
+        let web_search = self.resolve_turn_web_search(&config, &user_config_dir, None, None);
+        let mut turn_config = TurnConfig::new(model, thinking_selection);
+        turn_config.web_search = web_search;
+        turn_config
+    }
+
+    fn resolve_turn_web_search(
+        &self,
+        config: &AppConfig,
+        user_config_dir: &Path,
+        provider_override: Option<&WebSearchConfig>,
+        binding_override: Option<&WebSearchConfig>,
+    ) -> ResolvedWebSearchConfig {
+        let auth = match read_user_auth_config(&user_config_dir.join(AUTH_CONFIG_FILE_NAME)) {
+            Ok(auth) => auth,
+            Err(error) => {
+                tracing::warn!(%error, "failed to load web_search credentials");
+                return ResolvedWebSearchConfig::Disabled;
+            }
+        };
+        match resolve_web_search_config(
+            &config.tools.web_search,
+            provider_override,
+            binding_override,
+            &auth,
+        ) {
+            Ok(web_search) => web_search,
+            Err(error) => {
+                tracing::warn!(%error, "failed to resolve web_search config");
+                ResolvedWebSearchConfig::Disabled
+            }
+        }
     }
 
     /// Should move the discover skill main logic to skills crate, and server just keep a simple wrapper.
@@ -778,6 +828,81 @@ invocation_method = "openai_chat_completions"
         assert_eq!(
             turn_config.provider_route,
             ProviderRoute::binding("openrouter", ProviderWireApi::OpenAIChatCompletions)
+        );
+    }
+
+    #[test]
+    fn resolve_turn_config_applies_web_search_provider_override() {
+        let deps = test_deps(
+            r#"
+[tools.web_search]
+mode = "disabled"
+
+[defaults]
+model_binding = "main"
+
+[providers.openrouter]
+enabled = true
+name = "OpenRouter"
+wire_apis = ["openai_chat_completions"]
+
+[providers.openrouter.web_search]
+mode = "provider"
+
+[model_bindings.main]
+enabled = true
+model_slug = "catalog-slug"
+provider = "openrouter"
+model_name = "vendor/model-name"
+invocation_method = "openai_chat_completions"
+"#,
+        );
+
+        let turn_config =
+            deps.resolve_turn_config(Some("vendor/model-name"), /*thinking_selection*/ None);
+
+        assert_eq!(
+            turn_config.web_search,
+            devo_core::ResolvedWebSearchConfig::Provider
+        );
+    }
+
+    #[test]
+    fn resolve_turn_config_applies_web_search_binding_override() {
+        let deps = test_deps(
+            r#"
+[tools.web_search]
+mode = "disabled"
+
+[defaults]
+model_binding = "main"
+
+[providers.openrouter]
+enabled = true
+name = "OpenRouter"
+wire_apis = ["openai_chat_completions"]
+
+[providers.openrouter.web_search]
+mode = "provider"
+
+[model_bindings.main]
+enabled = true
+model_slug = "catalog-slug"
+provider = "openrouter"
+model_name = "vendor/model-name"
+invocation_method = "openai_chat_completions"
+
+[model_bindings.main.web_search]
+mode = "disabled"
+"#,
+        );
+
+        let turn_config =
+            deps.resolve_turn_config(Some("vendor/model-name"), /*thinking_selection*/ None);
+
+        assert_eq!(
+            turn_config.web_search,
+            devo_core::ResolvedWebSearchConfig::Disabled
         );
     }
 }

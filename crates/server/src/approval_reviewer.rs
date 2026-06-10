@@ -28,6 +28,7 @@ pub(crate) fn build_approval_review_request(
         }],
         max_tokens: 128,
         tools: None,
+        hosted_tools: Vec::new(),
         sampling: SamplingControls {
             temperature: Some(0.0),
             ..SamplingControls::default()

@@ -483,6 +483,7 @@ mod tests {
                 messages: Vec::new(),
                 max_tokens: 1,
                 tools: None,
+                hosted_tools: Vec::new(),
                 sampling: devo_protocol::SamplingControls::default(),
                 thinking: None,
                 reasoning_effort: None,

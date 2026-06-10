@@ -21,6 +21,7 @@ use serde::Serialize;
 use serde_json::Value;
 use std::fmt;
 
+use crate::HostedToolDefinition;
 use crate::ReasoningEffort;
 use crate::ReasoningEffortPreset;
 use crate::ResolvedThinkingRequest;
@@ -66,6 +67,8 @@ pub struct ModelRequest {
     pub max_tokens: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<ToolDefinition>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hosted_tools: Vec<HostedToolDefinition>,
     #[serde(default)]
     pub sampling: SamplingControls,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -908,6 +911,7 @@ mod tests {
             }],
             max_tokens: 4096,
             tools: None,
+            hosted_tools: Vec::new(),
             sampling: SamplingControls::default(),
             thinking: None,
             reasoning_effort: None,

@@ -13,6 +13,7 @@ use reqwest_eventsource::{Event, EventSource};
 use serde_json::{Value, json};
 use tracing::debug;
 
+use crate::hosted_tools::append_openai_responses_hosted_tools;
 use crate::text_normalization::{TaggedTextFragment, TaggedTextParser, split_tagged_text};
 use crate::{ModelProviderSDK, ProviderHttpOptions, merge_extra_body};
 
@@ -114,6 +115,8 @@ fn build_request(request: &ModelRequest, stream: bool) -> Value {
     if stream {
         root["stream_options"] = json!({ "include_usage": true });
     }
+
+    append_openai_responses_hosted_tools(&mut root, &request.hosted_tools);
 
     merge_extra_body(&mut root, request.extra_body.as_ref());
 
@@ -684,6 +687,7 @@ mod tests {
                 input_schema: json!({"type": "object"}),
                 output_schema: None,
             }]),
+            hosted_tools: Vec::new(),
             sampling: SamplingControls {
                 temperature: Some(0.4),
                 top_p: Some(0.7),

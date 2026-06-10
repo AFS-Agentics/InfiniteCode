@@ -69,6 +69,7 @@ impl HistorySummarizer for DefaultHistorySummarizer {
             messages,
             max_tokens: self.max_tokens,
             tools: None,
+            hosted_tools: Vec::new(),
             sampling: SamplingControls::default(),
             thinking: None,
             reasoning_effort: None,

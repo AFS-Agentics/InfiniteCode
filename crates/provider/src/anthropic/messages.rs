@@ -34,6 +34,7 @@ use crate::ModelProviderSDK;
 use crate::ProviderAdapter;
 use crate::ProviderCapabilities;
 use crate::ProviderHttpOptions;
+use crate::hosted_tools::append_anthropic_hosted_tools;
 use crate::merge_extra_body;
 
 /// <https://platform.claude.com/docs/en/api/messages>
@@ -665,6 +666,8 @@ fn build_request(request: &ModelRequest, stream: bool) -> Value {
     let mut root =
         serde_json::to_value(body).expect("anthropic request body serialization should succeed");
 
+    append_anthropic_hosted_tools(&mut root, &request.hosted_tools);
+
     merge_extra_body(&mut root, request.extra_body.as_ref());
 
     root
@@ -1012,6 +1015,7 @@ mod tests {
                 }),
                 output_schema: None,
             }]),
+            hosted_tools: Vec::new(),
             sampling: SamplingControls {
                 temperature: Some(0.2),
                 top_p: Some(0.9),

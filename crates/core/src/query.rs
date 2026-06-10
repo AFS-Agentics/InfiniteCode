@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
+use devo_protocol::HostedToolDefinition;
+use devo_protocol::HostedWebSearchTool;
 use devo_protocol::ModelRequest;
 use devo_protocol::RequestContent;
 use devo_protocol::RequestMessage;
@@ -54,6 +56,18 @@ use crate::response_item::message_to_response_items;
 
 const SUBAGENT_MODE_REMINDER: &str = "<system-reminder>\nYou are running as a sub-agent. Complete the delegated task using the available non-agent tools. Do not call agent coordination tools such as spawn_agent, send_message, wait_agent, list_agents, or close_agent; report progress and final results through assistant output.\n</system-reminder>";
 
+fn hosted_tools_for_web_search(
+    web_search: &devo_config::ResolvedWebSearchConfig,
+) -> Vec<HostedToolDefinition> {
+    match web_search {
+        devo_config::ResolvedWebSearchConfig::Provider => {
+            vec![HostedToolDefinition::WebSearch(HostedWebSearchTool::new())]
+        }
+        devo_config::ResolvedWebSearchConfig::Disabled
+        | devo_config::ResolvedWebSearchConfig::Local(_) => Vec::new(),
+    }
+}
+
 fn estimate_request_prompt_tokens(request: &ModelRequest) -> usize {
     let system_bytes = request.system.as_ref().map_or(0, String::len);
     let message_bytes = request
@@ -66,7 +80,9 @@ fn estimate_request_prompt_tokens(request: &ModelRequest) -> usize {
         .as_ref()
         .map(|tools| serde_json::to_string(tools).map_or(0, |json| json.len()))
         .unwrap_or(0);
-    (system_bytes + message_bytes + tool_bytes).div_ceil(4)
+    let hosted_tool_bytes =
+        serde_json::to_string(&request.hosted_tools).map_or(0, |json| json.len());
+    (system_bytes + message_bytes + tool_bytes + hosted_tool_bytes).div_ceil(4)
 }
 
 /// Events emitted during a query for the caller (CLI/UI) to observe.
@@ -437,6 +453,9 @@ pub async fn query(
     if agent_scope == ToolAgentScope::Subagent {
         request_tools.retain(|tool| !is_subagent_agent_coordination_tool(&tool.name));
     }
+    if !turn_config.web_search.is_local() {
+        request_tools.retain(|tool| tool.name != "web_search");
+    }
 
     if session.session_context.is_none() {
         session.session_context = Some(SessionContext::capture(
@@ -614,6 +633,7 @@ pub async fn query(
                     value as usize
                 }),
             tools: Some(request_tools.clone()),
+            hosted_tools: hosted_tools_for_web_search(&turn_config.web_search),
             sampling: SamplingControls {
                 temperature: turn_config.model.temperature,
                 top_p: turn_config.model.top_p,
@@ -1052,6 +1072,7 @@ pub async fn test_model_connection(
         }],
         max_tokens: model.max_tokens.map_or(64, |value| value as usize),
         tools: None,
+        hosted_tools: Vec::new(),
         sampling: SamplingControls {
             temperature: model.temperature,
             top_p: model.top_p,
@@ -1141,6 +1162,7 @@ mod tests {
     use serde_json::json;
 
     use super::QueryEvent;
+    use super::hosted_tools_for_web_search;
     use super::insert_subagent_request_reminders;
     use super::query;
     use super::test_model_connection;
@@ -1149,6 +1171,33 @@ mod tests {
     use crate::Model;
     use crate::ReasoningEffort;
     use crate::Role;
+
+    #[test]
+    fn hosted_tools_follow_resolved_web_search_mode() {
+        let hosted = hosted_tools_for_web_search(&devo_config::ResolvedWebSearchConfig::Provider);
+        assert_eq!(hosted.len(), 1);
+        assert!(matches!(
+            hosted.as_slice(),
+            [devo_protocol::HostedToolDefinition::WebSearch(_)]
+        ));
+
+        assert_eq!(
+            hosted_tools_for_web_search(&devo_config::ResolvedWebSearchConfig::Disabled),
+            Vec::new()
+        );
+        assert_eq!(
+            hosted_tools_for_web_search(&devo_config::ResolvedWebSearchConfig::Local(
+                devo_config::ResolvedLocalWebSearchConfig {
+                    provider_id: "test".to_string(),
+                    kind: devo_config::LocalWebSearchProviderKind::Exa,
+                    api_key: "secret".to_string(),
+                    base_url: None,
+                    max_results: None,
+                },
+            )),
+            Vec::new()
+        );
+    }
     use crate::SessionConfig;
     use crate::SessionState;
     use crate::ThinkingCapability;
@@ -1775,15 +1824,26 @@ mod tests {
             }
         }
 
+        let mut turn_config = TurnConfig::new(
+            Model {
+                base_instructions: "base system".to_string(),
+                ..Model::default()
+            },
+            None,
+        );
+        turn_config.web_search = devo_config::ResolvedWebSearchConfig::Local(
+            devo_config::ResolvedLocalWebSearchConfig {
+                provider_id: "test".to_string(),
+                kind: devo_config::LocalWebSearchProviderKind::Exa,
+                api_key: "secret".to_string(),
+                base_url: None,
+                max_results: None,
+            },
+        );
+
         query(
             &mut session,
-            &TurnConfig::new(
-                Model {
-                    base_instructions: "base system".to_string(),
-                    ..Model::default()
-                },
-                None,
-            ),
+            &turn_config,
             provider,
             registry,
             &runtime,
