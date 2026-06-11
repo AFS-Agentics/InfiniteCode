@@ -33,6 +33,7 @@ use crate::chatwidget::ThinkingListEntry;
 use crate::chatwidget::TuiSessionState;
 use crate::events::PlanStep;
 use crate::events::PlanStepStatus;
+use crate::events::SavedModelEntry;
 use crate::render::renderable::Renderable;
 use crate::slash_command::built_in_slash_commands;
 use crate::tui::frame_requester::FrameRequester;
@@ -60,12 +61,26 @@ fn widget_with_model_and_thinking(
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: Vec::new(),
-        saved_model_slugs: Vec::new(),
+        saved_models: Vec::new(),
         show_model_onboarding: false,
         startup_tooltip_override: None,
         initial_theme_name: None,
     });
     (widget, app_event_rx)
+}
+
+fn saved_model_entry(model: &str) -> SavedModelEntry {
+    SavedModelEntry {
+        binding_id: None,
+        model: model.to_string(),
+        request_model: None,
+        display_name: None,
+        provider_id: Some("provider".to_string()),
+        provider_name: Some("Provider".to_string()),
+        wire_api: ProviderWireApi::OpenAIChatCompletions,
+        base_url: None,
+        api_key: None,
+    }
 }
 
 fn onboarding_widget_with_model(
@@ -83,7 +98,7 @@ fn onboarding_widget_with_model(
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: Vec::new(),
-        saved_model_slugs: Vec::new(),
+        saved_models: Vec::new(),
         show_model_onboarding: true,
         startup_tooltip_override: None,
         initial_theme_name: None,
@@ -106,7 +121,7 @@ fn onboarding_widget_with_available_model(
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: vec![model],
-        saved_model_slugs: Vec::new(),
+        saved_models: Vec::new(),
         show_model_onboarding: true,
         startup_tooltip_override: None,
         initial_theme_name: None,
@@ -1451,7 +1466,7 @@ fn permissions_command_marks_initial_project_preset_current() {
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: Vec::new(),
-        saved_model_slugs: Vec::new(),
+        saved_models: Vec::new(),
         show_model_onboarding: false,
         startup_tooltip_override: None,
         initial_theme_name: None,
@@ -4470,7 +4485,10 @@ fn slash_model_opens_model_picker_instead_of_printing_current_model() {
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: vec![model, alt_model],
-        saved_model_slugs: vec!["test-model".into(), "second-model".into()],
+        saved_models: vec![
+            saved_model_entry("test-model"),
+            saved_model_entry("second-model"),
+        ],
         show_model_onboarding: false,
         startup_tooltip_override: None,
         initial_theme_name: None,
@@ -5120,7 +5138,10 @@ fn model_selection_updates_session_projection_and_emits_context_override() {
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: vec![model, alt_model.clone()],
-        saved_model_slugs: vec!["test-model".into(), "second-model".into()],
+        saved_models: vec![
+            saved_model_entry("test-model"),
+            saved_model_entry("second-model"),
+        ],
         show_model_onboarding: false,
         startup_tooltip_override: None,
         initial_theme_name: None,
@@ -5190,7 +5211,7 @@ fn model_selection_with_thinking_support_waits_for_second_step() {
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: vec![alt_model.clone()],
-        saved_model_slugs: vec!["second-model".into()],
+        saved_models: vec![saved_model_entry("second-model")],
         show_model_onboarding: false,
         startup_tooltip_override: None,
         initial_theme_name: None,
@@ -5244,7 +5265,7 @@ fn model_selection_without_thinking_support_finishes_immediately() {
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: vec![alt_model.clone()],
-        saved_model_slugs: vec!["plain-model".into()],
+        saved_models: vec![saved_model_entry("plain-model")],
         show_model_onboarding: false,
         startup_tooltip_override: None,
         initial_theme_name: None,

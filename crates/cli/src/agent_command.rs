@@ -70,8 +70,12 @@ pub(crate) async fn run_agent(
             Some(binding.model_name.clone())
         }
     });
+    let model_binding_id = active_model_binding
+        .as_ref()
+        .map(|binding| binding.binding_id.clone());
     let model = active_model_binding
-        .map(|binding| binding.model_slug)
+        .as_ref()
+        .map(|binding| binding.model_slug.clone())
         .unwrap_or(model);
 
     tracing::info!("starting interactive tui");
@@ -81,6 +85,7 @@ pub(crate) async fn run_agent(
             session_id: initial_session_id,
             model,
             request_model,
+            model_binding_id,
             provider: wire_api,
             thinking_selection: model_thinking_selection,
             permission_preset,
@@ -143,9 +148,9 @@ fn saved_model_entries(app_config: &AppConfig) -> Vec<SavedModelEntry> {
     let stored_config = &app_config.provider;
     let mut entries = stored_config
         .model_bindings
-        .values()
-        .filter(|binding| binding.enabled)
-        .filter_map(|binding| {
+        .iter()
+        .filter(|(_, binding)| binding.enabled)
+        .filter_map(|(binding_id, binding)| {
             let provider = stored_config.providers.get(&binding.provider)?;
             let request_model = if binding.model_name == binding.model_slug {
                 None
@@ -156,10 +161,19 @@ fn saved_model_entries(app_config: &AppConfig) -> Vec<SavedModelEntry> {
                 .display_name
                 .clone()
                 .or_else(|| request_model.clone());
+            let provider_name = provider
+                .name
+                .trim()
+                .is_empty()
+                .then(|| binding.provider.clone())
+                .unwrap_or_else(|| provider.name.clone());
             Some(SavedModelEntry {
+                binding_id: Some(binding_id.clone()),
                 model: binding.model_slug.clone(),
                 request_model,
                 display_name,
+                provider_id: Some(binding.provider.clone()),
+                provider_name: Some(provider_name),
                 wire_api: binding.invocation_method,
                 base_url: provider.base_url.clone(),
                 api_key: None,
@@ -167,35 +181,42 @@ fn saved_model_entries(app_config: &AppConfig) -> Vec<SavedModelEntry> {
         })
         .collect::<Vec<_>>();
 
-    entries.extend(
-        stored_config
-            .model_providers
-            .values()
-            .flat_map(|provider_config| {
-                // Older config entries may not have persisted `wire_api`; keep them
-                // on the historical OpenAI-compatible chat-completions default.
-                let wire_api = provider_config
-                    .wire_api
-                    .unwrap_or(ProviderWireApi::OpenAIChatCompletions);
-                provider_config
-                    .models
-                    .iter()
-                    .map(move |model| SavedModelEntry {
-                        model: model.model.clone(),
-                        request_model: None,
-                        display_name: None,
-                        wire_api,
-                        base_url: model
-                            .base_url
-                            .clone()
-                            .or_else(|| provider_config.base_url.clone()),
-                        api_key: model
-                            .api_key
-                            .clone()
-                            .or_else(|| provider_config.api_key.clone()),
-                    })
-            }),
-    );
+    entries.extend(stored_config.model_providers.iter().flat_map(
+        |(provider_id, provider_config)| {
+            // Older config entries may not have persisted `wire_api`; keep them
+            // on the historical OpenAI-compatible chat-completions default.
+            let wire_api = provider_config
+                .wire_api
+                .unwrap_or(ProviderWireApi::OpenAIChatCompletions);
+            let provider_name = provider_config
+                .name
+                .as_deref()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(ToOwned::to_owned)
+                .unwrap_or_else(|| provider_id.clone());
+            provider_config
+                .models
+                .iter()
+                .map(move |model| SavedModelEntry {
+                    binding_id: None,
+                    model: model.model.clone(),
+                    request_model: None,
+                    display_name: None,
+                    provider_id: Some(provider_id.clone()),
+                    provider_name: Some(provider_name.clone()),
+                    wire_api,
+                    base_url: model
+                        .base_url
+                        .clone()
+                        .or_else(|| provider_config.base_url.clone()),
+                    api_key: model
+                        .api_key
+                        .clone()
+                        .or_else(|| provider_config.api_key.clone()),
+                })
+        },
+    ));
     entries
 }
 
@@ -421,17 +442,23 @@ mod tests {
             saved_model_entries(&app_config),
             vec![
                 SavedModelEntry {
+                    binding_id: Some("openai".to_string()),
                     model: "provider-defaults".to_string(),
                     request_model: None,
                     display_name: None,
+                    provider_id: Some("openai".to_string()),
+                    provider_name: Some("openai".to_string()),
                     wire_api: ProviderWireApi::OpenAIResponses,
                     base_url: Some("https://provider.example".to_string()),
                     api_key: None,
                 },
                 SavedModelEntry {
+                    binding_id: None,
                     model: "model-overrides".to_string(),
                     request_model: None,
                     display_name: None,
+                    provider_id: Some("legacy".to_string()),
+                    provider_name: Some("legacy".to_string()),
                     wire_api: ProviderWireApi::OpenAIResponses,
                     base_url: Some("https://model.example".to_string()),
                     api_key: Some("model-key".to_string()),
@@ -469,9 +496,12 @@ mod tests {
         assert_eq!(
             saved_model_entries(&app_config),
             vec![SavedModelEntry {
+                binding_id: Some("deepseek".to_string()),
                 model: "deepseek-v4-flash".to_string(),
                 request_model: Some("DeepSeek-V4-Flash".to_string()),
                 display_name: Some("DeepSeek-V4-Flash".to_string()),
+                provider_id: Some("deepseek".to_string()),
+                provider_name: Some("deepseek".to_string()),
                 wire_api: ProviderWireApi::OpenAIChatCompletions,
                 base_url: Some("https://api.deepseek.com".to_string()),
                 api_key: None,
@@ -498,9 +528,12 @@ mod tests {
         assert_eq!(
             saved_model_entries(&app_config),
             vec![SavedModelEntry {
+                binding_id: None,
                 model: "default-wire-api".to_string(),
                 request_model: None,
                 display_name: None,
+                provider_id: Some("openai".to_string()),
+                provider_name: Some("openai".to_string()),
                 wire_api: ProviderWireApi::OpenAIChatCompletions,
                 base_url: None,
                 api_key: None,

@@ -38,7 +38,7 @@ fn onboarding_widget_with_available_model(
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: vec![model],
-        saved_model_slugs: Vec::new(),
+        saved_models: Vec::new(),
         show_model_onboarding: true,
         startup_tooltip_override: None,
         initial_theme_name: None,

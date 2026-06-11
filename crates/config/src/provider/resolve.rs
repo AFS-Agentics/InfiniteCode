@@ -154,6 +154,14 @@ pub fn resolve_model_binding(
     // a configured-but-disabled binding visible so the caller can report
     // "binding is disabled" instead of silently selecting another model.
     if let Some(requested_model) = requested_model {
+        if let Some((binding_id, binding)) = config
+            .model_bindings
+            .iter()
+            .find(|(binding_id, _)| binding_id.as_str() == requested_model)
+        {
+            return Some(ResolvedModelBinding::from_config(binding_id, binding));
+        }
+
         return config
             .model_bindings
             .iter()
@@ -195,9 +203,18 @@ pub fn resolve_enabled_model_binding(
     requested_model: Option<&str>,
 ) -> Option<ResolvedModelBinding> {
     // Runtime turn selection only uses enabled bindings. A user-facing model
-    // override may name either the local catalog slug or the provider wire name:
-    // e.g. `deepseek-v4-pro` or `deepseek/deepseek-v4-pro`.
+    // override may name the binding id, the local catalog slug, or the provider
+    // wire name: e.g. `deepseek-main`, `deepseek-v4-pro`, or
+    // `deepseek/deepseek-v4-pro`.
     if let Some(requested_model) = requested_model {
+        if let Some((binding_id, binding)) = config
+            .model_bindings
+            .iter()
+            .find(|(binding_id, binding)| binding.enabled && binding_id.as_str() == requested_model)
+        {
+            return Some(ResolvedModelBinding::from_config(binding_id, binding));
+        }
+
         return config
             .model_bindings
             .iter()

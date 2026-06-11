@@ -27,7 +27,7 @@ fn widget_with_model(model: Model, cwd: PathBuf) -> ChatWidget {
         enhanced_keys_supported: true,
         is_first_run: false,
         available_models: Vec::new(),
-        saved_model_slugs: Vec::new(),
+        saved_models: Vec::new(),
         show_model_onboarding: false,
         startup_tooltip_override: None,
         initial_theme_name: None,

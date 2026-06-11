@@ -20,6 +20,7 @@ use ratatui::text::Line;
 use ratatui::text::Span;
 use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
+use unicode_width::UnicodeWidthStr;
 
 mod approval_overlay;
 pub(crate) mod bottom_pane_view;
@@ -195,9 +196,10 @@ pub(crate) enum InputResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ModelPickerEntry {
-    pub(crate) slug: String,
+    pub(crate) selection_value: String,
     pub(crate) display_name: String,
     pub(crate) description: Option<String>,
+    pub(crate) right_hint: Option<String>,
     pub(crate) is_current: bool,
 }
 
@@ -1038,11 +1040,11 @@ impl ModelPickerView {
         self.selected_model = self
             .entries
             .get(self.selection)
-            .map(|entry| entry.slug.clone());
+            .map(|entry| entry.selection_value.clone());
         self.complete = true;
     }
 
-    fn render_lines(&self) -> Vec<Line<'static>> {
+    fn render_lines(&self, width: u16) -> Vec<Line<'static>> {
         let mut lines: Vec<Line<'static>> = Vec::new();
         for (index, entry) in self.entries.iter().enumerate() {
             let is_selected = index == self.selection;
@@ -1058,17 +1060,33 @@ impl ModelPickerView {
             } else {
                 Style::default()
             };
-            let mut title = Line::from(vec![
+            let label_style = if is_selected {
+                Style::default().fg(self.accent_color).bold()
+            } else if !entry.is_current {
+                Style::default().dim()
+            } else {
+                Style::default()
+            };
+            let mut title_spans = vec![
                 Span::styled(marker.to_string(), marker_style),
                 Span::raw(" "),
-                Span::raw(entry.display_name.clone()),
-            ]);
-            if is_selected {
-                title = title.style(Style::default().fg(self.accent_color).bold());
-            } else if !entry.is_current {
-                title = title.dim();
+                Span::styled(entry.display_name.clone(), label_style),
+            ];
+            if let Some(right_hint) = entry
+                .right_hint
+                .as_deref()
+                .map(str::trim)
+                .filter(|right_hint| !right_hint.is_empty())
+            {
+                let title_width = Line::from(title_spans.clone()).width();
+                let right_hint_width = UnicodeWidthStr::width(right_hint);
+                let padding = usize::from(width)
+                    .saturating_sub(title_width + right_hint_width)
+                    .max(2);
+                title_spans.push(Span::raw(" ".repeat(padding)));
+                title_spans.push(Span::styled(right_hint.to_string(), Style::default().dim()));
             }
-            lines.push(title);
+            lines.push(Line::from(title_spans));
             if let Some(description) = entry.description.as_deref()
                 && !description.trim().is_empty()
             {
@@ -1106,10 +1124,10 @@ impl BottomPaneView for ModelPickerView {
 
 impl Renderable for ModelPickerView {
     fn render(&self, area: Rect, buf: &mut Buffer) {
-        Paragraph::new(self.render_lines()).render(area, buf);
+        Paragraph::new(self.render_lines(area.width)).render(area, buf);
     }
 
-    fn desired_height(&self, _width: u16) -> u16 {
-        u16::try_from(self.render_lines().len()).unwrap_or(u16::MAX)
+    fn desired_height(&self, width: u16) -> u16 {
+        u16::try_from(self.render_lines(width).len()).unwrap_or(u16::MAX)
     }
 }

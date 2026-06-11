@@ -432,6 +432,20 @@ fn merge_last_used_model(
     let table = root
         .as_table_mut()
         .context("config root must be a TOML table")?;
+    if let Some((provider_id, model_slug)) = existing_model_binding_selection(table, model) {
+        let defaults = table
+            .entry("defaults".to_string())
+            .or_insert_with(|| Value::Table(Default::default()))
+            .as_table_mut()
+            .context("defaults must be a TOML table")?;
+        defaults.insert(
+            "model_binding".to_string(),
+            Value::String(model.to_string()),
+        );
+        table.insert("model_provider".to_string(), Value::String(provider_id));
+        table.insert("model".to_string(), Value::String(model_slug));
+        return Ok(root);
+    }
     let provider_id = current_provider_id(table, &provider, model);
     let binding_id = current_model_binding_id(table, &provider_id, model)
         .unwrap_or_else(|| model_binding_id(model, &provider_id));
@@ -626,6 +640,20 @@ fn current_model_binding_id(
                 (matches_provider && matches_model).then(|| binding_id.clone())
             })
         })
+}
+
+fn existing_model_binding_selection(
+    table: &toml::map::Map<String, Value>,
+    binding_id: &str,
+) -> Option<(String, String)> {
+    let binding = table
+        .get("model_bindings")
+        .and_then(Value::as_table)?
+        .get(binding_id)?
+        .as_table()?;
+    let provider_id = binding.get("provider").and_then(Value::as_str)?;
+    let model_slug = binding.get("model_slug").and_then(Value::as_str)?;
+    Some((provider_id.to_string(), model_slug.to_string()))
 }
 
 fn model_binding_id(model: &str, provider_id: &str) -> String {
@@ -1023,6 +1051,70 @@ model = "gpt-5.4"
                 .and_then(|profile| profile.get("wire_api"))
                 .and_then(Value::as_str),
             Some("openai_chat_completions")
+        );
+    }
+
+    #[test]
+    fn merge_last_used_model_accepts_existing_model_binding_id() {
+        let root: Value = r#"
+model_provider = "deepseek"
+model = "deepseek-v4-flash"
+
+[defaults]
+model_binding = "deepseek-v4-flash-deepseek"
+
+[providers.deepseek]
+wire_apis = ["openai_chat_completions"]
+
+[providers.openrouter]
+wire_apis = ["openai_chat_completions"]
+
+[model_bindings.deepseek-v4-flash-deepseek]
+model_slug = "deepseek-v4-flash"
+provider = "deepseek"
+model_name = "deepseek-v4-flash"
+invocation_method = "openai_chat_completions"
+
+[model_bindings.deepseek-v4-flash-openrouter]
+model_slug = "deepseek-v4-flash"
+provider = "openrouter"
+model_name = "deepseek-v4-flash"
+invocation_method = "openai_chat_completions"
+"#
+        .parse()
+        .expect("parse");
+
+        let merged = merge_last_used_model(
+            root,
+            None,
+            ProviderWireApi::OpenAIChatCompletions,
+            "deepseek-v4-flash-openrouter",
+        )
+        .expect("merge");
+
+        let table = merged.as_table().expect("table");
+        assert_eq!(
+            table
+                .get("defaults")
+                .and_then(Value::as_table)
+                .and_then(|defaults| defaults.get("model_binding"))
+                .and_then(Value::as_str),
+            Some("deepseek-v4-flash-openrouter")
+        );
+        assert_eq!(
+            table.get("model_provider").and_then(Value::as_str),
+            Some("openrouter")
+        );
+        assert_eq!(
+            table.get("model").and_then(Value::as_str),
+            Some("deepseek-v4-flash")
+        );
+        assert_eq!(
+            table
+                .get("model_bindings")
+                .and_then(Value::as_table)
+                .map(toml::map::Map::len),
+            Some(2)
         );
     }
 

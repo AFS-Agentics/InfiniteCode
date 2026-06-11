@@ -34,6 +34,8 @@ pub struct InitialTuiSession {
     pub model: String,
     /// Optional provider-specific model name used for requests when it differs from `model`.
     pub request_model: Option<String>,
+    /// Active model binding id when startup resolved one from `[model_bindings]`.
+    pub model_binding_id: Option<String>,
     /// Provider family used for the initial runtime connection and picker fallback.
     pub provider: ProviderWireApi,
     /// Initial thinking selection restored from persisted config.

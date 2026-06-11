@@ -27,6 +27,7 @@ use crate::bottom_pane::BottomPaneParams;
 use crate::bottom_pane::InputMode;
 use crate::bottom_pane::LocalImageAttachment;
 use crate::bottom_pane::MentionBinding;
+use crate::events::SavedModelEntry;
 use crate::history_cell::HistoryCell;
 use crate::onboarding_widget::OnboardingWidget;
 use crate::startup_header::STARTUP_HEADER_ANIMATION_INTERVAL;
@@ -98,8 +99,8 @@ pub(crate) struct ChatWidgetInit {
     pub(crate) enhanced_keys_supported: bool,
     pub(crate) is_first_run: bool,
     pub(crate) available_models: Vec<Model>,
-    /// Configured model slugs from config.toml used by the /model picker.
-    pub(crate) saved_model_slugs: Vec<String>,
+    /// Configured model bindings from config.toml used by the /model picker.
+    pub(crate) saved_models: Vec<SavedModelEntry>,
     pub(crate) show_model_onboarding: bool,
     pub(crate) startup_tooltip_override: Option<String>,
     pub(crate) initial_theme_name: Option<String>,
@@ -114,6 +115,7 @@ pub(crate) struct TuiSessionState {
     pub(crate) cwd: PathBuf,
     pub(crate) model: Option<Model>,
     pub(crate) request_model: Option<String>,
+    pub(crate) model_binding_id: Option<String>,
     pub(crate) provider: Option<ProviderWireApi>,
     pub(crate) reasoning_effort: Option<ReasoningEffort>,
     pub(crate) active_agent_label: Option<String>,
@@ -126,6 +128,7 @@ impl TuiSessionState {
             cwd,
             model,
             request_model: None,
+            model_binding_id: None,
             provider,
             reasoning_effort: None,
             active_agent_label: None,
@@ -209,7 +212,8 @@ enum PickerMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PendingModelSelection {
-    slug: String,
+    selection: String,
+    display_name: String,
     thinking_selection: Option<String>,
 }
 
@@ -251,7 +255,8 @@ pub(crate) struct ChatWidget {
     active_text_items: Vec<ActiveTextItem>,
     stream_chunking_policy: AdaptiveChunkingPolicy,
     available_models: Vec<Model>,
-    saved_model_slugs: Vec<String>,
+    saved_models: Vec<SavedModelEntry>,
+    current_model_binding_id: Option<String>,
     onboarding: Option<OnboardingWidget>,
     resume_browser: Option<ResumeBrowserState>,
     resume_browser_loading: bool,
@@ -307,7 +312,7 @@ impl ChatWidget {
             enhanced_keys_supported,
             is_first_run,
             available_models,
-            saved_model_slugs,
+            saved_models,
             show_model_onboarding,
             startup_tooltip_override,
             initial_theme_name,
@@ -365,6 +370,15 @@ impl ChatWidget {
             })]
         };
 
+        let current_model_binding_id = initial_session.model_binding_id.clone().or_else(|| {
+            saved_models.iter().find_map(|entry| {
+                let model = initial_session.model.as_ref()?;
+                (entry.model == model.slug && entry.request_model == initial_session.request_model)
+                    .then(|| entry.binding_id.clone())
+                    .flatten()
+            })
+        });
+
         // Assemble the full widget state from the initial session, composer, history, and queues.
         let mut widget = Self {
             app_event_tx,
@@ -385,7 +399,8 @@ impl ChatWidget {
             active_text_items: Vec::new(),
             stream_chunking_policy: AdaptiveChunkingPolicy::default(),
             available_models,
-            saved_model_slugs,
+            current_model_binding_id,
+            saved_models,
             onboarding: None,
             resume_browser: None,
             resume_browser_loading: false,

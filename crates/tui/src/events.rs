@@ -127,12 +127,18 @@ pub(crate) enum SubagentMonitorEvent {
 /// One persisted model profile available for switching in the interactive model picker.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SavedModelEntry {
+    /// Stable model binding id when the entry comes from `[model_bindings]`.
+    pub binding_id: Option<String>,
     /// Stable catalog model slug or custom model name.
     pub model: String,
     /// Provider-specific model name used in requests when it differs from `model`.
     pub request_model: Option<String>,
     /// Persisted display label for the saved binding.
     pub display_name: Option<String>,
+    /// Provider config id that owns this saved model entry.
+    pub provider_id: Option<String>,
+    /// Human-readable provider label shown alongside the model picker item.
+    pub provider_name: Option<String>,
     /// Concrete wire protocol stored for this model's provider profile.
     pub wire_api: ProviderWireApi,
     /// Optional provider base URL override stored with the model.

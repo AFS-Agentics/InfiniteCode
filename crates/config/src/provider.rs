@@ -170,6 +170,38 @@ model_name = "gpt-5.4"
     }
 
     #[test]
+    fn enabled_model_binding_resolves_requested_binding_id_before_slug() {
+        let mut config = provider_config_with_bindings();
+        config.model_bindings.insert(
+            "catalog-two".to_string(),
+            ModelBindingConfig {
+                enabled: true,
+                model_slug: "catalog-one".to_string(),
+                provider: "direct".to_string(),
+                model_name: "direct/one".to_string(),
+                invocation_method: ProviderWireApi::OpenAIChatCompletions,
+                ..ModelBindingConfig::default()
+            },
+        );
+
+        let binding =
+            resolve_enabled_model_binding(&config, Some("catalog-two")).expect("resolve binding");
+
+        assert_eq!(
+            binding,
+            ResolvedModelBinding {
+                binding_id: "catalog-two".to_string(),
+                model_slug: "catalog-one".to_string(),
+                model_name: "direct/one".to_string(),
+                provider_id: "direct".to_string(),
+                invocation_method: ProviderWireApi::OpenAIChatCompletions,
+                default_reasoning_effort: None,
+                enabled: true,
+            }
+        );
+    }
+
+    #[test]
     fn enabled_model_binding_uses_default_binding_without_requested_model() {
         let config = provider_config_with_bindings();
 

@@ -237,12 +237,6 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
     // Resolve model metadata for the chat widget, falling back to the session slug.
     let available_models = available_models_with_saved_metadata(&config);
 
-    let saved_model_slugs: Vec<String> = config
-        .saved_models
-        .iter()
-        .map(|entry| entry.model.clone())
-        .collect();
-
     let cwd = initial_session.cwd.clone();
     let project_config_key = devo_core::project_config_key(&cwd);
 
@@ -274,6 +268,7 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
             cwd: cwd.clone(),
             model: Some(model),
             request_model,
+            model_binding_id: initial_session.model_binding_id.clone(),
             provider: Some(initial_provider),
             reasoning_effort: initial_reasoning_effort,
             active_agent_label: None,
@@ -284,7 +279,7 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
         enhanced_keys_supported: tui.enhanced_keys_supported(),
         is_first_run: config.saved_models.is_empty(),
         available_models,
-        saved_model_slugs,
+        saved_models: config.saved_models.clone(),
         show_model_onboarding: config.show_model_onboarding,
         startup_tooltip_override: Some(format!("Ready in {}", cwd.display())),
         initial_theme_name,

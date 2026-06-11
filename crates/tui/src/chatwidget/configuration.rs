@@ -19,6 +19,7 @@ use crate::app_event::AppEvent;
 use crate::bottom_pane::ModelPickerEntry;
 use crate::bottom_pane::list_selection_view::ListSelectionView;
 use crate::bottom_pane::list_selection_view::SelectionViewParams;
+use crate::events::SavedModelEntry;
 use crate::history_cell;
 
 use super::ChatWidget;
@@ -37,12 +38,20 @@ impl ChatWidget {
         self.session.provider = Some(model.provider_wire_api());
         self.session.model = Some(model);
         self.session.request_model = None;
+        self.session.model_binding_id = None;
+        self.current_model_binding_id = None;
         self.set_default_placeholder();
         self.frame_requester.schedule_frame();
     }
 
     pub(super) fn update_session_request_model(&mut self, slug: String) {
         self.session.request_model = None;
+        if let Some(entry) = self.saved_model_entry_by_binding_id(&slug).cloned() {
+            self.apply_saved_model_entry_to_session(&entry);
+            return;
+        }
+        self.current_model_binding_id = None;
+        self.session.model_binding_id = None;
         self.sync_session_catalog_model(slug);
     }
 
@@ -272,23 +281,110 @@ impl ChatWidget {
         model.effective_thinking_capability().options()
     }
 
+    fn saved_model_selection_value(entry: &SavedModelEntry) -> &str {
+        entry.binding_id.as_deref().unwrap_or(entry.model.as_str())
+    }
+
+    fn saved_model_display_name(entry: &SavedModelEntry) -> Option<String> {
+        entry
+            .display_name
+            .as_deref()
+            .or(entry.request_model.as_deref())
+            .map(str::trim)
+            .filter(|display_name| !display_name.is_empty())
+            .map(ToOwned::to_owned)
+    }
+
+    fn saved_model_display_label(&self, entry: &SavedModelEntry) -> String {
+        Self::saved_model_display_name(entry)
+            .or_else(|| {
+                self.available_models
+                    .iter()
+                    .find(|model| model.slug == entry.model)
+                    .map(|model| model.display_name.clone())
+            })
+            .unwrap_or_else(|| entry.model.clone())
+    }
+
+    fn saved_model_provider_name(entry: &SavedModelEntry) -> Option<String> {
+        entry
+            .provider_name
+            .as_deref()
+            .or(entry.provider_id.as_deref())
+            .map(str::trim)
+            .filter(|provider_name| !provider_name.is_empty())
+            .map(ToOwned::to_owned)
+    }
+
+    fn saved_model_entry_by_binding_id(&self, binding_id: &str) -> Option<&SavedModelEntry> {
+        self.saved_models
+            .iter()
+            .find(|entry| entry.binding_id.as_deref() == Some(binding_id))
+    }
+
+    fn saved_model_entry_for_selection(&self, selection: &str) -> Option<&SavedModelEntry> {
+        self.saved_model_entry_by_binding_id(selection).or_else(|| {
+            self.saved_models.iter().find(|entry| {
+                entry.model == selection || entry.request_model.as_deref() == Some(selection)
+            })
+        })
+    }
+
+    fn saved_model_entry_is_current(&self, entry: &SavedModelEntry) -> bool {
+        if entry.binding_id.is_some()
+            && self.current_model_binding_id.as_deref() == entry.binding_id.as_deref()
+        {
+            return true;
+        }
+        if self.current_model_binding_id.is_some() {
+            return false;
+        }
+        self.session
+            .model
+            .as_ref()
+            .is_some_and(|model| model.slug == entry.model)
+            && self.session.request_model == entry.request_model
+    }
+
+    fn model_for_saved_entry(&self, entry: &SavedModelEntry) -> Model {
+        let mut model = self
+            .available_models
+            .iter()
+            .find(|model| model.slug == entry.model)
+            .cloned()
+            .unwrap_or_else(|| Model {
+                slug: entry.model.clone(),
+                ..Model::default()
+            });
+        if let Some(display_name) = Self::saved_model_display_name(entry) {
+            model.display_name = display_name;
+        }
+        model.provider = entry.wire_api;
+        model
+    }
+
+    fn apply_saved_model_entry_to_session(&mut self, entry: &SavedModelEntry) -> Model {
+        let model = self.model_for_saved_entry(entry);
+        self.session.provider = Some(entry.wire_api);
+        self.session.model = Some(model.clone());
+        self.session.request_model = entry.request_model.clone();
+        self.session.model_binding_id = entry.binding_id.clone();
+        self.current_model_binding_id = entry.binding_id.clone();
+        model
+    }
+
     pub(super) fn open_model_picker(&mut self) {
         self.picker_mode = Some(PickerMode::Model);
         self.pending_model_selection = None;
-        let current_slug = self.session.model.as_ref().map(|model| model.slug.as_str());
         let entries = self
-            .saved_model_slugs
+            .saved_models
             .iter()
-            .filter_map(|slug| {
-                self.available_models
-                    .iter()
-                    .find(|model| model.slug == *slug)
-            })
-            .map(|model| ModelPickerEntry {
-                slug: model.slug.clone(),
-                display_name: model.display_name.clone(),
-                description: model.channel.clone(),
-                is_current: current_slug == Some(model.slug.as_str()),
+            .map(|entry| ModelPickerEntry {
+                selection_value: Self::saved_model_selection_value(entry).to_string(),
+                display_name: self.saved_model_display_label(entry),
+                description: None,
+                right_hint: Self::saved_model_provider_name(entry),
+                is_current: self.saved_model_entry_is_current(entry),
             })
             .collect();
         self.bottom_pane.open_model_picker(entries);
@@ -296,6 +392,30 @@ impl ChatWidget {
     }
 
     pub(super) fn handle_model_picker_selection(&mut self, slug: String) {
+        if let Some(entry) = self.saved_model_entry_for_selection(&slug).cloned() {
+            let selected_model = self.apply_saved_model_entry_to_session(&entry);
+            let thinking_selection = selected_model.default_thinking_selection();
+            self.pending_model_selection = Some(PendingModelSelection {
+                selection: Self::saved_model_selection_value(&entry).to_string(),
+                display_name: self.saved_model_display_label(&entry),
+                thinking_selection: thinking_selection.clone(),
+            });
+            self.thinking_selection = thinking_selection;
+            self.refresh_header_box();
+
+            if selected_model
+                .effective_thinking_capability()
+                .options()
+                .is_empty()
+            {
+                self.finalize_pending_model_selection();
+                return;
+            }
+
+            self.open_thinking_picker();
+            return;
+        }
+
         let Some(selected_model) = self
             .available_models
             .iter()
@@ -308,9 +428,12 @@ impl ChatWidget {
 
         let thinking_selection = selected_model.default_thinking_selection();
         self.pending_model_selection = Some(PendingModelSelection {
-            slug: selected_model.slug.clone(),
+            selection: selected_model.slug.clone(),
+            display_name: selected_model.display_name.clone(),
             thinking_selection: thinking_selection.clone(),
         });
+        self.current_model_binding_id = None;
+        self.session.model_binding_id = None;
         self.session.provider = Some(selected_model.provider);
         self.session.model = Some(selected_model.clone());
         self.session.request_model = None;
@@ -386,6 +509,24 @@ impl ChatWidget {
     }
 
     pub(super) fn apply_model_selection(&mut self, slug: String) {
+        if let Some(entry) = self.saved_model_entry_for_selection(&slug).cloned() {
+            let selected_model = self.apply_saved_model_entry_to_session(&entry);
+            self.thinking_selection = selected_model.default_thinking_selection();
+            self.app_event_tx
+                .send(AppEvent::Command(AppCommand::override_turn_context(
+                    /*cwd*/ None,
+                    Some(Self::saved_model_selection_value(&entry).to_string()),
+                    Some(self.thinking_selection.clone()),
+                    /*sandbox*/ None,
+                    /*approval_policy*/ None,
+                )));
+            self.set_status_message(format!(
+                "Model set to {}",
+                self.saved_model_display_label(&entry)
+            ));
+            return;
+        }
+
         if let Some(selected_model) = self
             .available_models
             .iter()
@@ -396,6 +537,8 @@ impl ChatWidget {
             self.session.provider = Some(selected_model.provider);
             self.session.model = Some(selected_model.clone());
             self.session.request_model = None;
+            self.session.model_binding_id = None;
+            self.current_model_binding_id = None;
             self.app_event_tx
                 .send(AppEvent::Command(AppCommand::override_turn_context(
                     /*cwd*/ None,
@@ -435,9 +578,10 @@ impl ChatWidget {
         let model_entries = entries
             .into_iter()
             .map(|entry| ModelPickerEntry {
-                slug: entry.value,
+                selection_value: entry.value,
                 display_name: entry.label,
                 description: Some(entry.description),
+                right_hint: None,
                 is_current: entry.is_current,
             })
             .collect();
@@ -476,11 +620,11 @@ impl ChatWidget {
         self.app_event_tx
             .send(AppEvent::Command(AppCommand::override_turn_context(
                 /*cwd*/ None,
-                Some(pending.slug.clone()),
+                Some(pending.selection.clone()),
                 Some(self.thinking_selection.clone()),
                 /*sandbox*/ None,
                 /*approval_policy*/ None,
             )));
-        self.set_status_message(format!("Model set to {}", pending.slug));
+        self.set_status_message(format!("Model set to {}", pending.display_name));
     }
 }
