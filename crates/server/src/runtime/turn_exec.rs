@@ -939,6 +939,7 @@ impl ServerRuntime {
                 collaboration_mode: devo_protocol::CollaborationMode::Build,
                 agent_coordinator: None,
                 local_web_search: None,
+                hooks: self.hook_context_for_session(session_id).await,
             },
         );
         let result = runtime
@@ -1910,6 +1911,7 @@ impl ServerRuntime {
             };
             let permission_mode = core_session.config.permission_mode;
             let permission_profile = core_session.config.permission_profile.clone();
+            let hook_context = self.hook_context_for_session(session_id).await;
             let turn_cancel_token = self
                 .active_turn_cancellations
                 .lock()
@@ -1937,6 +1939,7 @@ impl ServerRuntime {
                         devo_core::ResolvedWebSearchConfig::Disabled
                         | devo_core::ResolvedWebSearchConfig::Provider => None,
                     },
+                    hooks: hook_context,
                 },
                 ToolExecutionOptions {
                     cancel_token: turn_cancel_token,
@@ -1980,6 +1983,36 @@ impl ServerRuntime {
             .lock()
             .await
             .remove(&session_id);
+        match &result {
+            Ok(()) => {
+                self.run_session_hook(
+                    session_id,
+                    devo_core::HookEvent::Stop,
+                    serde_json::Map::from_iter([(
+                        "stop_hook_active".to_string(),
+                        serde_json::Value::Bool(false),
+                    )]),
+                )
+                .await;
+            }
+            Err(error) => {
+                self.run_session_hook(
+                    session_id,
+                    devo_core::HookEvent::StopFailure,
+                    serde_json::Map::from_iter([
+                        (
+                            "error".to_string(),
+                            serde_json::Value::String(error.to_string()),
+                        ),
+                        (
+                            "error_details".to_string(),
+                            serde_json::Value::String(error.to_string()),
+                        ),
+                    ]),
+                )
+                .await;
+            }
+        }
 
         let final_turn = {
             let mut session = session_arc.lock().await;

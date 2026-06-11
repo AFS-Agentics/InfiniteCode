@@ -227,6 +227,22 @@ impl ToolRuntime {
                 "sub-agents cannot use parent-agent coordination tools",
             );
         }
+        if let Some(reason) = super::hook_events::pre_tool_use_block_reason(
+            self.context.hooks.as_ref(),
+            call,
+            tool_name,
+        )
+        .await
+        {
+            super::hook_events::post_tool_use_failure(
+                self.context.hooks.as_ref(),
+                call,
+                tool_name,
+                &reason,
+            )
+            .await;
+            return ToolCallResult::error(&call.id, &format!("blocked by hook: {reason}"));
+        }
         let tool = match self
             .registry
             .get(tool_name)
@@ -235,7 +251,15 @@ impl ToolRuntime {
             Some(t) => t.clone(),
             None => {
                 warn!(tool = %call.name, "tool not found");
-                return ToolCallResult::error(&call.id, &format!("unknown tool: {}", call.name));
+                let message = format!("unknown tool: {}", call.name);
+                super::hook_events::post_tool_use_failure(
+                    self.context.hooks.as_ref(),
+                    call,
+                    tool_name,
+                    &message,
+                )
+                .await;
+                return ToolCallResult::error(&call.id, &message);
             }
         };
 
@@ -243,10 +267,15 @@ impl ToolRuntime {
             match self.permission.check(request).await {
                 Ok(()) => {}
                 Err(reason) => {
-                    return ToolCallResult::error(
-                        &call.id,
-                        &format!("permission denied: {reason}"),
-                    );
+                    let message = format!("permission denied: {reason}");
+                    super::hook_events::post_tool_use_failure(
+                        self.context.hooks.as_ref(),
+                        call,
+                        tool_name,
+                        &message,
+                    )
+                    .await;
+                    return ToolCallResult::error(&call.id, &message);
                 }
             }
         }
@@ -320,14 +349,42 @@ impl ToolRuntime {
                         | crate::contracts::ToolTerminalStatus::Denied { .. }
                         | crate::contracts::ToolTerminalStatus::BlockedByMode { .. }
                 );
-                ToolCallResult {
+                let result = ToolCallResult {
                     tool_use_id: call.id.clone(),
                     content,
                     is_error,
                     display_content: output.display_content,
+                };
+                if result.is_error {
+                    super::hook_events::post_tool_use_failure(
+                        self.context.hooks.as_ref(),
+                        call,
+                        tool_name,
+                        &result.content.clone().into_string(),
+                    )
+                    .await;
+                } else {
+                    super::hook_events::post_tool_use(
+                        self.context.hooks.as_ref(),
+                        call,
+                        tool_name,
+                        &result,
+                    )
+                    .await;
                 }
+                result
             }
-            Err(e) => ToolCallResult::error(&call.id, &e.to_string()),
+            Err(e) => {
+                let message = e.to_string();
+                super::hook_events::post_tool_use_failure(
+                    self.context.hooks.as_ref(),
+                    call,
+                    tool_name,
+                    &message,
+                )
+                .await;
+                ToolCallResult::error(&call.id, &message)
+            }
         }
     }
 
@@ -430,6 +487,7 @@ pub struct ToolRuntimeContext {
     pub collaboration_mode: devo_protocol::CollaborationMode,
     pub agent_coordinator: Option<Arc<dyn AgentToolCoordinator>>,
     pub local_web_search: Option<ResolvedLocalWebSearchConfig>,
+    pub hooks: Option<crate::hooks::HookRuntimeContext>,
 }
 
 impl std::fmt::Debug for ToolRuntimeContext {
@@ -451,6 +509,7 @@ impl std::fmt::Debug for ToolRuntimeContext {
                     .as_ref()
                     .map(|config| &config.provider_id),
             )
+            .field("hooks", &self.hooks.as_ref().map(|_| "<configured>"))
             .finish()
     }
 }
@@ -1065,6 +1124,7 @@ mod tests {
                 collaboration_mode: devo_protocol::CollaborationMode::Build,
                 agent_coordinator: None,
                 local_web_search: None,
+                hooks: None,
             },
         );
         let call = ToolCall {
