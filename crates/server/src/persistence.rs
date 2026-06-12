@@ -1215,6 +1215,7 @@ mod tests {
     use devo_core::ItemId;
     use devo_core::ItemLine;
     use devo_core::ItemRecord;
+    use devo_core::LanguageContext;
     use devo_core::Message;
     use devo_core::Model;
     use devo_core::Persona;
@@ -1454,6 +1455,7 @@ mod tests {
         let now = Utc.with_ymd_and_hms(2026, 4, 27, 8, 0, 0).unwrap();
         let session_context = SessionContext {
             base_instructions: "base".into(),
+            available_skills: None,
             workspace_instructions: Some("workspace".into()),
             locked_agents_snapshot: None,
             environment: EnvironmentContext {
@@ -1462,6 +1464,7 @@ mod tests {
                 current_date: "2026-04-27".into(),
                 timezone: "UTC".into(),
             },
+            language: LanguageContext::default(),
             persona: Persona::Default,
             model: Model {
                 slug: "model-a".into(),
