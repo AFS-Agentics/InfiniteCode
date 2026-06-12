@@ -17,6 +17,8 @@ use std::process::Command;
 
 use anyhow::Context;
 use anyhow::Result;
+#[cfg(unix)]
+use anyhow::bail;
 
 #[cfg(unix)]
 const INSTALL_SH_URL: &str = "https://raw.githubusercontent.com/7df-lab/devo/main/install.sh";
