@@ -691,11 +691,11 @@ pub async fn query(
         }
 
         // 1.3 + 1.7: Check token budget and compact before building the request
-        if session.last_input_tokens > 0
+        if session.last_turn_tokens > 0
             && session
                 .config
                 .token_budget
-                .should_compact(session.last_input_tokens)
+                .should_compact(session.last_turn_tokens)
         {
             if !budget_steer_injected {
                 if let Some(turn) = session.turn_state.as_mut() {
@@ -982,6 +982,10 @@ pub async fn query(
                     session.total_cache_read_tokens +=
                         response.usage.cache_read_input_tokens.unwrap_or(0);
                     session.last_input_tokens = response.usage.input_tokens;
+                    session.last_turn_tokens = response
+                        .usage
+                        .input_tokens
+                        .saturating_add(response.usage.output_tokens);
 
                     emit(QueryEvent::Usage {
                         input_tokens: response.usage.input_tokens,

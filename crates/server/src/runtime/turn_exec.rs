@@ -1902,6 +1902,7 @@ impl ServerRuntime {
                 TurnInputMode::HiddenGoalContinuation { goal } => Some(goal.clone()),
             };
             let mut core_session = core_session.lock().await;
+            core_session.config.token_budget = turn_config.token_budget();
             core_session.collaboration_mode = collaboration_mode;
             if let Some(goal) = turn_goal {
                 core_session.set_active_goal(goal);
