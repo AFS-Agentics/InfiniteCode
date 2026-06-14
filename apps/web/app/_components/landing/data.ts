@@ -664,7 +664,7 @@ export const landingCopy = {
       {
         eyebrow: "模型中立",
         title: "接入您的任何模型",
-        body: "云端 provider、本地 endpoint 和自定义模型路由都能进入同一套工作流，不把项目锁在单一供应商里。",
+        body: "云端 provider、本地 endpoint 和自定义模型路由可以共用一套配置方式，不把项目锁在单一供应商里。",
       },
       {
         eyebrow: "长程任务",
@@ -675,7 +675,7 @@ export const landingCopy = {
     workflow: {
       kicker: "不止于编程",
       title: "一套 agent runtime，延展到更多工程场景。",
-      body: "Devo 可以用于深度调研、安全审计、测试生成与验证、仓库治理等下游场景，将上下文收集、任务执行和结果复核连接成可追踪的工作流。",
+      body: "Devo 可以用于深度调研、安全审计、测试生成与验证、仓库治理等下游场景，将上下文收集、任务执行和结果复核连接成可追踪的链路。",
       imageAlt: "Devo 命令行视觉风格",
     },
     enterprise: {
