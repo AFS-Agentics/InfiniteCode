@@ -1104,9 +1104,9 @@ fn paste_and_submit(widget: &mut ChatWidget, text: &str) {
 }
 
 /// Trace: L2-DES-TUI-003
-/// Verifies: Mode labels render as the first bottom status-line field.
+/// Verifies: Mode labels and switch hints render as the first bottom status-line field.
 #[test]
-fn mode_label_renders_at_left_of_status_line() {
+fn mode_label_and_switch_hint_render_at_left_of_status_line() {
     let model = Model {
         slug: "test-model".to_string(),
         display_name: "Test Model".to_string(),
@@ -1116,17 +1116,25 @@ fn mode_label_renders_at_left_of_status_line() {
 
     let rows = rendered_rows(&widget, 100, 12);
     let build_row = status_row_starting_with(&rows, "BUILD");
-    assert!(build_row.trim_start().starts_with("BUILD ·"));
+    assert!(
+        build_row
+            .trim_start()
+            .starts_with("BUILD SHIFT+TAB switch ·")
+    );
 
     widget.handle_key_event(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
     let rows = rendered_rows(&widget, 100, 12);
     let plan_row = status_row_starting_with(&rows, "PLAN");
-    assert!(plan_row.trim_start().starts_with("PLAN ·"));
+    assert!(plan_row.trim_start().starts_with("PLAN SHIFT+TAB switch ·"));
 
     widget.handle_key_event(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
     let rows = rendered_rows(&widget, 100, 12);
     let build_row = status_row_starting_with(&rows, "BUILD");
-    assert!(build_row.trim_start().starts_with("BUILD ·"));
+    assert!(
+        build_row
+            .trim_start()
+            .starts_with("BUILD SHIFT+TAB switch ·")
+    );
     assert!(
         rows.iter()
             .all(|row| !row.trim_start().starts_with("SHELL")),
