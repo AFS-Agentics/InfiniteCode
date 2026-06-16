@@ -39,6 +39,16 @@ export function docsI18nProvider(locale: string) {
   return i18nProvider(docsTranslations, locale);
 }
 
+export const localizedDocsLanguages = i18n.languages.filter(
+  (language) => language !== i18n.defaultLanguage,
+);
+
+export function isLocalizedDocsLanguage(language: string) {
+  return localizedDocsLanguages.includes(
+    language as (typeof i18n.languages)[number],
+  );
+}
+
 export function docsLocalePath(locale: string, pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
   const hasLocalePrefix = i18n.languages.includes(
