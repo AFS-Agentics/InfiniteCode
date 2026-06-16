@@ -11,6 +11,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <RootProvider i18n={docsI18nProvider("en")} theme={{ enabled: false }}>
       <DocsLayout
         i18n={false}
+        sidebar={{ prefetch: false }}
         themeSwitch={{ enabled: false }}
         tree={source.getPageTree("en")}
         nav={{
