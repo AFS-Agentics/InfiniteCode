@@ -68,7 +68,7 @@ fn widget_with_model(
 }
 
 #[test]
-fn startup_header_and_summary_prefer_provider_request_model() {
+fn status_summary_prefers_provider_request_model() {
     let model = Model {
         slug: "deepseek-v4-flash".to_string(),
         display_name: "deepseek-v4-flash".to_string(),
