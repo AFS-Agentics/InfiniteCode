@@ -58,6 +58,7 @@ use devo_server::SessionHistoryItem;
 use devo_server::SessionHistoryItemKind;
 use devo_server::SessionListParams;
 use devo_server::SessionResumeParams;
+use devo_server::SessionRollbackMode;
 use devo_server::SessionRollbackParams;
 use devo_server::SessionStartParams;
 use devo_server::SessionTitleUpdateParams;
@@ -69,6 +70,7 @@ use devo_server::StdioServerClientConfig;
 use devo_server::ToolCallPayload;
 use devo_server::ToolResultPayload;
 use devo_server::TurnEventPayload;
+use devo_server::TurnExecutionMode;
 use devo_server::TurnInterruptParams;
 use devo_server::TurnStartParams;
 use devo_server::TurnSteerParams;
@@ -215,8 +217,11 @@ enum OperationCommand {
     SwitchSession(SessionId),
     /// Rename the current active session.
     RenameSession(String),
-    /// Roll back the active session to a selected user turn.
-    RollbackToUserTurn(u32),
+    /// Roll back the active session using the server-selected user-turn cut mode.
+    RollbackUserTurn {
+        user_turn_index: u32,
+        mode: SessionRollbackMode,
+    },
     /// Fork a new session at a selected user turn.
     ForkAtUserTurn(u32),
     /// Interrupt the active turn when one is running.
@@ -228,6 +233,9 @@ enum OperationCommand {
     },
     /// Ask a side question in a one-turn forked agent.
     RunBtwQuestion {
+        question: String,
+    },
+    RunResearch {
         question: String,
     },
     ApprovalRespond {
@@ -545,7 +553,19 @@ impl QueryWorkerHandle {
 
     pub(crate) fn rollback_to_user_turn(&self, user_turn_index: u32) -> Result<()> {
         self.command_tx
-            .send(OperationCommand::RollbackToUserTurn(user_turn_index))
+            .send(OperationCommand::RollbackUserTurn {
+                user_turn_index,
+                mode: SessionRollbackMode::ThroughUserTurn,
+            })
+            .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
+    }
+
+    pub(crate) fn rollback_before_user_turn(&self, user_turn_index: u32) -> Result<()> {
+        self.command_tx
+            .send(OperationCommand::RollbackUserTurn {
+                user_turn_index,
+                mode: SessionRollbackMode::BeforeUserTurn,
+            })
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
     }
 
@@ -580,6 +600,12 @@ impl QueryWorkerHandle {
     pub(crate) fn run_btw_question(&self, question: String) -> Result<()> {
         self.command_tx
             .send(OperationCommand::RunBtwQuestion { question })
+            .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
+    }
+
+    pub(crate) fn run_research(&self, question: String) -> Result<()> {
+        self.command_tx
+            .send(OperationCommand::RunResearch { question })
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
     }
 
@@ -833,6 +859,7 @@ async fn run_worker_inner(
                             approval_policy,
                             cwd: None,
                             collaboration_mode,
+                            execution_mode: TurnExecutionMode::Regular,
                         }).await;
                         match start_result {
                             Ok(result) => {
@@ -1564,7 +1591,10 @@ async fn run_worker_inner(
                             }
                         }
                     }
-                    Some(OperationCommand::RollbackToUserTurn(user_turn_index)) => {
+                    Some(OperationCommand::RollbackUserTurn {
+                        user_turn_index,
+                        mode,
+                    }) => {
                         let Some(active_session_id) = session_id else {
                             let _ = event_tx.send(WorkerEvent::TurnFailed {
                                 message: "no active session exists yet; send a prompt or switch to a saved session first".to_string(),
@@ -1581,6 +1611,7 @@ async fn run_worker_inner(
                             .session_rollback(SessionRollbackParams {
                                 session_id: active_session_id,
                                 user_turn_index,
+                                mode,
                             })
                             .await
                         {
@@ -1775,6 +1806,7 @@ async fn run_worker_inner(
                                 fork_turns: Some("all".to_string()),
                                 max_turns: Some(1),
                                 tool_policy: AgentToolPolicy::DenyAll,
+                                context_mode: devo_protocol::AgentContextMode::CodingAgent,
                                 ephemeral: true,
                             })
                             .await
@@ -1793,6 +1825,66 @@ async fn run_worker_inner(
                             Err(error) => {
                                 let _ = event_tx.send(WorkerEvent::BtwFailed {
                                     message: error.to_string(),
+                                });
+                            }
+                        }
+                    }
+                    Some(OperationCommand::RunResearch { question }) => {
+                        let session_start = ensure_session_started(
+                            &mut client,
+                            &config.cwd,
+                            &model,
+                            &model_binding_id,
+                            &mut session_id,
+                        )
+                        .await?;
+                        if let Some(start_model) = session_start.model.clone() {
+                            model = start_model;
+                        }
+                        model_binding_id = session_start
+                            .model_binding_id
+                            .clone()
+                            .or(model_binding_id);
+                        thinking_selection = session_start.thinking.clone().or(thinking_selection);
+                        let active_session_id = session_start.session_id;
+                        if session_start.created {
+                            let _ = event_tx.send(WorkerEvent::SessionActivated {
+                                session_id: active_session_id,
+                            });
+                            apply_session_permissions(
+                                &mut client,
+                                active_session_id,
+                                permission_preset,
+                            )
+                            .await?;
+                        }
+                        match client
+                            .turn_start(TurnStartParams {
+                                session_id: active_session_id,
+                                input: vec![InputItem::Text { text: question }],
+                                model: Some(model.clone()),
+                                model_binding_id: model_binding_id.clone(),
+                                thinking: thinking_selection.clone(),
+                                sandbox: None,
+                                approval_policy: None,
+                                cwd: None,
+                                collaboration_mode: CollaborationMode::Build,
+                                execution_mode: TurnExecutionMode::Research,
+                            })
+                            .await
+                        {
+                            Ok(result) => {
+                                active_turn_id = Some(result.turn_id);
+                            }
+                            Err(error) => {
+                                let _ = event_tx.send(WorkerEvent::TurnFailed {
+                                    message: error.to_string(),
+                                    turn_count,
+                                    total_input_tokens,
+                                    total_output_tokens,
+                                    total_cache_read_tokens,
+                                    prompt_token_estimate: total_input_tokens,
+                                    last_query_input_tokens,
                                 });
                             }
                         }
@@ -2045,6 +2137,12 @@ async fn run_worker_inner(
                                                 kind: TextItemKind::Reasoning,
                                             });
                                         }
+                                        ItemKind::ResearchArtifact => {
+                                            let _ = event_tx.send(WorkerEvent::TextItemStarted {
+                                                item_id: payload.item.item_id,
+                                                kind: TextItemKind::ResearchArtifact,
+                                            });
+                                        }
                                         ItemKind::Plan => {
                                             if is_proposed_plan_payload(&payload.item.payload) {
                                                 let _ = event_tx.send(
@@ -2125,6 +2223,15 @@ async fn run_worker_inner(
                                         });
                                     } else {
                                         let _ = event_tx.send(WorkerEvent::TextDelta(payload.delta));
+                                    }
+                                }
+                            }
+                            "item/researchArtifact/delta" => {
+                                if let ServerEvent::ItemDelta { payload, .. } = event {
+                                    if let Some(worker_event) =
+                                        research_artifact_delta_event(payload)
+                                    {
+                                        let _ = event_tx.send(worker_event);
                                     }
                                 }
                             }
@@ -2696,6 +2803,17 @@ fn completed_agent_message_text(payload: &ItemEventPayload) -> Option<String> {
     }
 }
 
+fn research_artifact_delta_event(payload: devo_server::ItemDeltaPayload) -> Option<WorkerEvent> {
+    payload
+        .context
+        .item_id
+        .map(|item_id| WorkerEvent::TextItemDelta {
+            item_id,
+            kind: TextItemKind::ResearchArtifact,
+            delta: payload.delta,
+        })
+}
+
 fn btw_agent_prompt(question: &str) -> String {
     format!(
         "You are answering a /btw side question in a lightweight forked agent.\n\
@@ -2832,6 +2950,33 @@ fn handle_completed_item(payload: ItemEventPayload, event_tx: &mpsc::UnboundedSe
                     final_text: text,
                 });
             }
+        }
+        ItemEnvelope {
+            item_id,
+            item_kind: ItemKind::ResearchArtifact,
+            payload,
+            ..
+        } => {
+            let title = payload
+                .get("title")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+                .unwrap_or("Research Artifact");
+            let content = payload
+                .get("content")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|text| !text.is_empty());
+            let final_text = match content {
+                Some(content) => format!("### {title}\n\n{content}"),
+                None => format!("### {title}"),
+            };
+            let _ = event_tx.send(WorkerEvent::TextItemCompleted {
+                item_id,
+                kind: TextItemKind::ResearchArtifact,
+                final_text,
+            });
         }
         ItemEnvelope {
             item_kind: ItemKind::ToolCall,
@@ -3755,6 +3900,7 @@ mod tests {
     use super::normalize_display_output;
     use super::project_history_items;
     use super::render_skill_list_body;
+    use super::research_artifact_delta_event;
     use super::summarize_tool_call;
     use super::tool_call_started_actions;
     use super::tool_call_started_event;
@@ -3762,12 +3908,16 @@ mod tests {
     use crate::events::PlanStep;
     use crate::events::PlanStepStatus;
     use crate::events::SessionListEntry;
+    use crate::events::TextItemKind;
     use crate::events::TranscriptItem;
     use crate::events::TranscriptItemKind;
     use crate::events::WorkerEvent;
     use devo_core::ItemId;
+    use devo_core::TurnId;
     use devo_protocol::SessionHistoryMetadata;
     use devo_protocol::SessionPlanStepStatus;
+    use devo_server::EventContext;
+    use devo_server::ItemDeltaPayload;
     use devo_server::ItemEnvelope;
     use devo_server::ItemEventPayload;
     use devo_server::ItemKind;
@@ -3794,6 +3944,36 @@ mod tests {
             .unwrap_or(false);
 
         assert_eq!([completed], [true]);
+    }
+
+    #[test]
+    fn research_artifact_delta_maps_to_research_artifact_text_item_delta() {
+        // Trace: L2-DES-RESEARCH-001
+        // Verifies: research artifact deltas append through the normal TUI text item path
+        // without occupying the assistant stream.
+        let session_id = SessionId::new();
+        let turn_id = TurnId::new();
+        let item_id = ItemId::new();
+        let event = research_artifact_delta_event(ItemDeltaPayload {
+            context: EventContext {
+                session_id,
+                turn_id: Some(turn_id),
+                item_id: Some(item_id),
+                seq: 0,
+            },
+            delta: "partial finding".to_string(),
+            stream_index: None,
+            channel: None,
+        });
+
+        assert_eq!(
+            event,
+            Some(WorkerEvent::TextItemDelta {
+                item_id,
+                kind: TextItemKind::ResearchArtifact,
+                delta: "partial finding".to_string()
+            })
+        );
     }
 
     #[test]

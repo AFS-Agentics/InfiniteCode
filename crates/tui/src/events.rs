@@ -566,6 +566,7 @@ pub(crate) enum WorkerEvent {
 pub(crate) enum TextItemKind {
     Assistant,
     Reasoning,
+    ResearchArtifact,
 }
 
 /// One rendered transcript item shown in the history pane.

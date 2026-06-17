@@ -144,6 +144,7 @@ impl ChatWidget {
                 self.set_status_message(match kind {
                     TextItemKind::Assistant => "Generating",
                     TextItemKind::Reasoning => "Thinking",
+                    TextItemKind::ResearchArtifact => "Researching",
                 });
             }
             WorkerEvent::TextItemDelta {
@@ -155,6 +156,7 @@ impl ChatWidget {
                 self.set_status_message(match kind {
                     TextItemKind::Assistant => "Generating",
                     TextItemKind::Reasoning => "Thinking",
+                    TextItemKind::ResearchArtifact => "Researching",
                 });
             }
             WorkerEvent::TextItemCompleted {
@@ -166,6 +168,7 @@ impl ChatWidget {
                 self.set_status_message(match kind {
                     TextItemKind::Assistant => "Generating",
                     TextItemKind::Reasoning => "Thinking",
+                    TextItemKind::ResearchArtifact => "Researching",
                 });
             }
             WorkerEvent::ProposedPlanStarted { item_id } => {

@@ -281,6 +281,17 @@ mod tests {
     }
 
     #[test]
+    fn default_web_fetch_mode_resolves_local() {
+        // Trace: L2-DES-APP-005
+        // Verifies: missing web_fetch config preserves the local webfetch default.
+        assert_eq!(WebFetchConfig::default().mode, WebFetchMode::Local);
+        assert_eq!(
+            resolve_web_fetch_config(&WebFetchConfig::default(), None, None),
+            ResolvedWebFetchConfig::Local
+        );
+    }
+
+    #[test]
     fn provider_and_binding_overrides_global() {
         let global = WebSearchConfig::default();
         let provider = WebSearchConfig {

@@ -36,6 +36,14 @@ impl Persona {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemPromptMode {
+    #[default]
+    CodingAgent,
+    DeepResearch,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvironmentContext {
     pub cwd: PathBuf,
@@ -101,6 +109,8 @@ pub struct SessionContext {
     pub model: Model,
     pub thinking_selection: Option<String>,
     pub reasoning_effort: Option<ReasoningEffort>,
+    #[serde(default)]
+    pub system_prompt_mode: SystemPromptMode,
 }
 
 impl SessionContext {
@@ -127,11 +137,15 @@ impl SessionContext {
             model: model.clone(),
             thinking_selection: normalized_thinking_selection,
             reasoning_effort: resolved.effective_reasoning_effort,
+            system_prompt_mode: SystemPromptMode::CodingAgent,
         }
     }
 
     pub fn build_system_prompt(&self) -> String {
         let base = self.base_instructions.trim();
+        if self.system_prompt_mode == SystemPromptMode::DeepResearch {
+            return base.to_string();
+        }
         let mode_prompt = crate::collaboration_mode_prompts::mode_introductions_prompt();
         if base.is_empty() {
             mode_prompt
@@ -141,6 +155,10 @@ impl SessionContext {
     }
 
     pub fn prefix_user_inputs(&self) -> Vec<UserInput> {
+        if self.system_prompt_mode == SystemPromptMode::DeepResearch {
+            return Vec::new();
+        }
+
         let mut inputs = Vec::new();
         if let Some(text) = self
             .available_skills
@@ -489,7 +507,7 @@ mod tests {
 
         assert_eq!(
             context.render(),
-            "<language_preference>Reply in the same natural language as the user's latest message. If the latest user message mixes languages, use the primary language of that message. Preserve technical terms, code identifiers, file paths, commands, API names, and quoted text in their original form unless the user explicitly asks to translate them.</language_preference>"
+            "<language_preference>Reply in the same natural language as the user's latest message. If the latest user message mixes languages, use the primary language of that message. Preserve technical terms, code identifiers, file paths, commands, API names, and quoted text in their original form unless the user explicitly asks to translate them. This language rule also applies to Proposed Plan: any content inside <proposed_plan></proposed_plan> must follow the same natural language as the user's latest message.</language_preference>"
         );
     }
 
@@ -626,5 +644,23 @@ mod tests {
                 crate::collaboration_mode_prompts::mode_introductions_prompt()
             )
         );
+    }
+
+    #[test]
+    fn deep_research_session_context_uses_only_base_system_prompt() {
+        let mut context = SessionContext::capture(
+            &Model {
+                base_instructions: "research system".into(),
+                ..Model::default()
+            },
+            None,
+            Path::new("/tmp/a"),
+            None,
+            /*available_skills*/ None,
+        );
+        context.system_prompt_mode = super::SystemPromptMode::DeepResearch;
+
+        assert_eq!(context.build_system_prompt(), "research system");
+        assert_eq!(context.prefix_user_inputs(), Vec::<UserInput>::new());
     }
 }

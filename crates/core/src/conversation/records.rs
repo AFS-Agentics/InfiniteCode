@@ -237,6 +237,26 @@ pub struct ApprovalDecisionItem {
     pub scope: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResearchArtifactType {
+    Clarification,
+    Brief,
+    Plan,
+    Finding,
+    CompressedFinding,
+    WebpageSummary,
+    Failure,
+    FinalReportMetadata,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResearchArtifactItem {
+    pub artifact_type: ResearchArtifactType,
+    pub title: String,
+    pub content: String,
+}
+
 /// Enumerates the canonical persisted item kinds used by the conversation model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TurnItem {
@@ -272,6 +292,8 @@ pub enum TurnItem {
     ImageGeneration(TextItem),
     /// A context-compaction summary item.
     ContextCompaction(TextItem),
+    /// A deep-research milestone artifact persisted for replay and inspection.
+    ResearchArtifact(ResearchArtifactItem),
     /// A turn boundary summary with model name and duration.
     /// title = model name, body = duration_secs:u64 as string
     TurnSummary(TextItem),
@@ -629,6 +651,11 @@ mod tests {
             TurnItem::ContextCompaction(TextItem {
                 text: "summary".into(),
             }),
+            TurnItem::ResearchArtifact(ResearchArtifactItem {
+                artifact_type: ResearchArtifactType::Brief,
+                title: "Research Brief".into(),
+                content: "brief".into(),
+            }),
             TurnItem::TurnSummary(TextItem { text: "0".into() }),
             TurnItem::WebSearch(TextItem {
                 text: "results".into(),
@@ -643,6 +670,22 @@ mod tests {
             let restored: TurnItem = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(variant, restored, "roundtrip failed for variant");
         }
+    }
+
+    #[test]
+    fn research_artifact_item_roundtrips() {
+        // Trace: L2-DES-RESEARCH-001
+        // Verifies: research milestones persist as a single ResearchArtifact turn item.
+        let item = TurnItem::ResearchArtifact(ResearchArtifactItem {
+            artifact_type: ResearchArtifactType::CompressedFinding,
+            title: "Compressed Finding".into(),
+            content: "Visible finding details and source context.".into(),
+        });
+
+        let json = serde_json::to_string(&item).expect("serialize");
+        let restored: TurnItem = serde_json::from_str(&json).expect("deserialize");
+
+        assert_eq!(item, restored);
     }
 
     // ── RolloutLine enum ──────────────────────────────────────

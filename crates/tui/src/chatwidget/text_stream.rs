@@ -88,7 +88,7 @@ impl ChatWidget {
 
         let stream_controller = match kind {
             TextItemKind::Assistant => Some(StreamController::new(None, &self.session.cwd)),
-            TextItemKind::Reasoning => None,
+            TextItemKind::Reasoning | TextItemKind::ResearchArtifact => None,
         };
         let insert_index = self.active_text_item_insert_index(kind);
         tracing::debug!(
@@ -179,6 +179,9 @@ impl ChatWidget {
                 }
             }
             TextItemKind::Reasoning => {
+                self.active_text_items[index].raw_text.push_str(delta);
+            }
+            TextItemKind::ResearchArtifact => {
                 self.active_text_items[index].raw_text.push_str(delta);
             }
         }
@@ -311,6 +314,11 @@ impl ChatWidget {
                     self.add_markdown_history_with_status("Reasoning", &item.raw_text, status);
                 }
             }
+            TextItemKind::ResearchArtifact => {
+                if !item.raw_text.trim().is_empty() {
+                    self.add_markdown_history_with_status("Research", &item.raw_text, status);
+                }
+            }
         }
         self.stream_chunking_policy.reset();
     }
@@ -330,7 +338,7 @@ impl ChatWidget {
 
     fn active_text_item_insert_index(&self, kind: TextItemKind) -> usize {
         match kind {
-            TextItemKind::Reasoning => self
+            TextItemKind::Reasoning | TextItemKind::ResearchArtifact => self
                 .active_text_items
                 .iter()
                 .position(|item| item.kind == TextItemKind::Assistant)
@@ -455,6 +463,9 @@ impl ChatWidget {
         let cell = match self.active_text_items[index].kind {
             TextItemKind::Assistant => self.assistant_active_cell(&self.active_text_items[index]),
             TextItemKind::Reasoning => self.reasoning_active_cell(&self.active_text_items[index]),
+            TextItemKind::ResearchArtifact => {
+                self.research_artifact_active_cell(&self.active_text_items[index])
+            }
         };
         self.active_text_items[index].cell = cell;
         self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
@@ -505,6 +516,35 @@ impl ChatWidget {
         Some(history_cell::AgentMessageCell::new_ai_response_with_prefix(
             body_lines,
             Self::reasoning_dot_prefix(item.status),
+            "  ",
+            false,
+        ))
+    }
+
+    fn research_artifact_active_cell(
+        &self,
+        item: &ActiveTextItem,
+    ) -> Option<history_cell::AgentMessageCell> {
+        if item.raw_text.trim().is_empty() {
+            return None;
+        }
+
+        let mut body_lines = Vec::new();
+        append_markdown(
+            &item.raw_text,
+            None,
+            Some(&self.session.cwd),
+            &mut body_lines,
+        );
+        if let Some(first_line) = body_lines.first_mut() {
+            first_line.spans.insert(
+                0,
+                Span::styled("Research: ", Self::reasoning_heading_style()),
+            );
+        }
+        Some(history_cell::AgentMessageCell::new_ai_response_with_prefix(
+            body_lines,
+            Self::pending_dot_prefix(),
             "  ",
             false,
         ))

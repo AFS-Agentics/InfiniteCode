@@ -83,6 +83,18 @@ pub enum CollaborationMode {
     Plan,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TurnExecutionMode {
+    #[default]
+    Regular,
+    Research,
+}
+
+fn is_default_turn_execution_mode(mode: &TurnExecutionMode) -> bool {
+    *mode == TurnExecutionMode::Regular
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TurnStartParams {
     pub session_id: SessionId,
@@ -96,6 +108,8 @@ pub struct TurnStartParams {
     pub cwd: Option<PathBuf>,
     #[serde(default, alias = "interaction_mode")]
     pub collaboration_mode: CollaborationMode,
+    #[serde(default, skip_serializing_if = "is_default_turn_execution_mode")]
+    pub execution_mode: TurnExecutionMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,6 +160,7 @@ pub enum TurnKind {
     Regular,
     Review,
     ManualCompaction,
+    Research,
     Other(String),
 }
 
@@ -241,6 +256,51 @@ mod tests {
         let restored: TurnStartParams = serde_json::from_value(json).expect("deserialize");
 
         assert_eq!(restored.collaboration_mode, CollaborationMode::Build);
+        assert_eq!(restored.execution_mode, TurnExecutionMode::Regular);
+    }
+
+    #[test]
+    fn turn_start_params_accept_research_execution_mode() {
+        // Trace: L2-DES-RESEARCH-001
+        // Verifies: turn/start can select the deep research execution workflow.
+        let json = serde_json::json!({
+            "session_id": SessionId::new(),
+            "input": [{ "type": "text", "text": "research this" }],
+            "model": null,
+            "thinking": null,
+            "sandbox": null,
+            "approval_policy": null,
+            "cwd": null,
+            "execution_mode": "research"
+        });
+
+        let restored: TurnStartParams = serde_json::from_value(json).expect("deserialize");
+
+        assert_eq!(restored.execution_mode, TurnExecutionMode::Research);
+    }
+
+    #[test]
+    fn turn_execution_mode_serializes_default_regular_omitted() {
+        // Trace: L2-DES-RESEARCH-001
+        // Verifies: regular remains the default turn/start execution mode.
+        let params = TurnStartParams {
+            session_id: SessionId::new(),
+            input: vec![InputItem::Text {
+                text: "hello".into(),
+            }],
+            model: None,
+            model_binding_id: None,
+            thinking: None,
+            sandbox: None,
+            approval_policy: None,
+            cwd: None,
+            collaboration_mode: CollaborationMode::Build,
+            execution_mode: TurnExecutionMode::Regular,
+        };
+
+        let value = serde_json::to_value(params).expect("serialize");
+
+        assert_eq!(value.get("execution_mode"), None);
     }
 
     #[test]
@@ -317,5 +377,14 @@ mod tests {
     #[test]
     fn turn_kind_default_is_regular() {
         assert_eq!(TurnKind::default(), TurnKind::Regular);
+    }
+
+    #[test]
+    fn turn_kind_research_serializes_as_snake_case() {
+        // Trace: L2-DES-RESEARCH-001
+        // Verifies: research turns persist with a first-class turn kind.
+        let value = serde_json::to_value(TurnKind::Research).expect("serialize");
+
+        assert_eq!(value, serde_json::json!("research"));
     }
 }

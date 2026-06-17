@@ -522,6 +522,7 @@ impl ServerRuntime {
                 &source,
                 forked_id,
                 params.user_turn_index,
+                SessionRollbackMode::ThroughUserTurn,
                 params.cwd.clone(),
                 params.title.clone(),
                 now,
@@ -621,7 +622,8 @@ impl ServerRuntime {
                 &source,
                 params.session_id,
                 Some(params.user_turn_index),
-                None,
+                params.mode,
+                /*cwd_override*/ None,
                 source.summary.title.clone(),
                 source.summary.created_at,
             )
@@ -658,42 +660,17 @@ impl ServerRuntime {
         source: &RuntimeSession,
         session_id: SessionId,
         user_turn_index: Option<u32>,
+        rollback_mode: SessionRollbackMode,
         cwd_override: Option<PathBuf>,
         title_override: Option<String>,
         created_at: chrono::DateTime<Utc>,
     ) -> Result<RuntimeSession, String> {
         let source_core_session = source.core_session.lock().await;
-        let kept_items = if let Some(user_turn_index) = user_turn_index {
-            let mut user_turn_ids: Vec<TurnId> = Vec::new();
-            for item in &source.persisted_turn_items {
-                if matches!(item.turn_item, TurnItem::UserMessage(_))
-                    && user_turn_ids.last().copied() != Some(item.turn_id)
-                {
-                    user_turn_ids.push(item.turn_id);
-                }
-            }
-            let selected_idx = usize::try_from(user_turn_index)
-                .map_err(|_| "selected turn index is invalid".to_string())?;
-            let Some(selected_turn_id) = user_turn_ids.get(selected_idx).copied() else {
-                return Err("selected turn does not exist".to_string());
-            };
-            source
-                .persisted_turn_items
-                .iter()
-                .take_while(|item| item.turn_id != selected_turn_id)
-                .cloned()
-                .chain(
-                    source
-                        .persisted_turn_items
-                        .iter()
-                        .skip_while(|item| item.turn_id != selected_turn_id)
-                        .take_while(|item| item.turn_id == selected_turn_id)
-                        .cloned(),
-                )
-                .collect::<Vec<_>>()
-        } else {
-            source.persisted_turn_items.clone()
-        };
+        let kept_items = kept_items_for_user_turn_cut(
+            &source.persisted_turn_items,
+            user_turn_index,
+            rollback_mode,
+        )?;
 
         let cwd = cwd_override.unwrap_or_else(|| source.summary.cwd.clone());
         let mut core_session = self.deps.new_session_state(session_id, cwd.clone());
@@ -714,6 +691,7 @@ impl ServerRuntime {
                 &mut rebuilt_messages,
                 &mut rebuilt_history_items,
                 &mut tool_names_by_id,
+                &item.turn_kind,
                 item.turn_item.clone(),
             );
         }
@@ -833,5 +811,138 @@ impl ServerRuntime {
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
         })
+    }
+}
+
+fn kept_items_for_user_turn_cut(
+    persisted_turn_items: &[crate::execution::PersistedTurnItem],
+    user_turn_index: Option<u32>,
+    rollback_mode: SessionRollbackMode,
+) -> Result<Vec<crate::execution::PersistedTurnItem>, String> {
+    let Some(user_turn_index) = user_turn_index else {
+        return Ok(persisted_turn_items.to_vec());
+    };
+
+    let mut user_turn_ids: Vec<TurnId> = Vec::new();
+    for item in persisted_turn_items {
+        if matches!(item.turn_item, TurnItem::UserMessage(_))
+            && user_turn_ids.last().copied() != Some(item.turn_id)
+        {
+            user_turn_ids.push(item.turn_id);
+        }
+    }
+    let selected_idx = usize::try_from(user_turn_index)
+        .map_err(|_| "selected turn index is invalid".to_string())?;
+    let Some(selected_turn_id) = user_turn_ids.get(selected_idx).copied() else {
+        return Err("selected turn does not exist".to_string());
+    };
+
+    match rollback_mode {
+        SessionRollbackMode::ThroughUserTurn => Ok(persisted_turn_items
+            .iter()
+            .take_while(|item| item.turn_id != selected_turn_id)
+            .cloned()
+            .chain(
+                persisted_turn_items
+                    .iter()
+                    .skip_while(|item| item.turn_id != selected_turn_id)
+                    .take_while(|item| item.turn_id == selected_turn_id)
+                    .cloned(),
+            )
+            .collect()),
+        SessionRollbackMode::BeforeUserTurn => Ok(persisted_turn_items
+            .iter()
+            .take_while(|item| item.turn_id != selected_turn_id)
+            .cloned()
+            .collect()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    fn user_item(turn_id: TurnId, text: &str) -> crate::execution::PersistedTurnItem {
+        crate::execution::PersistedTurnItem {
+            turn_id,
+            turn_kind: devo_core::TurnKind::Regular,
+            item_id: devo_core::ItemId::new(),
+            turn_item: TurnItem::UserMessage(devo_core::TextItem {
+                text: text.to_string(),
+            }),
+        }
+    }
+
+    fn assistant_item(turn_id: TurnId, text: &str) -> crate::execution::PersistedTurnItem {
+        crate::execution::PersistedTurnItem {
+            turn_id,
+            turn_kind: devo_core::TurnKind::Regular,
+            item_id: devo_core::ItemId::new(),
+            turn_item: TurnItem::AgentMessage(devo_core::TextItem {
+                text: text.to_string(),
+            }),
+        }
+    }
+
+    #[test]
+    fn kept_items_for_user_turn_cut_keeps_selected_turn_in_legacy_mode() {
+        let first_turn_id = TurnId::new();
+        let second_turn_id = TurnId::new();
+        let items = vec![
+            user_item(first_turn_id, "first user"),
+            assistant_item(first_turn_id, "first answer"),
+            user_item(second_turn_id, "second user"),
+            assistant_item(second_turn_id, "second answer"),
+        ];
+
+        let kept = kept_items_for_user_turn_cut(
+            &items,
+            Some(/*user_turn_index*/ 1),
+            SessionRollbackMode::ThroughUserTurn,
+        )
+        .expect("keep selected turn");
+
+        assert_eq!(kept, items);
+    }
+
+    #[test]
+    fn kept_items_for_user_turn_cut_can_drop_selected_turn() {
+        let first_turn_id = TurnId::new();
+        let second_turn_id = TurnId::new();
+        let items = vec![
+            user_item(first_turn_id, "first user"),
+            assistant_item(first_turn_id, "first answer"),
+            user_item(second_turn_id, "second user"),
+            assistant_item(second_turn_id, "second answer"),
+        ];
+
+        let kept = kept_items_for_user_turn_cut(
+            &items,
+            Some(/*user_turn_index*/ 1),
+            SessionRollbackMode::BeforeUserTurn,
+        )
+        .expect("drop selected turn");
+
+        assert_eq!(kept, items[..2]);
+    }
+
+    #[test]
+    fn kept_items_for_user_turn_cut_can_drop_the_first_turn() {
+        let turn_id = TurnId::new();
+        let items = vec![
+            user_item(turn_id, "first user"),
+            assistant_item(turn_id, "first answer"),
+        ];
+
+        let kept = kept_items_for_user_turn_cut(
+            &items,
+            Some(/*user_turn_index*/ 0),
+            SessionRollbackMode::BeforeUserTurn,
+        )
+        .expect("drop first turn");
+
+        assert_eq!(kept, Vec::new());
     }
 }

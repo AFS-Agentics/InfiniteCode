@@ -22,6 +22,8 @@ use devo_core::ItemId;
 use devo_core::ItemLine;
 use devo_core::ItemRecord;
 use devo_core::Message;
+use devo_core::ResearchArtifactItem;
+use devo_core::ResearchArtifactType;
 use devo_core::Role;
 use devo_core::RolloutLine;
 use devo_core::SessionId;
@@ -35,6 +37,7 @@ use devo_core::ToolCallItem;
 use devo_core::ToolResultItem;
 use devo_core::TurnId;
 use devo_core::TurnItem;
+use devo_core::TurnKind;
 use devo_core::TurnLine;
 use devo_core::TurnRecord;
 use devo_core::TurnStatus;
@@ -334,6 +337,7 @@ struct ReplayState {
     last_turn_tokens: usize,
     session_context: Option<devo_core::SessionContext>,
     latest_turn_context: Option<devo_core::TurnContext>,
+    turn_kinds_by_id: HashMap<TurnId, TurnKind>,
     messages: Vec<Message>,
     history_items: Vec<crate::SessionHistoryItem>,
     pending_items: Vec<ReplayHistoryItem>,
@@ -360,6 +364,7 @@ impl ReplayState {
                     let body = duration_secs.map(|s| s.to_string()).unwrap_or_default();
                     self.pending_items.push(ReplayHistoryItem {
                         turn_id: prev_turn.turn_id,
+                        turn_kind: prev_turn.kind.clone(),
                         item_id: devo_core::ItemId::new(),
                         seq: self.loaded_item_count,
                         timestamp: ts,
@@ -415,6 +420,8 @@ impl ReplayState {
                     completed_at: line.turn.completed_at,
                     usage: line.turn.usage.clone(),
                 });
+                self.turn_kinds_by_id
+                    .insert(line.turn.id, line.turn.kind.clone());
                 if let Some(session_context) = line.turn.session_context.clone() {
                     self.session_context = Some(session_context);
                 }
@@ -458,6 +465,7 @@ impl ReplayState {
             let body = duration_secs.map(|s| s.to_string()).unwrap_or_default();
             self.pending_items.push(ReplayHistoryItem {
                 turn_id: last_turn.turn_id,
+                turn_kind: last_turn.kind.clone(),
                 item_id: devo_core::ItemId::new(),
                 seq: self.loaded_item_count,
                 timestamp: ts,
@@ -497,10 +505,12 @@ impl ReplayState {
                 &mut replayed_messages,
                 &mut replayed_history_items,
                 &mut tool_names_by_id,
+                &pending_item.turn_kind,
                 pending_item.turn_item.clone(),
             );
             replayed_persisted_turn_items.push(PersistedTurnItem {
                 turn_id: pending_item.turn_id,
+                turn_kind: pending_item.turn_kind,
                 item_id: pending_item.item_id,
                 turn_item: pending_item.turn_item,
             });
@@ -643,11 +653,17 @@ impl ReplayState {
         let record_timestamp = item.timestamp;
         let line_timestamp = record_timestamp;
         let seq = item.seq;
+        let turn_kind = self
+            .turn_kinds_by_id
+            .get(&item.turn_id)
+            .cloned()
+            .unwrap_or_default();
         let mut intra_record_order = 0usize;
 
         for turn_item in item.output_items {
             self.pending_items.push(ReplayHistoryItem {
                 turn_id: item.turn_id,
+                turn_kind: turn_kind.clone(),
                 item_id,
                 seq,
                 timestamp: record_timestamp,
@@ -663,6 +679,7 @@ impl ReplayState {
         for turn_item in item.input_items {
             self.pending_items.push(ReplayHistoryItem {
                 turn_id: item.turn_id,
+                turn_kind: turn_kind.clone(),
                 item_id,
                 seq,
                 timestamp: record_timestamp,
@@ -680,6 +697,7 @@ impl ReplayState {
 #[derive(Debug, Clone)]
 struct ReplayHistoryItem {
     turn_id: TurnId,
+    turn_kind: TurnKind,
     item_id: ItemId,
     seq: u64,
     timestamp: chrono::DateTime<Utc>,
@@ -690,13 +708,13 @@ struct ReplayHistoryItem {
     turn_item: TurnItem,
 }
 
-fn build_prompt_messages_from_snapshot(
+pub(crate) fn build_prompt_messages_from_snapshot(
     persisted_turn_items: &[PersistedTurnItem],
     snapshot: &CompactionSnapshotLine,
 ) -> Option<Vec<Message>> {
     let ordered_items = persisted_turn_items
         .iter()
-        .filter(|item| prompt_visible_turn_item(&item.turn_item))
+        .filter(|item| prompt_visible_persisted_turn_item(item))
         .collect::<Vec<_>>();
     let summary_index = ordered_items
         .iter()
@@ -736,7 +754,23 @@ fn build_prompt_messages_from_snapshot(
     Some(messages)
 }
 
-fn prompt_visible_turn_item(item: &TurnItem) -> bool {
+pub(crate) fn prompt_visible_persisted_turn_item(item: &PersistedTurnItem) -> bool {
+    prompt_visible_turn_item(&item.turn_kind, &item.turn_item)
+}
+
+fn prompt_visible_turn_item(turn_kind: &TurnKind, item: &TurnItem) -> bool {
+    if *turn_kind == TurnKind::Research {
+        return matches!(
+            item,
+            TurnItem::UserMessage(_)
+                | TurnItem::AgentMessage(_)
+                | TurnItem::ResearchArtifact(ResearchArtifactItem {
+                    artifact_type: ResearchArtifactType::FinalReportMetadata,
+                    ..
+                })
+        );
+    }
+
     matches!(
         item,
         TurnItem::ContextCompaction(_)
@@ -748,6 +782,7 @@ fn prompt_visible_turn_item(item: &TurnItem) -> bool {
             | TurnItem::ToolResult(_)
             | TurnItem::CommandExecution(_)
             | TurnItem::Plan(_)
+            | TurnItem::ResearchArtifact(_)
             | TurnItem::WebSearch(_)
             | TurnItem::ImageGeneration(_)
             | TurnItem::HookPrompt(_)
@@ -758,6 +793,7 @@ pub(crate) fn apply_turn_item(
     messages: &mut Vec<Message>,
     history_items: &mut Vec<crate::SessionHistoryItem>,
     tool_names_by_id: &mut HashMap<String, String>,
+    turn_kind: &TurnKind,
     item: TurnItem,
 ) {
     let item = match item {
@@ -810,140 +846,9 @@ pub(crate) fn apply_turn_item(
     if let Some(history_item) = history_item_from_turn_item(&item) {
         history_items.push(history_item);
     }
-    match item {
-        TurnItem::UserMessage(TextItem { text }) | TurnItem::SteerInput(TextItem { text }) => {
-            messages.push(Message::user(text));
-        }
-        TurnItem::AgentMessage(TextItem { text }) => match messages.last_mut() {
-            Some(message) if message.role == Role::Assistant => {
-                message.content.push(ContentBlock::Text { text });
-            }
-            _ => {
-                messages.push(Message::assistant_text(text));
-            }
-        },
-        TurnItem::ToolCall(ToolCallItem {
-            tool_call_id,
-            tool_name,
-            input,
-        }) => match messages.last_mut() {
-            Some(message) if message.role == Role::Assistant => {
-                message.content.push(ContentBlock::ToolUse {
-                    id: tool_call_id,
-                    name: tool_name,
-                    input,
-                });
-            }
-            _ => {
-                messages.push(Message {
-                    role: Role::Assistant,
-                    content: vec![ContentBlock::ToolUse {
-                        id: tool_call_id,
-                        name: tool_name,
-                        input,
-                    }],
-                });
-            }
-        },
-        TurnItem::ToolResult(ToolResultItem {
-            tool_call_id,
-            tool_name: _,
-            output,
-            display_content: _,
-            is_error,
-        }) => {
-            let content = match output {
-                serde_json::Value::String(text) => text,
-                other => other.to_string(),
-            };
-            match messages.last_mut() {
-                Some(message)
-                    if message.role == Role::User
-                        && message
-                            .content
-                            .iter()
-                            .all(|block| matches!(block, ContentBlock::ToolResult { .. })) =>
-                {
-                    message.content.push(ContentBlock::ToolResult {
-                        tool_use_id: tool_call_id,
-                        content,
-                        is_error,
-                    });
-                }
-                _ => {
-                    messages.push(Message {
-                        role: Role::User,
-                        content: vec![ContentBlock::ToolResult {
-                            tool_use_id: tool_call_id,
-                            content,
-                            is_error,
-                        }],
-                    });
-                }
-            }
-        }
-        TurnItem::CommandExecution(CommandExecutionItem {
-            tool_call_id,
-            tool_name,
-            input,
-            output,
-            is_error,
-            ..
-        }) => {
-            match messages.last_mut() {
-                Some(message) if message.role == Role::Assistant => {
-                    message.content.push(ContentBlock::ToolUse {
-                        id: tool_call_id.clone(),
-                        name: tool_name,
-                        input,
-                    });
-                }
-                _ => {
-                    messages.push(Message {
-                        role: Role::Assistant,
-                        content: vec![ContentBlock::ToolUse {
-                            id: tool_call_id.clone(),
-                            name: tool_name,
-                            input,
-                        }],
-                    });
-                }
-            }
-            let content = match output {
-                serde_json::Value::String(text) => text,
-                other => other.to_string(),
-            };
-            messages.push(Message {
-                role: Role::User,
-                content: vec![ContentBlock::ToolResult {
-                    tool_use_id: tool_call_id,
-                    content,
-                    is_error,
-                }],
-            });
-        }
-        TurnItem::Plan(TextItem { text })
-        | TurnItem::WebSearch(TextItem { text })
-        | TurnItem::ImageGeneration(TextItem { text })
-        | TurnItem::HookPrompt(TextItem { text }) => {
-            messages.push(Message::assistant_text(text));
-        }
-        TurnItem::ContextCompaction(TextItem { .. }) => {}
-        TurnItem::Reasoning(TextItem { text }) => match messages.last_mut() {
-            Some(message) if message.role == Role::Assistant => {
-                message.content.push(ContentBlock::Reasoning { text });
-            }
-            _ => {
-                messages.push(Message {
-                    role: Role::Assistant,
-                    content: vec![ContentBlock::Reasoning { text }],
-                });
-            }
-        },
-        TurnItem::ToolProgress(_)
-        | TurnItem::ApprovalRequest(_)
-        | TurnItem::ApprovalDecision(_)
-        | TurnItem::TurnSummary(_) => {}
+
+    if prompt_visible_turn_item(turn_kind, &item) {
+        apply_prompt_turn_item(messages, tool_names_by_id, item);
     }
 }
 
@@ -1010,6 +915,9 @@ fn apply_prompt_turn_item(
         | TurnItem::ContextCompaction(TextItem { text })
         | TurnItem::HookPrompt(TextItem { text }) => {
             messages.push(Message::assistant_text(text));
+        }
+        TurnItem::ResearchArtifact(ResearchArtifactItem { title, content, .. }) => {
+            messages.push(Message::assistant_text(format!("### {title}\n\n{content}")));
         }
         TurnItem::ToolCall(ToolCallItem {
             tool_call_id,
@@ -1223,6 +1131,8 @@ mod tests {
     use devo_core::Message;
     use devo_core::Model;
     use devo_core::Persona;
+    use devo_core::ResearchArtifactItem;
+    use devo_core::ResearchArtifactType;
     use devo_core::RolloutLine;
     use devo_core::SessionContext;
     use devo_core::SessionId;
@@ -1235,6 +1145,7 @@ mod tests {
     use devo_core::TurnContext;
     use devo_core::TurnId;
     use devo_core::TurnItem;
+    use devo_core::TurnKind;
     use devo_core::TurnLine;
     use devo_core::TurnRecord;
     use devo_core::TurnStatus;
@@ -1326,6 +1237,7 @@ mod tests {
             &mut messages,
             &mut history_items,
             &mut tool_names_by_id,
+            &TurnKind::Regular,
             TurnItem::ToolCall(ToolCallItem {
                 tool_call_id: "call-1".to_string(),
                 tool_name: "read".to_string(),
@@ -1336,6 +1248,7 @@ mod tests {
             &mut messages,
             &mut history_items,
             &mut tool_names_by_id,
+            &TurnKind::Regular,
             TurnItem::ToolResult(ToolResultItem {
                 tool_call_id: "call-1".to_string(),
                 tool_name: None,
@@ -1360,6 +1273,7 @@ mod tests {
             &mut messages,
             &mut history_items,
             &mut tool_names_by_id,
+            &TurnKind::Regular,
             TurnItem::ToolCall(ToolCallItem {
                 tool_call_id: "call-1".to_string(),
                 tool_name: "read".to_string(),
@@ -1370,6 +1284,7 @@ mod tests {
             &mut messages,
             &mut history_items,
             &mut tool_names_by_id,
+            &TurnKind::Regular,
             TurnItem::ToolResult(ToolResultItem {
                 tool_call_id: "call-1".to_string(),
                 tool_name: Some("read".to_string()),
@@ -1394,6 +1309,101 @@ mod tests {
     }
 
     #[test]
+    fn replay_projects_regular_research_artifact_into_history_and_prompt() {
+        // Trace: L2-DES-RESEARCH-001
+        // Verifies: non-research prompt projection keeps existing artifact behavior.
+        let mut messages = Vec::new();
+        let mut history_items = Vec::new();
+        let mut tool_names_by_id = HashMap::new();
+
+        apply_turn_item(
+            &mut messages,
+            &mut history_items,
+            &mut tool_names_by_id,
+            &TurnKind::Regular,
+            TurnItem::ResearchArtifact(ResearchArtifactItem {
+                artifact_type: ResearchArtifactType::Plan,
+                title: "Research Plan".to_string(),
+                content: "1. Inspect sources".to_string(),
+            }),
+        );
+
+        assert_eq!(history_items.len(), 1);
+        assert_eq!(history_items[0].title, "Research Plan");
+        assert_eq!(history_items[0].body, "1. Inspect sources");
+        assert_eq!(
+            messages,
+            vec![Message::assistant_text(
+                "### Research Plan\n\n1. Inspect sources"
+            )]
+        );
+    }
+
+    #[test]
+    fn replay_projects_research_turn_into_compact_prompt_handoff() {
+        // Trace: L2-DES-RESEARCH-001
+        // Verifies: completed research turns do not leak internal artifacts or tool payloads into regular prompts.
+        let mut messages = Vec::new();
+        let mut history_items = Vec::new();
+        let mut tool_names_by_id = HashMap::new();
+        let turn_kind = TurnKind::Research;
+
+        for item in [
+            TurnItem::UserMessage(TextItem {
+                text: "/research original question".to_string(),
+            }),
+            TurnItem::ResearchArtifact(ResearchArtifactItem {
+                artifact_type: ResearchArtifactType::Brief,
+                title: "Research Brief".to_string(),
+                content: "internal brief should stay hidden".to_string(),
+            }),
+            TurnItem::ToolCall(ToolCallItem {
+                tool_call_id: "search-1".to_string(),
+                tool_name: "web_search".to_string(),
+                input: serde_json::json!({"query":"secret internal query"}),
+            }),
+            TurnItem::ToolResult(ToolResultItem {
+                tool_call_id: "search-1".to_string(),
+                tool_name: Some("web_search".to_string()),
+                output: serde_json::Value::String("opaque provider payload".to_string()),
+                display_content: None,
+                is_error: false,
+            }),
+            TurnItem::Reasoning(TextItem {
+                text: "internal research reasoning".to_string(),
+            }),
+            TurnItem::AgentMessage(TextItem {
+                text: "final report".to_string(),
+            }),
+            TurnItem::ResearchArtifact(ResearchArtifactItem {
+                artifact_type: ResearchArtifactType::FinalReportMetadata,
+                title: "Research Context Reference".to_string(),
+                content: "compact reference".to_string(),
+            }),
+        ] {
+            apply_turn_item(
+                &mut messages,
+                &mut history_items,
+                &mut tool_names_by_id,
+                &turn_kind,
+                item,
+            );
+        }
+
+        assert_eq!(history_items.len(), 7);
+        assert_eq!(
+            messages,
+            vec![
+                Message::user("/research original question".to_string()),
+                Message::assistant_text("final report".to_string()),
+                Message::assistant_text(
+                    "### Research Context Reference\n\ncompact reference".to_string()
+                ),
+            ]
+        );
+    }
+
+    #[test]
     fn prompt_messages_rebuild_from_compaction_snapshot_without_trimming_transcript() {
         let summary_item_id = ItemId::new();
         let preserved_item_id = ItemId::new();
@@ -1402,6 +1412,7 @@ mod tests {
         let persisted_turn_items = vec![
             PersistedTurnItem {
                 turn_id: TurnId::new(),
+                turn_kind: TurnKind::Regular,
                 item_id: ItemId::new(),
                 turn_item: TurnItem::UserMessage(TextItem {
                     text: "older user".to_string(),
@@ -1409,6 +1420,7 @@ mod tests {
             },
             PersistedTurnItem {
                 turn_id: TurnId::new(),
+                turn_kind: TurnKind::Regular,
                 item_id: summary_item_id,
                 turn_item: TurnItem::ContextCompaction(TextItem {
                     text: "<compaction_summary>summary</compaction_summary>".to_string(),
@@ -1416,6 +1428,7 @@ mod tests {
             },
             PersistedTurnItem {
                 turn_id: TurnId::new(),
+                turn_kind: TurnKind::Regular,
                 item_id: preserved_item_id,
                 turn_item: TurnItem::UserMessage(TextItem {
                     text: "latest user".to_string(),
@@ -1423,6 +1436,7 @@ mod tests {
             },
             PersistedTurnItem {
                 turn_id: TurnId::new(),
+                turn_kind: TurnKind::Regular,
                 item_id: later_item_id,
                 turn_item: TurnItem::AgentMessage(TextItem {
                     text: "latest assistant".to_string(),
@@ -1476,6 +1490,7 @@ mod tests {
             },
             thinking_selection: None,
             reasoning_effort: None,
+            system_prompt_mode: devo_core::SystemPromptMode::CodingAgent,
         };
         let turn_context = TurnContext {
             environment: EnvironmentContext {

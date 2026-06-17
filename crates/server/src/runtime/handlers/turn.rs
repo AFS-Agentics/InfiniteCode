@@ -116,6 +116,16 @@ impl ServerRuntime {
                 format!("prompt blocked by hook: {reason}"),
             );
         }
+        if params.execution_mode == devo_protocol::TurnExecutionMode::Research {
+            return self
+                .handle_research_turn_start(
+                    request_id,
+                    params,
+                    display_input,
+                    resolved_input.prompt_text,
+                )
+                .await;
+        }
 
         let now = Utc::now();
         let mut cwd_change = None;
@@ -571,6 +581,23 @@ impl ServerRuntime {
                 serde_json::json!({ "title": "Reasoning", "text": text }),
             )
             .await;
+        }
+
+        {
+            let mut session = session_arc.lock().await;
+            let previous_len = session.pending_user_inputs.len();
+            session
+                .pending_user_inputs
+                .retain(|_, pending| pending.turn_id != params.turn_id);
+            let removed_len = previous_len.saturating_sub(session.pending_user_inputs.len());
+            if removed_len > 0 {
+                tracing::info!(
+                    session_id = %params.session_id,
+                    turn_id = %params.turn_id,
+                    removed_len,
+                    "cleared pending request_user_input requests for interrupted turn"
+                );
+            }
         }
 
         if let Some(cancel_token) = self

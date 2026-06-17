@@ -290,6 +290,7 @@ impl ToolRuntime {
             budgets: self.execution_options.budgets,
             cancel_token: self.execution_options.cancel_token.clone(),
             agent_scope: self.context.agent_scope,
+            agent_context_mode: self.context.agent_context_mode,
             collaboration_mode: self.context.collaboration_mode,
             agent_coordinator: self.context.agent_coordinator.clone(),
             network_proxy: self.context.network_proxy.clone(),
@@ -490,6 +491,7 @@ pub struct ToolRuntimeContext {
     pub turn_id: Option<String>,
     pub cwd: PathBuf,
     pub agent_scope: ToolAgentScope,
+    pub agent_context_mode: devo_protocol::AgentContextMode,
     pub collaboration_mode: devo_protocol::CollaborationMode,
     pub agent_coordinator: Option<Arc<dyn AgentToolCoordinator>>,
     pub local_web_search: Option<ResolvedLocalWebSearchConfig>,
@@ -504,6 +506,7 @@ impl std::fmt::Debug for ToolRuntimeContext {
             .field("turn_id", &self.turn_id)
             .field("cwd", &self.cwd)
             .field("agent_scope", &self.agent_scope)
+            .field("agent_context_mode", &self.agent_context_mode)
             .field("collaboration_mode", &self.collaboration_mode)
             .field(
                 "agent_coordinator",
@@ -1132,6 +1135,7 @@ mod tests {
                 turn_id: Some("turn-1".into()),
                 cwd: PathBuf::from("C:/workspace"),
                 agent_scope: ToolAgentScope::Parent,
+                agent_context_mode: devo_protocol::AgentContextMode::CodingAgent,
                 collaboration_mode: devo_protocol::CollaborationMode::Build,
                 agent_coordinator: None,
                 local_web_search: None,

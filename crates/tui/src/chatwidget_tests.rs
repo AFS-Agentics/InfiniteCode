@@ -952,6 +952,61 @@ fn approval_request_does_not_duplicate_already_committed_assistant_text() {
 }
 
 #[test]
+fn research_artifact_completion_does_not_commit_assistant_turn() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+    let artifact_id = ItemId::new();
+
+    widget.handle_worker_event(crate::events::WorkerEvent::TurnStarted {
+        model: "test-model".to_string(),
+        model_binding_id: None,
+        thinking: None,
+        reasoning_effort: None,
+        turn_id: Default::default(),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::TextItemStarted {
+        item_id: artifact_id,
+        kind: crate::events::TextItemKind::ResearchArtifact,
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::TextItemDelta {
+        item_id: artifact_id,
+        kind: crate::events::TextItemKind::ResearchArtifact,
+        delta: "partial finding".to_string(),
+    });
+    let live_rows = rendered_rows(&widget, 80, 16).join("\n");
+    assert!(
+        live_rows.contains("partial finding"),
+        "research artifact delta should be visible before completion:\n{live_rows}"
+    );
+
+    widget.handle_worker_event(crate::events::WorkerEvent::TextItemCompleted {
+        item_id: artifact_id,
+        kind: crate::events::TextItemKind::ResearchArtifact,
+        final_text: "### Finding\n\npartial finding".to_string(),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::AssistantMessageCompleted(
+        "final report".to_string(),
+    ));
+
+    let committed = scrollback_plain_lines(&trim_trailing_blank_scrollback_lines(
+        widget.drain_scrollback_lines(80),
+    ))
+    .join("\n");
+    assert!(
+        committed.contains("partial finding"),
+        "research artifact should commit independently:\n{committed}"
+    );
+    assert!(
+        committed.contains("final report"),
+        "research artifact completion must not suppress assistant completion:\n{committed}"
+    );
+}
+
+#[test]
 fn approval_request_bottom_pane_menu_denies_with_n_shortcut() {
     let model = Model {
         slug: "test-model".to_string(),

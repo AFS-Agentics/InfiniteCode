@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use devo_protocol::AgentContextMode;
+use devo_protocol::AgentToolPolicy;
+
 use super::*;
 
 mod coordinator;
@@ -26,12 +29,33 @@ impl ServerRuntime {
         let parent_session_id = params.session_id;
         let child_session_id = SessionId::new();
         let now = Utc::now();
-        let fork_turns = params.fork_turns.as_deref().unwrap_or("all");
-        if !matches!(fork_turns, "none" | "all") {
+        if let Some(fork_turns) = params.fork_turns.as_deref()
+            && !matches!(fork_turns, "none" | "all")
+        {
             return Err(ToolCallError::InvalidInput(
                 "fork_turns must be \"none\" or \"all\"".to_string(),
             ));
         }
+        let effective_context_mode = match (params.context_mode, params.tool_policy) {
+            (AgentContextMode::DeepResearch, AgentToolPolicy::Inherit)
+            | (AgentContextMode::DeepResearch, AgentToolPolicy::DenyAll)
+            | (AgentContextMode::DeepResearch, AgentToolPolicy::DeepResearch)
+            | (AgentContextMode::CodingAgent, AgentToolPolicy::DeepResearch) => {
+                AgentContextMode::DeepResearch
+            }
+            (AgentContextMode::CodingAgent, AgentToolPolicy::Inherit)
+            | (AgentContextMode::CodingAgent, AgentToolPolicy::DenyAll) => {
+                AgentContextMode::CodingAgent
+            }
+        };
+        let effective_tool_policy = match effective_context_mode {
+            AgentContextMode::CodingAgent => params.tool_policy,
+            AgentContextMode::DeepResearch => AgentToolPolicy::DeepResearch,
+        };
+        let fork_turns = match effective_context_mode {
+            AgentContextMode::CodingAgent => params.fork_turns.as_deref().unwrap_or("all"),
+            AgentContextMode::DeepResearch => "none",
+        };
         if params.max_turns == Some(0) {
             return Err(ToolCallError::InvalidInput(
                 "max_turns must be positive when provided".to_string(),
@@ -110,6 +134,7 @@ impl ServerRuntime {
                 &mut rebuilt_messages,
                 &mut rebuilt_history_items,
                 &mut tool_names_by_id,
+                &item.turn_kind,
                 item.turn_item.clone(),
             );
         }
@@ -152,6 +177,22 @@ impl ServerRuntime {
             last_query_total_tokens: 0,
             status: SessionRuntimeStatus::Idle,
         };
+        if effective_context_mode == AgentContextMode::DeepResearch {
+            let turn_config = self
+                .deps
+                .resolve_turn_config(session_model_selection(&summary), summary.thinking.clone());
+            core_session.session_context = Some(research::research_session_context(
+                &core_session,
+                &turn_config,
+                research::research_stage_system(devo_core::research::prompts::subagent()),
+            ));
+            core_session.push_message(Message::user(
+                devo_core::research::prompts::environment_context(
+                    &devo_core::research::prompts::today_string(),
+                    &devo_core::research::prompts::timezone_string(),
+                ),
+            ));
+        }
         let child_session = RuntimeSession {
             record,
             summary: summary.clone(),
@@ -165,7 +206,7 @@ impl ServerRuntime {
             latest_compaction_snapshot: None,
             pending_turn_queue,
             btw_input_queue,
-            agent_tool_policy: params.tool_policy,
+            agent_tool_policy: effective_tool_policy,
             max_turns: params.max_turns,
             deferred_assistant: None,
             deferred_reasoning: None,

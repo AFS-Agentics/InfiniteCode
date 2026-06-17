@@ -305,10 +305,24 @@ impl ServerRuntime {
                 if let Some(history_item) = history_item_from_turn_item(&turn_item) {
                     session.history_items.push(history_item);
                 }
+                let turn_kind = session
+                    .active_turn
+                    .as_ref()
+                    .filter(|turn| turn.turn_id == turn_id)
+                    .map(|turn| turn.kind.clone())
+                    .or_else(|| {
+                        session
+                            .latest_turn
+                            .as_ref()
+                            .filter(|turn| turn.turn_id == turn_id)
+                            .map(|turn| turn.kind.clone())
+                    })
+                    .unwrap_or_default();
                 session
                     .persisted_turn_items
                     .push(crate::execution::PersistedTurnItem {
                         turn_id,
+                        turn_kind,
                         item_id,
                         turn_item: turn_item.clone(),
                     });

@@ -515,12 +515,20 @@ fn emit_hosted_tool_result<F>(
     }
 
     let text = hosted_tool_result_text(name, input, output.as_ref(), status.as_deref());
+    let content = if output.is_some() {
+        ToolContent::Mixed {
+            text: Some(text.clone()),
+            json: output.clone(),
+        }
+    } else {
+        ToolContent::Text(text.clone())
+    };
     let summary = crate::tools::tool_summary::tool_summary(name, input, session_cwd);
     emit(QueryEvent::ToolResult {
         tool_use_id: id.to_string(),
         tool_name: name.to_string(),
         input: input.clone(),
-        content: ToolContent::Text(text.clone()),
+        content,
         display_content: Some(micro_compact(text)),
         is_error: hosted_tool_status_is_error(status.as_deref()),
         summary,
@@ -2543,6 +2551,8 @@ mod tests {
         );
     }
 
+    /// Trace: L2-DES-RESEARCH-001
+    /// Verifies: provider-hosted web_search emits normal tool events with hosted output.
     #[tokio::test]
     async fn provider_hosted_web_search_emits_tool_events_without_local_execution() {
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -2673,7 +2683,18 @@ mod tests {
         assert!(!*is_error);
         assert!(matches!(
             *content,
-            ToolContent::Text(text) if text == "status: completed"
+            ToolContent::Mixed {
+                text: Some(text),
+                json: Some(json),
+            } if text == "status: completed"
+                && json == &json!({
+                    "results": [
+                        {
+                            "title": "Rust documentation",
+                            "url": "https://example.test/rust"
+                        }
+                    ]
+                })
         ));
         assert!(events.iter().any(|event| matches!(
             event,
@@ -2691,6 +2712,8 @@ mod tests {
         }));
     }
 
+    /// Trace: L2-DES-RESEARCH-001
+    /// Verifies: provider-hosted web_fetch emits normal tool events with hosted output.
     #[tokio::test]
     async fn provider_hosted_web_fetch_emits_tool_events_without_local_execution() {
         let requests = Arc::new(Mutex::new(Vec::new()));
@@ -2821,7 +2844,14 @@ mod tests {
         assert!(!*is_error);
         assert!(matches!(
             *content,
-            ToolContent::Text(text) if text == "status: completed"
+            ToolContent::Mixed {
+                text: Some(text),
+                json: Some(json),
+            } if text == "status: completed"
+                && json == &json!({
+                    "title": "Docs",
+                    "url": "https://example.test/docs"
+                })
         ));
     }
 
@@ -3603,14 +3633,9 @@ mod tests {
             assistant_message,
             &Message {
                 role: Role::Assistant,
-                content: vec![
-                    ContentBlock::Reasoning {
-                        text: "plan".into(),
-                    },
-                    ContentBlock::Text {
-                        text: "final".into(),
-                    },
-                ],
+                content: vec![ContentBlock::Text {
+                    text: "final".into(),
+                }],
             }
         );
     }

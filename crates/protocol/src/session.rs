@@ -247,10 +247,20 @@ pub struct SessionForkResult {
     pub forked_from_session_id: SessionId,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionRollbackMode {
+    #[default]
+    ThroughUserTurn,
+    BeforeUserTurn,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionRollbackParams {
     pub session_id: SessionId,
     pub user_turn_index: u32,
+    #[serde(default)]
+    pub mode: SessionRollbackMode,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -419,5 +429,24 @@ mod tests {
         let restored: SessionHistoryItem =
             serde_json::from_str(&json).expect("deserialize history item");
         assert_eq!(restored, item);
+    }
+
+    #[test]
+    fn session_rollback_params_default_to_through_user_turn_mode() {
+        let session_id = SessionId::new();
+        let params: SessionRollbackParams = serde_json::from_value(serde_json::json!({
+            "session_id": session_id,
+            "user_turn_index": 2,
+        }))
+        .expect("deserialize legacy rollback params");
+
+        assert_eq!(
+            params,
+            SessionRollbackParams {
+                session_id,
+                user_turn_index: 2,
+                mode: SessionRollbackMode::ThroughUserTurn,
+            }
+        );
     }
 }
