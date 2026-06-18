@@ -517,7 +517,7 @@ impl ServerRuntime {
         let source = source_arc.lock().await;
         let now = Utc::now();
         let forked_id = SessionId::new();
-        let forked_runtime = match self
+        let mut forked_runtime = match self
             .build_runtime_session_from_user_turn_cut(
                 &source,
                 forked_id,
@@ -534,40 +534,34 @@ impl ServerRuntime {
                 return self.error_response(request_id, ProtocolErrorCode::InvalidParams, message);
             }
         };
-        let summary = forked_runtime.summary.clone();
+        forked_runtime.summary.parent_session_id = Some(params.session_id);
         drop(source);
+        if !forked_runtime.summary.ephemeral {
+            let record = self.rollout_store.create_session_record(
+                forked_id,
+                now,
+                forked_runtime.summary.cwd.clone(),
+                forked_runtime.summary.title.clone(),
+                forked_runtime.summary.model.clone(),
+                forked_runtime.summary.model_binding_id.clone(),
+                forked_runtime.summary.thinking.clone(),
+                self.deps.provider.name().to_string(),
+                Some(params.session_id),
+            );
+            if let Err(error) = self.rollout_store.append_session_meta(&record) {
+                return self.error_response(
+                    request_id,
+                    ProtocolErrorCode::InternalError,
+                    format!("failed to persist forked session metadata: {error}"),
+                );
+            }
+            forked_runtime.record = Some(record);
+        }
+        let summary = forked_runtime.summary.clone();
         self.sessions
             .lock()
             .await
             .insert(forked_id, forked_runtime.shared());
-        let sessions = self.sessions.lock().await;
-        if let Some(forked_session) = sessions.get(&forked_id).cloned() {
-            drop(sessions);
-            let mut forked_session = forked_session.lock().await;
-            if !forked_session.summary.ephemeral {
-                let record = self.rollout_store.create_session_record(
-                    forked_id,
-                    now,
-                    forked_session.summary.cwd.clone(),
-                    forked_session.summary.title.clone(),
-                    forked_session.summary.model.clone(),
-                    forked_session.summary.model_binding_id.clone(),
-                    forked_session.summary.thinking.clone(),
-                    self.deps.provider.name().to_string(),
-                    Some(params.session_id),
-                );
-                if let Err(error) = self.rollout_store.append_session_meta(&record) {
-                    return self.error_response(
-                        request_id,
-                        ProtocolErrorCode::InternalError,
-                        format!("failed to persist forked session metadata: {error}"),
-                    );
-                }
-                forked_session.record = Some(record);
-            }
-        } else {
-            drop(sessions);
-        }
         self.subscribe_connection_to_session(connection_id, forked_id, None)
             .await;
         tracing::info!(
@@ -617,7 +611,7 @@ impl ServerRuntime {
             );
         };
         let source = session_arc.lock().await;
-        let rebuilt = match self
+        let mut rebuilt = match self
             .build_runtime_session_from_user_turn_cut(
                 &source,
                 params.session_id,
@@ -634,11 +628,30 @@ impl ServerRuntime {
                 return self.error_response(request_id, ProtocolErrorCode::InvalidParams, message);
             }
         };
+        let record = source.record.clone();
+        let (retained_turn_ids, retained_item_ids) =
+            retained_ids_for_persisted_items(&rebuilt.persisted_turn_items);
+        let latest_turn_id = rebuilt.latest_turn.as_ref().map(|turn| turn.turn_id);
+        drop(source);
+        if let Some(record) = record.clone()
+            && let Err(error) = self.rollout_store.append_session_rollback(
+                &record,
+                retained_turn_ids,
+                retained_item_ids,
+                latest_turn_id,
+            )
+        {
+            return self.error_response(
+                request_id,
+                ProtocolErrorCode::InternalError,
+                format!("failed to persist session rollback: {error}"),
+            );
+        }
+        rebuilt.record = record;
         let summary = rebuilt.summary.clone();
         let latest_turn = rebuilt.latest_turn.clone();
         let loaded_item_count = rebuilt.loaded_item_count;
         let history_items = rebuilt.history_items.clone();
-        drop(source);
         *session_arc.lock().await = rebuilt;
         self.subscribe_connection_to_session(connection_id, params.session_id, None)
             .await;
@@ -856,6 +869,22 @@ fn kept_items_for_user_turn_cut(
             .cloned()
             .collect()),
     }
+}
+
+fn retained_ids_for_persisted_items(
+    items: &[crate::execution::PersistedTurnItem],
+) -> (Vec<TurnId>, Vec<devo_core::ItemId>) {
+    let mut retained_turn_ids = Vec::new();
+    let mut retained_item_ids = Vec::new();
+    for item in items {
+        if !retained_turn_ids.contains(&item.turn_id) {
+            retained_turn_ids.push(item.turn_id);
+        }
+        if !retained_item_ids.contains(&item.item_id) {
+            retained_item_ids.push(item.item_id);
+        }
+    }
+    (retained_turn_ids, retained_item_ids)
 }
 
 #[cfg(test)]

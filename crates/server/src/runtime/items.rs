@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::*;
 
 impl ServerRuntime {
@@ -358,19 +360,86 @@ impl ServerRuntime {
 }
 
 pub(crate) fn render_input_items(input: &[crate::InputItem]) -> Option<String> {
-    let parts = input
-        .iter()
-        .map(|item| match item {
-            crate::InputItem::Text { text } => text.trim().to_string(),
+    let mut rendered = String::new();
+    for item in input {
+        let part = match item {
+            crate::InputItem::Text { text } => {
+                let text = text.trim();
+                if text.is_empty() {
+                    continue;
+                }
+                Cow::Borrowed(text)
+            }
             crate::InputItem::Skill { name, path } => {
-                format!("[skill:{name} @ {}]", path.display())
+                Cow::Owned(format!("[skill:{name} @ {}]", path.display()))
             }
-            crate::InputItem::LocalImage { path } => format!("[image:{}]", path.display()),
-            crate::InputItem::Mention { path, name } => {
-                format!("[mention:{}]", name.as_deref().unwrap_or(path.as_str()))
+            crate::InputItem::LocalImage { path } => {
+                Cow::Owned(format!("[image:{}]", path.display()))
             }
-        })
-        .filter(|text| !text.is_empty())
-        .collect::<Vec<_>>();
-    (!parts.is_empty()).then(|| parts.join("\n"))
+            crate::InputItem::Mention { path, name } => Cow::Owned(format!(
+                "[mention:{}]",
+                name.as_deref().unwrap_or(path.as_str())
+            )),
+        };
+        if !rendered.is_empty() {
+            rendered.push('\n');
+        }
+        rendered.push_str(&part);
+    }
+    (!rendered.is_empty()).then_some(rendered)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+    use crate::InputItem;
+
+    #[test]
+    fn render_input_items_trims_text_and_preserves_item_markers() {
+        let input = vec![
+            InputItem::Text {
+                text: "  hello  ".to_string(),
+            },
+            InputItem::Text {
+                text: "   ".to_string(),
+            },
+            InputItem::Skill {
+                name: "writer".to_string(),
+                path: PathBuf::from("writer.md"),
+            },
+            InputItem::LocalImage {
+                path: PathBuf::from("photo.png"),
+            },
+            InputItem::Mention {
+                path: "src/lib.rs".to_string(),
+                name: None,
+            },
+            InputItem::Mention {
+                path: "src/main.rs".to_string(),
+                name: Some("main".to_string()),
+            },
+        ];
+
+        assert_eq!(
+            render_input_items(&input),
+            Some(
+                "hello\n[skill:writer @ writer.md]\n[image:photo.png]\n[mention:src/lib.rs]\n[mention:main]"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn render_input_items_returns_none_for_empty_text_only_input() {
+        assert_eq!(
+            render_input_items(&[InputItem::Text {
+                text: " \n\t ".to_string(),
+            }]),
+            None
+        );
+    }
 }

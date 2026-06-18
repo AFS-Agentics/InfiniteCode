@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{ItemId, ReasoningEffort, SessionId, TurnId, TurnStatus, TurnUsage};
@@ -153,7 +154,7 @@ pub struct TurnSteerResult {
     pub turn_id: TurnId,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TurnKind {
     #[default]
@@ -162,6 +163,55 @@ pub enum TurnKind {
     ManualCompaction,
     Research,
     Other(String),
+}
+
+impl<'de> Deserialize<'de> for TurnKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        match value {
+            serde_json::Value::String(text) => Ok(match text.as_str() {
+                "regular" => Self::Regular,
+                "review" => Self::Review,
+                "manual_compaction" => Self::ManualCompaction,
+                "research" => Self::Research,
+                other => Self::Other(other.to_string()),
+            }),
+            serde_json::Value::Object(object) if object.len() == 1 => {
+                let Some((kind, payload)) = object.into_iter().next() else {
+                    return Err(D::Error::custom("expected a turn kind object"));
+                };
+                match kind.as_str() {
+                    "other" => match payload {
+                        serde_json::Value::String(text) => Ok(Self::Other(text)),
+                        _ => Err(D::Error::custom(
+                            "expected string payload for other turn kind",
+                        )),
+                    },
+                    "regular" => Ok(Self::Regular),
+                    "review" => Ok(Self::Review),
+                    "manual_compaction" => Ok(Self::ManualCompaction),
+                    "research" => Ok(Self::Research),
+                    other => Err(D::Error::unknown_variant(
+                        other,
+                        &[
+                            "regular",
+                            "review",
+                            "manual_compaction",
+                            "research",
+                            "other",
+                        ],
+                    )),
+                }
+            }
+            serde_json::Value::Object(_) => {
+                Err(D::Error::custom("expected a single-field turn kind object"))
+            }
+            _ => Err(D::Error::custom("expected a turn kind string")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -386,5 +436,23 @@ mod tests {
         let value = serde_json::to_value(TurnKind::Research).expect("serialize");
 
         assert_eq!(value, serde_json::json!("research"));
+    }
+
+    #[test]
+    fn turn_kind_unknown_string_deserializes_as_other() {
+        let value: TurnKind = serde_json::from_value(serde_json::json!("shell_command"))
+            .expect("deserialize unknown turn kind");
+
+        assert_eq!(value, TurnKind::Other("shell_command".to_string()));
+    }
+
+    #[test]
+    fn turn_kind_legacy_other_object_deserializes_as_other() {
+        let value: TurnKind = serde_json::from_value(serde_json::json!({
+            "other": "shell_command"
+        }))
+        .expect("deserialize legacy other turn kind");
+
+        assert_eq!(value, TurnKind::Other("shell_command".to_string()));
     }
 }

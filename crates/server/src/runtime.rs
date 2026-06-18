@@ -171,6 +171,7 @@ mod research;
 mod research_tools;
 mod skills;
 mod turn_exec;
+mod turn_reservation;
 mod user_input;
 
 pub(crate) use connection::CONNECTION_NOTIFICATION_CHANNEL_CAPACITY;

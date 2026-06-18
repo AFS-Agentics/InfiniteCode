@@ -57,8 +57,8 @@ Later layers win over earlier layers for overlapping fields. TOML tables are
 merged recursively; non-table values replace the earlier value.
 
 Provider-owned fields use `ProviderConfigSection::merge_overlay` while loading
-user and project config, so project config can override specific provider fields
-without clearing every omitted provider field from user config.
+user, project, and CLI config, so higher-priority layers can override specific
+provider fields without clearing every omitted provider field from lower layers.
 
 ## App Defaults
 

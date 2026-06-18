@@ -2227,12 +2227,11 @@ async fn run_worker_inner(
                                 }
                             }
                             "item/researchArtifact/delta" => {
-                                if let ServerEvent::ItemDelta { payload, .. } = event {
-                                    if let Some(worker_event) =
+                                if let ServerEvent::ItemDelta { payload, .. } = event
+                                    && let Some(worker_event) =
                                         research_artifact_delta_event(payload)
-                                    {
-                                        let _ = event_tx.send(worker_event);
-                                    }
+                                {
+                                    let _ = event_tx.send(worker_event);
                                 }
                             }
                             "item/plan/delta" => {
@@ -3143,10 +3142,10 @@ fn handle_completed_item(payload: ItemEventPayload, event_tx: &mpsc::UnboundedSe
 }
 
 fn project_history_items(items: &[SessionHistoryItem]) -> Vec<TranscriptItem> {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     let mut paired_result_by_call_id = HashMap::new();
-    let mut consumed_result_indexes = HashMap::new();
+    let mut consumed_result_indexes = HashSet::new();
 
     for (index, item) in items.iter().enumerate() {
         if matches!(
@@ -3160,12 +3159,26 @@ fn project_history_items(items: &[SessionHistoryItem]) -> Vec<TranscriptItem> {
         }
     }
 
+    let metadata_owned_ids = items
+        .iter()
+        .filter_map(|item| {
+            item.tool_call_id
+                .clone()
+                .filter(|_| item.metadata.is_some())
+        })
+        .collect::<HashSet<_>>();
     let mut transcript = Vec::new();
     let mut index = 0usize;
 
     while index < items.len() {
         let item = &items[index];
         if let Some(metadata) = &item.metadata {
+            if let Some(tool_call_id) = item.tool_call_id.as_deref()
+                && let Some(result_index) = paired_result_by_call_id.get(tool_call_id).copied()
+                && result_index != index
+            {
+                consumed_result_indexes.insert(result_index);
+            }
             match metadata {
                 SessionHistoryMetadata::PlanUpdate { explanation, steps } => {
                     transcript.push(TranscriptItem::new(
@@ -3204,24 +3217,32 @@ fn project_history_items(items: &[SessionHistoryItem]) -> Vec<TranscriptItem> {
         }
         if item.kind == SessionHistoryItemKind::ToolCall
             && let Some(tool_call_id) = item.tool_call_id.as_deref()
-            && let Some(result_index) = paired_result_by_call_id.get(tool_call_id).copied()
         {
-            let result_item = &items[result_index];
-            consumed_result_indexes.insert(result_index, ());
-            let mut ti = if result_item.kind == SessionHistoryItemKind::Error {
-                TranscriptItem::tool_error(item.title.clone(), result_item.body.clone())
-            } else {
-                TranscriptItem::restored_tool_result(item.title.clone(), result_item.body.clone())
-            };
-            if let Some(duration_ms) = result_item.duration_ms {
-                ti = ti.with_duration(duration_ms);
+            if metadata_owned_ids.contains(tool_call_id) {
+                index += 1;
+                continue;
             }
-            transcript.push(ti);
-            index += 1;
-            continue;
+            if let Some(result_index) = paired_result_by_call_id.get(tool_call_id).copied() {
+                let result_item = &items[result_index];
+                consumed_result_indexes.insert(result_index);
+                let mut ti = if result_item.kind == SessionHistoryItemKind::Error {
+                    TranscriptItem::tool_error(item.title.clone(), result_item.body.clone())
+                } else {
+                    TranscriptItem::restored_tool_result(
+                        item.title.clone(),
+                        result_item.body.clone(),
+                    )
+                };
+                if let Some(duration_ms) = result_item.duration_ms {
+                    ti = ti.with_duration(duration_ms);
+                }
+                transcript.push(ti);
+                index += 1;
+                continue;
+            }
         }
 
-        if consumed_result_indexes.contains_key(&index) {
+        if consumed_result_indexes.contains(&index) {
             index += 1;
             continue;
         }
@@ -5028,6 +5049,81 @@ mod tests {
         assert_eq!(projected.len(), 1);
         assert_eq!(projected[0].kind, TranscriptItemKind::System);
         assert!(projected[0].body.contains("completed: Inspect"));
+    }
+
+    #[test]
+    fn project_history_prefers_plan_metadata_over_paired_tool_output() {
+        let items = vec![
+            SessionHistoryItem {
+                tool_call_id: Some("call-1".to_string()),
+                kind: SessionHistoryItemKind::ToolCall,
+                title: "update_plan".to_string(),
+                body: String::new(),
+                tool_io: None,
+                metadata: None,
+                duration_ms: None,
+            },
+            SessionHistoryItem {
+                tool_call_id: Some("call-1".to_string()),
+                kind: SessionHistoryItemKind::ToolResult,
+                title: "update_plan output".to_string(),
+                body:
+                    r#"{"explanation":"Do work","plan":[{"step":"Inspect","status":"completed"}]}"#
+                        .to_string(),
+                tool_io: None,
+                metadata: Some(SessionHistoryMetadata::PlanUpdate {
+                    explanation: Some("Do work".to_string()),
+                    steps: vec![devo_protocol::SessionPlanStep {
+                        text: "Inspect".to_string(),
+                        status: SessionPlanStepStatus::Completed,
+                    }],
+                }),
+                duration_ms: None,
+            },
+        ];
+
+        assert_eq!(
+            project_history_items(&items),
+            vec![TranscriptItem::new(
+                TranscriptItemKind::System,
+                "Do work",
+                "completed: Inspect"
+            )]
+        );
+    }
+
+    #[test]
+    fn project_history_keeps_edited_metadata_result_as_fallback_output() {
+        let items = vec![
+            SessionHistoryItem {
+                tool_call_id: Some("call-1".to_string()),
+                kind: SessionHistoryItemKind::ToolCall,
+                title: "write foo.txt".to_string(),
+                body: String::new(),
+                tool_io: None,
+                metadata: None,
+                duration_ms: None,
+            },
+            SessionHistoryItem {
+                tool_call_id: Some("call-1".to_string()),
+                kind: SessionHistoryItemKind::ToolResult,
+                title: "write output".to_string(),
+                body: "patched".to_string(),
+                tool_io: None,
+                metadata: Some(SessionHistoryMetadata::Edited {
+                    changes: std::collections::HashMap::new(),
+                }),
+                duration_ms: None,
+            },
+        ];
+
+        assert_eq!(
+            project_history_items(&items),
+            vec![TranscriptItem::restored_tool_result(
+                "write output",
+                "patched"
+            )]
+        );
     }
 
     #[test]

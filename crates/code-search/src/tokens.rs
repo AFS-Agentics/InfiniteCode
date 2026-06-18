@@ -78,7 +78,8 @@ pub fn split_identifier_tokens(input: &str) -> Vec<String> {
         .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
         .filter(|part| !part.is_empty())
     {
-        tokens.push(raw.to_ascii_lowercase());
+        push_lowercase_token(&mut tokens, raw);
+        let skip_single_part_duplicate = !raw.contains('_');
         for part in raw.split('_').filter(|part| !part.is_empty()) {
             let mut chars = part.char_indices();
             let Some((_, mut previous)) = chars.next() else {
@@ -86,6 +87,7 @@ pub fn split_identifier_tokens(input: &str) -> Vec<String> {
             };
             let mut chars = chars.peekable();
             let mut start = 0;
+            let mut saw_boundary = false;
             while let Some((byte_idx, current)) = chars.next() {
                 let next_is_lower = chars
                     .peek()
@@ -96,17 +98,31 @@ pub fn split_identifier_tokens(input: &str) -> Vec<String> {
                         && previous.is_ascii_uppercase()
                         && next_is_lower);
                 if boundary {
-                    tokens.push(part[start..byte_idx].to_ascii_lowercase());
+                    push_lowercase_token(&mut tokens, &part[start..byte_idx]);
                     start = byte_idx;
+                    saw_boundary = true;
                 }
                 previous = current;
             }
-            tokens.push(part[start..].to_ascii_lowercase());
+
+            // The full raw identifier has already been inserted. For common one-word
+            // identifiers, pushing the same part again only allocates work for sort/dedup.
+            if saw_boundary || !skip_single_part_duplicate {
+                push_lowercase_token(&mut tokens, &part[start..]);
+            }
         }
     }
     tokens.sort();
     tokens.dedup();
     tokens
+}
+
+fn push_lowercase_token(tokens: &mut Vec<String>, token: &str) {
+    if token.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        tokens.push(token.to_ascii_lowercase());
+    } else {
+        tokens.push(token.to_string());
+    }
 }
 
 #[cfg(test)]
@@ -138,6 +154,21 @@ mod tests {
             "server".to_string(),
         ];
         assert_eq!(tokens, expected);
+    }
+
+    #[test]
+    fn split_identifier_tokens_preserves_single_part_output() {
+        let tokens = split_identifier_tokens("parse ParseInput parse_input");
+
+        assert_eq!(
+            tokens,
+            vec![
+                "input".to_string(),
+                "parse".to_string(),
+                "parse_input".to_string(),
+                "parseinput".to_string(),
+            ]
+        );
     }
 
     /// Trace: L2-DES-TOOL-001

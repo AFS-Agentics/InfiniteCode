@@ -142,6 +142,10 @@ pub struct SessionHistoryToolIo {
     pub input: serde_json::Value,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<serde_json::Value>,
+    /// Optional human-facing rendering of `output`.
+    ///
+    /// Session history keeps the canonical output for replay/debugging and this
+    /// separate text for compact display surfaces.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_content: Option<String>,
 }
@@ -333,14 +337,20 @@ pub struct SessionDeleteResult {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MessageEditPreviousParams {
     pub session_id: SessionId,
-    pub target_message_id: ItemId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_message_id: Option<ItemId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expected_target_message_id: Option<ItemId>,
-    pub replacement_content_parts: Vec<serde_json::Value>,
-    pub replacement_mentions: Vec<serde_json::Value>,
+    #[serde(default, alias = "replacement_content_parts")]
+    pub edited_content_parts: Vec<serde_json::Value>,
+    #[serde(default, alias = "replacement_mentions")]
+    pub edited_mentions: Vec<serde_json::Value>,
     #[serde(default)]
     pub edit_mode: EditMode,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub client_edit_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_restore_policy: Option<MessageEditWorkspaceRestorePolicy>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -349,6 +359,14 @@ pub enum EditMode {
     #[default]
     Normal,
     QueuedOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MessageEditWorkspaceRestorePolicy {
+    Safe,
+    Skip,
+    ConfiguredRestore,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -397,6 +415,76 @@ mod tests {
         let json = serde_json::to_string(&metadata).expect("serialize");
         let restored: SessionMetadata = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(restored, metadata);
+    }
+
+    #[test]
+    fn message_edit_previous_params_accept_spec_shape() {
+        let session_id = SessionId::new();
+        let expected_target_message_id = ItemId::new();
+        let payload = serde_json::json!({
+            "session_id": session_id,
+            "expected_target_message_id": expected_target_message_id,
+            "edited_content_parts": [{ "type": "text", "text": "updated" }],
+            "edited_mentions": [{ "type": "file", "path": "src/main.rs" }],
+            "client_edit_id": "client-edit-1",
+            "workspace_restore_policy": "skip"
+        });
+
+        let params: MessageEditPreviousParams =
+            serde_json::from_value(payload).expect("deserialize message/editPrevious params");
+
+        assert_eq!(
+            params,
+            MessageEditPreviousParams {
+                session_id,
+                target_message_id: None,
+                expected_target_message_id: Some(expected_target_message_id),
+                edited_content_parts: vec![serde_json::json!({
+                    "type": "text",
+                    "text": "updated"
+                })],
+                edited_mentions: vec![serde_json::json!({
+                    "type": "file",
+                    "path": "src/main.rs"
+                })],
+                edit_mode: EditMode::Normal,
+                client_edit_id: Some("client-edit-1".to_string()),
+                workspace_restore_policy: Some(MessageEditWorkspaceRestorePolicy::Skip),
+            }
+        );
+    }
+
+    #[test]
+    fn message_edit_previous_params_accept_legacy_replacement_names() {
+        let session_id = SessionId::new();
+        let target_message_id = ItemId::new();
+        let payload = serde_json::json!({
+            "session_id": session_id,
+            "target_message_id": target_message_id,
+            "replacement_content_parts": [{ "type": "text", "text": "legacy" }],
+            "replacement_mentions": [],
+            "edit_mode": "queued_only"
+        });
+
+        let params: MessageEditPreviousParams =
+            serde_json::from_value(payload).expect("deserialize legacy edit params");
+
+        assert_eq!(
+            params,
+            MessageEditPreviousParams {
+                session_id,
+                target_message_id: Some(target_message_id),
+                expected_target_message_id: None,
+                edited_content_parts: vec![serde_json::json!({
+                    "type": "text",
+                    "text": "legacy"
+                })],
+                edited_mentions: Vec::new(),
+                edit_mode: EditMode::QueuedOnly,
+                client_edit_id: None,
+                workspace_restore_policy: None,
+            }
+        );
     }
 
     #[test]

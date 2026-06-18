@@ -375,6 +375,176 @@ invocation_method = "openai_responses"
 }
 
 /// Trace: L2-DES-APP-005
+/// Verifies: omitted defaulted provider fields in a higher-priority partial overlay do not overwrite lower-priority values.
+#[test]
+fn loader_provider_overlay_preserves_absent_defaulted_provider_fields() {
+    let root = unique_temp_dir("config-provider-defaulted-overlay");
+    let home = root.join("home").join(".devo");
+    let workspace = root.join("workspace");
+    std::fs::create_dir_all(&home).expect("home config dir");
+    std::fs::create_dir_all(workspace.join(".devo")).expect("workspace config dir");
+
+    std::fs::write(
+        home.join("config.toml"),
+        r#"
+[defaults]
+model_binding = "main"
+
+[providers.main]
+name = "User Provider"
+base_url = "https://user.example/v1"
+credential = "user_api_key"
+headers = '{"X-User":"yes"}'
+wire_apis = ["openai_responses"]
+enabled = false
+
+[model_bindings.main]
+model_slug = "user-model"
+provider = "main"
+model_name = "user/model"
+invocation_method = "openai_responses"
+enabled = false
+"#,
+    )
+    .expect("write user config");
+    std::fs::write(
+        workspace.join(".devo").join("config.toml"),
+        r#"
+[providers.main]
+name = "Project Provider"
+
+[model_bindings.main]
+model_slug = "project-model"
+provider = "main"
+model_name = "project/model"
+"#,
+    )
+    .expect("write project config");
+
+    let loader = FileSystemAppConfigLoader::new(home);
+    let config = loader.load(Some(&workspace)).expect("load config");
+
+    assert_eq!(
+        config.provider,
+        ProviderConfigSection {
+            defaults: ProviderDefaultsConfig {
+                model_binding: Some("main".to_string()),
+            },
+            providers: BTreeMap::from([(
+                "main".to_string(),
+                ProviderVendorConfig {
+                    name: "Project Provider".to_string(),
+                    base_url: Some("https://user.example/v1".to_string()),
+                    credential: Some("user_api_key".to_string()),
+                    headers: Some(r#"{"X-User":"yes"}"#.to_string()),
+                    wire_apis: vec![ProviderWireApi::OpenAIResponses],
+                    web_search: None,
+                    web_fetch: None,
+                    enabled: false,
+                },
+            )]),
+            model_bindings: BTreeMap::from([(
+                "main".to_string(),
+                ModelBindingConfig {
+                    model_slug: "project-model".to_string(),
+                    provider: "main".to_string(),
+                    model_name: "project/model".to_string(),
+                    invocation_method: ProviderWireApi::OpenAIResponses,
+                    enabled: false,
+                    ..ModelBindingConfig::default()
+                },
+            )]),
+            ..ProviderConfigSection::default()
+        }
+    );
+
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// Trace: L2-DES-APP-005
+/// Verifies: CLI provider overrides participate in the same provider merge precedence as other CLI config.
+#[test]
+fn loader_applies_cli_provider_overrides_to_provider_section() {
+    let root = unique_temp_dir("config-provider-cli-overlay");
+    let home = root.join("home").join(".devo");
+    std::fs::create_dir_all(&home).expect("home config dir");
+
+    std::fs::write(
+        home.join("config.toml"),
+        r#"
+[defaults]
+model_binding = "main"
+
+[providers.main]
+name = "User Provider"
+base_url = "https://user.example/v1"
+credential = "user_api_key"
+wire_apis = ["openai_responses"]
+
+[model_bindings.main]
+model_slug = "user-model"
+provider = "main"
+model_name = "user/model"
+invocation_method = "openai_responses"
+"#,
+    )
+    .expect("write user config");
+    let cli_overrides: toml::Value = r#"
+[providers.main]
+name = "CLI Provider"
+enabled = false
+
+[model_bindings.main]
+model_slug = "cli-model"
+provider = "main"
+model_name = "cli/model"
+invocation_method = "openai_responses"
+enabled = false
+"#
+    .parse()
+    .expect("parse cli overrides");
+
+    let loader = FileSystemAppConfigLoader::new(home).with_cli_overrides(cli_overrides);
+    let config = loader.load(None).expect("load config");
+
+    assert_eq!(
+        config.provider,
+        ProviderConfigSection {
+            defaults: ProviderDefaultsConfig {
+                model_binding: Some("main".to_string()),
+            },
+            providers: BTreeMap::from([(
+                "main".to_string(),
+                ProviderVendorConfig {
+                    name: "CLI Provider".to_string(),
+                    base_url: Some("https://user.example/v1".to_string()),
+                    credential: Some("user_api_key".to_string()),
+                    headers: None,
+                    wire_apis: vec![ProviderWireApi::OpenAIResponses],
+                    web_search: None,
+                    web_fetch: None,
+                    enabled: false,
+                },
+            )]),
+            model_bindings: BTreeMap::from([(
+                "main".to_string(),
+                ModelBindingConfig {
+                    model_slug: "cli-model".to_string(),
+                    provider: "main".to_string(),
+                    model_name: "cli/model".to_string(),
+                    invocation_method: ProviderWireApi::OpenAIResponses,
+                    enabled: false,
+                    ..ModelBindingConfig::default()
+                },
+            )]),
+            ..ProviderConfigSection::default()
+        }
+    );
+
+    let _ = std::fs::remove_dir_all(root);
+}
+
+/// Trace: L2-DES-APP-005
 /// Verifies: provider upsert persists custom provider header JSON in user config and projections.
 #[test]
 fn provider_upsert_writes_user_config_when_workspace_is_active() {

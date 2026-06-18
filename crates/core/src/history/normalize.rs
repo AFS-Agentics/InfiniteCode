@@ -179,17 +179,18 @@ pub fn pair_tool_call_items(items: &mut Vec<ResponseItem>) {
         return;
     };
 
+    if items
+        .iter()
+        .all(|item| item_has_required_tool_pair(item, &tool_call_ids, &tool_output_ids))
+    {
+        return;
+    }
+
     // Compute keep decisions while the ID sets can borrow from `items`, then
     // drop those borrows before mutating the vector with `retain`.
     let retain_flags = items
         .iter()
-        .map(|item| match item {
-            ResponseItem::ToolCall { id, .. } => tool_output_ids.contains(id.as_str()),
-            ResponseItem::ToolCallOutput { tool_use_id, .. } => {
-                tool_call_ids.contains(tool_use_id.as_str())
-            }
-            _ => true,
-        })
+        .map(|item| item_has_required_tool_pair(item, &tool_call_ids, &tool_output_ids))
         .collect::<Vec<_>>();
     drop(tool_call_ids);
     drop(tool_output_ids);
@@ -200,6 +201,20 @@ pub fn pair_tool_call_items(items: &mut Vec<ResponseItem>) {
         index += 1;
         keep
     });
+}
+
+fn item_has_required_tool_pair(
+    item: &ResponseItem,
+    tool_call_ids: &HashSet<&str>,
+    tool_output_ids: &HashSet<&str>,
+) -> bool {
+    match item {
+        ResponseItem::ToolCall { id, .. } => tool_output_ids.contains(id.as_str()),
+        ResponseItem::ToolCallOutput { tool_use_id, .. } => {
+            tool_call_ids.contains(tool_use_id.as_str())
+        }
+        _ => true,
+    }
 }
 
 #[cfg(test)]

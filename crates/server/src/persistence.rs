@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
@@ -22,6 +22,8 @@ use devo_core::ItemId;
 use devo_core::ItemLine;
 use devo_core::ItemRecord;
 use devo_core::Message;
+use devo_core::MessageEditRecordedLine;
+use devo_core::MessageEditRecordedRecord;
 use devo_core::ResearchArtifactItem;
 use devo_core::ResearchArtifactType;
 use devo_core::Role;
@@ -29,6 +31,7 @@ use devo_core::RolloutLine;
 use devo_core::SessionId;
 use devo_core::SessionMetaLine;
 use devo_core::SessionRecord;
+use devo_core::SessionRollbackLine;
 use devo_core::SessionTitleFinalSource;
 use devo_core::SessionTitleState;
 use devo_core::SessionTitleUpdatedLine;
@@ -41,6 +44,12 @@ use devo_core::TurnKind;
 use devo_core::TurnLine;
 use devo_core::TurnRecord;
 use devo_core::TurnStatus;
+use devo_core::TurnSupersededLine;
+use devo_core::TurnSupersededRecord;
+use devo_core::TurnWorkspaceRestoreCompletedLine;
+use devo_core::TurnWorkspaceRestoreCompletedRecord;
+use devo_core::TurnWorkspaceRestoreStartedLine;
+use devo_core::TurnWorkspaceRestoreStartedRecord;
 use devo_core::Worklog;
 
 use crate::execution::PersistedTurnItem;
@@ -202,6 +211,93 @@ impl RolloutStore {
         )
     }
 
+    /// Appends one accepted message-edit record to the durable rollout journal.
+    #[allow(dead_code)]
+    pub(crate) fn append_message_edit_recorded(
+        &self,
+        record: &SessionRecord,
+        edit: MessageEditRecordedRecord,
+    ) -> Result<()> {
+        self.append_line(
+            &record.rollout_path,
+            &RolloutLine::MessageEditRecorded(Box::new(MessageEditRecordedLine {
+                timestamp: Utc::now(),
+                record: edit,
+            })),
+        )
+    }
+
+    /// Appends one turn-superseded marker to the durable rollout journal.
+    #[allow(dead_code)]
+    pub(crate) fn append_turn_superseded(
+        &self,
+        record: &SessionRecord,
+        superseded: TurnSupersededRecord,
+    ) -> Result<()> {
+        self.append_line(
+            &record.rollout_path,
+            &RolloutLine::TurnSuperseded(Box::new(TurnSupersededLine {
+                timestamp: Utc::now(),
+                record: superseded,
+            })),
+        )
+    }
+
+    /// Appends one workspace-restore-start record to the durable rollout journal.
+    #[allow(dead_code)]
+    pub(crate) fn append_workspace_restore_started(
+        &self,
+        record: &SessionRecord,
+        restore: TurnWorkspaceRestoreStartedRecord,
+    ) -> Result<()> {
+        self.append_line(
+            &record.rollout_path,
+            &RolloutLine::TurnWorkspaceRestoreStarted(Box::new(TurnWorkspaceRestoreStartedLine {
+                timestamp: Utc::now(),
+                record: restore,
+            })),
+        )
+    }
+
+    /// Appends one workspace-restore-completed record to the durable rollout journal.
+    #[allow(dead_code)]
+    pub(crate) fn append_workspace_restore_completed(
+        &self,
+        record: &SessionRecord,
+        restore: TurnWorkspaceRestoreCompletedRecord,
+    ) -> Result<()> {
+        self.append_line(
+            &record.rollout_path,
+            &RolloutLine::TurnWorkspaceRestoreCompleted(Box::new(
+                TurnWorkspaceRestoreCompletedLine {
+                    timestamp: Utc::now(),
+                    record: restore,
+                },
+            )),
+        )
+    }
+
+    /// Appends one rollback marker to the durable rollout journal.
+    pub(crate) fn append_session_rollback(
+        &self,
+        record: &SessionRecord,
+        retained_turn_ids: Vec<TurnId>,
+        retained_item_ids: Vec<ItemId>,
+        latest_turn_id: Option<TurnId>,
+    ) -> Result<()> {
+        self.append_line(
+            &record.rollout_path,
+            &RolloutLine::SessionRollback(Box::new(SessionRollbackLine {
+                timestamp: Utc::now(),
+                session_id: record.id,
+                retained_turn_ids,
+                retained_item_ids,
+                latest_turn_id,
+                schema_version: 1,
+            })),
+        )
+    }
+
     /// Loads every durable session that can be rebuilt from canonical rollout files.
     pub(crate) fn load_sessions(
         &self,
@@ -326,6 +422,7 @@ struct ReplayState {
     session: Option<SessionRecord>,
     latest_turn: Option<TurnRecord>,
     latest_turn_metadata: Option<TurnMetadata>,
+    turn_records_by_id: HashMap<TurnId, TurnRecord>,
     loaded_item_count: u64,
     next_item_seq: u64,
     turns_seen: u32,
@@ -342,6 +439,9 @@ struct ReplayState {
     history_items: Vec<crate::SessionHistoryItem>,
     pending_items: Vec<ReplayHistoryItem>,
     latest_compaction_snapshot: Option<CompactionSnapshotLine>,
+    turn_order: Vec<TurnId>,
+    superseded_turn_ids: HashSet<TurnId>,
+    summarized_turn_ids: HashSet<TurnId>,
 }
 
 impl ReplayState {
@@ -352,8 +452,10 @@ impl ReplayState {
             }
             RolloutLine::Turn(line) => {
                 // Insert turn summary for the previous turn before processing the new turn
-                if let Some(ref prev_turn) = self.latest_turn_metadata
+                if let Some(prev_turn) = self.latest_turn_metadata.clone()
                     && prev_turn.status == devo_core::TurnStatus::Completed
+                    && !self.superseded_turn_ids.contains(&prev_turn.turn_id)
+                    && self.summarized_turn_ids.insert(prev_turn.turn_id)
                 {
                     let ts = prev_turn.completed_at.unwrap_or(prev_turn.started_at);
                     let duration_secs = prev_turn.completed_at.and_then(|completed| {
@@ -382,8 +484,15 @@ impl ReplayState {
                     });
                 }
 
-                self.turns_seen = self.turns_seen.max(line.turn.sequence);
-                if let Some(usage) = &line.turn.usage {
+                let turn = line.turn;
+                if self.superseded_turn_ids.contains(&turn.id) {
+                    return Ok(());
+                }
+                if !self.turn_records_by_id.contains_key(&turn.id) {
+                    self.turn_order.push(turn.id);
+                }
+                self.turns_seen = self.turns_seen.max(turn.sequence);
+                if let Some(usage) = &turn.usage {
                     self.total_input_tokens += usage.input_tokens as usize;
                     self.total_output_tokens += usage.output_tokens as usize;
                     self.total_cache_creation_tokens +=
@@ -394,46 +503,23 @@ impl ReplayState {
                     self.last_turn_tokens =
                         usage.input_tokens as usize + usage.output_tokens as usize;
                 }
-                self.latest_turn_metadata = Some(TurnMetadata {
-                    turn_id: line.turn.id,
-                    session_id: line.turn.session_id,
-                    sequence: line.turn.sequence,
-                    status: line.turn.status.clone(),
-                    kind: line.turn.kind.clone(),
-                    model: line.turn.model.clone(),
-                    model_binding_id: line.turn.model_binding_id.clone(),
-                    thinking: line.turn.thinking.clone(),
-                    reasoning_effort: line
-                        .turn
-                        .turn_context
-                        .as_ref()
-                        .and_then(|context| context.reasoning_effort)
-                        .or_else(|| {
-                            line.turn
-                                .session_context
-                                .as_ref()
-                                .and_then(|context| context.reasoning_effort)
-                        }),
-                    request_model: line.turn.request_model.clone(),
-                    request_thinking: line.turn.request_thinking.clone(),
-                    started_at: line.turn.started_at,
-                    completed_at: line.turn.completed_at,
-                    usage: line.turn.usage.clone(),
-                });
-                self.turn_kinds_by_id
-                    .insert(line.turn.id, line.turn.kind.clone());
-                if let Some(session_context) = line.turn.session_context.clone() {
+                self.latest_turn_metadata = Some(turn_metadata_from_record(&turn));
+                self.turn_kinds_by_id.insert(turn.id, turn.kind.clone());
+                if let Some(session_context) = turn.session_context.clone() {
                     self.session_context = Some(session_context);
                 }
-                if let Some(turn_context) = line.turn.turn_context.clone() {
+                if let Some(turn_context) = turn.turn_context.clone() {
                     self.latest_turn_context = Some(turn_context);
                 }
-                self.latest_turn = Some(line.turn);
+                self.turn_records_by_id.insert(turn.id, turn.clone());
+                self.latest_turn = Some(turn);
             }
             RolloutLine::Item(line) => {
-                self.loaded_item_count += 1;
-                self.next_item_seq = self.next_item_seq.max(line.item.seq + 1);
-                self.collect_item_line(line.item);
+                if !self.superseded_turn_ids.contains(&line.item.turn_id) {
+                    self.loaded_item_count += 1;
+                    self.next_item_seq = self.next_item_seq.max(line.item.seq + 1);
+                    self.collect_item_line(line.item);
+                }
             }
             RolloutLine::SessionTitleUpdated(line) => {
                 let session = self
@@ -447,14 +533,48 @@ impl ReplayState {
             RolloutLine::CompactionSnapshot(line) => {
                 self.latest_compaction_snapshot = Some(*line);
             }
+            RolloutLine::MessageEditRecorded(line) => {
+                self.apply_record_timestamp(
+                    line.record.session_id,
+                    line.timestamp,
+                    "message edit line",
+                )?;
+            }
+            RolloutLine::TurnSuperseded(line) => {
+                self.apply_record_timestamp(
+                    line.record.session_id,
+                    line.timestamp,
+                    "turn superseded line",
+                )?;
+                self.apply_turn_superseded(line.record);
+            }
+            RolloutLine::TurnWorkspaceRestoreStarted(line) => {
+                self.apply_record_timestamp(
+                    line.record.session_id,
+                    line.timestamp,
+                    "workspace restore started line",
+                )?;
+            }
+            RolloutLine::TurnWorkspaceRestoreCompleted(line) => {
+                self.apply_record_timestamp(
+                    line.record.session_id,
+                    line.timestamp,
+                    "workspace restore completed line",
+                )?;
+            }
+            RolloutLine::SessionRollback(line) => {
+                self.apply_session_rollback(*line)?;
+            }
         }
         Ok(())
     }
 
     fn into_runtime_session(mut self, deps: &ServerRuntimeDependencies) -> Result<RuntimeSession> {
         // Insert turn summary for the last turn before converting
-        if let Some(ref last_turn) = self.latest_turn_metadata
+        if let Some(last_turn) = self.latest_turn_metadata.clone()
             && last_turn.status == devo_core::TurnStatus::Completed
+            && !self.superseded_turn_ids.contains(&last_turn.turn_id)
+            && self.summarized_turn_ids.insert(last_turn.turn_id)
         {
             let ts = last_turn.completed_at.unwrap_or(last_turn.started_at);
             let duration_secs = last_turn.completed_at.and_then(|completed| {
@@ -646,6 +766,165 @@ impl ReplayState {
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
         })
+    }
+
+    fn apply_record_timestamp(
+        &mut self,
+        session_id: SessionId,
+        timestamp: chrono::DateTime<Utc>,
+        line_kind: &str,
+    ) -> Result<()> {
+        if let Some(session) = self.session.as_mut() {
+            if session.id != session_id {
+                anyhow::bail!("{line_kind} session id does not match session header");
+            }
+            session.updated_at = timestamp;
+        }
+        Ok(())
+    }
+
+    fn apply_turn_superseded(&mut self, record: TurnSupersededRecord) {
+        self.superseded_turn_ids.insert(record.superseded_turn_id);
+        let removed_item_ids = self
+            .pending_items
+            .iter()
+            .filter(|item| item.turn_id == record.superseded_turn_id)
+            .map(|item| item.item_id)
+            .collect::<HashSet<_>>();
+
+        self.pending_items
+            .retain(|item| item.turn_id != record.superseded_turn_id);
+        self.turn_order
+            .retain(|turn_id| *turn_id != record.superseded_turn_id);
+        self.turn_records_by_id.remove(&record.superseded_turn_id);
+        self.turn_kinds_by_id.remove(&record.superseded_turn_id);
+
+        if self
+            .latest_turn_metadata
+            .as_ref()
+            .is_some_and(|turn| turn.turn_id == record.superseded_turn_id)
+        {
+            self.latest_turn = self
+                .turn_order
+                .iter()
+                .rev()
+                .find_map(|turn_id| self.turn_records_by_id.get(turn_id).cloned());
+            self.latest_turn_metadata = self.latest_turn.as_ref().map(turn_metadata_from_record);
+        }
+
+        if self
+            .latest_compaction_snapshot
+            .as_ref()
+            .is_some_and(|snapshot| {
+                removed_item_ids.contains(&snapshot.summary_item_id)
+                    || snapshot
+                        .preserved_item_ids
+                        .iter()
+                        .any(|item_id| removed_item_ids.contains(item_id))
+            })
+        {
+            self.latest_compaction_snapshot = None;
+        }
+
+        self.recompute_turn_aggregates();
+    }
+
+    fn apply_session_rollback(&mut self, line: SessionRollbackLine) -> Result<()> {
+        if let Some(session) = self.session.as_mut() {
+            if session.id != line.session_id {
+                anyhow::bail!("rollback line session id does not match session header");
+            }
+            session.updated_at = line.timestamp;
+        }
+
+        let retained_turn_ids = line
+            .retained_turn_ids
+            .iter()
+            .copied()
+            .collect::<HashSet<_>>();
+        let retained_item_ids = line
+            .retained_item_ids
+            .iter()
+            .copied()
+            .collect::<HashSet<_>>();
+
+        self.pending_items.retain(|item| {
+            retained_turn_ids.contains(&item.turn_id) && retained_item_ids.contains(&item.item_id)
+        });
+        self.turn_order
+            .retain(|turn_id| retained_turn_ids.contains(turn_id));
+        self.turn_records_by_id
+            .retain(|turn_id, _| retained_turn_ids.contains(turn_id));
+        self.turn_kinds_by_id
+            .retain(|turn_id, _| retained_turn_ids.contains(turn_id));
+        self.superseded_turn_ids
+            .retain(|turn_id| retained_turn_ids.contains(turn_id));
+        self.summarized_turn_ids
+            .retain(|turn_id| retained_turn_ids.contains(turn_id));
+
+        self.latest_turn = line
+            .latest_turn_id
+            .and_then(|turn_id| self.turn_records_by_id.get(&turn_id).cloned());
+        self.latest_turn_metadata = self.latest_turn.as_ref().map(turn_metadata_from_record);
+        self.session_context = self
+            .latest_turn
+            .as_ref()
+            .and_then(|turn| turn.session_context.clone())
+            .or_else(|| {
+                self.session
+                    .as_ref()
+                    .and_then(|session| session.session_context.clone())
+            });
+        self.latest_turn_context = None;
+        self.loaded_item_count = u64::try_from(retained_item_ids.len()).unwrap_or(u64::MAX);
+        self.next_item_seq = self
+            .pending_items
+            .iter()
+            .map(|item| item.seq.saturating_add(1))
+            .max()
+            .unwrap_or(1);
+        self.recompute_turn_aggregates();
+
+        if self
+            .latest_compaction_snapshot
+            .as_ref()
+            .is_some_and(|snapshot| {
+                !retained_item_ids.contains(&snapshot.summary_item_id)
+                    || snapshot
+                        .preserved_item_ids
+                        .iter()
+                        .any(|item_id| !retained_item_ids.contains(item_id))
+            })
+        {
+            self.latest_compaction_snapshot = None;
+        }
+        Ok(())
+    }
+
+    fn recompute_turn_aggregates(&mut self) {
+        self.turns_seen = 0;
+        self.total_input_tokens = 0;
+        self.total_output_tokens = 0;
+        self.total_cache_creation_tokens = 0;
+        self.total_cache_read_tokens = 0;
+        self.last_input_tokens = 0;
+        self.last_turn_tokens = 0;
+
+        for turn_id in &self.turn_order {
+            let Some(turn) = self.turn_records_by_id.get(turn_id) else {
+                continue;
+            };
+            self.turns_seen = self.turns_seen.max(turn.sequence);
+            if let Some(usage) = &turn.usage {
+                self.total_input_tokens += usage.input_tokens as usize;
+                self.total_output_tokens += usage.output_tokens as usize;
+                self.total_cache_creation_tokens +=
+                    usage.cache_creation_input_tokens.unwrap_or(0) as usize;
+                self.total_cache_read_tokens += usage.cache_read_input_tokens.unwrap_or(0) as usize;
+                self.last_input_tokens = usage.input_tokens as usize;
+                self.last_turn_tokens = usage.input_tokens as usize + usage.output_tokens as usize;
+            }
+        }
     }
 
     fn collect_item_line(&mut self, item: ItemRecord) {
@@ -1082,6 +1361,33 @@ pub(crate) fn build_turn_record(
     }
 }
 
+fn turn_metadata_from_record(turn: &TurnRecord) -> TurnMetadata {
+    TurnMetadata {
+        turn_id: turn.id,
+        session_id: turn.session_id,
+        sequence: turn.sequence,
+        status: turn.status.clone(),
+        kind: turn.kind.clone(),
+        model: turn.model.clone(),
+        model_binding_id: turn.model_binding_id.clone(),
+        thinking: turn.thinking.clone(),
+        reasoning_effort: turn
+            .turn_context
+            .as_ref()
+            .and_then(|context| context.reasoning_effort)
+            .or_else(|| {
+                turn.session_context
+                    .as_ref()
+                    .and_then(|context| context.reasoning_effort)
+            }),
+        request_model: turn.request_model.clone(),
+        request_thinking: turn.request_thinking.clone(),
+        started_at: turn.started_at,
+        completed_at: turn.completed_at,
+        usage: turn.usage.clone(),
+    }
+}
+
 /// Creates one canonical persisted item record from a normalized turn item payload.
 pub(crate) fn build_item_record(
     session_id: SessionId,
@@ -1123,12 +1429,17 @@ mod tests {
     use crate::execution::PersistedTurnItem;
     use crate::persistence::apply_turn_item;
     use devo_core::CompactionSnapshotLine;
+    use devo_core::ContentPart;
+    use devo_core::EditId;
+    use devo_core::EditState;
     use devo_core::EnvironmentContext;
     use devo_core::ItemId;
     use devo_core::ItemLine;
     use devo_core::ItemRecord;
     use devo_core::LanguageContext;
     use devo_core::Message;
+    use devo_core::MessageEditRecordedLine;
+    use devo_core::MessageEditRecordedRecord;
     use devo_core::Model;
     use devo_core::Persona;
     use devo_core::ResearchArtifactItem;
@@ -1149,6 +1460,9 @@ mod tests {
     use devo_core::TurnLine;
     use devo_core::TurnRecord;
     use devo_core::TurnStatus;
+    use devo_core::TurnSupersededLine;
+    use devo_core::TurnSupersededRecord;
+    use devo_core::WorkspaceRestorePolicy;
 
     #[test]
     fn replay_orders_items_by_sequence_before_timestamp() {
@@ -1225,6 +1539,170 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(titles, vec!["assistant 1", "date"]);
+    }
+
+    #[test]
+    fn replay_prunes_superseded_turn_from_rollout_projection() {
+        let now = Utc.with_ymd_and_hms(2026, 6, 18, 8, 0, 0).unwrap();
+        let session_id = SessionId::new();
+        let original_turn_id = TurnId::new();
+        let replacement_turn_id = TurnId::new();
+        let original_item_id = ItemId::new();
+        let replacement_item_id = ItemId::new();
+        let edit_id = EditId::new();
+        let mut replay = ReplayState::default();
+
+        replay
+            .apply_line(RolloutLine::Turn(Box::new(TurnLine {
+                timestamp: now,
+                turn: TurnRecord {
+                    id: original_turn_id,
+                    session_id,
+                    sequence: 1,
+                    started_at: now,
+                    completed_at: Some(now),
+                    status: TurnStatus::Completed,
+                    kind: TurnKind::Regular,
+                    model: "model-a".into(),
+                    model_binding_id: None,
+                    thinking: None,
+                    request_model: "model-a".into(),
+                    request_thinking: None,
+                    input_token_estimate: None,
+                    usage: None,
+                    session_context: None,
+                    turn_context: None,
+                    schema_version: 2,
+                },
+            })))
+            .expect("apply original turn");
+        replay
+            .apply_line(RolloutLine::Item(ItemLine {
+                timestamp: now,
+                item: ItemRecord {
+                    id: original_item_id,
+                    session_id,
+                    turn_id: original_turn_id,
+                    seq: 1,
+                    timestamp: now,
+                    attempt_placement: None,
+                    turn_status: Some(TurnStatus::Completed),
+                    sibling_turn_ids: Vec::new(),
+                    input_items: vec![TurnItem::UserMessage(TextItem {
+                        text: "original".into(),
+                    })],
+                    output_items: Vec::new(),
+                    worklog: None,
+                    error: None,
+                    schema_version: 1,
+                },
+            }))
+            .expect("apply original item");
+        replay
+            .apply_line(RolloutLine::MessageEditRecorded(Box::new(
+                MessageEditRecordedLine {
+                    timestamp: now,
+                    record: MessageEditRecordedRecord {
+                        schema_version: 1,
+                        session_id,
+                        edit_id,
+                        target_message_id: original_item_id,
+                        replacement_message_id: replacement_item_id,
+                        target_turn_id: Some(original_turn_id),
+                        replacement_turn_id: Some(replacement_turn_id),
+                        queue_item_id: None,
+                        edited_content_parts: vec![ContentPart::Text("edited".into())],
+                        edited_mentions: Vec::new(),
+                        workspace_restore_policy: WorkspaceRestorePolicy::Skip,
+                        edit_state: EditState::Accepted,
+                        requested_by_client_id: None,
+                        created_at: now,
+                    },
+                },
+            )))
+            .expect("apply message edit line");
+        replay
+            .apply_line(RolloutLine::TurnSuperseded(Box::new(TurnSupersededLine {
+                timestamp: now,
+                record: TurnSupersededRecord {
+                    schema_version: 1,
+                    session_id,
+                    superseded_turn_id: original_turn_id,
+                    replacement_turn_id,
+                    edit_id,
+                    restore_id: None,
+                    reason: "message_edit_previous".into(),
+                    created_at: now,
+                },
+            })))
+            .expect("apply superseded line");
+        replay
+            .apply_line(RolloutLine::Turn(Box::new(TurnLine {
+                timestamp: now,
+                turn: TurnRecord {
+                    id: replacement_turn_id,
+                    session_id,
+                    sequence: 2,
+                    started_at: now,
+                    completed_at: None,
+                    status: TurnStatus::Running,
+                    kind: TurnKind::Regular,
+                    model: "model-a".into(),
+                    model_binding_id: None,
+                    thinking: None,
+                    request_model: "model-a".into(),
+                    request_thinking: None,
+                    input_token_estimate: None,
+                    usage: None,
+                    session_context: None,
+                    turn_context: None,
+                    schema_version: 2,
+                },
+            })))
+            .expect("apply replacement turn");
+        replay
+            .apply_line(RolloutLine::Item(ItemLine {
+                timestamp: now,
+                item: ItemRecord {
+                    id: replacement_item_id,
+                    session_id,
+                    turn_id: replacement_turn_id,
+                    seq: 2,
+                    timestamp: now,
+                    attempt_placement: None,
+                    turn_status: Some(TurnStatus::Running),
+                    sibling_turn_ids: Vec::new(),
+                    input_items: vec![TurnItem::UserMessage(TextItem {
+                        text: "edited".into(),
+                    })],
+                    output_items: Vec::new(),
+                    worklog: None,
+                    error: None,
+                    schema_version: 1,
+                },
+            }))
+            .expect("apply replacement item");
+
+        let projected_items = replay
+            .pending_items
+            .iter()
+            .map(|item| item.turn_item.clone())
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            projected_items,
+            vec![TurnItem::UserMessage(TextItem {
+                text: "edited".into(),
+            })]
+        );
+        assert_eq!(replay.turn_order, vec![replacement_turn_id]);
+        assert_eq!(
+            replay
+                .latest_turn_metadata
+                .as_ref()
+                .map(|turn| turn.turn_id),
+            Some(replacement_turn_id)
+        );
     }
 
     #[test]

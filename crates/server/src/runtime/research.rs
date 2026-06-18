@@ -1994,6 +1994,13 @@ impl ServerRuntime {
             .provider_http
             .proxy_url
             .clone();
+        let turn_cancel_token = self
+            .active_turn_cancellations
+            .lock()
+            .await
+            .get(&session_id)
+            .cloned()
+            .unwrap_or_else(CancellationToken::new);
         Ok(ToolRuntime::new_with_context_and_options(
             registry,
             self.build_permission_checker(session_id, turn_id, permission_mode, permission_profile),
@@ -2013,7 +2020,10 @@ impl ServerRuntime {
                 hooks: self.hook_context_for_session(session_id).await,
                 network_proxy,
             },
-            ToolExecutionOptions::default(),
+            ToolExecutionOptions {
+                cancel_token: turn_cancel_token,
+                ..ToolExecutionOptions::default()
+            },
         ))
     }
 

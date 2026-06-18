@@ -915,6 +915,7 @@ impl ServerRuntime {
             .await;
 
         let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() else {
+            self.clear_active_turn_runtime_handles(session_id).await;
             return;
         };
         let (permission_mode, permission_profile) = {
@@ -934,7 +935,14 @@ impl ServerRuntime {
             .provider_http
             .proxy_url
             .clone();
-        let runtime = ToolRuntime::new_with_context(
+        let turn_cancel_token = self
+            .active_turn_cancellations
+            .lock()
+            .await
+            .get(&session_id)
+            .cloned()
+            .unwrap_or_else(CancellationToken::new);
+        let runtime = ToolRuntime::new_with_context_and_options(
             Arc::clone(&self.deps.registry),
             self.build_permission_checker(
                 session_id,
@@ -953,6 +961,10 @@ impl ServerRuntime {
                 local_web_search: None,
                 hooks: self.hook_context_for_session(session_id).await,
                 network_proxy,
+            },
+            ToolExecutionOptions {
+                cancel_token: turn_cancel_token,
+                ..ToolExecutionOptions::default()
             },
         );
         let result = runtime
@@ -973,6 +985,7 @@ impl ServerRuntime {
             }
         };
         let is_error = result.is_error;
+        self.clear_active_turn_runtime_handles(session_id).await;
         self.complete_item(
             session_id,
             turn.turn_id,

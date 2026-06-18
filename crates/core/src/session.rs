@@ -288,9 +288,11 @@ impl SessionState {
     }
 
     pub fn push_message(&mut self, msg: Message) {
-        self.messages.push(msg.clone());
         if let Some(prompt_messages) = self.prompt_messages.as_mut() {
+            self.messages.push(msg.clone());
             prompt_messages.push(msg);
+        } else {
+            self.messages.push(msg);
         }
     }
 

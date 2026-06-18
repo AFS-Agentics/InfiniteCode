@@ -497,7 +497,11 @@ impl ServerRuntime {
             session.active_turn = Some(turn.clone());
             turn
         };
-        self.append_turn_start(session_id, &turn).await?;
+        if let Err(error) = self.append_turn_start(session_id, &turn).await {
+            self.clear_active_turn_reservation(&session_arc, turn.turn_id)
+                .await;
+            return Err(error);
+        }
         self.broadcast_event(ServerEvent::SessionStatusChanged(
             SessionStatusChangedPayload {
                 session_id,
