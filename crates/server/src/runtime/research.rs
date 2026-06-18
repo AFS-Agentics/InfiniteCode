@@ -533,9 +533,9 @@ impl ServerRuntime {
 
         serde_json::to_value(SuccessResponse {
             id: request_id,
-            result: TurnStartResult {
+            result: TurnStartResult::Started {
                 turn_id: turn.turn_id,
-                status: turn.status,
+                status: turn.status.clone(),
                 accepted_at: now,
             },
         })

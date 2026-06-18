@@ -1483,7 +1483,11 @@ async fn start_research_turn(
         .context("turn/start response")?;
     let response: devo_server::SuccessResponse<devo_server::TurnStartResult> =
         serde_json::from_value(response)?;
-    Ok(response.result.turn_id.to_string())
+    Ok(response
+        .result
+        .turn_id()
+        .expect("research turn should have started")
+        .to_string())
 }
 
 async fn start_regular_turn_after_research(
@@ -1518,7 +1522,11 @@ async fn start_regular_turn_after_research(
         .context("regular turn/start after research response")?;
     let response: devo_server::SuccessResponse<devo_server::TurnStartResult> =
         serde_json::from_value(response)?;
-    Ok(response.result.turn_id.to_string())
+    Ok(response
+        .result
+        .turn_id()
+        .expect("regular turn should have started")
+        .to_string())
 }
 
 async fn queue_regular_turn_during_research(
@@ -1550,7 +1558,13 @@ async fn queue_regular_turn_during_research(
             }),
         )
         .await;
-    assert_eq!(response, None);
+    let response = response.context("queued turn/start response")?;
+    let response: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+        serde_json::from_value(response)?;
+    assert!(
+        matches!(response.result, devo_server::TurnStartResult::Queued { .. }),
+        "regular turn should be queued while research is active"
+    );
     Ok(())
 }
 

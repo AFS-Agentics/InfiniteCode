@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
-import defaultMdxComponents from "fumadocs-ui/mdx";
+import { renderDocsPage } from "@/lib/docs-page";
 import {
-  DocsBody,
-  DocsDescription,
-  DocsPage,
-  DocsTitle,
-} from "fumadocs-ui/page";
-import { i18n } from "@/lib/i18n";
+  isLocalizedDocsLanguage,
+  localizedDocsLanguages,
+} from "@/lib/layout.shared";
 import { source } from "@/lib/source";
+
+export const dynamic = "force-static";
+export const dynamicParams = false;
 
 export default async function Page({
   params,
@@ -16,7 +16,7 @@ export default async function Page({
 }) {
   const { slug, lang } = await params;
 
-  if (!i18n.languages.includes(lang as (typeof i18n.languages)[number])) {
+  if (!isLocalizedDocsLanguage(lang)) {
     notFound();
   }
 
@@ -26,21 +26,16 @@ export default async function Page({
     notFound();
   }
 
-  const MDX = page.data.body;
-
-  return (
-    <DocsPage toc={page.data.toc}>
-      <DocsTitle>{page.data.title}</DocsTitle>
-      <DocsDescription>{page.data.description}</DocsDescription>
-      <DocsBody>
-        <MDX components={defaultMdxComponents} />
-      </DocsBody>
-    </DocsPage>
-  );
+  return renderDocsPage(page);
 }
 
 export function generateStaticParams() {
-  return source.generateParams("slug", "lang");
+  return localizedDocsLanguages.flatMap((lang) =>
+    source.getPages(lang).map((page) => ({
+      lang,
+      slug: page.slugs,
+    })),
+  );
 }
 
 export async function generateMetadata({
@@ -50,7 +45,7 @@ export async function generateMetadata({
 }) {
   const { slug, lang } = await params;
 
-  if (!i18n.languages.includes(lang as (typeof i18n.languages)[number])) {
+  if (!isLocalizedDocsLanguage(lang)) {
     notFound();
   }
 

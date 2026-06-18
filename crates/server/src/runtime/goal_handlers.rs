@@ -19,6 +19,15 @@ impl ServerRuntime {
             }
         };
         let session_id = params.session_id;
+        let replace_existing = params.replace_existing;
+        let title_input = params.objective.trim().to_string();
+        if !self.sessions.lock().await.contains_key(&session_id) {
+            return self.error_response(
+                request_id,
+                ProtocolErrorCode::SessionNotFound,
+                "session does not exist",
+            );
+        }
 
         let mut stores = self.goal_stores.lock().await;
         let store = stores.entry(session_id).or_insert_with(GoalStore::new);
@@ -42,6 +51,12 @@ impl ServerRuntime {
                     tracing::warn!(session_id = %session_id, error = %error, "failed to persist goal create record");
                 }
                 self.sync_core_session_goal(session_id, session_goal).await;
+                self.maybe_start_title_generation_from_user_input(session_id, &title_input)
+                    .await;
+                if replace_existing {
+                    self.interrupt_active_goal_continuation_turn(session_id, "goal replaced")
+                        .await;
+                }
                 if should_continue {
                     self.maybe_start_goal_continuation_turn(session_id).await;
                 }
@@ -71,13 +86,56 @@ impl ServerRuntime {
             }
         };
         let session_id = params.session_id;
+        let requested_status = params.status;
+        let title_input = params
+            .objective
+            .as_deref()
+            .map(str::trim)
+            .filter(|objective| !objective.is_empty())
+            .map(str::to_string);
+        let only_pause_budget_limited = requested_status
+            == Some(devo_protocol::ThreadGoalStatus::Paused)
+            && params.objective.is_none()
+            && params.token_budget.is_none();
+        if !self.sessions.lock().await.contains_key(&session_id) {
+            return self.error_response(
+                request_id,
+                ProtocolErrorCode::SessionNotFound,
+                "session does not exist",
+            );
+        }
 
         let mut stores = self.goal_stores.lock().await;
         let store = stores.entry(session_id).or_insert_with(GoalStore::new);
         let previous_status = store.get().map(|goal| goal.status);
+        if previous_status == Some(crate::goal::GoalStatus::BudgetLimited)
+            && only_pause_budget_limited
+            && let Some(goal) = store.get().cloned()
+        {
+            let thread_goal = goal.to_thread_goal();
+            let result = serde_json::to_value(SuccessResponse {
+                id: request_id,
+                result: devo_protocol::GoalSetResult { goal: thread_goal },
+            })
+            .expect("serialize budget-limited goal pause result");
+            drop(stores);
+            self.sync_core_session_goal(session_id, None).await;
+            self.interrupt_active_goal_continuation_turn(
+                session_id,
+                "budget-limited goal wrap-up stopped",
+            )
+            .await;
+            return result;
+        }
         match store.set(params) {
             Ok(goal) => {
                 let should_continue = goal.status == crate::goal::GoalStatus::Active;
+                let should_interrupt_continuation = previous_status.is_some_and(|status| {
+                    matches!(
+                        status,
+                        crate::goal::GoalStatus::Active | crate::goal::GoalStatus::BudgetLimited
+                    )
+                }) && !should_continue;
                 let thread_goal = goal.to_thread_goal();
                 let session_goal = should_continue.then(|| thread_goal.clone());
                 let durable_goal = goal.clone();
@@ -104,6 +162,17 @@ impl ServerRuntime {
                     tracing::warn!(session_id = %session_id, error = %error, "failed to persist goal status record");
                 }
                 self.sync_core_session_goal(session_id, session_goal).await;
+                if should_interrupt_continuation {
+                    self.interrupt_active_goal_continuation_turn(
+                        session_id,
+                        "goal status changed from active",
+                    )
+                    .await;
+                }
+                if let Some(title_input) = title_input {
+                    self.maybe_start_title_generation_from_user_input(session_id, &title_input)
+                        .await;
+                }
                 if should_continue {
                     self.maybe_start_goal_continuation_turn(session_id).await;
                 }
@@ -119,7 +188,7 @@ impl ServerRuntime {
 
     #[allow(dead_code)]
     pub(super) async fn handle_goal_pause(
-        &self,
+        self: &Arc<Self>,
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
@@ -143,6 +212,31 @@ impl ServerRuntime {
             );
         };
         let previous_status = store.get().map(|goal| goal.status);
+        let should_interrupt_continuation = previous_status.is_some_and(|status| {
+            matches!(
+                status,
+                crate::goal::GoalStatus::Active | crate::goal::GoalStatus::BudgetLimited
+            )
+        });
+        if previous_status == Some(crate::goal::GoalStatus::BudgetLimited)
+            && let Some(goal) = store.get().cloned()
+        {
+            let thread_goal = goal.to_thread_goal();
+            let result = serde_json::to_value(SuccessResponse {
+                id: request_id,
+                result: devo_protocol::GoalSetStatusResult { goal: thread_goal },
+            })
+            .expect("serialize budget-limited goal pause result");
+            let session_id = params.session_id;
+            drop(stores);
+            self.sync_core_session_goal(session_id, None).await;
+            self.interrupt_active_goal_continuation_turn(
+                session_id,
+                "budget-limited goal wrap-up stopped",
+            )
+            .await;
+            return result;
+        }
         match store.set_status(devo_protocol::ThreadGoalStatus::Paused) {
             Ok(goal) => {
                 let thread_goal = goal.to_thread_goal();
@@ -163,6 +257,10 @@ impl ServerRuntime {
                     tracing::warn!(session_id = %session_id, error = %error, "failed to persist goal pause record");
                 }
                 self.sync_core_session_goal(session_id, None).await;
+                if should_interrupt_continuation {
+                    self.interrupt_active_goal_continuation_turn(session_id, "goal paused")
+                        .await;
+                }
                 result
             }
             Err(e) => self.error_response(
@@ -235,7 +333,7 @@ impl ServerRuntime {
 
     #[allow(dead_code)]
     pub(super) async fn handle_goal_complete(
-        &self,
+        self: &Arc<Self>,
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
@@ -279,6 +377,8 @@ impl ServerRuntime {
                     tracing::warn!(session_id = %session_id, error = %error, "failed to persist goal complete record");
                 }
                 self.sync_core_session_goal(session_id, None).await;
+                self.interrupt_active_goal_continuation_turn(session_id, "goal completed")
+                    .await;
                 result
             }
             Err(e) => self.error_response(
@@ -290,7 +390,7 @@ impl ServerRuntime {
     }
 
     pub(super) async fn handle_goal_cancel(
-        &self,
+        self: &Arc<Self>,
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
@@ -338,6 +438,8 @@ impl ServerRuntime {
                     tracing::warn!(session_id = %session_id, error = %error, "failed to persist goal cancel record");
                 }
                 self.sync_core_session_goal(session_id, None).await;
+                self.interrupt_active_goal_continuation_turn(session_id, "goal canceled")
+                    .await;
                 result
             }
             Err(e) => self.error_response(
@@ -350,7 +452,7 @@ impl ServerRuntime {
 
     #[allow(dead_code)]
     pub(super) async fn handle_goal_clear(
-        &self,
+        self: &Arc<Self>,
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
@@ -384,6 +486,8 @@ impl ServerRuntime {
                 tracing::warn!(session_id = %params.session_id, error = %error, "failed to persist goal clear record");
             }
             self.sync_core_session_goal(params.session_id, None).await;
+            self.interrupt_active_goal_continuation_turn(params.session_id, "goal cleared")
+                .await;
         }
 
         serde_json::to_value(SuccessResponse {

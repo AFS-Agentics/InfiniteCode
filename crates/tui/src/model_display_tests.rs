@@ -68,7 +68,7 @@ fn widget_with_model(
 }
 
 #[test]
-fn startup_header_and_summary_prefer_provider_request_model() {
+fn status_summary_prefers_provider_request_model() {
     let model = Model {
         slug: "deepseek-v4-flash".to_string(),
         display_name: "deepseek-v4-flash".to_string(),
@@ -123,6 +123,7 @@ fn saved_model_metadata_overlays_catalog_display_for_picker() {
             api_key: None,
         }],
         show_model_onboarding: false,
+        startup_warnings: Vec::new(),
     };
 
     let available_models = crate::interactive::available_models_with_saved_metadata(&config);

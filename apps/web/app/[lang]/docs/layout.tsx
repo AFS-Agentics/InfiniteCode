@@ -3,8 +3,11 @@ import { notFound } from "next/navigation";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import { DocsLanguageSwitch } from "@/app/_components/docs-language-switch";
-import { i18n } from "@/lib/i18n";
-import { docsI18nProvider } from "@/lib/layout.shared";
+import { DevoWord } from "@/app/_components/landing/devo-word";
+import {
+  docsI18nProvider,
+  isLocalizedDocsLanguage,
+} from "@/lib/layout.shared";
 import { source } from "@/lib/source";
 
 export default async function Layout({
@@ -16,18 +19,31 @@ export default async function Layout({
 }) {
   const { lang } = await params;
 
-  if (!i18n.languages.includes(lang as (typeof i18n.languages)[number])) {
+  if (!isLocalizedDocsLanguage(lang)) {
     notFound();
   }
 
   return (
-    <RootProvider i18n={docsI18nProvider(lang)}>
+    <RootProvider i18n={docsI18nProvider(lang)} theme={{ enabled: false }}>
       <DocsLayout
         i18n={false}
+        sidebar={{ prefetch: false }}
+        themeSwitch={{ enabled: false }}
         tree={source.getPageTree(lang)}
         nav={{
-          title: "Devo",
-          children: <DocsLanguageSwitch locale={lang as "en" | "zh"} />,
+          title: (
+            <DevoWord
+              className="text-sm font-semibold"
+              iconClassName="h-5 w-5 rounded-full bg-[#070a0f] p-0.5"
+              key="docs-brand"
+            />
+          ),
+          children: (
+            <DocsLanguageSwitch
+              key="docs-language-switch"
+              locale={lang as "en" | "zh"}
+            />
+          ),
         }}
       >
         {children}

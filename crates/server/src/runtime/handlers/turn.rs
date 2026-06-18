@@ -1,4 +1,5 @@
 use super::super::*;
+use crate::TurnInputDisposition;
 
 fn pending_turn_metadata(
     collaboration_mode: devo_protocol::CollaborationMode,
@@ -133,7 +134,7 @@ impl ServerRuntime {
             let mut session = session_arc.lock().await;
             if let Some(active_turn) = session.active_turn.as_ref() {
                 let pending_turn_queue = Arc::clone(&session.pending_turn_queue);
-                let _active_turn_id = active_turn.turn_id;
+                let active_turn_id = active_turn.turn_id;
                 let is_ephemeral = session.summary.ephemeral;
                 let queued_model = params
                     .model
@@ -145,25 +146,26 @@ impl ServerRuntime {
                     .or_else(|| session.summary.model_binding_id.clone());
                 drop(session);
 
-                {
+                let queued_input_id = {
                     let collaboration_mode = params.collaboration_mode;
                     let mut guard = pending_turn_queue
                         .lock()
                         .expect("pending turn queue mutex should not be poisoned");
-                    let item = devo_core::PendingInputItem {
-                        kind: devo_core::PendingInputKind::UserInput {
+                    let item = devo_core::PendingInputItem::new(
+                        devo_core::PendingInputKind::UserInput {
                             input: params.input.clone(),
                             display_text: display_input.clone(),
                             prompt_text: resolved_input.prompt_text.clone(),
                             prompt_messages: resolved_input.prompt_messages.clone(),
                         },
-                        metadata: pending_turn_metadata(
+                        pending_turn_metadata(
                             collaboration_mode,
                             queued_model.clone(),
                             queued_model_binding_id.clone(),
                         ),
-                        created_at: chrono::Utc::now(),
-                    };
+                        now,
+                    );
+                    let queued_input_id = item.id;
                     guard.push_back(item.clone());
 
                     if !is_ephemeral
@@ -178,13 +180,23 @@ impl ServerRuntime {
                             "failed to persist pending turn message to database"
                         );
                     }
-                }
+                    queued_input_id
+                };
                 let sid = params.session_id;
                 let runtime = Arc::clone(self);
                 tokio::spawn(async move {
                     runtime.broadcast_updated_queue(sid).await;
                 });
-                return serde_json::Value::Null;
+                return serde_json::to_value(SuccessResponse {
+                    id: request_id,
+                    result: TurnStartResult::Queued {
+                        active_turn_id,
+                        queued_input_id,
+                        status: TurnStatus::Pending,
+                        accepted_at: now,
+                    },
+                })
+                .expect("serialize queued turn/start response");
             }
             if let Some(cwd) = params.cwd.clone() {
                 let old_cwd = session.summary.cwd.clone();
@@ -260,32 +272,8 @@ impl ServerRuntime {
             )
             .await;
         }
-        self.maybe_assign_provisional_title(params.session_id, &display_input)
+        self.maybe_start_title_generation_from_user_input(params.session_id, &display_input)
             .await;
-        {
-            let mut session = session_arc.lock().await;
-            if session.first_user_input.is_none() {
-                session.first_user_input = Some(display_input.clone());
-            }
-        }
-        let needs_title = {
-            let session = session_arc.lock().await;
-            let first_input = session.first_user_input.clone();
-            let needs = matches!(
-                session.summary.title_state,
-                SessionTitleState::Unset | SessionTitleState::Provisional
-            );
-            (needs, first_input)
-        };
-        if needs_title.0
-            && let Some(first_input) = needs_title.1
-        {
-            let runtime = Arc::clone(self);
-            let sid = params.session_id;
-            tokio::spawn(async move {
-                runtime.maybe_generate_final_title(sid, first_input).await;
-            });
-        }
         let (record, session_context, turn_context) = {
             let session = session_arc.lock().await;
             let core_session = session.core_session.lock().await;
@@ -382,7 +370,7 @@ impl ServerRuntime {
 
         serde_json::to_value(SuccessResponse {
             id: request_id,
-            result: TurnStartResult {
+            result: TurnStartResult::Started {
                 turn_id: turn.turn_id,
                 status: turn.status.clone(),
                 accepted_at: now,
@@ -857,16 +845,16 @@ impl ServerRuntime {
             serde_json::json!({ "title": "You", "text": display_input.clone() }),
         )
         .await;
-        let item = devo_core::PendingInputItem {
-            kind: devo_core::PendingInputKind::UserInput {
+        let item = devo_core::PendingInputItem::new(
+            devo_core::PendingInputKind::UserInput {
                 input: params.input.clone(),
                 display_text: display_input,
                 prompt_text: resolved_input.prompt_text,
                 prompt_messages: resolved_input.prompt_messages,
             },
-            metadata: None,
-            created_at: chrono::Utc::now(),
-        };
+            None,
+            chrono::Utc::now(),
+        );
         btw_input_queue
             .lock()
             .expect("btw input queue mutex should not be poisoned")
@@ -907,7 +895,10 @@ impl ServerRuntime {
         );
         serde_json::to_value(SuccessResponse {
             id: request_id,
-            result: TurnSteerResult { turn_id },
+            result: TurnSteerResult {
+                turn_id,
+                disposition: TurnInputDisposition::Steered,
+            },
         })
         .expect("serialize turn/steer response")
     }

@@ -15,9 +15,6 @@ pub(crate) const STARTUP_HEADER_ANIMATION_INTERVAL: Duration = Duration::from_mi
 
 const STARTUP_HEADER_MAX_TOTAL_WIDTH: usize = 62;
 const STARTUP_HEADER_MIN_FULL_WIDTH: usize = 44;
-const META_GAP: usize = 2;
-const MODEL_LABEL: &str = "Model      ";
-const REASONING_LABEL: &str = "Reasoning   ";
 const DIRECTORY_LABEL: &str = "Workspace  ";
 const DEVO_LOGO: [&str; 6] = [
     "██████╗  ███████╗██╗   ██╗ ██████╗",
@@ -85,8 +82,7 @@ fn build_full_header(data: StartupHeaderData<'_>, inner_width: usize) -> Vec<Lin
     let muted_style = Style::default().dim();
     let logo_style = Style::default().fg(data.accent_color).bold();
     let version = format!("v{}", data.version);
-    let reasoning = sanitize_reasoning(data.reasoning);
-    let mut lines = Vec::with_capacity(11);
+    let mut lines = Vec::with_capacity(10);
 
     lines.push(border_line('┏', '━', '┓', inner_width, border_style));
     for (idx, logo_line) in DEVO_LOGO.iter().enumerate() {
@@ -104,17 +100,6 @@ fn build_full_header(data: StartupHeaderData<'_>, inner_width: usize) -> Vec<Lin
     }
     lines.push(border_line('┣', '━', '┫', inner_width, border_style));
     lines.push(content_line(
-        build_model_reasoning_row(
-            data.model,
-            &reasoning,
-            inner_width,
-            muted_style,
-            Style::default(),
-        ),
-        inner_width,
-        border_style,
-    ));
-    lines.push(content_line(
         build_directory_row(data.directory, inner_width, muted_style),
         inner_width,
         border_style,
@@ -128,10 +113,8 @@ fn build_compact_header(data: StartupHeaderData<'_>, inner_width: usize) -> Vec<
     let muted_style = Style::default().dim();
     let accent_style = Style::default().fg(data.accent_color).bold();
     let version = format!("v{}", data.version);
-    let reasoning = sanitize_reasoning(data.reasoning);
 
     let title = truncate_right(&format!("Devo {version}"), inner_width);
-    let model_reasoning = compact_model_reasoning(data.model, &reasoning, inner_width);
 
     vec![
         border_line('┏', '━', '┓', inner_width, border_style),
@@ -144,11 +127,6 @@ fn build_compact_header(data: StartupHeaderData<'_>, inner_width: usize) -> Vec<
             border_style,
         ),
         border_line('┣', '━', '┫', inner_width, border_style),
-        content_line(
-            vec![Span::styled(model_reasoning, Style::default())],
-            inner_width,
-            border_style,
-        ),
         content_line(
             build_directory_row(data.directory, inner_width, muted_style),
             inner_width,
@@ -180,41 +158,6 @@ fn build_logo_row(
     spans
 }
 
-fn build_model_reasoning_row(
-    model: &str,
-    reasoning: &str,
-    inner_width: usize,
-    label_style: Style,
-    value_style: Style,
-) -> Vec<Span<'static>> {
-    let model_label_width = UnicodeWidthStr::width(MODEL_LABEL);
-    let reasoning_label_width = UnicodeWidthStr::width(REASONING_LABEL);
-    let fixed_width = model_label_width + META_GAP + reasoning_label_width;
-    let remaining_width = inner_width.saturating_sub(fixed_width);
-    let reasoning_width = UnicodeWidthStr::width(reasoning);
-    let mut reasoning_budget = reasoning_width.min(remaining_width.saturating_sub(1).max(1));
-    let mut model_budget = remaining_width.saturating_sub(reasoning_budget);
-
-    if model_budget == 0 && remaining_width > 0 {
-        model_budget = 1;
-        reasoning_budget = remaining_width.saturating_sub(model_budget);
-    }
-
-    let model_text = truncate_right(model, model_budget);
-    let reasoning_text = truncate_right(reasoning, reasoning_budget);
-    let model_padding = model_budget.saturating_sub(UnicodeWidthStr::width(model_text.as_str()));
-
-    let mut spans = vec![
-        Span::styled(MODEL_LABEL.to_string(), label_style),
-        Span::styled(model_text, value_style),
-    ];
-    push_spaces(&mut spans, model_padding);
-    push_spaces(&mut spans, META_GAP);
-    spans.push(Span::styled(REASONING_LABEL.to_string(), label_style));
-    spans.push(Span::styled(reasoning_text, value_style));
-    spans
-}
-
 fn build_directory_row(
     directory: &Path,
     inner_width: usize,
@@ -226,40 +169,6 @@ fn build_directory_row(
         Span::styled(DIRECTORY_LABEL.to_string(), label_style),
         Span::from(path),
     ]
-}
-
-fn compact_model_reasoning(model: &str, reasoning: &str, inner_width: usize) -> String {
-    let separator = " / ";
-    let separator_width = UnicodeWidthStr::width(separator);
-    let reasoning_width = UnicodeWidthStr::width(reasoning);
-    if inner_width <= separator_width {
-        return truncate_right(reasoning, inner_width);
-    }
-
-    let mut reasoning_budget = reasoning_width.min(inner_width.saturating_sub(separator_width + 1));
-    let mut model_budget = inner_width.saturating_sub(separator_width + reasoning_budget);
-    if model_budget == 0 {
-        model_budget = 1.min(inner_width);
-        reasoning_budget = inner_width.saturating_sub(separator_width + model_budget);
-    }
-
-    let model_text = truncate_right(model, model_budget);
-    let reasoning_text = truncate_right(reasoning, reasoning_budget);
-    let mut out = model_text;
-    if !reasoning_text.is_empty() && UnicodeWidthStr::width(out.as_str()) < inner_width {
-        out.push_str(separator);
-        out.push_str(&reasoning_text);
-    }
-    truncate_right(&out, inner_width)
-}
-
-fn sanitize_reasoning(reasoning: &str) -> String {
-    let trimmed = reasoning.trim();
-    if trimmed.is_empty() {
-        "unknown".to_string()
-    } else {
-        trimmed.to_string()
-    }
 }
 
 fn format_directory(directory: &Path, max_width: usize) -> String {
@@ -424,13 +333,14 @@ mod tests {
             "medium",
             Path::new("/Users/tester/Desktop/devo"),
         );
-        assert_eq!(11, rows.len());
+        assert_eq!(10, rows.len());
         assert!(rows[0].starts_with('┏'));
         assert!(rows[1].contains("██████"));
         assert!(rows[3].contains("v0.1.3"));
-        assert!(rows[8].contains("Model"));
-        assert!(rows[8].contains("Reasoning"));
-        assert!(rows[9].contains("Workspace"));
+        assert!(rows[8].contains("Workspace"));
+        let rendered = rows.join("\n");
+        assert!(!rendered.contains("Model"));
+        assert!(!rendered.contains("Reasoning"));
     }
 
     #[test]
@@ -441,7 +351,7 @@ mod tests {
             "medium",
             Path::new("/Users/tester/Desktop/devo"),
         );
-        assert_eq!(6, rows.len());
+        assert_eq!(5, rows.len());
         assert!(rows[1].contains("Devo v0.1.3"));
         assert!(rows[3].contains('/'));
     }
@@ -455,8 +365,7 @@ mod tests {
             Path::new("/Users/tester/Desktop/projects/devo/some/really/long/path"),
         );
         assert!(rows[8].contains('…'));
-        assert!(rows[9].contains('…'));
-        assert!(rows[9].contains("long/path"));
+        assert!(rows[8].contains("long/path"));
         assert!(
             rows.iter()
                 .all(|row| UnicodeWidthStr::width(row.as_str()) <= 60)
@@ -464,15 +373,14 @@ mod tests {
     }
 
     #[test]
-    fn unknown_reasoning_and_windows_paths_are_supported() {
+    fn windows_paths_are_supported() {
         let rows = rendered_strings(
             60,
             "gpt-5-high",
             "",
             Path::new(r"C:\Users\tester\Desktop\devo\long\workspace"),
         );
-        assert!(rows[8].contains("unknown"));
-        assert!(rows[9].contains("workspace"));
+        assert!(rows[8].contains("workspace"));
         assert!(
             rows.iter()
                 .all(|row| UnicodeWidthStr::width(row.as_str()) <= 60)

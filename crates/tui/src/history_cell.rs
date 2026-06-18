@@ -24,6 +24,7 @@ use crate::markdown::append_markdown;
 use crate::render::line_utils::prefix_lines;
 use crate::render::line_utils::push_owned_lines;
 use crate::render::renderable::Renderable;
+use crate::slash_command::SlashCommand;
 use crate::startup_header::StartupHeaderData;
 use crate::startup_header::build_startup_header;
 use crate::style::proposed_plan_style;
@@ -50,8 +51,10 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::Wrap;
 use std::any::Any;
 use std::collections::HashMap;
+use std::ops::Range;
 use std::path::Path;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Instant;
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -202,14 +205,51 @@ pub(crate) struct UserHistoryCell {
 ///
 /// This preserves explicit newlines while interleaving element spans and skips
 /// malformed byte ranges instead of panicking during history rendering.
+#[derive(Clone, Debug)]
+struct UserMessageStyleRange {
+    byte_range: Range<usize>,
+    style: Style,
+}
+
+fn leading_slash_command_range(message: &str) -> Option<Range<usize>> {
+    let first_line = message.split_once('\n').map_or(message, |(line, _)| line);
+    let stripped = first_line.strip_prefix('/')?;
+    let name_end = stripped
+        .char_indices()
+        .find(|(_, ch)| ch.is_whitespace())
+        .map(|(idx, _)| idx)
+        .unwrap_or(stripped.len());
+    if name_end == 0 {
+        return None;
+    }
+    let name = &stripped[..name_end];
+    if name.contains('/') || SlashCommand::from_str(name).is_err() {
+        return None;
+    }
+    Some(0..1 + name.len())
+}
+
 fn build_user_message_lines_with_elements(
     message: &str,
     elements: &[TextElement],
     style: Style,
     element_style: Style,
+    slash_command_style: Style,
 ) -> Vec<Line<'static>> {
-    let mut elements = elements.to_vec();
-    elements.sort_by_key(|e| e.byte_range.start);
+    let mut style_ranges: Vec<UserMessageStyleRange> = elements
+        .iter()
+        .map(|element| UserMessageStyleRange {
+            byte_range: element.byte_range.start..element.byte_range.end,
+            style: element_style,
+        })
+        .collect();
+    if let Some(byte_range) = leading_slash_command_range(message) {
+        style_ranges.push(UserMessageStyleRange {
+            byte_range,
+            style: slash_command_style,
+        });
+    }
+    style_ranges.sort_by_key(|range| range.byte_range.start);
     let mut offset = 0usize;
     let mut raw_lines: Vec<Line<'static>> = Vec::new();
     for line_text in message.split('\n') {
@@ -218,9 +258,9 @@ fn build_user_message_lines_with_elements(
         let mut spans: Vec<Span<'static>> = Vec::new();
         // Track how much of the line we've emitted to interleave plain and styled spans.
         let mut cursor = line_start;
-        for elem in &elements {
-            let start = elem.byte_range.start.max(line_start);
-            let end = elem.byte_range.end.min(line_end);
+        for style_range in &style_ranges {
+            let start = style_range.byte_range.start.max(line_start).max(cursor);
+            let end = style_range.byte_range.end.min(line_end);
             if start >= end {
                 continue;
             }
@@ -239,7 +279,7 @@ fn build_user_message_lines_with_elements(
                 spans.push(Span::from(segment.to_string()));
             }
             if let Some(segment) = line_text.get(rel_start..rel_end) {
-                spans.push(Span::styled(segment.to_string(), element_style));
+                spans.push(Span::styled(segment.to_string(), style_range.style));
                 cursor = end;
             }
         }

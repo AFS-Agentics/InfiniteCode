@@ -1154,9 +1154,9 @@ fn paste_and_submit(widget: &mut ChatWidget, text: &str) {
 }
 
 /// Trace: L2-DES-TUI-003
-/// Verifies: Mode labels render as the first bottom status-line field.
+/// Verifies: Mode labels and switch hints render as the first bottom status-line field.
 #[test]
-fn mode_label_renders_at_left_of_status_line() {
+fn mode_label_and_switch_hint_render_at_left_of_status_line() {
     let model = Model {
         slug: "test-model".to_string(),
         display_name: "Test Model".to_string(),
@@ -1166,17 +1166,25 @@ fn mode_label_renders_at_left_of_status_line() {
 
     let rows = rendered_rows(&widget, 100, 12);
     let build_row = status_row_starting_with(&rows, "BUILD");
-    assert!(build_row.trim_start().starts_with("BUILD ·"));
+    assert!(
+        build_row
+            .trim_start()
+            .starts_with("BUILD SHIFT+TAB switch ·")
+    );
 
     widget.handle_key_event(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
     let rows = rendered_rows(&widget, 100, 12);
     let plan_row = status_row_starting_with(&rows, "PLAN");
-    assert!(plan_row.trim_start().starts_with("PLAN ·"));
+    assert!(plan_row.trim_start().starts_with("PLAN SHIFT+TAB switch ·"));
 
     widget.handle_key_event(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
     let rows = rendered_rows(&widget, 100, 12);
     let build_row = status_row_starting_with(&rows, "BUILD");
-    assert!(build_row.trim_start().starts_with("BUILD ·"));
+    assert!(
+        build_row
+            .trim_start()
+            .starts_with("BUILD SHIFT+TAB switch ·")
+    );
     assert!(
         rows.iter()
             .all(|row| !row.trim_start().starts_with("SHELL")),
@@ -1339,6 +1347,67 @@ fn queued_prompt_keeps_submitted_mode_when_promoted_to_history() {
         history.contains("▣ PLAN · Test Model"),
         "expected queued Plan mode in turn summary:
 {history}"
+    );
+}
+
+#[test]
+fn queued_prompt_promotes_after_active_assistant_stream() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
+    widget.handle_app_event(AppEvent::ClearTranscript);
+    widget.handle_worker_event(crate::events::WorkerEvent::TurnStarted {
+        model: "test-model".to_string(),
+        model_binding_id: None,
+        thinking: None,
+        reasoning_effort: None,
+        turn_id: TurnId::new(),
+    });
+    let item_id = ItemId::new();
+    widget.handle_worker_event(crate::events::WorkerEvent::TextItemStarted {
+        item_id,
+        kind: TextItemKind::Assistant,
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::TextItemDelta {
+        item_id,
+        kind: TextItemKind::Assistant,
+        delta: "assistant before promotion".to_string(),
+    });
+
+    paste_and_submit(&mut widget, "queued prompt");
+    widget.handle_worker_event(crate::events::WorkerEvent::InputQueueUpdated {
+        pending_count: 0,
+        pending_texts: Vec::new(),
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::TextItemCompleted {
+        item_id,
+        kind: TextItemKind::Assistant,
+        final_text: "assistant before promotion".to_string(),
+    });
+
+    let history = scrollback_plain_lines(&widget.drain_scrollback_lines(100));
+    let assistant_indexes = history
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| line.contains("assistant before promotion").then_some(index))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        assistant_indexes.len(),
+        1,
+        "late item completion should not duplicate assistant cell:\n{}",
+        history.join("\n")
+    );
+    let queued_index = history
+        .iter()
+        .position(|line| line.contains("queued prompt"))
+        .expect("queued prompt should be promoted");
+    assert!(
+        assistant_indexes[0] < queued_index,
+        "assistant stream should stay before queued prompt:\n{}",
+        history.join("\n")
     );
 }
 
@@ -5096,7 +5165,7 @@ fn subagent_discovery_shows_ctrl_x_hint_without_auto_opening_selector() {
 
     assert!(!widget.is_subagent_monitor_open_for_test());
     assert_eq!(widget.selected_subagent_for_test(), Some(child));
-    let rows = rendered_rows(&widget, 100, 18).join("\n");
+    let rows = rendered_rows(&widget, 160, 18).join("\n");
     assert!(rows.contains("ctrl + x agents"), "rows:\n{rows}");
     assert!(!rows.contains("checking files"), "rows:\n{rows}");
     let parent_transcript = line_texts(widget.transcript_overlay_lines(80)).join("\n");
@@ -5125,7 +5194,7 @@ fn ctrl_x_selector_selects_live_subagents_and_q_exits() {
     widget.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL));
     assert!(widget.is_subagent_monitor_open_for_test());
     assert_eq!(widget.selected_subagent_for_test(), Some(second));
-    let rows = rendered_rows(&widget, 100, 18).join("\n");
+    let rows = rendered_rows(&widget, 160, 18).join("\n");
     assert!(rows.contains("Sub-agents"), "rows:\n{rows}");
     assert!(rows.contains("run first"), "rows:\n{rows}");
     assert!(rows.contains("root/second"), "rows:\n{rows}");
@@ -5154,7 +5223,7 @@ fn terminal_subagent_status_hides_ctrl_x_hint_when_no_live_children_remain() {
         agent: monitor_agent(child, parent, "builder"),
     });
     assert!(widget.has_live_subagents_for_test());
-    let rows = rendered_rows(&widget, 100, 18).join("\n");
+    let rows = rendered_rows(&widget, 160, 18).join("\n");
     assert!(rows.contains("ctrl + x agents"), "rows:\n{rows}");
 
     widget.handle_worker_event(crate::events::WorkerEvent::SubagentMonitor {
@@ -5322,7 +5391,7 @@ fn session_switch_sets_active_agent_footer_label() {
         pending_texts: vec![],
     });
 
-    let rows = rendered_rows(&widget, 80, 16);
+    let rows = rendered_rows(&widget, 160, 16);
     assert!(
         rows.iter().any(|row| row.contains("Agent: cr")),
         "expected active agent footer label in rows:\n{}",
@@ -5403,8 +5472,8 @@ fn new_session_prepared_appends_header_after_existing_history_and_resets_status(
     assert!(transcript_text.contains("old session line"));
     let old_line_index = find_row_index(&transcript_lines, "old session line")
         .expect("old session line remains in transcript");
-    let header_index = find_row_index(&transcript_lines, "new-session-model")
-        .expect("new session header is appended");
+    let header_index =
+        find_row_index(&transcript_lines, "Workspace").expect("new session header is appended");
     assert!(header_index > old_line_index);
 }
 

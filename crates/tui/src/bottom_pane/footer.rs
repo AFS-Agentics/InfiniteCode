@@ -50,6 +50,8 @@ use crate::ui_consts::FOOTER_INDENT_COLS;
 use crossterm::event::KeyCode;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Color;
+use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
@@ -90,6 +92,8 @@ pub(crate) struct FooterProps {
 }
 
 const FOOTER_CONTEXT_GAP_COLS: u16 = 1;
+const MODE_SWITCH_HINT: &str = " SHIFT+TAB switch";
+const MODE_SWITCH_HINT_COLOR: Color = Color::Rgb(160, 163, 168);
 
 /// Selects which footer content is rendered.
 ///
@@ -238,7 +242,9 @@ struct LeftSideState {
 fn left_side_line(input_mode_indicator: Option<InputMode>, state: LeftSideState) -> Line<'static> {
     let mut line = Line::from("");
     if let Some(input_mode_indicator) = input_mode_indicator {
-        line.push_span(input_mode_indicator.styled_span(state.show_cycle_hint));
+        for span in mode_indicator_spans(input_mode_indicator, state.show_cycle_hint) {
+            line.push_span(span);
+        }
     }
 
     let has_hint = !matches!(state.hint, SummaryHintKind::None);
@@ -263,6 +269,20 @@ fn left_side_line(input_mode_indicator: Option<InputMode>, state: LeftSideState)
     };
 
     line
+}
+
+fn mode_indicator_spans(
+    input_mode_indicator: InputMode,
+    show_switch_hint: bool,
+) -> Vec<Span<'static>> {
+    let mut spans = vec![input_mode_indicator.styled_span(/*show_cycle_hint*/ false)];
+    if show_switch_hint && matches!(input_mode_indicator, InputMode::Build | InputMode::Plan) {
+        spans.push(Span::styled(
+            MODE_SWITCH_HINT,
+            Style::default().fg(MODE_SWITCH_HINT_COLOR),
+        ));
+    }
+    spans
 }
 
 pub(crate) enum SummaryLeft {
@@ -578,7 +598,10 @@ pub(crate) fn status_line_with_input_mode(
 ) -> Option<Line<'static>> {
     let mut spans = Vec::new();
     if let Some(input_mode_indicator) = input_mode_indicator {
-        spans.push(input_mode_indicator.styled_span(/*show_cycle_hint*/ false));
+        spans.extend(mode_indicator_spans(
+            input_mode_indicator,
+            /*show_switch_hint*/ true,
+        ));
     }
     if let Some(status_line) = status_line {
         let status_line = status_line.dim();

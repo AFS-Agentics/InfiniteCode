@@ -73,6 +73,7 @@ use devo_server::TurnEventPayload;
 use devo_server::TurnExecutionMode;
 use devo_server::TurnInterruptParams;
 use devo_server::TurnStartParams;
+use devo_server::TurnStartResult;
 use devo_server::TurnSteerParams;
 
 use crate::app_command::GoalObjectiveMode;
@@ -862,9 +863,14 @@ async fn run_worker_inner(
                             execution_mode: TurnExecutionMode::Regular,
                         }).await;
                         match start_result {
-                            Ok(result) => {
-                                active_turn_id = Some(result.turn_id);
-                            }
+                            Ok(result) => match result {
+                                TurnStartResult::Started { turn_id, .. } => {
+                                    active_turn_id = Some(turn_id);
+                                }
+                                TurnStartResult::Queued { active_turn_id: queued_active_turn_id, .. } => {
+                                    active_turn_id = Some(queued_active_turn_id);
+                                }
+                            },
                             Err(error) => {
                                 let _ = event_tx.send(WorkerEvent::TurnFailed {
                                     message: error.to_string(),
@@ -1451,6 +1457,21 @@ async fn run_worker_inner(
                         }
                     }
                     Some(OperationCommand::StartNewSession) => {
+                        if let Some(active_session_id) = session_id {
+                            match pause_active_goal_before_session_leave(
+                                &mut client,
+                                active_session_id,
+                                active_turn_id,
+                            )
+                            .await
+                            {
+                                Ok(()) => {}
+                                Err(error) => {
+                                    emit_goal_leave_failure(event_tx, error);
+                                    continue;
+                                }
+                            }
+                        }
                         active_turn_id = None;
                         session_id = None;
                         active_reference_search_id = None;
@@ -1476,6 +1497,23 @@ async fn run_worker_inner(
                         let _ = emit_skills_list(&mut client, &session_cwd, event_tx, false).await;
                     }
                     Some(OperationCommand::SwitchSession(next_session_id)) => {
+                        if let Some(active_session_id) =
+                            session_id.filter(|session_id| *session_id != next_session_id)
+                        {
+                            match pause_active_goal_before_session_leave(
+                                &mut client,
+                                active_session_id,
+                                active_turn_id,
+                            )
+                            .await
+                            {
+                                Ok(()) => {}
+                                Err(error) => {
+                                    emit_goal_leave_failure(event_tx, error);
+                                    continue;
+                                }
+                            }
+                        }
                         active_reference_search_id = None;
                         match client
                             .session_resume(SessionResumeParams {
@@ -1607,6 +1645,16 @@ async fn run_worker_inner(
                             });
                             continue;
                         };
+                        if let Err(error) = pause_active_goal_before_session_leave(
+                            &mut client,
+                            active_session_id,
+                            active_turn_id,
+                        )
+                        .await
+                        {
+                            emit_goal_leave_failure(event_tx, error);
+                            continue;
+                        }
                         match client
                             .session_rollback(SessionRollbackParams {
                                 session_id: active_session_id,
@@ -1682,6 +1730,19 @@ async fn run_worker_inner(
                             });
                             continue;
                         };
+                        match pause_active_goal_before_session_leave(
+                            &mut client,
+                            active_session_id,
+                            active_turn_id,
+                        )
+                        .await
+                        {
+                            Ok(()) => {}
+                            Err(error) => {
+                                emit_goal_leave_failure(event_tx, error);
+                                continue;
+                            }
+                        }
                         match client
                             .session_fork(devo_server::SessionForkParams {
                                 session_id: active_session_id,
@@ -1874,7 +1935,7 @@ async fn run_worker_inner(
                             .await
                         {
                             Ok(result) => {
-                                active_turn_id = Some(result.turn_id);
+                                active_turn_id = Some(result.active_turn_id());
                             }
                             Err(error) => {
                                 let _ = event_tx.send(WorkerEvent::TurnFailed {
@@ -2519,7 +2580,9 @@ async fn run_worker_inner(
                                     }
                             }
                             "session/compaction/started" => {
-                                let _ = event;
+                                if let ServerEvent::SessionCompactionStarted(_) = event {
+                                    let _ = event_tx.send(WorkerEvent::SessionCompactionStarted);
+                                }
                             }
                             "session/compaction/completed" => {
                                 if let ServerEvent::SessionCompactionCompleted(payload) = event {
@@ -2641,6 +2704,68 @@ async fn ensure_session_started(
         reasoning_effort: session.session.reasoning_effort,
         created: true,
     })
+}
+
+async fn pause_active_goal_before_session_leave(
+    client: &mut StdioServerClient,
+    session_id: SessionId,
+    active_turn_id: Option<TurnId>,
+) -> Result<()> {
+    let goal_status = client
+        .goal_status(GoalStatusParams { session_id })
+        .await
+        .context("failed to load goal before leaving session")?;
+    if !should_pause_goal_before_session_leave(goal_status.goal.as_ref()) {
+        return Ok(());
+    }
+
+    client
+        .goal_set(GoalSetParams {
+            session_id,
+            objective: None,
+            status: Some(ThreadGoalStatus::Paused),
+            token_budget: None,
+        })
+        .await
+        .context("failed to pause active goal before leaving session")?;
+
+    if let Some(turn_id) = active_turn_id
+        && let Err(error) = client
+            .turn_interrupt(TurnInterruptParams {
+                session_id,
+                turn_id,
+                reason: Some("user left session with active goal".to_string()),
+            })
+            .await
+        && !is_stale_turn_interrupt_error(&error)
+    {
+        return Err(error).context("failed to interrupt active goal turn before leaving session");
+    }
+
+    Ok(())
+}
+
+fn is_stale_turn_interrupt_error(error: &anyhow::Error) -> bool {
+    let message = error.to_string();
+    message.starts_with("server turn_not_found:")
+        || message.starts_with("server no_active_turn:")
+        || message.contains("turn is not active")
+        || message.contains("turn does not exist")
+}
+
+fn should_pause_goal_before_session_leave(goal: Option<&devo_protocol::ThreadGoal>) -> bool {
+    goal.is_some_and(|goal| {
+        matches!(
+            goal.status,
+            ThreadGoalStatus::Active | ThreadGoalStatus::BudgetLimited
+        )
+    })
+}
+
+fn emit_goal_leave_failure(event_tx: &mpsc::UnboundedSender<WorkerEvent>, error: anyhow::Error) {
+    let _ = event_tx.send(WorkerEvent::GoalOperationFailed {
+        message: error.to_string(),
+    });
 }
 
 async fn apply_session_permissions(
@@ -2898,7 +3023,10 @@ async fn close_btw_agent(
         .await;
 }
 
-fn handle_completed_item(payload: ItemEventPayload, event_tx: &mpsc::UnboundedSender<WorkerEvent>) {
+pub(crate) fn handle_completed_item(
+    payload: ItemEventPayload,
+    event_tx: &mpsc::UnboundedSender<WorkerEvent>,
+) {
     match payload.item {
         ItemEnvelope {
             item_id,
@@ -3032,6 +3160,20 @@ fn handle_completed_item(payload: ItemEventPayload, event_tx: &mpsc::UnboundedSe
                 item_id,
                 final_text: proposed_plan_text(&payload),
             });
+        }
+        ItemEnvelope {
+            item_kind: ItemKind::ContextCompaction,
+            payload,
+            ..
+        } => {
+            let title = payload
+                .get("title")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|title| !title.is_empty())
+                .unwrap_or("Context Compaction")
+                .to_string();
+            let _ = event_tx.send(WorkerEvent::ContextCompactionCompleted { title });
         }
         ItemEnvelope {
             item_kind: ItemKind::ToolResult,
@@ -3917,11 +4059,13 @@ mod tests {
     use super::QueryWorkerHandle;
     use super::ShellCommandExecStart;
     use super::handle_completed_item;
+    use super::is_stale_turn_interrupt_error;
     use super::next_shell_command_exec_start;
     use super::normalize_display_output;
     use super::project_history_items;
     use super::render_skill_list_body;
     use super::research_artifact_delta_event;
+    use super::should_pause_goal_before_session_leave;
     use super::summarize_tool_call;
     use super::tool_call_started_actions;
     use super::tool_call_started_event;
@@ -3937,6 +4081,9 @@ mod tests {
     use devo_core::TurnId;
     use devo_protocol::SessionHistoryMetadata;
     use devo_protocol::SessionPlanStepStatus;
+    use devo_protocol::ThreadGoal;
+    use devo_protocol::ThreadGoalStatus;
+    use devo_protocol::TurnKind;
     use devo_server::EventContext;
     use devo_server::ItemDeltaPayload;
     use devo_server::ItemEnvelope;
@@ -4854,6 +5001,90 @@ mod tests {
             ),
             super::subagent_events::RoutedServerEvent::Ignore
         ));
+    }
+
+    #[test]
+    fn route_server_event_ignores_session_events_without_active_session() {
+        let session_id = SessionId::new();
+        let turn_started = devo_server::ServerEvent::TurnStarted(devo_server::TurnEventPayload {
+            session_id,
+            turn: devo_server::TurnMetadata {
+                turn_id: devo_core::TurnId::new(),
+                session_id,
+                sequence: 1,
+                status: devo_core::TurnStatus::Running,
+                kind: TurnKind::Regular,
+                model: "test-model".to_string(),
+                model_binding_id: None,
+                thinking: None,
+                reasoning_effort: None,
+                request_model: "test-model".to_string(),
+                request_thinking: None,
+                started_at: Utc::now(),
+                completed_at: None,
+                usage: None,
+            },
+        });
+
+        assert!(matches!(
+            super::subagent_events::route_server_event(
+                /*active_session_id*/ None,
+                &std::collections::HashSet::new(),
+                &turn_started
+            ),
+            super::subagent_events::RoutedServerEvent::Ignore
+        ));
+    }
+
+    #[test]
+    fn session_leave_pause_decision_only_pauses_active_goals() {
+        let session_id = SessionId::new();
+        let active_goal = ThreadGoal {
+            thread_id: session_id,
+            objective: "finish the goal".to_string(),
+            status: ThreadGoalStatus::Active,
+            token_budget: None,
+            tokens_used: 0,
+            time_used_seconds: 0,
+            created_at: 1,
+            updated_at: 1,
+        };
+        let paused_goal = ThreadGoal {
+            status: ThreadGoalStatus::Paused,
+            ..active_goal.clone()
+        };
+        let budget_limited_goal = ThreadGoal {
+            status: ThreadGoalStatus::BudgetLimited,
+            ..active_goal.clone()
+        };
+
+        assert_eq!(
+            [
+                should_pause_goal_before_session_leave(Some(&active_goal)),
+                should_pause_goal_before_session_leave(Some(&budget_limited_goal)),
+                should_pause_goal_before_session_leave(Some(&paused_goal)),
+                should_pause_goal_before_session_leave(None),
+            ],
+            [true, true, false, false]
+        );
+    }
+
+    #[test]
+    fn stale_turn_interrupt_errors_are_cleanup_successes() {
+        assert_eq!(
+            [
+                is_stale_turn_interrupt_error(&anyhow::anyhow!(
+                    "server turn_not_found: turn is not active"
+                )),
+                is_stale_turn_interrupt_error(&anyhow::anyhow!(
+                    "server turn_not_found: turn does not exist"
+                )),
+                is_stale_turn_interrupt_error(&anyhow::anyhow!(
+                    "server internal_error: database failed"
+                )),
+            ],
+            [true, true, false]
+        );
     }
 
     #[test]

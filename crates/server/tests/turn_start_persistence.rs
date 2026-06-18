@@ -143,7 +143,7 @@ async fn turn_start_append_failure_does_not_launch_model_turn_or_leave_session_a
         .context("successful turn/start response")?;
     let response: devo_server::SuccessResponse<devo_server::TurnStartResult> =
         serde_json::from_value(successful_start)?;
-    assert_eq!(response.result.status, devo_protocol::TurnStatus::Running);
+    assert_eq!(response.result.status(), devo_protocol::TurnStatus::Running);
     stream_calls_rx
         .recv()
         .await
@@ -152,7 +152,7 @@ async fn turn_start_append_failure_does_not_launch_model_turn_or_leave_session_a
         &runtime,
         connection_id,
         session.session_id,
-        response.result.turn_id,
+        response.result.turn_id().expect("turn should have started"),
     )
     .await?;
 
@@ -192,7 +192,10 @@ async fn message_edit_previous_accepts_skip_restore_and_replaces_prompt_branch()
         &runtime,
         connection_id,
         session.session_id,
-        original_start.result.turn_id,
+        original_start
+            .result
+            .turn_id()
+            .expect("original turn should have started"),
     )
     .await?;
 
@@ -281,7 +284,10 @@ async fn message_edit_previous_default_safe_restore_records_and_broadcasts() -> 
         &runtime,
         connection_id,
         session.session_id,
-        original_start.result.turn_id,
+        original_start
+            .result
+            .turn_id()
+            .expect("original turn should have started"),
     )
     .await?;
     drain_notifications(&mut notifications_rx).await;
