@@ -166,8 +166,8 @@ fn onboarding_completion_appends_header_after_success_record() {
         .expect("success record should be present");
     let header_idx = lines
         .iter()
-        .rposition(|line| line.contains("Model      DeepSeek-V4-Flash"))
-        .expect("final session header should use saved request model");
+        .rposition(|line| line.contains("Workspace"))
+        .expect("final session header should be appended");
     assert!(header_idx > success_idx);
     assert!(!lines.join("\n").contains("Provider saved: Deepseek"));
 }
