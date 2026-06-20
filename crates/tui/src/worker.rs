@@ -21,9 +21,12 @@ use devo_core::SessionId;
 use devo_core::TurnId;
 use devo_core::TurnStatus;
 use devo_protocol::ACP_SESSION_UPDATE_METHOD;
+use devo_protocol::AcpContentBlock;
+use devo_protocol::AcpEmbeddedResource;
 use devo_protocol::AcpPlanEntryStatus;
 use devo_protocol::AcpSessionNotification;
 use devo_protocol::AcpSessionUpdate;
+use devo_protocol::AcpStopReason;
 use devo_protocol::AgentToolPolicy;
 use devo_protocol::CloseAgentParams;
 use devo_protocol::CommandExecExitedPayload;
@@ -46,6 +49,8 @@ use devo_protocol::SessionHistoryMetadata;
 use devo_protocol::SessionPlanStepStatus;
 use devo_protocol::SpawnAgentParams;
 use devo_protocol::ThreadGoalStatus;
+use devo_server::ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD;
+use devo_server::ACP_PROMPT_STARTED_NOTIFICATION_METHOD;
 use devo_server::ApprovalDecisionPayload;
 use devo_server::ApprovalRequestPayload;
 use devo_server::ApprovalResponseParams;
@@ -736,6 +741,7 @@ async fn run_worker_inner(
     let mut thinking_selection = config.thinking_selection;
     let mut permission_preset = config.permission_preset;
     let mut active_turn_id: Option<TurnId> = None;
+    let mut synthetic_acp_turn_id: Option<TurnId> = None;
     let mut turn_count = 0usize;
     let mut total_input_tokens = 0usize;
     let mut total_output_tokens = 0usize;
@@ -2121,10 +2127,44 @@ async fn run_worker_inner(
                     Some(notification) => {
                         let method = notification.method;
                         let params = notification.params;
-                        if method == ACP_SESSION_UPDATE_METHOD {
-                            if let Some(event) =
-                                plan_event_from_acp_notification(&params, session_id)
+                        if method == ACP_PROMPT_STARTED_NOTIFICATION_METHOD {
+                            if active_turn_id.is_none()
+                                && let Some((turn_id, event)) = acp_prompt_started_event(
+                                    &params,
+                                    session_id,
+                                    &model,
+                                    &model_binding_id,
+                                    &thinking_selection,
+                                )
                             {
+                                active_turn_id = Some(turn_id);
+                                synthetic_acp_turn_id = Some(turn_id);
+                                saw_usage_update_for_turn = false;
+                                let _ = event_tx.send(event);
+                            }
+                            continue;
+                        }
+                        if method == ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD {
+                            if synthetic_acp_turn_id.is_some()
+                                && let Some(event) = acp_prompt_completed_event(
+                                    &params,
+                                    session_id,
+                                    &mut active_turn_id,
+                                    &mut turn_count,
+                                    total_input_tokens,
+                                    total_output_tokens,
+                                    total_cache_read_tokens,
+                                    last_query_total_tokens,
+                                    last_query_input_tokens,
+                                )
+                            {
+                                synthetic_acp_turn_id = None;
+                                let _ = event_tx.send(event);
+                            }
+                            continue;
+                        }
+                        if method == ACP_SESSION_UPDATE_METHOD {
+                            for event in worker_events_from_acp_notification(&params, session_id) {
                                 let _ = event_tx.send(event);
                             }
                             continue;
@@ -3875,33 +3915,174 @@ fn proposed_plan_text(payload: &serde_json::Value) -> String {
         .to_string()
 }
 
-// TurnPlanUpdated became the primary live source.
-fn plan_event_from_acp_notification(
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AcpPromptLifecycleNotification {
+    session_id: SessionId,
+    #[serde(default)]
+    stop_reason: Option<AcpStopReason>,
+    #[serde(default)]
+    error: Option<String>,
+}
+
+fn acp_prompt_started_event(
     params: &serde_json::Value,
     active_session_id: Option<SessionId>,
+    model: &str,
+    model_binding_id: &Option<String>,
+    thinking: &Option<String>,
+) -> Option<(TurnId, WorkerEvent)> {
+    acp_prompt_lifecycle_notification(params, active_session_id)?;
+    let turn_id = TurnId::new();
+    Some((
+        turn_id,
+        WorkerEvent::TurnStarted {
+            model: model.to_string(),
+            model_binding_id: model_binding_id.clone(),
+            thinking: thinking.clone(),
+            reasoning_effort: None,
+            turn_id,
+        },
+    ))
+}
+
+#[expect(clippy::too_many_arguments)]
+fn acp_prompt_completed_event(
+    params: &serde_json::Value,
+    active_session_id: Option<SessionId>,
+    active_turn_id: &mut Option<TurnId>,
+    turn_count: &mut usize,
+    total_input_tokens: usize,
+    total_output_tokens: usize,
+    total_cache_read_tokens: usize,
+    last_query_total_tokens: usize,
+    last_query_input_tokens: usize,
 ) -> Option<WorkerEvent> {
-    let notification = serde_json::from_value::<AcpSessionNotification>(params.clone()).ok()?;
-    if Some(notification.session_id) != active_session_id {
-        return None;
+    let notification = acp_prompt_lifecycle_notification(params, active_session_id)?;
+    *active_turn_id = None;
+    if let Some(error) = notification.error {
+        return Some(WorkerEvent::TurnFailed {
+            message: error,
+            turn_count: *turn_count,
+            total_input_tokens,
+            total_output_tokens,
+            total_cache_read_tokens,
+            prompt_token_estimate: total_input_tokens,
+            last_query_input_tokens,
+        });
     }
-    let AcpSessionUpdate::Plan { entries } = notification.update else {
+    *turn_count += 1;
+    Some(WorkerEvent::TurnFinished {
+        stop_reason: acp_stop_reason_text(
+            notification.stop_reason.unwrap_or(AcpStopReason::EndTurn),
+        ),
+        turn_count: *turn_count,
+        total_input_tokens,
+        total_output_tokens,
+        total_cache_read_tokens,
+        last_query_total_tokens,
+        last_query_input_tokens,
+        prompt_token_estimate: total_input_tokens,
+    })
+}
+
+fn acp_prompt_lifecycle_notification(
+    params: &serde_json::Value,
+    active_session_id: Option<SessionId>,
+) -> Option<AcpPromptLifecycleNotification> {
+    let Ok(notification) = serde_json::from_value::<AcpPromptLifecycleNotification>(params.clone())
+    else {
         return None;
     };
-    let steps = entries
-        .into_iter()
-        .map(|entry| PlanStep {
-            text: entry.content,
-            status: match entry.status {
-                AcpPlanEntryStatus::Pending => PlanStepStatus::Pending,
-                AcpPlanEntryStatus::InProgress => PlanStepStatus::InProgress,
-                AcpPlanEntryStatus::Completed => PlanStepStatus::Completed,
-            },
-        })
-        .collect::<Vec<_>>();
-    Some(WorkerEvent::PlanUpdated {
-        explanation: None,
-        steps,
-    })
+    (Some(notification.session_id) == active_session_id).then_some(notification)
+}
+
+fn acp_stop_reason_text(stop_reason: AcpStopReason) -> String {
+    match stop_reason {
+        AcpStopReason::EndTurn => "Completed",
+        AcpStopReason::MaxTokens => "MaxTokens",
+        AcpStopReason::MaxTurnRequests => "MaxTurnRequests",
+        AcpStopReason::Refusal => "Refusal",
+        AcpStopReason::Cancelled => "Interrupted",
+    }
+    .to_string()
+}
+
+// Devo events reconstructed from ACP metadata are the primary live source for
+// local server sessions. This handles raw ACP-native updates that do not carry
+// Devo metadata.
+fn worker_events_from_acp_notification(
+    params: &serde_json::Value,
+    active_session_id: Option<SessionId>,
+) -> Vec<WorkerEvent> {
+    let Ok(notification) = serde_json::from_value::<AcpSessionNotification>(params.clone()) else {
+        return Vec::new();
+    };
+    if Some(notification.session_id) != active_session_id {
+        return Vec::new();
+    }
+    match notification.update {
+        AcpSessionUpdate::AgentMessageChunk { content, .. } => acp_content_display_text(&content)
+            .into_iter()
+            .map(WorkerEvent::TextDelta)
+            .collect(),
+        AcpSessionUpdate::AgentThoughtChunk { content, .. } => acp_content_display_text(&content)
+            .into_iter()
+            .map(WorkerEvent::ReasoningDelta)
+            .collect(),
+        AcpSessionUpdate::Plan { entries } => vec![WorkerEvent::PlanUpdated {
+            explanation: None,
+            steps: entries
+                .into_iter()
+                .map(|entry| PlanStep {
+                    text: entry.content,
+                    status: match entry.status {
+                        AcpPlanEntryStatus::Pending => PlanStepStatus::Pending,
+                        AcpPlanEntryStatus::InProgress => PlanStepStatus::InProgress,
+                        AcpPlanEntryStatus::Completed => PlanStepStatus::Completed,
+                    },
+                })
+                .collect(),
+        }],
+        AcpSessionUpdate::SessionInfoUpdate {
+            title: Some(title), ..
+        } => vec![WorkerEvent::SessionTitleUpdated {
+            session_id: notification.session_id.to_string(),
+            title,
+        }],
+        AcpSessionUpdate::UserMessageChunk { .. }
+        | AcpSessionUpdate::ToolCall { .. }
+        | AcpSessionUpdate::ToolCallUpdate { .. }
+        | AcpSessionUpdate::SessionInfoUpdate { title: None, .. }
+        | AcpSessionUpdate::UsageUpdate { .. } => Vec::new(),
+    }
+}
+
+fn acp_content_display_text(content: &AcpContentBlock) -> Option<String> {
+    let text = match content {
+        AcpContentBlock::Text { text, .. } => text.clone(),
+        AcpContentBlock::Image { mime_type, uri, .. } => uri
+            .as_ref()
+            .map_or_else(|| format!("[image: {mime_type}]"), ToString::to_string),
+        AcpContentBlock::Audio { mime_type, .. } => format!("[audio: {mime_type}]"),
+        AcpContentBlock::ResourceLink {
+            uri, title, name, ..
+        } => {
+            let label = title
+                .as_deref()
+                .filter(|title| !title.is_empty())
+                .unwrap_or(name);
+            format!("{label}: {uri}")
+        }
+        AcpContentBlock::Resource { resource, .. } => match resource {
+            AcpEmbeddedResource::Text(resource) => resource.text.clone(),
+            AcpEmbeddedResource::Blob(resource) => {
+                let mime_type = resource.mime_type.as_deref().unwrap_or("unknown");
+                format!("[resource: {} ({mime_type})]", resource.uri)
+            }
+        },
+    };
+    (!text.is_empty()).then_some(text)
 }
 
 fn plan_event_from_tool_result(payload: &ToolResultPayload) -> Option<WorkerEvent> {
@@ -4091,11 +4272,12 @@ mod tests {
 
     use super::QueryWorkerHandle;
     use super::ShellCommandExecStart;
+    use super::acp_prompt_completed_event;
+    use super::acp_prompt_started_event;
     use super::handle_completed_item;
     use super::is_stale_turn_interrupt_error;
     use super::next_shell_command_exec_start;
     use super::normalize_display_output;
-    use super::plan_event_from_acp_notification;
     use super::project_history_items;
     use super::render_skill_list_body;
     use super::research_artifact_delta_event;
@@ -4104,6 +4286,7 @@ mod tests {
     use super::tool_call_started_actions;
     use super::tool_call_started_event;
     use super::truncate_tool_output;
+    use super::worker_events_from_acp_notification;
     use crate::events::PlanStep;
     use crate::events::PlanStepStatus;
     use crate::events::SessionListEntry;
@@ -4716,9 +4899,110 @@ mod tests {
     }
 
     #[test]
+    fn acp_prompt_started_emits_turn_started() {
+        let session_id = SessionId::new();
+        let (turn_id, event) = acp_prompt_started_event(
+            &serde_json::json!({ "sessionId": session_id }),
+            Some(session_id),
+            "test-model",
+            &Some("binding".to_string()),
+            &Some("high".to_string()),
+        )
+        .expect("ACP prompt started event");
+
+        assert_eq!(
+            event,
+            WorkerEvent::TurnStarted {
+                model: "test-model".to_string(),
+                model_binding_id: Some("binding".to_string()),
+                thinking: Some("high".to_string()),
+                reasoning_effort: None,
+                turn_id,
+            }
+        );
+    }
+
+    #[test]
+    fn acp_prompt_completed_emits_turn_finished() {
+        let session_id = SessionId::new();
+        let mut active_turn_id = Some(TurnId::new());
+        let mut turn_count = 2;
+
+        let event = acp_prompt_completed_event(
+            &serde_json::json!({
+                "sessionId": session_id,
+                "stopReason": "end_turn"
+            }),
+            Some(session_id),
+            &mut active_turn_id,
+            &mut turn_count,
+            11,
+            13,
+            17,
+            19,
+            23,
+        )
+        .expect("ACP prompt completed event");
+
+        assert_eq!(active_turn_id, None);
+        assert_eq!(turn_count, 3);
+        assert_eq!(
+            event,
+            WorkerEvent::TurnFinished {
+                stop_reason: "Completed".to_string(),
+                turn_count: 3,
+                total_input_tokens: 11,
+                total_output_tokens: 13,
+                total_cache_read_tokens: 17,
+                last_query_total_tokens: 19,
+                last_query_input_tokens: 23,
+                prompt_token_estimate: 11,
+            }
+        );
+    }
+
+    #[test]
+    fn acp_prompt_error_emits_turn_failed() {
+        let session_id = SessionId::new();
+        let mut active_turn_id = Some(TurnId::new());
+        let mut turn_count = 2;
+
+        let event = acp_prompt_completed_event(
+            &serde_json::json!({
+                "sessionId": session_id,
+                "error": "server -32000: failed"
+            }),
+            Some(session_id),
+            &mut active_turn_id,
+            &mut turn_count,
+            11,
+            13,
+            17,
+            19,
+            23,
+        )
+        .expect("ACP prompt failed event");
+
+        assert_eq!(active_turn_id, None);
+        assert_eq!(turn_count, 2);
+        assert_eq!(
+            event,
+            WorkerEvent::TurnFailed {
+                message: "server -32000: failed".to_string(),
+                turn_count: 2,
+                total_input_tokens: 11,
+                total_output_tokens: 13,
+                total_cache_read_tokens: 17,
+                prompt_token_estimate: 11,
+                last_query_input_tokens: 23,
+            }
+        );
+    }
+
+    #[test]
     fn acp_plan_notification_emits_plan_updated() {
         let session_id = SessionId::new();
-        let event = plan_event_from_acp_notification(
+        let events = worker_events_from_acp_notification(
             &serde_json::json!({
                 "sessionId": session_id,
                 "update": {
@@ -4746,8 +5030,8 @@ mod tests {
         );
 
         assert_eq!(
-            event,
-            Some(WorkerEvent::PlanUpdated {
+            events,
+            vec![WorkerEvent::PlanUpdated {
                 explanation: None,
                 steps: vec![
                     PlanStep {
@@ -4763,7 +5047,31 @@ mod tests {
                         status: PlanStepStatus::Pending,
                     },
                 ],
-            })
+            }]
+        );
+    }
+
+    #[test]
+    fn acp_agent_message_chunk_emits_text_delta() {
+        let session_id = SessionId::new();
+
+        let events = worker_events_from_acp_notification(
+            &serde_json::json!({
+                "sessionId": session_id,
+                "update": {
+                    "sessionUpdate": "agent_message_chunk",
+                    "content": {
+                        "type": "text",
+                        "text": "streamed answer"
+                    }
+                }
+            }),
+            Some(session_id),
+        );
+
+        assert_eq!(
+            events,
+            vec![WorkerEvent::TextDelta("streamed answer".to_string())]
         );
     }
 

@@ -25,6 +25,7 @@ use devo_protocol::ACP_SESSION_RESUME_METHOD;
 use devo_protocol::ACP_SESSION_UPDATE_METHOD;
 use devo_protocol::AcpAgentCapabilities;
 use devo_protocol::AcpClientRequest;
+use devo_protocol::AcpContentBlock;
 use devo_protocol::AcpImplementation;
 use devo_protocol::AcpInitializeParams;
 use devo_protocol::AcpInitializeResult;
@@ -33,6 +34,7 @@ use devo_protocol::AcpListSessionsResult;
 use devo_protocol::AcpNewSessionParams;
 use devo_protocol::AcpNewSessionResult;
 use devo_protocol::AcpPromptParams;
+use devo_protocol::AcpPromptResult;
 use devo_protocol::AcpResumeSessionParams;
 use devo_protocol::AcpResumeSessionResult;
 use devo_protocol::AcpSessionNotification;
@@ -125,6 +127,7 @@ use devo_protocol::TurnId;
 use devo_protocol::TurnInterruptParams;
 use devo_protocol::TurnInterruptResult;
 use devo_protocol::TurnStartParams;
+use devo_protocol::TurnStartResult;
 use devo_protocol::TurnSteerParams;
 use devo_protocol::TurnSteerResult;
 use devo_protocol::devo_extension_inner_method;
@@ -148,6 +151,8 @@ use tokio::time::timeout;
 const SERVER_CHILD_STDIN_SHUTDOWN_TIMEOUT: Duration = Duration::from_millis(100);
 const SERVER_CHILD_EXIT_TIMEOUT: Duration = Duration::from_millis(500);
 static ACP_PERMISSION_NEXT_ID: AtomicU64 = AtomicU64::new(1);
+pub const ACP_PROMPT_STARTED_NOTIFICATION_METHOD: &str = "_devo/acp_prompt/started";
+pub const ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD: &str = "_devo/acp_prompt/completed";
 
 type PendingResponses = Arc<Mutex<HashMap<u64, oneshot::Sender<serde_json::Value>>>>;
 
@@ -573,19 +578,16 @@ impl StdioServerClient {
     }
 
     pub async fn turn_start(&mut self, params: TurnStartParams) -> Result<()> {
-        self.request_detached(
-            ACP_SESSION_PROMPT_METHOD,
-            AcpPromptParams {
-                session_id: params.session_id,
-                prompt: params
-                    .input
-                    .into_iter()
-                    .map(acp_content_block_from_input_item)
-                    .collect(),
-                meta: None,
-            },
-        )
-        .await
+        match self
+            .request_devo::<_, TurnStartResult>("turn/start", params.clone())
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(error) if is_method_not_found_error(&error) => {
+                self.turn_start_acp_prompt_detached(params).await
+            }
+            Err(error) => Err(error),
+        }
     }
 
     pub async fn turn_shell_command(
@@ -755,20 +757,71 @@ impl StdioServerClient {
         self.request(&method, params).await
     }
 
-    async fn request_detached<P>(&mut self, method: &str, params: P) -> Result<()>
-    where
-        P: serde::Serialize,
-    {
+    async fn turn_start_acp_prompt_detached(&mut self, params: TurnStartParams) -> Result<()> {
+        let session_id = params.session_id;
+        let prompt = params
+            .input
+            .into_iter()
+            .map(acp_content_block_from_input_item)
+            .collect();
         let request_id = self.next_request_id.fetch_add(1, Ordering::SeqCst);
-        tracing::debug!(request_id, method, "sending detached client request");
-        let (response_tx, _response_rx) = oneshot::channel();
+        tracing::debug!(
+            request_id,
+            method = ACP_SESSION_PROMPT_METHOD,
+            "sending ACP prompt request"
+        );
+        let (response_tx, response_rx) = oneshot::channel();
         self.pending.lock().await.insert(request_id, response_tx);
-        self.write_json(&AcpClientRequest::new(
-            serde_json::json!(request_id),
-            method,
-            params,
-        ))
-        .await
+        let write_result = self
+            .write_json(&AcpClientRequest::new(
+                serde_json::json!(request_id),
+                ACP_SESSION_PROMPT_METHOD,
+                AcpPromptParams {
+                    session_id,
+                    prompt,
+                    meta: None,
+                },
+            ))
+            .await;
+        if let Err(error) = write_result {
+            self.pending.lock().await.remove(&request_id);
+            return Err(error);
+        }
+
+        let _ = self.notifications_tx.send(ServerNotificationMessage {
+            method: ACP_PROMPT_STARTED_NOTIFICATION_METHOD.to_string(),
+            params: serde_json::json!({ "sessionId": session_id }),
+        });
+        let notifications_tx = self.notifications_tx.clone();
+        tokio::spawn(async move {
+            let params = match response_rx.await {
+                Ok(response) if response.get("error").is_some() => serde_json::json!({
+                    "sessionId": session_id,
+                    "error": server_error_text(&response),
+                }),
+                Ok(response) => {
+                    match serde_json::from_value::<AcpSuccessResponse<AcpPromptResult>>(response) {
+                        Ok(success) => serde_json::json!({
+                            "sessionId": session_id,
+                            "stopReason": success.result.stop_reason,
+                        }),
+                        Err(error) => serde_json::json!({
+                            "sessionId": session_id,
+                            "error": format!("decode ACP prompt response: {error}"),
+                        }),
+                    }
+                }
+                Err(error) => serde_json::json!({
+                    "sessionId": session_id,
+                    "error": format!("server dropped ACP prompt response: {error}"),
+                }),
+            };
+            let _ = notifications_tx.send(ServerNotificationMessage {
+                method: ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD.to_string(),
+                params,
+            });
+        });
+        Ok(())
     }
 
     async fn write_json<T>(&mut self, value: &T) -> Result<()>
@@ -1291,59 +1344,73 @@ fn format_protocol_error_code(code: &ProtocolErrorCode) -> &'static str {
 }
 
 fn bail_server_error(response: &serde_json::Value) -> Result<()> {
+    anyhow::bail!("{}", server_error_text(response))
+}
+
+fn is_method_not_found_error(error: &anyhow::Error) -> bool {
+    error.to_string().starts_with("server -32601:")
+}
+
+fn server_error_text(response: &serde_json::Value) -> String {
     if let Ok(error) = serde_json::from_value::<ErrorResponse>(response.clone()) {
         let data = if error.error.data.is_null() {
             String::new()
         } else {
             format!(" data={}", error.error.data)
         };
-        anyhow::bail!(
+        return format!(
             "server {}: {}{}",
             format_protocol_error_code(&error.error.code),
             error.error.message,
             data
         );
     }
-    let code = response
+    format!(
+        "server {}: {}",
+        server_error_code(response),
+        server_error_message(response)
+    )
+}
+
+fn server_error_code(response: &serde_json::Value) -> String {
+    response
         .get("error")
         .and_then(|error| error.get("code"))
         .map(serde_json::Value::to_string)
-        .unwrap_or_else(|| "unknown".to_string());
-    let message = response
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn server_error_message(response: &serde_json::Value) -> &str {
+    response
         .get("error")
         .and_then(|error| error.get("message"))
         .and_then(serde_json::Value::as_str)
-        .unwrap_or("unknown server error");
-    anyhow::bail!("server {code}: {message}")
+        .unwrap_or("unknown server error")
 }
 
-fn acp_content_block_from_input_item(
-    input: devo_protocol::InputItem,
-) -> devo_protocol::AcpContentBlock {
+fn acp_content_block_from_input_item(input: devo_protocol::InputItem) -> AcpContentBlock {
     match input {
-        devo_protocol::InputItem::Text { text } => devo_protocol::AcpContentBlock::text(text),
-        devo_protocol::InputItem::Skill { name, path } => devo_protocol::AcpContentBlock::Text {
+        devo_protocol::InputItem::Text { text } => AcpContentBlock::text(text),
+        devo_protocol::InputItem::Skill { name, path } => AcpContentBlock::Text {
             annotations: None,
             text: format!("Skill {name}: {}", path.display()),
             meta: None,
         },
-        devo_protocol::InputItem::LocalImage { path } => devo_protocol::AcpContentBlock::Text {
+        devo_protocol::InputItem::LocalImage { path } => AcpContentBlock::Text {
             annotations: None,
             text: format!("Image: {}", path.display()),
             meta: None,
         },
-        devo_protocol::InputItem::Mention { path, name } => {
-            devo_protocol::AcpContentBlock::ResourceLink {
-                annotations: None,
-                uri: file_uri_from_path(&path),
-                name: name.unwrap_or_else(|| path.clone()),
-                title: None,
-                description: None,
-                mime_type: None,
-                size: None,
-                meta: None,
-            }
-        }
+        devo_protocol::InputItem::Mention { path, name } => AcpContentBlock::ResourceLink {
+            annotations: None,
+            uri: file_uri_from_path(&path),
+            name: name.unwrap_or_else(|| path.clone()),
+            title: None,
+            description: None,
+            mime_type: None,
+            size: None,
+            meta: None,
+        },
     }
 }
 
@@ -1381,13 +1448,15 @@ fn notification_assistant_delta<'a>(
 }
 
 fn assistant_token_log_preview(text: &str) -> Option<String> {
-    assistant_token_logging_enabled()
-        .then(|| format_assistant_token_log_preview(text, assistant_token_log_max_chars()))
+    assistant_token_logging_enabled().then(|| {
+        let max_chars = assistant_token_log_max_chars();
+        format_assistant_token_log_preview(text, max_chars)
+    })
 }
 
 fn assistant_token_logging_enabled() -> bool {
-    static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
-    *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| {
         std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
             .ok()
             .is_some_and(|value| {
@@ -1429,6 +1498,203 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[tokio::test]
+    async fn turn_start_sends_devo_extension_with_full_params() {
+        let (child, stdin, stdout) = request_capture_child_for_turn_start_test().await;
+        let stdin = Arc::new(Mutex::new(stdin));
+        let pending = Arc::new(Mutex::new(HashMap::new()));
+        let acp_pending_permissions = Arc::new(Mutex::new(HashMap::new()));
+        let (notifications_tx, notifications_rx) = mpsc::unbounded_channel();
+        let mut client = StdioServerClient {
+            child,
+            stdin,
+            pending: Arc::clone(&pending),
+            acp_pending_permissions,
+            acp_agent_capabilities: None,
+            next_request_id: AtomicU64::new(1),
+            notifications_rx,
+            notifications_tx,
+        };
+        let params = TurnStartParams {
+            session_id: devo_protocol::SessionId::new(),
+            input: vec![devo_protocol::InputItem::Text {
+                text: "research this".to_string(),
+            }],
+            model: Some("test-model".to_string()),
+            model_binding_id: Some("test-binding".to_string()),
+            thinking: Some("high".to_string()),
+            sandbox: Some("workspace-write".to_string()),
+            approval_policy: Some("on-request".to_string()),
+            cwd: Some(PathBuf::from("workspace")),
+            collaboration_mode: devo_protocol::CollaborationMode::Plan,
+            execution_mode: devo_protocol::TurnExecutionMode::Research,
+        };
+        let expected_params = serde_json::to_value(&params).expect("serialize turn params");
+        let mut stdout_lines = BufReader::new(stdout).lines();
+
+        let turn_start = tokio::spawn(async move {
+            let result = client.turn_start(params).await;
+            (result, client)
+        });
+        let request_line = timeout(Duration::from_secs(5), stdout_lines.next_line())
+            .await
+            .expect("read request line before timeout")
+            .expect("read request line")
+            .expect("request line is present");
+        let request =
+            serde_json::from_str::<serde_json::Value>(&request_line).expect("request line is JSON");
+
+        assert_eq!(
+            request,
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "_devo/turn/start",
+                "params": expected_params,
+            })
+        );
+
+        let response_tx = pending
+            .lock()
+            .await
+            .remove(&1)
+            .expect("turn_start has pending response");
+        response_tx
+            .send(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "disposition": "started",
+                    "turn_id": devo_protocol::TurnId::new(),
+                    "status": "Running",
+                    "accepted_at": "2026-06-20T00:00:00Z"
+                }
+            }))
+            .expect("send turn_start response");
+        let (result, mut client) = turn_start.await.expect("turn_start task joins");
+        result.expect("turn_start response is accepted");
+
+        let _ = client.child.start_kill();
+        let _ = client.child.wait().await;
+    }
+
+    #[tokio::test]
+    async fn turn_start_falls_back_to_acp_prompt_with_lifecycle_notifications() {
+        let (child, stdin, stdout) = request_capture_child_for_turn_start_test().await;
+        let stdin = Arc::new(Mutex::new(stdin));
+        let pending = Arc::new(Mutex::new(HashMap::new()));
+        let acp_pending_permissions = Arc::new(Mutex::new(HashMap::new()));
+        let (notifications_tx, notifications_rx) = mpsc::unbounded_channel();
+        let mut client = StdioServerClient {
+            child,
+            stdin,
+            pending: Arc::clone(&pending),
+            acp_pending_permissions,
+            acp_agent_capabilities: None,
+            next_request_id: AtomicU64::new(1),
+            notifications_rx,
+            notifications_tx,
+        };
+        let session_id = devo_protocol::SessionId::new();
+        let params = TurnStartParams {
+            session_id,
+            input: vec![devo_protocol::InputItem::Text {
+                text: "native prompt".to_string(),
+            }],
+            model: Some("ignored-by-acp".to_string()),
+            model_binding_id: None,
+            thinking: None,
+            sandbox: None,
+            approval_policy: None,
+            cwd: None,
+            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            execution_mode: devo_protocol::TurnExecutionMode::Regular,
+        };
+        let mut stdout_lines = BufReader::new(stdout).lines();
+
+        let turn_start = tokio::spawn(async move {
+            let result = client.turn_start(params).await;
+            (result, client)
+        });
+
+        let first_request = read_request_line(&mut stdout_lines).await;
+        assert_eq!(first_request["method"], "_devo/turn/start");
+        pending
+            .lock()
+            .await
+            .remove(&1)
+            .expect("devo turn/start has pending response")
+            .send(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "error": {
+                    "code": -32601,
+                    "message": "method not found"
+                }
+            }))
+            .expect("send method-not-found response");
+
+        let second_request = read_request_line(&mut stdout_lines).await;
+        assert_eq!(
+            second_request,
+            serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 2,
+                "method": "session/prompt",
+                "params": {
+                    "sessionId": session_id,
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": "native prompt"
+                        }
+                    ]
+                }
+            })
+        );
+
+        let (result, mut client) = turn_start.await.expect("turn_start task joins");
+        result.expect("ACP prompt fallback starts");
+        let started = client
+            .recv_notification()
+            .await
+            .expect("ACP prompt started notification");
+        assert_eq!(started.method, ACP_PROMPT_STARTED_NOTIFICATION_METHOD);
+        assert_eq!(
+            started.params,
+            serde_json::json!({ "sessionId": session_id })
+        );
+
+        pending
+            .lock()
+            .await
+            .remove(&2)
+            .expect("ACP prompt has pending response")
+            .send(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 2,
+                "result": {
+                    "stopReason": "end_turn"
+                }
+            }))
+            .expect("send ACP prompt response");
+        let completed = timeout(Duration::from_secs(5), client.recv_notification())
+            .await
+            .expect("completed notification before timeout")
+            .expect("ACP prompt completed notification");
+        assert_eq!(completed.method, ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD);
+        assert_eq!(
+            completed.params,
+            serde_json::json!({
+                "sessionId": session_id,
+                "stopReason": "end_turn"
+            })
+        );
+
+        let _ = client.child.start_kill();
+        let _ = client.child.wait().await;
+    }
+
+    #[tokio::test]
     async fn stdout_reader_drops_pending_responses_when_stdout_closes() {
         let pending = Arc::new(Mutex::new(HashMap::new()));
         let (response_tx, response_rx) = oneshot::channel();
@@ -1452,6 +1718,55 @@ mod tests {
 
         let _ = child.start_kill();
         let _ = child.wait().await;
+    }
+
+    #[cfg(windows)]
+    async fn request_capture_child_for_turn_start_test()
+    -> (Child, ChildStdin, tokio::process::ChildStdout) {
+        let mut command = Command::new("powershell");
+        command.args([
+            "-NoProfile",
+            "-Command",
+            "for ($i = 0; $i -lt 2; $i++) { $line = [Console]::In.ReadLine(); if ($null -eq $line) { break }; [Console]::Out.WriteLine($line) }; Start-Sleep -Seconds 30",
+        ]);
+        request_capture_child_for_turn_start_command(command).await
+    }
+
+    #[cfg(unix)]
+    async fn request_capture_child_for_turn_start_test()
+    -> (Child, ChildStdin, tokio::process::ChildStdout) {
+        let mut command = Command::new("sh");
+        command.args([
+            "-c",
+            "i=0; while [ $i -lt 2 ] && IFS= read -r line; do printf '%s\n' \"$line\"; i=$((i + 1)); done; sleep 30",
+        ]);
+        request_capture_child_for_turn_start_command(command).await
+    }
+
+    async fn request_capture_child_for_turn_start_command(
+        mut command: Command,
+    ) -> (Child, ChildStdin, tokio::process::ChildStdout) {
+        command.kill_on_drop(true);
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        let mut child = command.spawn().expect("spawn request capture child");
+        let stdin = child.stdin.take().expect("capture child stdin");
+        let stdout = child.stdout.take().expect("capture child stdout");
+        (child, stdin, stdout)
+    }
+
+    async fn read_request_line<R>(stdout_lines: &mut tokio::io::Lines<R>) -> serde_json::Value
+    where
+        R: AsyncBufRead + Unpin,
+    {
+        let request_line = timeout(Duration::from_secs(5), stdout_lines.next_line())
+            .await
+            .expect("read request line before timeout")
+            .expect("read request line")
+            .expect("request line is present");
+        serde_json::from_str::<serde_json::Value>(&request_line).expect("request line is JSON")
     }
 
     #[cfg(windows)]
