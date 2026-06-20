@@ -2679,6 +2679,7 @@ async fn ensure_session_started(
     let session = client
         .session_start(SessionStartParams {
             cwd: cwd.to_path_buf(),
+            additional_directories: Vec::new(),
             ephemeral: false,
             title: None,
             model: Some(model.to_string()),
@@ -4912,6 +4913,7 @@ mod tests {
         SessionMetadata {
             session_id,
             cwd: ".".into(),
+            additional_directories: Vec::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
             title: Some("Saved conversation".to_string()),
@@ -5083,6 +5085,7 @@ mod tests {
         let summary = SessionMetadata {
             session_id: active_session_id,
             cwd: ".".into(),
+            additional_directories: Vec::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
             title: Some("Saved conversation".to_string()),
@@ -5123,6 +5126,7 @@ mod tests {
         let summary = SessionMetadata {
             session_id: SessionId::new(),
             cwd: ".".into(),
+            additional_directories: Vec::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
             title: Some("Saved conversation".to_string()),

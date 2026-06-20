@@ -104,6 +104,7 @@ impl ServerRuntime {
             child_session_id,
             now,
             parent_summary.cwd.clone(),
+            parent_summary.additional_directories.clone(),
             Some(nickname.clone()),
             model.clone(),
             model_binding_id.clone(),
@@ -124,9 +125,11 @@ impl ServerRuntime {
             Some(record)
         };
 
-        let mut core_session = self
-            .deps
-            .new_session_state(child_session_id, parent_summary.cwd.clone());
+        let mut core_session = self.deps.new_session_state(
+            child_session_id,
+            parent_summary.cwd.clone(),
+            parent_summary.additional_directories.clone(),
+        );
         core_session.config = parent_config.clone();
         let mut rebuilt_history_items = Vec::new();
         let mut rebuilt_messages = Vec::new();
@@ -158,6 +161,7 @@ impl ServerRuntime {
         let summary = SessionMetadata {
             session_id: child_session_id,
             cwd: parent_summary.cwd.clone(),
+            additional_directories: parent_summary.additional_directories.clone(),
             created_at: now,
             updated_at: now,
             title: Some(nickname.clone()),

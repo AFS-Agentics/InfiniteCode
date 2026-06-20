@@ -108,6 +108,7 @@ mod tests {
                 serde_json::json!(1),
                 SessionStartParams {
                     cwd,
+                    additional_directories: Vec::new(),
                     ephemeral: false,
                     title: None,
                     model: None,

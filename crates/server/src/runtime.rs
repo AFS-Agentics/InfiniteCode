@@ -307,6 +307,7 @@ fn permission_mode_from_approval_policy(policy: &str) -> Option<PermissionMode> 
 fn safety_profile_from_protocol(
     preset: devo_protocol::PermissionPreset,
     cwd: std::path::PathBuf,
+    additional_directories: Vec<std::path::PathBuf>,
 ) -> devo_safety::RuntimePermissionProfile {
     let preset = match preset {
         devo_protocol::PermissionPreset::ReadOnly => devo_safety::PermissionPreset::ReadOnly,
@@ -315,6 +316,7 @@ fn safety_profile_from_protocol(
         devo_protocol::PermissionPreset::FullAccess => devo_safety::PermissionPreset::FullAccess,
     };
     devo_safety::RuntimePermissionProfile::from_preset(preset, cwd)
+        .with_additional_roots(additional_directories)
 }
 
 fn protocol_reviewer_from_safety(

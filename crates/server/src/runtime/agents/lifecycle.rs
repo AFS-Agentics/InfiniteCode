@@ -292,6 +292,7 @@ mod tests {
                 serde_json::json!(1),
                 SessionStartParams {
                     cwd: data_root.path().to_path_buf(),
+                    additional_directories: Vec::new(),
                     ephemeral: false,
                     title: None,
                     model: None,

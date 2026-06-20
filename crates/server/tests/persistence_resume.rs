@@ -674,6 +674,7 @@ async fn resume_normalizes_historical_default_reasoning_effort() -> Result<()> {
             model_binding_id: None,
             thinking: thinking.clone(),
             cwd: data_root.to_path_buf(),
+            additional_directories: Vec::new(),
             cli_version: "0.1.0".into(),
             title: Some("Historical session".into()),
             title_state: devo_core::SessionTitleState::Final(

@@ -9,15 +9,6 @@ use crate::DEVO_SESSION_META;
 use crate::SessionId;
 use crate::SessionMetadata;
 
-pub const ACP_SESSION_LIST_METHOD: &str = "session/list";
-pub const ACP_SESSION_LOAD_METHOD: &str = "session/load";
-pub const ACP_SESSION_RESUME_METHOD: &str = "session/resume";
-pub const ACP_SESSION_CLOSE_METHOD: &str = "session/close";
-pub const ACP_SESSION_DELETE_METHOD: &str = "session/delete";
-pub const ACP_SESSION_SET_MODE_METHOD: &str = "session/set_mode";
-pub const ACP_SESSION_SET_CONFIG_OPTION_METHOD: &str = "session/set_config_option";
-pub const DEVO_SESSION_RESUME_META: &str = "devo/sessionResume";
-
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AcpListSessionsParams {
@@ -154,7 +145,7 @@ pub fn acp_session_info_from_metadata(session: &SessionMetadata) -> AcpSessionIn
         cwd: session.cwd.clone(),
         title: session.title.clone(),
         updated_at: Some(session.updated_at.to_rfc3339()),
-        additional_directories: Vec::new(),
+        additional_directories: session.additional_directories.clone(),
         meta: Some(meta),
     }
 }
@@ -173,6 +164,7 @@ mod tests {
         let session = SessionMetadata {
             session_id: SessionId::new(),
             cwd: ".".into(),
+            additional_directories: vec!["/workspace/shared".into()],
             created_at: Utc::now(),
             updated_at: Utc::now(),
             title: Some("Work".to_string()),
@@ -200,6 +192,10 @@ mod tests {
 
         assert_eq!(json["sessionId"], serde_json::json!(session.session_id));
         assert_eq!(json["title"], serde_json::json!("Work"));
+        assert_eq!(
+            json["additionalDirectories"],
+            serde_json::json!(["/workspace/shared"])
+        );
         assert_eq!(
             serde_json::from_value::<SessionMetadata>(json["_meta"][DEVO_SESSION_META].clone())
                 .expect("decode Devo session metadata"),

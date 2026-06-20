@@ -300,12 +300,13 @@ impl StdioServerClient {
         params: SessionStartParams,
     ) -> Result<SessionStartResult> {
         let cwd = params.cwd.clone();
+        let additional_directories = params.additional_directories.clone();
         let result: AcpNewSessionResult = self
             .request(
                 ACP_SESSION_NEW_METHOD,
                 AcpNewSessionParams {
                     cwd,
-                    additional_directories: Vec::new(),
+                    additional_directories,
                     mcp_servers: Vec::new(),
                     meta: None,
                 },
@@ -344,7 +345,7 @@ impl StdioServerClient {
                 AcpResumeSessionParams {
                     session_id: params.session_id,
                     cwd: session.cwd,
-                    additional_directories: Vec::new(),
+                    additional_directories: session.additional_directories,
                     mcp_servers: Vec::new(),
                     meta: None,
                 },

@@ -102,6 +102,7 @@ impl RolloutStore {
         id: SessionId,
         created_at: chrono::DateTime<Utc>,
         cwd: PathBuf,
+        additional_directories: Vec<PathBuf>,
         title: Option<String>,
         model: Option<String>,
         model_binding_id: Option<String>,
@@ -128,6 +129,7 @@ impl RolloutStore {
             model_binding_id,
             thinking,
             cwd,
+            additional_directories,
             cli_version: env!("CARGO_PKG_VERSION").into(),
             title,
             title_state,
@@ -638,7 +640,11 @@ impl ReplayState {
         }
 
         let mut record = self.session.context("missing SessionMetaLine in rollout")?;
-        let mut core_session = deps.new_session_state(record.id, record.cwd.clone());
+        let mut core_session = deps.new_session_state(
+            record.id,
+            record.cwd.clone(),
+            record.additional_directories.clone(),
+        );
         let mut ordered_items = self.pending_items;
         ordered_items.sort_by(|left, right| {
             left.seq
@@ -748,6 +754,7 @@ impl ReplayState {
         let summary = SessionMetadata {
             session_id: record.id,
             cwd: record.cwd.clone(),
+            additional_directories: record.additional_directories.clone(),
             created_at: record.created_at,
             updated_at: record.updated_at,
             title: record.title.clone(),
@@ -2046,6 +2053,7 @@ mod tests {
                     model_binding_id: None,
                     thinking: None,
                     cwd: PathBuf::from("/tmp/root"),
+                    additional_directories: Vec::new(),
                     cli_version: "0.1.0".into(),
                     title: None,
                     title_state: SessionTitleState::Unset,

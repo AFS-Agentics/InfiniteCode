@@ -102,6 +102,7 @@ async fn stdio_acp_initialize_negotiates_capabilities_and_allows_session_setup()
         serde_json::json!({
             "list": {},
             "delete": {},
+            "additionalDirectories": {},
             "resume": {},
             "close": {}
         })

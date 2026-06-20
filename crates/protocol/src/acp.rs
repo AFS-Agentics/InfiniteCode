@@ -19,15 +19,25 @@ use crate::ToolResultPayload;
 use crate::TurnPlanStepPayload;
 
 pub const ACP_INITIALIZE_METHOD: &str = "initialize";
+pub const ACP_AUTHENTICATE_METHOD: &str = "authenticate";
+pub const ACP_LOGOUT_METHOD: &str = "logout";
 pub const ACP_SESSION_NEW_METHOD: &str = "session/new";
+pub const ACP_SESSION_LIST_METHOD: &str = "session/list";
+pub const ACP_SESSION_LOAD_METHOD: &str = "session/load";
+pub const ACP_SESSION_RESUME_METHOD: &str = "session/resume";
+pub const ACP_SESSION_CLOSE_METHOD: &str = "session/close";
+pub const ACP_SESSION_DELETE_METHOD: &str = "session/delete";
 pub const ACP_SESSION_PROMPT_METHOD: &str = "session/prompt";
 pub const ACP_SESSION_CANCEL_METHOD: &str = "session/cancel";
 pub const ACP_SESSION_UPDATE_METHOD: &str = "session/update";
+pub const ACP_SESSION_SET_MODE_METHOD: &str = "session/set_mode";
+pub const ACP_SESSION_SET_CONFIG_OPTION_METHOD: &str = "session/set_config_option";
 pub const ACP_JSONRPC_VERSION: &str = "2.0";
 pub const DEVO_EXTENSION_METHOD_PREFIX: &str = "_devo/";
 pub const DEVO_ORIGINAL_METHOD_META: &str = "devo/originalMethod";
 pub const DEVO_ORIGINAL_EVENT_META: &str = "devo/originalEvent";
 pub const DEVO_SESSION_META: &str = "devo/session";
+pub const DEVO_SESSION_RESUME_META: &str = "devo/sessionResume";
 
 pub type AcpMeta = serde_json::Map<String, serde_json::Value>;
 

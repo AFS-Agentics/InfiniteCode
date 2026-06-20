@@ -134,6 +134,7 @@ impl ServerRuntime {
                     session_capabilities: AcpSessionCapabilities {
                         list: Some(serde_json::json!({})),
                         delete: Some(serde_json::json!({})),
+                        additional_directories: Some(serde_json::json!({})),
                         resume: Some(serde_json::json!({})),
                         close: Some(serde_json::json!({})),
                         ..AcpSessionCapabilities::default()
@@ -261,13 +262,6 @@ impl ServerRuntime {
         {
             return acp_error_response(request_id, AcpErrorCode::InvalidParams, error);
         }
-        if !params.additional_directories.is_empty() {
-            return acp_error_response(
-                request_id,
-                AcpErrorCode::InvalidParams,
-                "session/load additionalDirectories are not supported",
-            );
-        }
         if !params.mcp_servers.is_empty() {
             return acp_error_response(
                 request_id,
@@ -285,7 +279,7 @@ impl ServerRuntime {
                 .expect("serialize session resume params"),
             )
             .await;
-        let legacy: SuccessResponse<SessionResumeResult> =
+        let mut legacy: SuccessResponse<SessionResumeResult> =
             match serde_json::from_value(legacy_response.clone()) {
                 Ok(legacy) => legacy,
                 Err(_) => return legacy_error_to_acp(request_id, legacy_response),
@@ -297,6 +291,17 @@ impl ServerRuntime {
                 "session/load cwd does not match the stored session cwd",
             );
         }
+        let updated_summary = match self
+            .apply_acp_session_additional_directories(
+                params.session_id,
+                params.additional_directories.clone(),
+            )
+            .await
+        {
+            Ok(summary) => summary,
+            Err(error) => return acp_error_response(request_id, AcpErrorCode::ServerError, error),
+        };
+        legacy.result.session = updated_summary;
         self.send_acp_history_updates(
             connection_id,
             params.session_id,
@@ -343,13 +348,6 @@ impl ServerRuntime {
         {
             return acp_error_response(request_id, AcpErrorCode::InvalidParams, error);
         }
-        if !params.additional_directories.is_empty() {
-            return acp_error_response(
-                request_id,
-                AcpErrorCode::InvalidParams,
-                "session/new additionalDirectories are not supported",
-            );
-        }
         let tool_registry = match self.acp_session_tool_registry(&params.mcp_servers).await {
             Ok(tool_registry) => tool_registry,
             Err(error) => {
@@ -362,6 +360,7 @@ impl ServerRuntime {
                 request_id.clone(),
                 SessionStartParams {
                     cwd: params.cwd,
+                    additional_directories: params.additional_directories,
                     ephemeral: false,
                     title: None,
                     model: None,
@@ -443,13 +442,6 @@ impl ServerRuntime {
         ) {
             return acp_error_response(request_id, AcpErrorCode::InvalidParams, error);
         }
-        if !params.additional_directories.is_empty() {
-            return acp_error_response(
-                request_id,
-                AcpErrorCode::InvalidParams,
-                "session/resume additionalDirectories are not supported",
-            );
-        }
         if !params.mcp_servers.is_empty() {
             return acp_error_response(
                 request_id,
@@ -467,7 +459,7 @@ impl ServerRuntime {
                 .expect("serialize session resume params"),
             )
             .await;
-        let legacy: SuccessResponse<SessionResumeResult> =
+        let mut legacy: SuccessResponse<SessionResumeResult> =
             match serde_json::from_value(legacy_response.clone()) {
                 Ok(legacy) => legacy,
                 Err(_) => return legacy_error_to_acp(request_id, legacy_response),
@@ -479,6 +471,17 @@ impl ServerRuntime {
                 "session/resume cwd does not match the stored session cwd",
             );
         }
+        let updated_summary = match self
+            .apply_acp_session_additional_directories(
+                params.session_id,
+                params.additional_directories.clone(),
+            )
+            .await
+        {
+            Ok(summary) => summary,
+            Err(error) => return acp_error_response(request_id, AcpErrorCode::ServerError, error),
+        };
+        legacy.result.session = updated_summary;
         let mut meta = serde_json::Map::new();
         meta.insert(
             DEVO_SESSION_META.to_string(),
@@ -496,6 +499,47 @@ impl ServerRuntime {
                 meta: Some(meta),
             },
         )
+    }
+
+    async fn apply_acp_session_additional_directories(
+        &self,
+        session_id: SessionId,
+        additional_directories: Vec<PathBuf>,
+    ) -> Result<SessionMetadata, String> {
+        let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() else {
+            return Err("session does not exist".to_string());
+        };
+        let (summary, core_session, profile) = {
+            let mut session = session_arc.lock().await;
+            session.summary.additional_directories = additional_directories.clone();
+            if let Some(record) = session.record.as_mut() {
+                record.additional_directories = additional_directories.clone();
+            }
+
+            let profile = devo_safety::RuntimePermissionProfile::from_preset(
+                session.config.permission_profile.preset,
+                session.summary.cwd.clone(),
+            )
+            .with_additional_roots(additional_directories);
+            session.config.permission_profile = profile.clone();
+            (
+                session.summary.clone(),
+                Arc::clone(&session.core_session),
+                profile,
+            )
+        };
+        core_session.lock().await.config.permission_profile = profile;
+
+        if !summary.ephemeral
+            && let Err(error) = self.deps.db.upsert_session(&summary)
+        {
+            tracing::warn!(
+                session_id = %session_id,
+                error = %error,
+                "failed to persist ACP session additional directories"
+            );
+        }
+        Ok(summary)
     }
 
     pub(crate) async fn handle_acp_session_prompt(

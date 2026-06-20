@@ -444,6 +444,7 @@ impl SessionProjector for DefaultProjection {
         SessionMetadata {
             session_id: session.id,
             cwd: session.cwd.clone(),
+            additional_directories: session.additional_directories.clone(),
             created_at: session.created_at,
             updated_at: session.updated_at,
             title: session.title.clone(),

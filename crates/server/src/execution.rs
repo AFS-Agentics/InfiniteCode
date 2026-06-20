@@ -202,12 +202,18 @@ impl ServerRuntimeDependencies {
     }
 
     /// Creates an initial core session state for a newly created server session.
-    pub(crate) fn new_session_state(&self, session_id: SessionId, cwd: PathBuf) -> SessionState {
+    pub(crate) fn new_session_state(
+        &self,
+        session_id: SessionId,
+        cwd: PathBuf,
+        additional_directories: Vec<PathBuf>,
+    ) -> SessionState {
         // TODO: Session config already has workspace cwd, I think the cwd at permission_profile preset is duplicated.
         let permission_profile = devo_safety::RuntimePermissionProfile::from_preset(
             devo_safety::PermissionPreset::Default,
             cwd.clone(),
-        );
+        )
+        .with_additional_roots(additional_directories);
         let available_skills_instructions = {
             let mut skill_catalog = self
                 .skill_catalog

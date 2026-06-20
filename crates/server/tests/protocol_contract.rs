@@ -227,6 +227,7 @@ fn session_projection_maps_core_record() {
         model_binding_id: None,
         thinking: None,
         cwd: ".".into(),
+        additional_directories: Vec::new(),
         cli_version: "0.1.0".into(),
         title: Some("Test".into()),
         title_state: SessionTitleState::Final(SessionTitleFinalSource::ExplicitCreate),
@@ -328,6 +329,7 @@ fn session_title_updated_event_serializes_expected_kind() {
         session: SessionMetadata {
             session_id: SessionId::new(),
             cwd: ".".into(),
+            additional_directories: Vec::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
             title: Some("Renamed session".into()),
@@ -360,6 +362,7 @@ fn session_compaction_events_serialize_expected_kinds() {
     let metadata = SessionMetadata {
         session_id: SessionId::new(),
         cwd: ".".into(),
+        additional_directories: Vec::new(),
         created_at: Utc::now(),
         updated_at: Utc::now(),
         title: Some("Compacting session".into()),

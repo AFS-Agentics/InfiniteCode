@@ -17,6 +17,7 @@ use devo_protocol::AcpAuthMethod;
 use devo_protocol::AcpLoadSessionResult;
 use devo_protocol::AcpNewSessionResult;
 use devo_protocol::AcpPromptResult;
+use devo_protocol::AcpResumeSessionResult;
 use devo_protocol::AcpSessionNotification;
 use devo_protocol::AcpSessionUpdate;
 use devo_protocol::AcpStopReason;
@@ -26,6 +27,7 @@ use devo_protocol::ModelResponse;
 use devo_protocol::ResponseContent;
 use devo_protocol::ResponseMetadata;
 use devo_protocol::SessionId;
+use devo_protocol::SessionMetadata;
 use devo_protocol::StopReason;
 use devo_protocol::StreamEvent;
 use devo_protocol::Usage;
@@ -293,6 +295,98 @@ async fn acp_session_load_replays_history_and_rejects_relative_roots() -> Result
     assert_legacy_session_method_removed(&runtime, connection_id, 25, "_devo/session/start")
         .await?;
     assert_legacy_session_method_removed(&runtime, connection_id, 26, "_devo/session/list").await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn acp_session_additional_directories_roundtrip_new_load_and_resume() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, _notifications_rx) = initialize_acp_connection(&runtime).await?;
+    let cwd = data_root.path().join("repo");
+    let first_root = data_root.path().join("first-root");
+    let load_root = data_root.path().join("load-root");
+    let resume_root = data_root.path().join("resume-root");
+    std::fs::create_dir_all(&cwd)?;
+    std::fs::create_dir_all(&first_root)?;
+    std::fs::create_dir_all(&load_root)?;
+    std::fs::create_dir_all(&resume_root)?;
+
+    let new_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 13,
+                "method": "session/new",
+                "params": {
+                    "cwd": path_value(&cwd),
+                    "additionalDirectories": [path_value(&first_root)],
+                    "mcpServers": []
+                }
+            }),
+        )
+        .await
+        .context("session/new with additionalDirectories response")?;
+    let new_session: AcpSuccessResponse<AcpNewSessionResult> =
+        serde_json::from_value(new_response)?;
+    assert_eq!(
+        decode_devo_session_meta(&new_session.result.meta)?.additional_directories,
+        vec![first_root.clone()]
+    );
+    let session_id = new_session.result.session_id;
+
+    let listed = list_acp_sessions(&runtime, connection_id, 14, Some(&cwd), None).await?;
+    assert_eq!(listed.sessions.len(), 1);
+    assert_eq!(listed.sessions[0].additional_directories, vec![first_root]);
+
+    let load_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 15,
+                "method": "session/load",
+                "params": {
+                    "sessionId": session_id,
+                    "cwd": path_value(&cwd),
+                    "additionalDirectories": [path_value(&load_root)],
+                    "mcpServers": []
+                }
+            }),
+        )
+        .await
+        .context("session/load with additionalDirectories response")?;
+    let loaded: AcpSuccessResponse<AcpLoadSessionResult> = serde_json::from_value(load_response)?;
+    assert_eq!(
+        decode_devo_session_meta(&loaded.result.meta)?.additional_directories,
+        vec![load_root.clone()]
+    );
+    let listed = list_acp_sessions(&runtime, connection_id, 16, Some(&cwd), None).await?;
+    assert_eq!(listed.sessions[0].additional_directories, vec![load_root]);
+
+    let resume_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 17,
+                "method": "session/resume",
+                "params": {
+                    "sessionId": session_id,
+                    "cwd": path_value(&cwd),
+                    "additionalDirectories": [path_value(&resume_root)],
+                    "mcpServers": []
+                }
+            }),
+        )
+        .await
+        .context("session/resume with additionalDirectories response")?;
+    let resumed: AcpSuccessResponse<AcpResumeSessionResult> =
+        serde_json::from_value(resume_response)?;
+    assert_eq!(
+        decode_devo_session_meta(&resumed.result.meta)?.additional_directories,
+        vec![resume_root.clone()]
+    );
+    let listed = list_acp_sessions(&runtime, connection_id, 18, Some(&cwd), None).await?;
+    assert_eq!(listed.sessions[0].additional_directories, vec![resume_root]);
     Ok(())
 }
 
@@ -707,6 +801,15 @@ async fn assert_legacy_session_method_removed(
         serde_json::json!(format!("unknown method: {method}"))
     );
     Ok(())
+}
+
+fn decode_devo_session_meta(meta: &Option<devo_protocol::AcpMeta>) -> Result<SessionMetadata> {
+    let session = meta
+        .as_ref()
+        .and_then(|meta| meta.get(devo_protocol::DEVO_SESSION_META))
+        .cloned()
+        .context("missing Devo session metadata")?;
+    serde_json::from_value(session).context("decode Devo session metadata")
 }
 
 fn path_value(path: &Path) -> String {

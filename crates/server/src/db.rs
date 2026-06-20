@@ -72,6 +72,7 @@ impl Database {
                 model TEXT,
                 thinking TEXT,
                 cwd TEXT NOT NULL,
+                additional_directories TEXT NOT NULL DEFAULT '[]',
                 ephemeral INTEGER NOT NULL DEFAULT 0,
                 created_at INTEGER NOT NULL,
                 updated_at INTEGER NOT NULL,
@@ -105,6 +106,29 @@ impl Database {
             ",
         )
         .context("failed to run database migrations")?;
+        let has_session_additional_directories = {
+            let mut stmt = conn
+                .prepare("PRAGMA table_info(sessions)")
+                .context("failed to inspect sessions schema")?;
+            let columns = stmt
+                .query_map([], |row| row.get::<_, String>(1))
+                .context("failed to read sessions schema")?;
+            let mut found = false;
+            for column in columns {
+                if column? == "additional_directories" {
+                    found = true;
+                    break;
+                }
+            }
+            found
+        };
+        if !has_session_additional_directories {
+            conn.execute(
+                "ALTER TABLE sessions ADD COLUMN additional_directories TEXT NOT NULL DEFAULT '[]'",
+                [],
+            )
+            .context("failed to add additional_directories column")?;
+        }
         let has_pending_input_id = {
             let mut stmt = conn
                 .prepare("PRAGMA table_info(pending_messages)")
@@ -136,20 +160,23 @@ impl Database {
     /// Inserts or updates a session's metadata.
     pub fn upsert_session(&self, meta: &SessionMetadata) -> Result<()> {
         let conn = self.conn.lock().expect("database mutex poisoned");
+        let additional_directories = serde_json::to_string(&meta.additional_directories)
+            .context("failed to serialize session additional directories")?;
         let title_state_str = match &meta.title_state {
             SessionTitleState::Unset => "unset",
             SessionTitleState::Provisional => "provisional",
             SessionTitleState::Final(_) => "final",
         };
         conn.execute(
-            "INSERT INTO sessions (id, title, title_state, model, thinking, cwd, ephemeral, created_at, updated_at, schema_version)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 2)
+            "INSERT INTO sessions (id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at, schema_version)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 2)
              ON CONFLICT(id) DO UPDATE SET
                 title = excluded.title,
                 title_state = excluded.title_state,
                 model = excluded.model,
                 thinking = excluded.thinking,
                 cwd = excluded.cwd,
+                additional_directories = excluded.additional_directories,
                 updated_at = excluded.updated_at",
             params![
                 meta.session_id.to_string(),
@@ -158,6 +185,7 @@ impl Database {
                 meta.model,
                 meta.thinking,
                 meta.cwd.to_string_lossy().to_string(),
+                additional_directories,
                 meta.ephemeral as i32,
                 meta.created_at.timestamp(),
                 meta.updated_at.timestamp(),
@@ -172,7 +200,7 @@ impl Database {
         let conn = self.conn.lock().expect("database mutex poisoned");
         let mut stmt = conn
             .prepare(
-                "SELECT id, title, title_state, model, thinking, cwd, ephemeral, created_at, updated_at
+                "SELECT id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at
                  FROM sessions WHERE id = ?1",
             )
             .context("failed to prepare get_session statement")?;
@@ -183,9 +211,10 @@ impl Database {
             let model: Option<String> = row.get(3)?;
             let thinking: Option<String> = row.get(4)?;
             let cwd_str: String = row.get(5)?;
-            let ephemeral: i32 = row.get(6)?;
-            let created_at: i64 = row.get(7)?;
-            let updated_at: i64 = row.get(8)?;
+            let additional_directories_str: String = row.get(6)?;
+            let ephemeral: i32 = row.get(7)?;
+            let created_at: i64 = row.get(8)?;
+            let updated_at: i64 = row.get(9)?;
 
             let title_state = match title_state_str.as_str() {
                 "provisional" => SessionTitleState::Provisional,
@@ -198,6 +227,10 @@ impl Database {
             Ok(SessionMetadata {
                 session_id: parse_session_id_column(id_str, 0)?,
                 cwd: PathBuf::from(&cwd_str),
+                additional_directories: parse_additional_directories_column(
+                    additional_directories_str,
+                    6,
+                )?,
                 created_at: Utc
                     .timestamp_opt(created_at, 0)
                     .single()
@@ -239,7 +272,7 @@ impl Database {
         let conn = self.conn.lock().expect("database mutex poisoned");
         let mut stmt = conn
             .prepare(
-                "SELECT id, title, title_state, model, thinking, cwd, ephemeral, created_at, updated_at
+                "SELECT id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at
                  FROM sessions ORDER BY updated_at DESC",
             )
             .context("failed to prepare list_sessions statement")?;
@@ -251,9 +284,10 @@ impl Database {
                 let model: Option<String> = row.get(3)?;
                 let thinking: Option<String> = row.get(4)?;
                 let cwd_str: String = row.get(5)?;
-                let ephemeral: i32 = row.get(6)?;
-                let created_at: i64 = row.get(7)?;
-                let updated_at: i64 = row.get(8)?;
+                let additional_directories_str: String = row.get(6)?;
+                let ephemeral: i32 = row.get(7)?;
+                let created_at: i64 = row.get(8)?;
+                let updated_at: i64 = row.get(9)?;
 
                 let title_state = match title_state_str.as_str() {
                     "provisional" => SessionTitleState::Provisional,
@@ -266,6 +300,10 @@ impl Database {
                 Ok(SessionMetadata {
                     session_id: parse_session_id_column(id_str, 0)?,
                     cwd: PathBuf::from(&cwd_str),
+                    additional_directories: parse_additional_directories_column(
+                        additional_directories_str,
+                        6,
+                    )?,
                     created_at: Utc
                         .timestamp_opt(created_at, 0)
                         .single()
@@ -570,6 +608,15 @@ fn parse_session_id_column(id: String, column: usize) -> rusqlite::Result<Sessio
     })
 }
 
+fn parse_additional_directories_column(
+    value: String,
+    column: usize,
+) -> rusqlite::Result<Vec<PathBuf>> {
+    serde_json::from_str(&value).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(column, Type::Text, Box::new(error))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -587,6 +634,7 @@ mod tests {
         SessionMetadata {
             session_id: SessionId::from_str(id).unwrap_or_default(),
             cwd: PathBuf::from("/tmp"),
+            additional_directories: Vec::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
             title: Some("Test Session".into()),
@@ -613,7 +661,8 @@ mod tests {
     #[test]
     fn upsert_and_get_session() {
         let (db, _dir) = test_db();
-        let meta = sample_session("session-1");
+        let mut meta = sample_session("session-1");
+        meta.additional_directories = vec![PathBuf::from("/tmp/shared")];
         db.upsert_session(&meta).expect("upsert");
 
         let retrieved = db.get_session(&meta.session_id).expect("get");
@@ -621,6 +670,10 @@ mod tests {
         let retrieved = retrieved.unwrap();
         assert_eq!(retrieved.session_id, meta.session_id);
         assert_eq!(retrieved.title, Some("Test Session".into()));
+        assert_eq!(
+            retrieved.additional_directories,
+            meta.additional_directories
+        );
     }
 
     #[test]

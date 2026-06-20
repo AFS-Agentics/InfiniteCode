@@ -29,6 +29,8 @@ pub enum SessionRuntimeStatus {
 pub struct SessionMetadata {
     pub session_id: SessionId,
     pub cwd: PathBuf,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_directories: Vec<PathBuf>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub title: Option<String>,
@@ -66,6 +68,8 @@ pub struct SessionMetadata {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionStartParams {
     pub cwd: PathBuf,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_directories: Vec<PathBuf>,
     pub ephemeral: bool,
     pub title: Option<String>,
     pub model: Option<String>,
@@ -390,6 +394,7 @@ mod tests {
         let metadata = SessionMetadata {
             session_id: SessionId::new(),
             cwd: "/tmp".into(),
+            additional_directories: Vec::new(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
             title: Some("Test".to_string()),

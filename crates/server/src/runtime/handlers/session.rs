@@ -28,6 +28,7 @@ impl ServerRuntime {
                 session_id,
                 now,
                 params.cwd.clone(),
+                params.additional_directories.clone(),
                 params.title.clone(),
                 Some(model.clone()),
                 params.model_binding_id.clone(),
@@ -39,6 +40,7 @@ impl ServerRuntime {
         let summary = crate::SessionMetadata {
             session_id,
             cwd: params.cwd.clone(),
+            additional_directories: params.additional_directories.clone(),
             created_at: now,
             updated_at: now,
             title: params.title.clone(),
@@ -73,7 +75,11 @@ impl ServerRuntime {
                 format!("failed to persist session metadata: {error}"),
             );
         }
-        let core_session = self.deps.new_session_state(session_id, params.cwd.clone());
+        let core_session = self.deps.new_session_state(
+            session_id,
+            params.cwd.clone(),
+            params.additional_directories.clone(),
+        );
         let config = core_session.config.clone();
         let pending_turn_queue = Arc::clone(&core_session.pending_turn_queue);
         let btw_input_queue = Arc::clone(&core_session.btw_input_queue);
@@ -273,7 +279,11 @@ impl ServerRuntime {
 
         let profile = {
             let mut session = session_arc.lock().await;
-            let profile = safety_profile_from_protocol(params.preset, session.summary.cwd.clone());
+            let profile = safety_profile_from_protocol(
+                params.preset,
+                session.summary.cwd.clone(),
+                session.summary.additional_directories.clone(),
+            );
             {
                 let mut core_session = session.core_session.lock().await;
                 core_session.config.permission_mode = profile.permission_mode();
@@ -502,6 +512,7 @@ impl ServerRuntime {
                 forked_id,
                 now,
                 forked_runtime.summary.cwd.clone(),
+                forked_runtime.summary.additional_directories.clone(),
                 forked_runtime.summary.title.clone(),
                 forked_runtime.summary.model.clone(),
                 forked_runtime.summary.model_binding_id.clone(),
@@ -652,7 +663,10 @@ impl ServerRuntime {
         )?;
 
         let cwd = cwd_override.unwrap_or_else(|| source.summary.cwd.clone());
-        let mut core_session = self.deps.new_session_state(session_id, cwd.clone());
+        let additional_directories = source.summary.additional_directories.clone();
+        let mut core_session =
+            self.deps
+                .new_session_state(session_id, cwd.clone(), additional_directories.clone());
         core_session.session_context = source_core_session.session_context.clone();
         core_session.latest_turn_context = None;
         core_session.total_input_tokens = source_core_session.total_input_tokens;
@@ -735,6 +749,7 @@ impl ServerRuntime {
         let summary = crate::SessionMetadata {
             session_id,
             cwd: cwd.clone(),
+            additional_directories,
             created_at,
             updated_at,
             title: title_override.or_else(|| source.summary.title.clone()),

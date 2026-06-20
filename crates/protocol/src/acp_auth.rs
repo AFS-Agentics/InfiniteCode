@@ -5,9 +5,6 @@ use crate::AcpErrorCode;
 use crate::AcpErrorResponse;
 use crate::AcpMeta;
 
-pub const ACP_AUTHENTICATE_METHOD: &str = "authenticate";
-pub const ACP_LOGOUT_METHOD: &str = "logout";
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AcpAuthenticateParams {

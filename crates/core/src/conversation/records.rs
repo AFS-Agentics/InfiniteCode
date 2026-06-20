@@ -39,6 +39,9 @@ pub struct SessionRecord {
     pub thinking: Option<String>,
     /// The working directory associated with the session.
     pub cwd: PathBuf,
+    /// Additional absolute workspace roots associated with the session.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub additional_directories: Vec<PathBuf>,
     /// The CLI version that created the session.
     pub cli_version: String,
     /// The current best-known title for the session.
@@ -510,6 +513,7 @@ mod tests {
             model_binding_id: None,
             thinking: None,
             cwd: ".".into(),
+            additional_directories: Vec::new(),
             cli_version: "0.1.0".into(),
             title: None,
             title_state: SessionTitleState::Unset,
@@ -995,6 +999,7 @@ mod tests {
             model_binding_id: Some("test-binding".into()),
             thinking: None,
             cwd: "/tmp/test".into(),
+            additional_directories: Vec::new(),
             cli_version: "0.1.0".into(),
             title: Some("Test Session".into()),
             title_state: SessionTitleState::Provisional,
