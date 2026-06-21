@@ -148,18 +148,13 @@ impl ClientFilesystem for ServerRuntime {
 }
 
 fn client_capabilities_support_fs(
-    client_capabilities: &serde_json::Value,
+    client_capabilities: &crate::AcpClientCapabilities,
     capability: AcpFsCapability,
 ) -> bool {
-    let key = match capability {
-        AcpFsCapability::ReadTextFile => "readTextFile",
-        AcpFsCapability::WriteTextFile => "writeTextFile",
-    };
-    client_capabilities
-        .get("fs")
-        .and_then(|fs| fs.get(key))
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(false)
+    match capability {
+        AcpFsCapability::ReadTextFile => client_capabilities.fs.read_text_file,
+        AcpFsCapability::WriteTextFile => client_capabilities.fs.write_text_file,
+    }
 }
 
 #[cfg(test)]
@@ -168,12 +163,15 @@ mod tests {
 
     #[test]
     fn client_capabilities_gate_fs_methods() {
-        let capabilities = serde_json::json!({
-            "fs": {
-                "readTextFile": true,
-                "writeTextFile": false
-            }
-        });
+        let capabilities = crate::AcpClientCapabilities {
+            fs: crate::AcpFileSystemCapabilities {
+                read_text_file: true,
+                write_text_file: false,
+                meta: None,
+            },
+            terminal: false,
+            meta: None,
+        };
 
         assert!(client_capabilities_support_fs(
             &capabilities,
@@ -184,7 +182,7 @@ mod tests {
             AcpFsCapability::WriteTextFile
         ));
         assert!(!client_capabilities_support_fs(
-            &serde_json::json!({}),
+            &crate::AcpClientCapabilities::default(),
             AcpFsCapability::ReadTextFile
         ));
     }

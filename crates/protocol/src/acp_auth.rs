@@ -3,13 +3,15 @@ use serde::Serialize;
 
 use crate::AcpErrorCode;
 use crate::AcpErrorResponse;
+use crate::AcpAuthMethodId;
+use crate::AcpLogoutCapabilities;
 use crate::AcpMeta;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AcpAuthenticateParams {
     #[serde(rename = "methodId")]
-    pub method_id: String,
+    pub method_id: AcpAuthMethodId,
     #[serde(default, rename = "_meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<AcpMeta>,
 }
@@ -27,7 +29,7 @@ pub type AcpLogoutResult = AcpEmptyAuthResult;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AcpAuthMethod {
-    pub id: String,
+    pub id: AcpAuthMethodId,
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
@@ -74,7 +76,7 @@ impl AcpAuthMethodType {
 #[serde(rename_all = "camelCase")]
 pub struct AcpAuthCapabilities {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub logout: Option<serde_json::Value>,
+    pub logout: Option<AcpLogoutCapabilities>,
     #[serde(default, rename = "_meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<AcpMeta>,
 }
@@ -82,7 +84,7 @@ pub struct AcpAuthCapabilities {
 impl AcpAuthCapabilities {
     pub fn with_logout() -> Self {
         Self {
-            logout: Some(serde_json::json!({})),
+            logout: Some(AcpLogoutCapabilities::default()),
             meta: None,
         }
     }

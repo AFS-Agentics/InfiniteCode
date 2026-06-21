@@ -6,7 +6,16 @@
 
 mod acp;
 mod acp_auth;
+mod acp_capabilities;
+mod acp_client_io;
+mod acp_common;
+mod acp_content;
+mod acp_ids;
+mod acp_schema_aliases;
 mod acp_session;
+mod acp_session_config;
+mod acp_session_mode;
+mod acp_session_update;
 mod agent;
 mod approval;
 mod command_exec;
@@ -35,7 +44,16 @@ pub mod user_input;
 
 pub use acp::*;
 pub use acp_auth::*;
+pub use acp_capabilities::*;
+pub use acp_client_io::*;
+pub use acp_common::*;
+pub use acp_content::*;
+pub use acp_ids::*;
+pub use acp_schema_aliases::*;
 pub use acp_session::*;
+pub use acp_session_config::*;
+pub use acp_session_mode::*;
+pub use acp_session_update::*;
 pub use agent::*;
 pub use approval::*;
 pub use command_exec::*;

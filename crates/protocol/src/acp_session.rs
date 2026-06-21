@@ -5,7 +5,12 @@ use serde::Serialize;
 
 use crate::AcpMcpServer;
 use crate::AcpMeta;
+use crate::AcpSessionConfigId;
+use crate::AcpSessionConfigOption;
+use crate::AcpSessionConfigValueId;
 use crate::DEVO_SESSION_META;
+use crate::AcpSessionModeId;
+use crate::AcpSessionModeState;
 use crate::SessionId;
 use crate::SessionMetadata;
 
@@ -77,9 +82,9 @@ pub type AcpLoadSessionResult = ();
 #[serde(rename_all = "camelCase")]
 pub struct AcpResumeSessionResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub modes: Option<serde_json::Value>,
+    pub modes: Option<AcpSessionModeState>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub config_options: Option<Vec<serde_json::Value>>,
+    pub config_options: Option<Vec<AcpSessionConfigOption>>,
     #[serde(default, rename = "_meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<AcpMeta>,
 }
@@ -110,7 +115,7 @@ pub type AcpSetModeResult = AcpEmptyResult;
 #[serde(rename_all = "camelCase")]
 pub struct AcpSetModeParams {
     pub session_id: SessionId,
-    pub mode_id: String,
+    pub mode_id: AcpSessionModeId,
     #[serde(default, rename = "_meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<AcpMeta>,
 }
@@ -119,8 +124,8 @@ pub struct AcpSetModeParams {
 #[serde(rename_all = "camelCase")]
 pub struct AcpSetConfigOptionParams {
     pub session_id: SessionId,
-    pub config_id: String,
-    pub value: serde_json::Value,
+    pub config_id: AcpSessionConfigId,
+    pub value: AcpSessionConfigValueId,
     #[serde(default, rename = "_meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<AcpMeta>,
 }
@@ -129,7 +134,7 @@ pub struct AcpSetConfigOptionParams {
 #[serde(rename_all = "camelCase")]
 pub struct AcpSetConfigOptionResult {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub config_options: Vec<serde_json::Value>,
+    pub config_options: Vec<AcpSessionConfigOption>,
     #[serde(default, rename = "_meta", skip_serializing_if = "Option::is_none")]
     pub meta: Option<AcpMeta>,
 }
@@ -221,7 +226,7 @@ mod tests {
         let set_config = AcpSetConfigOptionParams {
             session_id,
             config_id: "permission".to_string(),
-            value: serde_json::json!("default"),
+            value: "default".to_string(),
             meta: None,
         };
 

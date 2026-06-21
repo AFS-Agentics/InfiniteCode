@@ -167,14 +167,16 @@ pub use crate::acp_terminal::ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD;
 
 type PendingResponses = Arc<Mutex<HashMap<u64, oneshot::Sender<serde_json::Value>>>>;
 
-fn acp_client_capabilities() -> serde_json::Value {
-    serde_json::json!({
-        "fs": {
-            "readTextFile": true,
-            "writeTextFile": true
+fn acp_client_capabilities() -> devo_protocol::AcpClientCapabilities {
+    devo_protocol::AcpClientCapabilities {
+        fs: devo_protocol::AcpFileSystemCapabilities {
+            read_text_file: true,
+            write_text_file: true,
+            meta: None,
         },
-        "terminal": true
-    })
+        terminal: true,
+        meta: None,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1558,7 +1560,8 @@ mod tests {
     #[test]
     fn acp_client_capabilities_advertise_fs_and_terminal_support() {
         assert_eq!(
-            acp_client_capabilities(),
+            serde_json::to_value(acp_client_capabilities())
+                .expect("serialize ACP client capabilities"),
             serde_json::json!({
                 "fs": {
                     "readTextFile": true,

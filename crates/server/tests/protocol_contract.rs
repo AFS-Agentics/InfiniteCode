@@ -5,7 +5,10 @@ use devo_core::{
     ItemId, SessionId, SessionRecord, SessionTitleFinalSource, SessionTitleState, TurnId,
     TurnRecord, TurnStatus,
 };
-use devo_protocol::{AcpInitializeParams, SkillChangedParams, SkillListParams, SkillListResult};
+use devo_protocol::{
+    AcpClientCapabilities, AcpInitializeParams, SkillChangedParams, SkillListParams,
+    SkillListResult,
+};
 use devo_server::{
     ActiveTurnSteeringState, ApprovalDecisionValue, ApprovalRequestPayload, ApprovalResponseParams,
     ApprovalScopeValue, ClientRequest, DefaultProjection, EventContext, EventsSubscribeParams,
@@ -25,7 +28,7 @@ fn acp_initialize_params_accept_documented_minimal_shape() {
         params,
         AcpInitializeParams {
             protocol_version: 1,
-            client_capabilities: serde_json::Value::Null,
+            client_capabilities: AcpClientCapabilities::default(),
             client_info: None,
             meta: None,
         }

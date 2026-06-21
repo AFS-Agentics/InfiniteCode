@@ -28,6 +28,7 @@ use devo_server::AcpDeleteSessionResult;
 use devo_server::AcpInitializeResult;
 use devo_server::AcpListSessionsResult;
 use devo_server::AcpNewSessionResult;
+use devo_server::AcpSessionDeleteCapabilities;
 use devo_server::AcpSuccessResponse;
 use devo_server::ClientTransportKind;
 use devo_server::DEVO_SESSION_META;
@@ -130,7 +131,7 @@ async fn acp_session_delete_removes_session_from_history_and_is_idempotent() -> 
             .agent_capabilities
             .session_capabilities
             .delete,
-        Some(serde_json::json!({}))
+        Some(AcpSessionDeleteCapabilities::default())
     );
 
     let cwd = data_root.path().join("repo");

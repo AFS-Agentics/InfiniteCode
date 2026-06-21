@@ -15,6 +15,20 @@ use crate::events::PlanStep;
 use crate::events::PlanStepStatus;
 use crate::events::WorkerEvent;
 
+struct AcpToolCallEventData {
+    tool_call_id: String,
+    title: Option<String>,
+    status: Option<AcpToolCallStatus>,
+    raw_input: Option<serde_json::Value>,
+    raw_output: Option<serde_json::Value>,
+    content: Vec<AcpToolCallContent>,
+}
+
+struct AcpTerminalRenderState<'a> {
+    visible_terminal_ids: &'a mut HashSet<String>,
+    pending_terminal_output: &'a mut HashMap<String, String>,
+}
+
 pub(super) fn acp_terminal_output_event(
     params: &serde_json::Value,
     visible_terminal_ids: &HashSet<String>,
@@ -73,7 +87,7 @@ pub(super) fn worker_events_from_acp_notification_with_terminal_state(
             .into_iter()
             .map(WorkerEvent::ReasoningDelta)
             .collect(),
-        AcpSessionUpdate::Plan { entries } => vec![WorkerEvent::PlanUpdated {
+        AcpSessionUpdate::Plan { entries, .. } => vec![WorkerEvent::PlanUpdated {
             explanation: None,
             steps: entries
                 .into_iter()
@@ -103,15 +117,19 @@ pub(super) fn worker_events_from_acp_notification_with_terminal_state(
             content,
             ..
         } => worker_events_from_acp_tool_call(
-            tool_call_id,
-            title,
+            AcpToolCallEventData {
+                tool_call_id,
+                title: Some(title),
+                status: Some(status),
+                raw_input,
+                raw_output,
+                content,
+            },
             kind,
-            status,
-            raw_input,
-            raw_output,
-            content,
-            visible_terminal_ids,
-            pending_terminal_output,
+            AcpTerminalRenderState {
+                visible_terminal_ids,
+                pending_terminal_output,
+            },
         ),
         AcpSessionUpdate::ToolCallUpdate {
             tool_call_id,
@@ -123,40 +141,49 @@ pub(super) fn worker_events_from_acp_notification_with_terminal_state(
             content,
             ..
         } => worker_events_from_acp_tool_call_update(
-            tool_call_id,
-            title,
+            AcpToolCallEventData {
+                tool_call_id,
+                title,
+                status,
+                raw_input,
+                raw_output,
+                content,
+            },
             kind,
-            status,
-            raw_input,
-            raw_output,
-            content,
-            visible_terminal_ids,
-            pending_terminal_output,
+            AcpTerminalRenderState {
+                visible_terminal_ids,
+                pending_terminal_output,
+            },
         ),
         AcpSessionUpdate::UserMessageChunk { .. }
+        | AcpSessionUpdate::AvailableCommandsUpdate { .. }
+        | AcpSessionUpdate::CurrentModeUpdate { .. }
+        | AcpSessionUpdate::ConfigOptionUpdate { .. }
         | AcpSessionUpdate::SessionInfoUpdate { title: None, .. }
         | AcpSessionUpdate::UsageUpdate { .. } => Vec::new(),
     }
 }
 
 fn worker_events_from_acp_tool_call(
-    tool_call_id: String,
-    title: String,
+    tool_call: AcpToolCallEventData,
     kind: AcpToolKind,
-    status: AcpToolCallStatus,
-    raw_input: Option<serde_json::Value>,
-    raw_output: Option<serde_json::Value>,
-    content: Vec<AcpToolCallContent>,
-    visible_terminal_ids: &mut HashSet<String>,
-    pending_terminal_output: &mut HashMap<String, String>,
+    terminal_state: AcpTerminalRenderState<'_>,
 ) -> Vec<WorkerEvent> {
+    let title = tool_call
+        .title
+        .clone()
+        .expect("ACP tool_call notifications always include a title");
+    let status = tool_call
+        .status
+        .expect("ACP tool_call notifications always include a status");
+    let tool_call_id = tool_call.tool_call_id.clone();
     let mut events = vec![WorkerEvent::ToolCall {
         tool_use_id: tool_call_id.clone(),
         summary: title.clone(),
         preparing: status == AcpToolCallStatus::Pending,
         parsed_commands: None,
     }];
-    if let Some(input) = raw_input.clone() {
+    if let Some(input) = tool_call.raw_input.clone() {
         events.push(WorkerEvent::ToolCallDetails {
             tool_use_id: tool_call_id.clone(),
             tool_name: acp_tool_kind_label(kind).to_string(),
@@ -164,71 +191,55 @@ fn worker_events_from_acp_tool_call(
         });
     }
     events.extend(worker_events_from_acp_tool_content(
-        &tool_call_id,
-        Some(title),
-        Some(status),
-        raw_input,
-        raw_output,
-        content,
-        visible_terminal_ids,
-        pending_terminal_output,
+        AcpToolCallEventData {
+            tool_call_id,
+            title: Some(title),
+            status: Some(status),
+            raw_input: tool_call.raw_input,
+            raw_output: tool_call.raw_output,
+            content: tool_call.content,
+        },
+        terminal_state,
     ));
     events
 }
 
 fn worker_events_from_acp_tool_call_update(
-    tool_call_id: String,
-    title: Option<String>,
+    tool_call: AcpToolCallEventData,
     kind: Option<AcpToolKind>,
-    status: Option<AcpToolCallStatus>,
-    raw_input: Option<serde_json::Value>,
-    raw_output: Option<serde_json::Value>,
-    content: Vec<AcpToolCallContent>,
-    visible_terminal_ids: &mut HashSet<String>,
-    pending_terminal_output: &mut HashMap<String, String>,
+    terminal_state: AcpTerminalRenderState<'_>,
 ) -> Vec<WorkerEvent> {
     let mut events = Vec::new();
-    if let Some(input) = raw_input.clone() {
+    if let Some(input) = tool_call.raw_input.clone() {
         events.push(WorkerEvent::ToolCallDetails {
-            tool_use_id: tool_call_id.clone(),
+            tool_use_id: tool_call.tool_call_id.clone(),
             tool_name: kind.map(acp_tool_kind_label).unwrap_or("tool").to_string(),
             input,
         });
     }
-    if let Some(summary) = title.clone().or_else(|| status.map(acp_tool_status_text)) {
+    if let Some(summary) = tool_call
+        .title
+        .clone()
+        .or_else(|| tool_call.status.map(acp_tool_status_text))
+    {
         events.push(WorkerEvent::ToolCallUpdated {
-            tool_use_id: tool_call_id.clone(),
+            tool_use_id: tool_call.tool_call_id.clone(),
             summary,
             parsed_commands: Vec::new(),
         });
     }
-    events.extend(worker_events_from_acp_tool_content(
-        &tool_call_id,
-        title,
-        status,
-        raw_input,
-        raw_output,
-        content,
-        visible_terminal_ids,
-        pending_terminal_output,
-    ));
+    events.extend(worker_events_from_acp_tool_content(tool_call, terminal_state));
     events
 }
 
 fn worker_events_from_acp_tool_content(
-    tool_call_id: &str,
-    title: Option<String>,
-    status: Option<AcpToolCallStatus>,
-    raw_input: Option<serde_json::Value>,
-    raw_output: Option<serde_json::Value>,
-    content: Vec<AcpToolCallContent>,
-    visible_terminal_ids: &mut HashSet<String>,
-    pending_terminal_output: &mut HashMap<String, String>,
+    tool_call: AcpToolCallEventData,
+    terminal_state: AcpTerminalRenderState<'_>,
 ) -> Vec<WorkerEvent> {
     let mut events = Vec::new();
     let mut changes = HashMap::new();
     let mut text_parts = Vec::new();
-    for item in content {
+    for item in tool_call.content {
         match item {
             AcpToolCallContent::Content { content } => {
                 if let Some(text) = acp_content_display_text(&content) {
@@ -243,14 +254,19 @@ fn worker_events_from_acp_tool_content(
                 changes.insert(path, file_change_from_acp_diff(old_text, new_text));
             }
             AcpToolCallContent::Terminal { terminal_id } => {
-                if visible_terminal_ids.insert(terminal_id.clone()) {
+                if terminal_state
+                    .visible_terminal_ids
+                    .insert(terminal_id.clone())
+                {
                     events.push(WorkerEvent::ToolCall {
                         tool_use_id: terminal_id.clone(),
                         summary: format!("Terminal {terminal_id}"),
                         preparing: false,
                         parsed_commands: None,
                     });
-                    if let Some(delta) = pending_terminal_output.remove(&terminal_id)
+                    if let Some(delta) = terminal_state
+                        .pending_terminal_output
+                        .remove(&terminal_id)
                         && !delta.is_empty()
                     {
                         events.push(WorkerEvent::ToolOutputDelta {
@@ -263,9 +279,12 @@ fn worker_events_from_acp_tool_content(
         }
     }
     if !changes.is_empty() {
-        if let Some(input) = raw_input.clone() {
+        if let Some(input) = tool_call.raw_input.clone() {
             events.push(WorkerEvent::PatchAppliedIo {
-                tool_name: title.clone().unwrap_or_else(|| "tool".to_string()),
+                tool_name: tool_call
+                    .title
+                    .clone()
+                    .unwrap_or_else(|| "tool".to_string()),
                 input,
                 changes,
             });
@@ -276,20 +295,20 @@ fn worker_events_from_acp_tool_content(
     let text = text_parts.join("\n");
     if !text.is_empty() {
         if matches!(
-            status,
+            tool_call.status,
             Some(AcpToolCallStatus::Completed | AcpToolCallStatus::Failed)
         ) {
             events.push(acp_tool_result_event(
-                tool_call_id.to_string(),
-                title,
-                raw_input,
-                raw_output,
+                tool_call.tool_call_id,
+                tool_call.title,
+                tool_call.raw_input,
+                tool_call.raw_output,
                 text,
-                status == Some(AcpToolCallStatus::Failed),
+                tool_call.status == Some(AcpToolCallStatus::Failed),
             ));
         } else {
             events.push(WorkerEvent::ToolOutputDelta {
-                tool_use_id: tool_call_id.to_string(),
+                tool_use_id: tool_call.tool_call_id,
                 delta: text,
             });
         }

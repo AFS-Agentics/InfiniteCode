@@ -51,7 +51,12 @@ use crate::AcpPromptResult;
 use crate::AcpResumeSessionParams;
 use crate::AcpResumeSessionResult;
 use crate::AcpSessionCapabilities;
+use crate::AcpSessionAdditionalDirectoriesCapabilities;
+use crate::AcpSessionCloseCapabilities;
+use crate::AcpSessionDeleteCapabilities;
 use crate::AcpSessionNotification;
+use crate::AcpSessionListCapabilities;
+use crate::AcpSessionResumeCapabilities;
 use crate::AcpSessionUpdate;
 use crate::AcpSetConfigOptionParams;
 use crate::AcpSetModeParams;
@@ -135,11 +140,13 @@ impl ServerRuntime {
                     },
                     auth: Self::acp_auth_capabilities(&acp_auth_config),
                     session_capabilities: AcpSessionCapabilities {
-                        list: Some(serde_json::json!({})),
-                        delete: Some(serde_json::json!({})),
-                        additional_directories: Some(serde_json::json!({})),
-                        resume: Some(serde_json::json!({})),
-                        close: Some(serde_json::json!({})),
+                        list: Some(AcpSessionListCapabilities::default()),
+                        delete: Some(AcpSessionDeleteCapabilities::default()),
+                        additional_directories: Some(
+                            AcpSessionAdditionalDirectoriesCapabilities::default(),
+                        ),
+                        resume: Some(AcpSessionResumeCapabilities::default()),
+                        close: Some(AcpSessionCloseCapabilities::default()),
                         ..AcpSessionCapabilities::default()
                     },
                     ..AcpAgentCapabilities::default()
@@ -942,6 +949,16 @@ fn acp_mcp_config(method: &str, mcp_servers: &[AcpMcpServer]) -> Result<McpConfi
     for mcp_server in mcp_servers {
         let server = match mcp_server {
             AcpMcpServer::Stdio(server) => server,
+            AcpMcpServer::Http(_) => {
+                return Err(format!(
+                    "{method} mcpServers transport 'http' is not supported"
+                ));
+            }
+            AcpMcpServer::Sse(_) => {
+                return Err(format!(
+                    "{method} mcpServers transport 'sse' is not supported"
+                ));
+            }
             AcpMcpServer::Unsupported(server) => {
                 return Err(format!(
                     "{method} mcpServers transport '{}' is not supported",
@@ -1047,6 +1064,7 @@ fn acp_update_from_history_item(
                     },
                 })
                 .collect(),
+            meta: None,
         });
     }
     let content = AcpContentBlock::text(item.body.clone());
@@ -1054,15 +1072,18 @@ fn acp_update_from_history_item(
         SessionHistoryItemKind::User => Some(AcpSessionUpdate::UserMessageChunk {
             content,
             message_id: None,
+            meta: None,
         }),
         SessionHistoryItemKind::Assistant => Some(AcpSessionUpdate::AgentMessageChunk {
             content,
             message_id: None,
+            meta: None,
         }),
         SessionHistoryItemKind::Reasoning | SessionHistoryItemKind::TurnSummary => {
             Some(AcpSessionUpdate::AgentThoughtChunk {
                 content,
                 message_id: None,
+                meta: None,
             })
         }
         SessionHistoryItemKind::ToolCall => {
@@ -1079,6 +1100,7 @@ fn acp_update_from_history_item(
                     .and_then(|tool_io| tool_io.output.clone()),
                 content: Vec::new(),
                 locations: Vec::new(),
+                meta: None,
             })
         }
         SessionHistoryItemKind::ToolResult
@@ -1108,6 +1130,7 @@ fn acp_update_from_history_item(
                     content: AcpContentBlock::text(text),
                 }],
                 locations: Vec::new(),
+                meta: None,
             })
         }
     }

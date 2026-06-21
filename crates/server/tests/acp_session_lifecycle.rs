@@ -14,6 +14,7 @@ use devo_core::ProviderVendorCatalog;
 use devo_core::SkillsConfig;
 use devo_core::tools::ToolRegistry;
 use devo_protocol::AcpAuthMethod;
+use devo_protocol::AcpLogoutCapabilities;
 use devo_protocol::AcpLoadSessionResult;
 use devo_protocol::AcpNewSessionResult;
 use devo_protocol::AcpPromptResult;
@@ -539,7 +540,7 @@ logout = true
     );
     assert_eq!(
         initialize.agent_capabilities.auth.logout,
-        Some(serde_json::json!({}))
+        Some(AcpLogoutCapabilities::default())
     );
     assert!(
         initialize
