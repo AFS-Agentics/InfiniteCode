@@ -40,6 +40,7 @@ fn onboarding_widget_with_available_model(
         available_models: vec![model],
         saved_models: Vec::new(),
         show_model_onboarding: true,
+        exit_after_onboarding: false,
         startup_tooltip_override: None,
         initial_theme_name: None,
     });
