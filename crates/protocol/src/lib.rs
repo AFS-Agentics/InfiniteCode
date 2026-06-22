@@ -10,6 +10,7 @@ mod acp_capabilities;
 mod acp_client_io;
 mod acp_common;
 mod acp_content;
+mod acp_event_to_update;
 mod acp_ids;
 mod acp_schema_aliases;
 mod acp_session;
