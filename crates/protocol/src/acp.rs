@@ -345,7 +345,7 @@ fn tool_kind_from_name(tool_name: &str) -> AcpToolKind {
         "read" | "grep" | "glob" | "lsp" => AcpToolKind::Read,
         "apply_patch" | "edit" | "write" => AcpToolKind::Edit,
         "bash" | "shell_command" | "exec_command" => AcpToolKind::Execute,
-        "websearch" | "web_fetch" | "websearch_query" => AcpToolKind::Fetch,
+        "web_search" | "websearch" | "web_fetch" | "websearch_query" => AcpToolKind::Fetch,
         "agent" => AcpToolKind::Think,
         _ => AcpToolKind::Other,
     }
@@ -1097,6 +1097,12 @@ mod tests {
 
         let config_update = AcpSessionUpdate::ConfigOptionUpdate {
             config_options: vec![crate::AcpSessionConfigOption::Select {
+                id: "model".to_string(),
+                name: "Model".to_string(),
+                description: Some("Controls the model used for this session".to_string()),
+                category: Some(crate::AcpSessionConfigOptionCategory::Known(
+                    crate::AcpSessionConfigOptionCategoryKnown::Model,
+                )),
                 current_value: "default".to_string(),
                 options: crate::AcpSessionConfigSelectOptions::Ungrouped(Vec::new()),
             }],
@@ -1109,6 +1115,10 @@ mod tests {
                 "configOptions": [
                     {
                         "type": "select",
+                        "id": "model",
+                        "name": "Model",
+                        "description": "Controls the model used for this session",
+                        "category": "model",
                         "currentValue": "default",
                         "options": []
                     }

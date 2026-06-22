@@ -63,6 +63,12 @@ pub struct AcpSessionConfigSelect {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AcpSessionConfigOption {
     Select {
+        id: AcpSessionConfigId,
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        category: Option<AcpSessionConfigOptionCategory>,
         #[serde(rename = "currentValue")]
         current_value: AcpSessionConfigValueId,
         options: AcpSessionConfigSelectOptions,
