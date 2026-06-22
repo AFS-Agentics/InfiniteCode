@@ -25,6 +25,7 @@ use tokio_util::sync::CancellationToken;
 use crate::ClientTransportKind;
 use crate::ServerRuntime;
 use crate::runtime::CONNECTION_NOTIFICATION_CHANNEL_CAPACITY;
+use crate::runtime::IncomingResponse;
 use crate::singleton::SERVER_CONTROL_SHUTDOWN_METHOD;
 use crate::singleton::SERVER_CONTROL_STATUS_METHOD;
 
@@ -321,8 +322,11 @@ async fn run_stdio(runtime: Arc<ServerRuntime>) -> Result<()> {
             continue;
         }
         let value: serde_json::Value = serde_json::from_str(&line)?;
-        if let Some(response) = runtime.handle_incoming(connection_id, value).await
-            && !send_transport_queue_message(
+        if let Some(response) = runtime
+            .handle_incoming_with_actions(connection_id, value)
+            .await
+            && !send_incoming_response(
+                &runtime,
                 &sender_clone,
                 response,
                 connection_id,
@@ -424,8 +428,11 @@ async fn handle_internal_proxy_connection(
         Result::<()>::Ok(())
     });
 
-    if let Some(response) = runtime.handle_incoming(connection_id, first_value).await
-        && !send_transport_queue_message(
+    if let Some(response) = runtime
+        .handle_incoming_with_actions(connection_id, first_value)
+        .await
+        && !send_incoming_response(
+            &runtime,
             &sender_clone,
             response,
             connection_id,
@@ -444,8 +451,11 @@ async fn handle_internal_proxy_connection(
         match frame {
             Message::Text(text) => {
                 let value: serde_json::Value = serde_json::from_str(&text)?;
-                if let Some(response) = runtime.handle_incoming(connection_id, value).await
-                    && !send_transport_queue_message(
+                if let Some(response) = runtime
+                    .handle_incoming_with_actions(connection_id, value)
+                    .await
+                    && !send_incoming_response(
+                        &runtime,
                         &sender_clone,
                         response,
                         connection_id,
@@ -560,8 +570,11 @@ async fn handle_websocket_connection(
         match frame {
             Message::Text(text) => {
                 let value: serde_json::Value = serde_json::from_str(&text)?;
-                if let Some(response) = runtime.handle_incoming(connection_id, value).await
-                    && !send_transport_queue_message(
+                if let Some(response) = runtime
+                    .handle_incoming_with_actions(connection_id, value)
+                    .await
+                    && !send_incoming_response(
+                        &runtime,
                         &sender_clone,
                         response,
                         connection_id,
@@ -581,6 +594,23 @@ async fn handle_websocket_connection(
     tracing::info!(connection_id, "websocket connection closed");
     writer_task.abort();
     Ok(())
+}
+
+async fn send_incoming_response(
+    runtime: &Arc<ServerRuntime>,
+    sender: &mpsc::Sender<serde_json::Value>,
+    response: IncomingResponse,
+    connection_id: u64,
+    queue: &'static str,
+) -> bool {
+    let (response, post_response_actions) = response.into_parts();
+    if !send_transport_queue_message(sender, response, connection_id, queue).await {
+        return false;
+    }
+    runtime
+        .run_post_response_actions(post_response_actions)
+        .await;
+    true
 }
 
 async fn send_transport_queue_message<T>(

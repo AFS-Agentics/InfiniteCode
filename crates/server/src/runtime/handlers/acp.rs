@@ -321,16 +321,14 @@ impl ServerRuntime {
             Ok(config_options) => config_options,
             Err(error) => return acp_error_response(request_id, AcpErrorCode::ServerError, error),
         };
-        let response = acp_success_response(
+        acp_success_response(
             request_id,
             AcpLoadSessionResult {
                 modes: None,
                 config_options: Some(config_options),
                 meta: None,
             },
-        );
-        self.schedule_acp_session_state_snapshot_after_response(connection_id, params.session_id);
-        response
+        )
     }
 
     pub(crate) async fn handle_acp_session_new(
@@ -397,7 +395,7 @@ impl ServerRuntime {
             Ok(config_options) => config_options,
             Err(error) => return acp_error_response(request_id, AcpErrorCode::ServerError, error),
         };
-        let response = acp_success_response(
+        acp_success_response(
             request_id,
             AcpNewSessionResult {
                 session_id: legacy.result.session.session_id,
@@ -405,12 +403,7 @@ impl ServerRuntime {
                 config_options: Some(config_options),
                 meta: Some(meta),
             },
-        );
-        self.schedule_acp_session_state_snapshot_after_response(
-            connection_id,
-            legacy.result.session.session_id,
-        );
-        response
+        )
     }
 
     async fn validate_acp_existing_session_cwd(
@@ -552,16 +545,14 @@ impl ServerRuntime {
             Ok(config_options) => config_options,
             Err(error) => return acp_error_response(request_id, AcpErrorCode::ServerError, error),
         };
-        let response = acp_success_response(
+        acp_success_response(
             request_id,
             AcpResumeSessionResult {
                 modes: None,
                 config_options: Some(config_options),
                 meta: Some(meta),
             },
-        );
-        self.schedule_acp_session_state_snapshot_after_response(connection_id, params.session_id);
-        response
+        )
     }
 
     async fn apply_acp_session_additional_directories(

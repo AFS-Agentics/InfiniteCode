@@ -71,8 +71,8 @@ async fn acp_available_commands_are_session_update_after_session_response() -> R
 
     let cwd = data_root.path().join("workspace");
     std::fs::create_dir_all(&cwd)?;
-    let response_value = runtime
-        .handle_incoming(
+    let incoming_response = runtime
+        .handle_incoming_with_actions(
             connection_id,
             serde_json::json!({
                 "id": 2,
@@ -85,6 +85,7 @@ async fn acp_available_commands_are_session_update_after_session_response() -> R
         )
         .await
         .context("session/new response")?;
+    let (response_value, post_response_actions) = incoming_response.into_parts();
     let response: AcpSuccessResponse<AcpNewSessionResult> =
         serde_json::from_value(response_value.clone())?;
     let session_id = response.result.session_id;
@@ -92,6 +93,9 @@ async fn acp_available_commands_are_session_update_after_session_response() -> R
         .send(response_value)
         .await
         .context("enqueue simulated transport response")?;
+    runtime
+        .run_post_response_actions(post_response_actions)
+        .await;
 
     let messages_before_response = recv_until_response(&mut outgoing_rx, 2, session_id).await?;
     assert!(

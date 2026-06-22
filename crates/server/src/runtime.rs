@@ -171,6 +171,8 @@ mod user_input;
 
 pub(crate) use connection::CONNECTION_NOTIFICATION_CHANNEL_CAPACITY;
 pub(crate) use connection::ConnectionRuntime;
+pub use connection::IncomingResponse;
+pub use connection::PostResponseActions;
 pub(crate) use connection::SubscriptionFilter;
 pub(crate) use items::render_input_items;
 pub(crate) use research_tools::extract_written_file_path;

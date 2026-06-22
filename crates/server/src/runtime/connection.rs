@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -42,6 +43,101 @@ enum PendingConnectionMessageKind {
     Notification,
     JsonRpcResponse,
     ClientRequest,
+}
+
+#[derive(Debug)]
+pub struct IncomingResponse {
+    response: serde_json::Value,
+    post_response_actions: PostResponseActions,
+}
+
+impl IncomingResponse {
+    fn new(response: serde_json::Value) -> Self {
+        Self {
+            response,
+            post_response_actions: PostResponseActions::default(),
+        }
+    }
+
+    fn with_post_response_action(mut self, action: PostResponseAction) -> Self {
+        self.post_response_actions.0.push(action);
+        self
+    }
+
+    pub fn into_parts(self) -> (serde_json::Value, PostResponseActions) {
+        (self.response, self.post_response_actions)
+    }
+
+    fn is_success(&self) -> bool {
+        self.response.get("result").is_some() && self.response.get("error").is_none()
+    }
+
+    fn with_acp_session_state_snapshot_after_success(
+        self,
+        connection_id: u64,
+        session_id: Option<SessionId>,
+    ) -> Self {
+        let Some(session_id) = session_id else {
+            return self;
+        };
+        if !self.is_success() {
+            return self;
+        }
+        self.with_post_response_action(PostResponseAction::SendAcpSessionStateSnapshot {
+            connection_id,
+            session_id,
+        })
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct PostResponseActions(Vec<PostResponseAction>);
+
+#[derive(Debug)]
+enum PostResponseAction {
+    SendAcpSessionStateSnapshot {
+        connection_id: u64,
+        session_id: SessionId,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AcpRoute {
+    SessionCancel,
+    SessionClose,
+    SessionDelete,
+    SessionList,
+    SessionLoad,
+    SessionNew,
+    SessionPrompt,
+    SessionResume,
+    SessionSetConfigOption,
+    SessionSetMode,
+}
+
+fn acp_route_registry() -> &'static BTreeMap<&'static str, AcpRoute> {
+    static ACP_ROUTES: OnceLock<BTreeMap<&'static str, AcpRoute>> = OnceLock::new();
+    ACP_ROUTES.get_or_init(|| {
+        BTreeMap::from([
+            (ACP_SESSION_CANCEL_METHOD, AcpRoute::SessionCancel),
+            (ACP_SESSION_CLOSE_METHOD, AcpRoute::SessionClose),
+            (ACP_SESSION_DELETE_METHOD, AcpRoute::SessionDelete),
+            (ACP_SESSION_LIST_METHOD, AcpRoute::SessionList),
+            (ACP_SESSION_LOAD_METHOD, AcpRoute::SessionLoad),
+            (ACP_SESSION_NEW_METHOD, AcpRoute::SessionNew),
+            (ACP_SESSION_PROMPT_METHOD, AcpRoute::SessionPrompt),
+            (ACP_SESSION_RESUME_METHOD, AcpRoute::SessionResume),
+            (
+                ACP_SESSION_SET_CONFIG_OPTION_METHOD,
+                AcpRoute::SessionSetConfigOption,
+            ),
+            (ACP_SESSION_SET_MODE_METHOD, AcpRoute::SessionSetMode),
+        ])
+    })
+}
+
+fn acp_route(method: &str) -> Option<AcpRoute> {
+    acp_route_registry().get(method).copied()
 }
 
 impl ServerRuntime {
@@ -113,6 +209,18 @@ impl ServerRuntime {
         connection_id: u64,
         message: serde_json::Value,
     ) -> Option<serde_json::Value> {
+        let (response, _) = self
+            .handle_incoming_with_actions(connection_id, message)
+            .await?
+            .into_parts();
+        Some(response)
+    }
+
+    pub async fn handle_incoming_with_actions(
+        self: &Arc<Self>,
+        connection_id: u64,
+        message: serde_json::Value,
+    ) -> Option<IncomingResponse> {
         if message.get("method").is_none()
             && message.get("id").is_some()
             && (message.get("result").is_some() || message.get("error").is_some())
@@ -136,32 +244,38 @@ impl ServerRuntime {
         );
 
         if method == ACP_INITIALIZE_METHOD {
-            return Some(self.handle_acp_initialize(connection_id, id, params).await);
+            return Some(IncomingResponse::new(
+                self.handle_acp_initialize(connection_id, id, params).await,
+            ));
         }
         // Before connection enter `Ready` state, only allowed method: "initialize"
         if !self.connection_ready(connection_id).await {
             return id.map(|request_id| {
-                self.error_response(
+                IncomingResponse::new(self.error_response(
                     request_id,
                     ProtocolErrorCode::NotInitialized,
                     "connection has not completed initialize",
-                )
+                ))
             });
         }
 
         if method == ACP_AUTHENTICATE_METHOD {
-            return Some(
+            return Some(IncomingResponse::new(
                 self.handle_acp_authenticate(connection_id, id, params)
                     .await,
-            );
+            ));
         }
         if method == ACP_LOGOUT_METHOD {
-            return Some(self.handle_acp_logout(connection_id, id, params).await);
+            return Some(IncomingResponse::new(
+                self.handle_acp_logout(connection_id, id, params).await,
+            ));
         }
 
         if !self.connection_authenticated(connection_id).await {
             if let Some(request_id) = id {
-                return Some(acp_auth_required_response(request_id));
+                return Some(IncomingResponse::new(acp_auth_required_response(
+                    request_id,
+                )));
             }
             tracing::warn!(
                 connection_id,
@@ -171,9 +285,10 @@ impl ServerRuntime {
             return None;
         }
 
-        if method == ACP_SESSION_CANCEL_METHOD {
-            self.handle_acp_session_cancel(params).await;
-            return None;
+        if let Some(route) = acp_route(&method) {
+            return self
+                .handle_acp_route(route, connection_id, id, params)
+                .await;
         }
 
         let client_method = devo_extension_inner_method(&method).and_then(ClientMethod::parse);
@@ -183,11 +298,11 @@ impl ServerRuntime {
                 let params: SessionStartParams = match serde_json::from_value(params) {
                     Ok(params) => params,
                     Err(error) => {
-                        return Some(self.error_response(
+                        return Some(IncomingResponse::new(self.error_response(
                             request_id,
                             ProtocolErrorCode::InvalidParams,
                             format!("invalid session/start params: {error}"),
-                        ));
+                        )));
                     }
                 };
                 let response = self
@@ -204,37 +319,6 @@ impl ServerRuntime {
                     .await;
                 }
                 Some(response)
-            }
-            None if method == ACP_SESSION_LIST_METHOD => {
-                Some(self.handle_acp_session_list(id?, params).await)
-            }
-            None if method == ACP_SESSION_LOAD_METHOD => Some(
-                self.handle_acp_session_load(connection_id, id?, params)
-                    .await,
-            ),
-            None if method == ACP_SESSION_NEW_METHOD => Some(
-                self.handle_acp_session_new(connection_id, id?, params)
-                    .await,
-            ),
-            None if method == ACP_SESSION_PROMPT_METHOD => {
-                self.handle_acp_session_prompt(connection_id, id?, params)
-                    .await
-            }
-            None if method == ACP_SESSION_RESUME_METHOD => Some(
-                self.handle_acp_session_resume(connection_id, id?, params)
-                    .await,
-            ),
-            None if method == ACP_SESSION_CLOSE_METHOD => {
-                Some(self.handle_acp_session_close(id?, params).await)
-            }
-            None if method == ACP_SESSION_DELETE_METHOD => {
-                Some(self.handle_acp_session_delete(id?, params).await)
-            }
-            None if method == ACP_SESSION_SET_MODE_METHOD => {
-                Some(self.handle_acp_session_set_mode(id?, params).await)
-            }
-            None if method == ACP_SESSION_SET_CONFIG_OPTION_METHOD => {
-                Some(self.handle_acp_session_set_config_option(id?, params).await)
             }
             // Update session metadata, including the current model and reasoning effort.
             Some(ClientMethod::SessionMetadataUpdate) => {
@@ -371,7 +455,100 @@ impl ServerRuntime {
         // Filter out responses already dispatched via the high-priority channel.
         match response {
             Some(serde_json::Value::Null) => None,
-            other => other,
+            Some(response) => Some(IncomingResponse::new(response)),
+            None => None,
+        }
+    }
+
+    async fn handle_acp_route(
+        self: &Arc<Self>,
+        route: AcpRoute,
+        connection_id: u64,
+        request_id: Option<serde_json::Value>,
+        params: serde_json::Value,
+    ) -> Option<IncomingResponse> {
+        match route {
+            AcpRoute::SessionCancel => {
+                self.handle_acp_session_cancel(params).await;
+                None
+            }
+            AcpRoute::SessionClose => Some(IncomingResponse::new(
+                self.handle_acp_session_close(request_id?, params).await,
+            )),
+            AcpRoute::SessionDelete => Some(IncomingResponse::new(
+                self.handle_acp_session_delete(request_id?, params).await,
+            )),
+            AcpRoute::SessionList => Some(IncomingResponse::new(
+                self.handle_acp_session_list(request_id?, params).await,
+            )),
+            AcpRoute::SessionLoad => {
+                let session_id =
+                    serde_json::from_value::<crate::AcpLoadSessionParams>(params.clone())
+                        .ok()
+                        .map(|params| params.session_id);
+                let response = IncomingResponse::new(
+                    self.handle_acp_session_load(connection_id, request_id?, params)
+                        .await,
+                );
+                Some(
+                    response
+                        .with_acp_session_state_snapshot_after_success(connection_id, session_id),
+                )
+            }
+            AcpRoute::SessionNew => {
+                let response = IncomingResponse::new(
+                    self.handle_acp_session_new(connection_id, request_id?, params)
+                        .await,
+                );
+                let session_id = serde_json::from_value::<
+                    crate::AcpSuccessResponse<crate::AcpNewSessionResult>,
+                >(response.response.clone())
+                .ok()
+                .map(|response| response.result.session_id);
+                Some(
+                    response
+                        .with_acp_session_state_snapshot_after_success(connection_id, session_id),
+                )
+            }
+            AcpRoute::SessionPrompt => self
+                .handle_acp_session_prompt(connection_id, request_id?, params)
+                .await
+                .map(IncomingResponse::new),
+            AcpRoute::SessionResume => {
+                let session_id =
+                    serde_json::from_value::<crate::AcpResumeSessionParams>(params.clone())
+                        .ok()
+                        .map(|params| params.session_id);
+                let response = IncomingResponse::new(
+                    self.handle_acp_session_resume(connection_id, request_id?, params)
+                        .await,
+                );
+                Some(
+                    response
+                        .with_acp_session_state_snapshot_after_success(connection_id, session_id),
+                )
+            }
+            AcpRoute::SessionSetConfigOption => Some(IncomingResponse::new(
+                self.handle_acp_session_set_config_option(request_id?, params)
+                    .await,
+            )),
+            AcpRoute::SessionSetMode => Some(IncomingResponse::new(
+                self.handle_acp_session_set_mode(request_id?, params).await,
+            )),
+        }
+    }
+
+    pub async fn run_post_response_actions(self: &Arc<Self>, actions: PostResponseActions) {
+        for action in actions.0 {
+            match action {
+                PostResponseAction::SendAcpSessionStateSnapshot {
+                    connection_id,
+                    session_id,
+                } => {
+                    self.send_acp_session_state_snapshot(connection_id, session_id)
+                        .await;
+                }
+            }
         }
     }
 
@@ -1123,6 +1300,81 @@ mod tests {
                 subscription.session_matches(Some(unrelated), &child_parent_by_session),
             ]
         );
+    }
+
+    #[tokio::test]
+    async fn post_response_actions_run_after_backpressured_response_enqueue() -> Result<()> {
+        let data_root = TempDir::new()?;
+        let runtime = build_runtime(data_root.path());
+        let (sender, mut receiver) = mpsc::channel(1);
+        let transport_sender = sender.clone();
+        let connection_id = runtime
+            .register_connection(ClientTransportKind::Stdio, sender)
+            .await;
+        let session_id = SessionId::new();
+        let response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {},
+        });
+        let expected_response = response.clone();
+
+        transport_sender
+            .send(serde_json::json!({ "queued": "backpressure" }))
+            .await
+            .expect("prefill transport queue");
+        let runtime_for_task = Arc::clone(&runtime);
+        let mut transport_task = tokio::spawn(async move {
+            let incoming = IncomingResponse::new(response).with_post_response_action(
+                PostResponseAction::SendAcpSessionStateSnapshot {
+                    connection_id,
+                    session_id,
+                },
+            );
+            let (response, post_response_actions) = incoming.into_parts();
+            transport_sender
+                .send(response)
+                .await
+                .expect("enqueue response");
+            runtime_for_task
+                .run_post_response_actions(post_response_actions)
+                .await;
+        });
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), &mut transport_task)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            receiver.recv().await.expect("prefilled queue item"),
+            serde_json::json!({ "queued": "backpressure" })
+        );
+        assert_eq!(
+            receiver.recv().await.expect("json-rpc response"),
+            expected_response
+        );
+        let notification = receiver.recv().await.expect("post-response notification");
+        assert_eq!(
+            notification.get("method"),
+            Some(&serde_json::json!(crate::ACP_SESSION_UPDATE_METHOD))
+        );
+        assert_eq!(
+            notification
+                .get("params")
+                .and_then(|params| params.get("sessionId")),
+            Some(&serde_json::to_value(session_id).expect("serialize session id"))
+        );
+        assert_eq!(
+            notification
+                .get("params")
+                .and_then(|params| params.get("update"))
+                .and_then(|update| update.get("sessionUpdate")),
+            Some(&serde_json::json!("available_commands_update"))
+        );
+        transport_task.await.expect("transport sequence completes");
+
+        Ok(())
     }
 
     #[tokio::test]
