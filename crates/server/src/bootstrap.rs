@@ -82,7 +82,7 @@ pub async fn run_server_process(args: ServerProcessArgs) -> Result<()> {
         SingletonRole::Real(guard) => match action {
             ServerProcessAction::Run => guard,
             ServerProcessAction::Status | ServerProcessAction::Shutdown => {
-                println!("devo server is not running for this DEVO_HOME");
+                println!("devo server is not running");
                 return Ok(());
             }
         },
