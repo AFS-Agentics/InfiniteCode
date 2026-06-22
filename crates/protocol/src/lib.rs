@@ -36,6 +36,7 @@ mod response;
 mod role;
 mod session;
 mod skill;
+mod slash_command;
 // TODO: Should rename 'thinking' to reasoning effort
 mod thinking;
 mod truncation;
@@ -73,6 +74,7 @@ pub use response::*;
 pub use role::*;
 pub use session::*;
 pub use skill::*;
+pub use slash_command::*;
 pub use thinking::*;
 pub use truncation::*;
 pub use turn::*;
