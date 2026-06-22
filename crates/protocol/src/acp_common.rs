@@ -79,6 +79,14 @@ impl<T> AcpSuccessResponse<T> {
     }
 }
 
+pub fn acp_success_response<T: Serialize>(
+    request_id: serde_json::Value,
+    result: T,
+) -> serde_json::Value {
+    serde_json::to_value(AcpSuccessResponse::new(request_id, result))
+        .expect("serialize ACP success response")
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AcpErrorResponse {
     #[serde(default = "jsonrpc_version")]
@@ -104,6 +112,24 @@ impl AcpErrorResponse {
             },
         }
     }
+}
+
+pub fn acp_error_response(
+    request_id: serde_json::Value,
+    code: AcpErrorCode,
+    message: impl Into<String>,
+) -> serde_json::Value {
+    acp_error_response_with_data(request_id, code, message, serde_json::Value::Null)
+}
+
+pub fn acp_error_response_with_data(
+    request_id: serde_json::Value,
+    code: AcpErrorCode,
+    message: impl Into<String>,
+    data: serde_json::Value,
+) -> serde_json::Value {
+    serde_json::to_value(AcpErrorResponse::new(request_id, code, message, data))
+        .expect("serialize ACP error response")
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

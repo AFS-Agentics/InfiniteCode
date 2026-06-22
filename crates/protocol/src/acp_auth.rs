@@ -3,7 +3,6 @@ use serde::Serialize;
 
 use crate::AcpAuthMethodId;
 use crate::AcpErrorCode;
-use crate::AcpErrorResponse;
 use crate::AcpLogoutCapabilities;
 use crate::AcpMeta;
 
@@ -95,13 +94,12 @@ impl AcpAuthCapabilities {
 }
 
 pub fn acp_auth_required_response(request_id: serde_json::Value) -> serde_json::Value {
-    serde_json::to_value(AcpErrorResponse::new(
+    crate::acp_error_response_with_data(
         request_id,
         AcpErrorCode::ServerError,
         "Authentication required",
         serde_json::json!({ "reason": "auth_required" }),
-    ))
-    .expect("serialize ACP auth_required response")
+    )
 }
 
 #[cfg(test)]

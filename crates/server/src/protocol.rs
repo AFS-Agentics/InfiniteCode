@@ -41,7 +41,7 @@ pub use devo_protocol::{
     SkillChangedParams, SkillChangedResult, SkillDependencies, SkillInterface, SkillListParams,
     SkillListResult, SkillRecord, SkillScope, SkillSetEnabledParams, SkillSetEnabledResult,
     SkillSource, SkillToolDependency, SpawnAgentParams, SpawnAgentResult, SuccessResponse,
-    WaitAgentParams, WaitAgentResult, acp_auth_required_response,
-    acp_notification_from_server_event, acp_session_info_from_metadata,
+    WaitAgentParams, WaitAgentResult, acp_auth_required_response, acp_error_response,
+    acp_notification_from_server_event, acp_session_info_from_metadata, acp_success_response,
     devo_extension_inner_method, input_items_from_acp_prompt,
 };

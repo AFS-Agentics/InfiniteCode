@@ -92,14 +92,13 @@ impl ServerRuntime {
             runtime
                 .send_raw_to_connection(
                     connection_id,
-                    serde_json::to_value(AcpSuccessResponse::new(
+                    acp_success_response(
                         request_id,
                         AcpPromptResult {
                             stop_reason,
                             meta: None,
                         },
-                    ))
-                    .expect("serialize ACP prompt response"),
+                    ),
                 )
                 .await;
         });

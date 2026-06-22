@@ -8,9 +8,9 @@ use crate::AcpAuthenticateParams;
 use crate::AcpAuthenticateResult;
 use crate::AcpEmptyAuthResult;
 use crate::AcpErrorCode;
-use crate::AcpErrorResponse;
 use crate::AcpLogoutResult;
-use crate::AcpSuccessResponse;
+use crate::acp_error_response;
+use crate::acp_success_response;
 
 impl ServerRuntime {
     pub(crate) fn acp_auth_config(&self) -> ServerAuthConfig {
@@ -80,7 +80,7 @@ impl ServerRuntime {
         let params: AcpAuthenticateParams = match serde_json::from_value(params) {
             Ok(params) => params,
             Err(error) => {
-                return acp_auth_error_response(
+                return acp_error_response(
                     request_id,
                     AcpErrorCode::InvalidParams,
                     format!("invalid authenticate params: {error}"),
@@ -89,7 +89,7 @@ impl ServerRuntime {
         };
         let config = self.acp_auth_config();
         if config.enabled && params.method_id != config.method_id {
-            return acp_auth_error_response(
+            return acp_error_response(
                 request_id,
                 AcpErrorCode::InvalidParams,
                 "authenticate methodId does not match an advertised authentication method",
@@ -97,7 +97,7 @@ impl ServerRuntime {
         }
 
         self.set_connection_authenticated(connection_id, true).await;
-        acp_auth_success_response(request_id, AcpAuthenticateResult::default())
+        acp_success_response(request_id, AcpAuthenticateResult::default())
     }
 
     pub(crate) async fn handle_acp_logout(
@@ -108,7 +108,7 @@ impl ServerRuntime {
     ) -> serde_json::Value {
         let request_id = id.unwrap_or(serde_json::Value::Null);
         if let Err(error) = serde_json::from_value::<AcpEmptyAuthResult>(params) {
-            return acp_auth_error_response(
+            return acp_error_response(
                 request_id,
                 AcpErrorCode::InvalidParams,
                 format!("invalid logout params: {error}"),
@@ -116,7 +116,7 @@ impl ServerRuntime {
         }
         let config = self.acp_auth_config();
         if !config.enabled || !config.logout {
-            return acp_auth_error_response(
+            return acp_error_response(
                 request_id,
                 AcpErrorCode::MethodNotFound,
                 "logout is not supported",
@@ -125,28 +125,6 @@ impl ServerRuntime {
 
         self.set_connection_authenticated(connection_id, false)
             .await;
-        acp_auth_success_response(request_id, AcpLogoutResult::default())
+        acp_success_response(request_id, AcpLogoutResult::default())
     }
-}
-
-fn acp_auth_success_response<T: serde::Serialize>(
-    request_id: serde_json::Value,
-    result: T,
-) -> serde_json::Value {
-    serde_json::to_value(AcpSuccessResponse::new(request_id, result))
-        .expect("serialize server auth success response")
-}
-
-fn acp_auth_error_response(
-    request_id: serde_json::Value,
-    code: AcpErrorCode,
-    message: impl Into<String>,
-) -> serde_json::Value {
-    serde_json::to_value(AcpErrorResponse::new(
-        request_id,
-        code,
-        message,
-        serde_json::Value::Null,
-    ))
-    .expect("serialize server auth error response")
 }

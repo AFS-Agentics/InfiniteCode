@@ -18,12 +18,10 @@ use crate::ACP_SESSION_UPDATE_METHOD;
 use crate::AcpClientNotification;
 use crate::AcpContentBlock;
 use crate::AcpErrorCode;
-use crate::AcpErrorResponse;
 use crate::AcpPromptResult;
 use crate::AcpSessionNotification;
 use crate::AcpSessionUpdate;
 use crate::AcpStopReason;
-use crate::AcpSuccessResponse;
 use crate::CollaborationMode;
 use crate::ErrorResponse;
 use crate::InputItem;
@@ -33,6 +31,8 @@ use crate::SuccessResponse;
 use crate::TurnExecutionMode;
 use crate::TurnStartParams;
 use crate::TurnStartResult;
+use crate::acp_error_response;
+use crate::acp_success_response;
 
 pub(super) enum AcpSlashCommandPromptResult {
     NotCommand,
@@ -402,14 +402,13 @@ impl ServerRuntime {
             runtime
                 .send_raw_to_connection(
                     connection_id,
-                    serde_json::to_value(AcpSuccessResponse::new(
+                    acp_success_response(
                         request_id,
                         AcpPromptResult {
                             stop_reason,
                             meta: None,
                         },
-                    ))
-                    .expect("serialize ACP prompt response"),
+                    ),
                 )
                 .await;
         });
@@ -495,28 +494,13 @@ fn input_items_from_research_prompt(
 }
 
 fn acp_prompt_success_response(request_id: serde_json::Value) -> serde_json::Value {
-    serde_json::to_value(AcpSuccessResponse::new(
+    acp_success_response(
         request_id,
         AcpPromptResult {
             stop_reason: AcpStopReason::EndTurn,
             meta: None,
         },
-    ))
-    .expect("serialize ACP prompt success response")
-}
-
-fn acp_error_response(
-    request_id: serde_json::Value,
-    code: AcpErrorCode,
-    message: impl Into<String>,
-) -> serde_json::Value {
-    serde_json::to_value(AcpErrorResponse::new(
-        request_id,
-        code,
-        message,
-        serde_json::Value::Null,
-    ))
-    .expect("serialize ACP error response")
+    )
 }
 
 fn legacy_error_to_acp(
