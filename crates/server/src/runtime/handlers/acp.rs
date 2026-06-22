@@ -375,6 +375,8 @@ impl ServerRuntime {
         );
         self.subscribe_connection_to_session(connection_id, legacy.result.session.session_id, None)
             .await;
+        self.send_acp_available_commands_update(connection_id, legacy.result.session.session_id)
+            .await;
         acp_success_response(
             request_id,
             AcpNewSessionResult {
@@ -521,6 +523,8 @@ impl ServerRuntime {
         );
         self.subscribe_connection_to_session(connection_id, params.session_id, None)
             .await;
+        self.send_acp_available_commands_update(connection_id, params.session_id)
+            .await;
         acp_success_response(
             request_id,
             AcpResumeSessionResult {
@@ -605,6 +609,21 @@ impl ServerRuntime {
         }
         self.subscribe_connection_to_session(connection_id, params.session_id, None)
             .await;
+        match self
+            .handle_acp_slash_command_prompt(
+                connection_id,
+                request_id.clone(),
+                params.session_id,
+                &params.prompt,
+            )
+            .await
+        {
+            super::acp_slash_commands::AcpSlashCommandPromptResult::NotCommand => {}
+            super::acp_slash_commands::AcpSlashCommandPromptResult::Response(response) => {
+                return Some(response);
+            }
+            super::acp_slash_commands::AcpSlashCommandPromptResult::Pending => return None,
+        }
         let session_id = params.session_id;
         let input = match input_items_from_acp_prompt(params.prompt) {
             Ok(input) => input,
@@ -876,7 +895,7 @@ impl ServerRuntime {
             .map(|turn| turn.turn_id)
     }
 
-    async fn wait_for_acp_prompt_stop_reason(
+    pub(super) async fn wait_for_acp_prompt_stop_reason(
         &self,
         session_id: SessionId,
         turn_id: TurnId,

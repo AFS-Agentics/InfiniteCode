@@ -139,9 +139,11 @@ pub(crate) fn assert_no_history_replay_before_response(messages: &[Value]) -> Re
     let (_, before_response) = messages
         .split_last()
         .context("session/resume produced at least one message")?;
-    let replayed_update = before_response
-        .iter()
-        .find(|message| message["method"] == serde_json::json!("session/update"));
+    let replayed_update = before_response.iter().find(|message| {
+        message["method"] == serde_json::json!("session/update")
+            && message["params"]["update"]["sessionUpdate"].as_str()
+                != Some("available_commands_update")
+    });
     anyhow::ensure!(
         replayed_update.is_none(),
         "session/resume replayed history before responding: {messages:?}"

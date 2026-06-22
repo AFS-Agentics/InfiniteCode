@@ -14,6 +14,8 @@ use devo_core::ProviderVendorCatalog;
 use devo_core::SkillsConfig;
 use devo_core::tools::ToolRegistry;
 use devo_protocol::AcpAuthMethod;
+use devo_protocol::AcpAvailableCommand;
+use devo_protocol::AcpContentBlock;
 use devo_protocol::AcpLoadSessionResult;
 use devo_protocol::AcpLogoutCapabilities;
 use devo_protocol::AcpNewSessionResult;
@@ -363,6 +365,116 @@ async fn acp_session_prompt_streams_session_updates_without_devo_subscriptions()
             .any(|update| matches!(update, AcpSessionUpdate::AgentMessageChunk { .. })),
         "expected ACP prompt turn to emit a native agent_message_chunk before the response; before={updates_before_response:?} after={updates_after_response:?}"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn acp_sessions_advertise_server_backed_slash_commands() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, mut notifications_rx) = initialize_acp_connection(&runtime).await?;
+    let cwd = data_root.path().join("repo");
+    std::fs::create_dir_all(&cwd)?;
+
+    let new_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 70,
+                "method": "session/new",
+                "params": {
+                    "cwd": path_value(&cwd),
+                    "mcpServers": []
+                }
+            }),
+        )
+        .await
+        .context("session/new response")?;
+    let new_response: AcpSuccessResponse<AcpNewSessionResult> =
+        serde_json::from_value(new_response)?;
+    let session_id = new_response.result.session_id;
+    let commands = wait_for_available_commands_update(&mut notifications_rx, session_id).await?;
+    assert_acp_slash_command_advertisement(&commands);
+
+    let (resume_connection_id, mut resume_notifications_rx) =
+        initialize_acp_connection(&runtime).await?;
+    let resume_response = runtime
+        .handle_incoming(
+            resume_connection_id,
+            serde_json::json!({
+                "id": 71,
+                "method": "session/resume",
+                "params": {
+                    "sessionId": session_id,
+                    "cwd": path_value(&cwd),
+                    "mcpServers": []
+                }
+            }),
+        )
+        .await
+        .context("session/resume response")?;
+    let _: AcpSuccessResponse<AcpResumeSessionResult> = serde_json::from_value(resume_response)?;
+    let commands =
+        wait_for_available_commands_update(&mut resume_notifications_rx, session_id).await?;
+    assert_acp_slash_command_advertisement(&commands);
+    Ok(())
+}
+
+#[tokio::test]
+async fn acp_session_prompt_runs_goal_slash_command_and_rejects_tui_only_command() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, mut notifications_rx) = initialize_acp_connection(&runtime).await?;
+    let cwd = data_root.path().join("repo");
+    std::fs::create_dir_all(&cwd)?;
+    let session_id = create_acp_session(&runtime, connection_id, &cwd, 72).await?;
+
+    assert_acp_error_message(
+        &runtime,
+        connection_id,
+        serde_json::json!({
+            "id": 74,
+            "method": "session/prompt",
+            "params": {
+                "sessionId": session_id,
+                "prompt": [
+                    {
+                        "type": "text",
+                        "text": "/theme"
+                    }
+                ]
+            }
+        }),
+        "/theme is a TUI command and is not available over ACP",
+    )
+    .await?;
+
+    let goal_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 73,
+                "method": "session/prompt",
+                "params": {
+                    "sessionId": session_id,
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": "/goal improve ACP slash command support"
+                        }
+                    ]
+                }
+            }),
+        )
+        .await
+        .context("/goal prompt response")?;
+    let goal_response: AcpSuccessResponse<AcpPromptResult> = serde_json::from_value(goal_response)?;
+    assert_eq!(goal_response.result.stop_reason, AcpStopReason::EndTurn);
+    assert_eq!(
+        wait_for_agent_text_update(&mut notifications_rx, session_id).await?,
+        "Goal set: improve ACP slash command support"
+    );
+
     Ok(())
 }
 
@@ -941,6 +1053,78 @@ where
     .with_context(|| format!("timed out waiting for response {request_id}"))?
 }
 
+async fn wait_for_available_commands_update(
+    notifications_rx: &mut mpsc::Receiver<serde_json::Value>,
+    session_id: SessionId,
+) -> Result<Vec<AcpAvailableCommand>> {
+    timeout(Duration::from_secs(5), async {
+        while let Some(value) = notifications_rx.recv().await {
+            if value.get("method") != Some(&serde_json::json!("session/update")) {
+                continue;
+            }
+            let notification: AcpSessionNotification =
+                serde_json::from_value(value["params"].clone())?;
+            if notification.session_id != session_id {
+                continue;
+            }
+            if let AcpSessionUpdate::AvailableCommandsUpdate {
+                available_commands, ..
+            } = notification.update
+            {
+                return Ok(available_commands);
+            }
+        }
+        anyhow::bail!("notification channel closed before available commands update")
+    })
+    .await
+    .context("timed out waiting for available commands update")?
+}
+
+async fn wait_for_agent_text_update(
+    notifications_rx: &mut mpsc::Receiver<serde_json::Value>,
+    session_id: SessionId,
+) -> Result<String> {
+    timeout(Duration::from_secs(5), async {
+        while let Some(value) = notifications_rx.recv().await {
+            if value.get("method") != Some(&serde_json::json!("session/update")) {
+                continue;
+            }
+            let notification: AcpSessionNotification =
+                serde_json::from_value(value["params"].clone())?;
+            if notification.session_id != session_id {
+                continue;
+            }
+            if let AcpSessionUpdate::AgentMessageChunk {
+                content: AcpContentBlock::Text { text, .. },
+                ..
+            } = notification.update
+            {
+                return Ok(text);
+            }
+        }
+        anyhow::bail!("notification channel closed before agent text update")
+    })
+    .await
+    .context("timed out waiting for agent text update")?
+}
+
+fn assert_acp_slash_command_advertisement(commands: &[AcpAvailableCommand]) {
+    let names = commands
+        .iter()
+        .map(|command| command.name.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(names, vec!["compact", "goal", "research"]);
+    assert_eq!(commands[0].input, None);
+    assert_eq!(
+        commands[1].input.as_ref().map(|input| input.hint.as_str()),
+        Some("objective, pause, resume, or clear")
+    );
+    assert_eq!(
+        commands[2].input.as_ref().map(|input| input.hint.as_str()),
+        Some("research question")
+    );
+}
+
 async fn wait_for_replayed_history(
     notifications_rx: &mut mpsc::Receiver<serde_json::Value>,
 ) -> Result<Vec<AcpSessionUpdate>> {
@@ -978,6 +1162,14 @@ async fn assert_no_replayed_history(
     let result = timeout(Duration::from_millis(100), async {
         while let Some(value) = notifications_rx.recv().await {
             if value.get("method") == Some(&serde_json::json!("session/update")) {
+                let notification: AcpSessionNotification =
+                    serde_json::from_value(value["params"].clone())?;
+                if matches!(
+                    notification.update,
+                    AcpSessionUpdate::AvailableCommandsUpdate { .. }
+                ) {
+                    continue;
+                }
                 anyhow::bail!("unexpected session/update notification: {value}");
             }
         }
