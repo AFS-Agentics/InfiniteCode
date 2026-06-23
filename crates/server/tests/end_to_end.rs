@@ -549,7 +549,7 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
                     .iter()
                     .any(|value| value.get("id") == Some(&serde_json::json!(3)))
         },
-        4,
+        8,
     )
     .await
     .context("read turn/start websocket messages")?;
