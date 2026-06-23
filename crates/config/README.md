@@ -426,9 +426,6 @@ configuration for all stages.
 
 Supported keys:
 
-- `max_concurrent_tasks` (default `3`): reserved concurrency budget for
-  researcher tasks.
-- `max_tasks` (default `4`): maximum supervisor-planned research tasks.
 - `max_researcher_iterations` (default `5`): search/fetch iteration guidance
   passed to researcher prompts.
 - `fetch_summary_threshold_chars` (default `24000`): local `webfetch` text
