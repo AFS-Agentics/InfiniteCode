@@ -102,36 +102,37 @@ enum PostResponseAction {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 enum AcpRoute {
-    SessionCancel,
-    SessionClose,
-    SessionDelete,
-    SessionList,
-    SessionLoad,
-    SessionNew,
-    SessionPrompt,
-    SessionResume,
-    SessionSetConfigOption,
-    SessionSetMode,
+    CancelSession,
+    CloseSession,
+    DeleteSession,
+    ListSession,
+    LoadSession,
+    NewSession,
+    PromptSession,
+    ResumeSession,
+    SetConfigOptionSession,
+    SetModeSession,
 }
 
 fn acp_route_registry() -> &'static BTreeMap<&'static str, AcpRoute> {
     static ACP_ROUTES: OnceLock<BTreeMap<&'static str, AcpRoute>> = OnceLock::new();
     ACP_ROUTES.get_or_init(|| {
         BTreeMap::from([
-            (ACP_SESSION_CANCEL_METHOD, AcpRoute::SessionCancel),
-            (ACP_SESSION_CLOSE_METHOD, AcpRoute::SessionClose),
-            (ACP_SESSION_DELETE_METHOD, AcpRoute::SessionDelete),
-            (ACP_SESSION_LIST_METHOD, AcpRoute::SessionList),
-            (ACP_SESSION_LOAD_METHOD, AcpRoute::SessionLoad),
-            (ACP_SESSION_NEW_METHOD, AcpRoute::SessionNew),
-            (ACP_SESSION_PROMPT_METHOD, AcpRoute::SessionPrompt),
-            (ACP_SESSION_RESUME_METHOD, AcpRoute::SessionResume),
+            (ACP_SESSION_CANCEL_METHOD, AcpRoute::CancelSession),
+            (ACP_SESSION_CLOSE_METHOD, AcpRoute::CloseSession),
+            (ACP_SESSION_DELETE_METHOD, AcpRoute::DeleteSession),
+            (ACP_SESSION_LIST_METHOD, AcpRoute::ListSession),
+            (ACP_SESSION_LOAD_METHOD, AcpRoute::LoadSession),
+            (ACP_SESSION_NEW_METHOD, AcpRoute::NewSession),
+            (ACP_SESSION_PROMPT_METHOD, AcpRoute::PromptSession),
+            (ACP_SESSION_RESUME_METHOD, AcpRoute::ResumeSession),
             (
                 ACP_SESSION_SET_CONFIG_OPTION_METHOD,
-                AcpRoute::SessionSetConfigOption,
+                AcpRoute::SetConfigOptionSession,
             ),
-            (ACP_SESSION_SET_MODE_METHOD, AcpRoute::SessionSetMode),
+            (ACP_SESSION_SET_MODE_METHOD, AcpRoute::SetModeSession),
         ])
     })
 }
@@ -209,10 +210,11 @@ impl ServerRuntime {
         connection_id: u64,
         message: serde_json::Value,
     ) -> Option<serde_json::Value> {
-        let (response, _) = self
+        let (response, post_response_actions) = self
             .handle_incoming_with_actions(connection_id, message)
             .await?
             .into_parts();
+        self.run_post_response_actions(post_response_actions).await;
         Some(response)
     }
 
@@ -468,20 +470,20 @@ impl ServerRuntime {
         params: serde_json::Value,
     ) -> Option<IncomingResponse> {
         match route {
-            AcpRoute::SessionCancel => {
+            AcpRoute::CancelSession => {
                 self.handle_acp_session_cancel(params).await;
                 None
             }
-            AcpRoute::SessionClose => Some(IncomingResponse::new(
+            AcpRoute::CloseSession => Some(IncomingResponse::new(
                 self.handle_acp_session_close(request_id?, params).await,
             )),
-            AcpRoute::SessionDelete => Some(IncomingResponse::new(
+            AcpRoute::DeleteSession => Some(IncomingResponse::new(
                 self.handle_acp_session_delete(request_id?, params).await,
             )),
-            AcpRoute::SessionList => Some(IncomingResponse::new(
+            AcpRoute::ListSession => Some(IncomingResponse::new(
                 self.handle_acp_session_list(request_id?, params).await,
             )),
-            AcpRoute::SessionLoad => {
+            AcpRoute::LoadSession => {
                 let session_id =
                     serde_json::from_value::<crate::AcpLoadSessionParams>(params.clone())
                         .ok()
@@ -495,7 +497,7 @@ impl ServerRuntime {
                         .with_acp_session_state_snapshot_after_success(connection_id, session_id),
                 )
             }
-            AcpRoute::SessionNew => {
+            AcpRoute::NewSession => {
                 let response = IncomingResponse::new(
                     self.handle_acp_session_new(connection_id, request_id?, params)
                         .await,
@@ -510,11 +512,11 @@ impl ServerRuntime {
                         .with_acp_session_state_snapshot_after_success(connection_id, session_id),
                 )
             }
-            AcpRoute::SessionPrompt => self
+            AcpRoute::PromptSession => self
                 .handle_acp_session_prompt(connection_id, request_id?, params)
                 .await
                 .map(IncomingResponse::new),
-            AcpRoute::SessionResume => {
+            AcpRoute::ResumeSession => {
                 let session_id =
                     serde_json::from_value::<crate::AcpResumeSessionParams>(params.clone())
                         .ok()
@@ -528,11 +530,11 @@ impl ServerRuntime {
                         .with_acp_session_state_snapshot_after_success(connection_id, session_id),
                 )
             }
-            AcpRoute::SessionSetConfigOption => Some(IncomingResponse::new(
+            AcpRoute::SetConfigOptionSession => Some(IncomingResponse::new(
                 self.handle_acp_session_set_config_option(request_id?, params)
                     .await,
             )),
-            AcpRoute::SessionSetMode => Some(IncomingResponse::new(
+            AcpRoute::SetModeSession => Some(IncomingResponse::new(
                 self.handle_acp_session_set_mode(request_id?, params).await,
             )),
         }
