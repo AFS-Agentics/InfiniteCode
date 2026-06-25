@@ -6,6 +6,8 @@ import { defineConfig, externalizeDepsPlugin } from "electron-vite"
 import type { Plugin } from "vite"
 import { protocolTypesPlugin } from "./scripts/protocol-types"
 
+const sdkClientAlias = path.resolve(__dirname, "packages/devo-ai-sdk/src/v2/client.ts")
+
 /**
  * Copies the drizzle migrations directory into the main process output.
  *
@@ -28,11 +30,17 @@ function copyDrizzleMigrations(): Plugin {
 export default defineConfig({
 	main: {
 		plugins: [
+			protocolTypesPlugin({ desktopDir: __dirname }),
 			externalizeDepsPlugin({
 				exclude: ["@devo-ai/plugin", "@devo-ai/sdk", "@devo/configconv", "drizzle-orm"],
 			}),
 			copyDrizzleMigrations(),
 		],
+		resolve: {
+			alias: {
+				"@devo-ai/sdk/v2/client": sdkClientAlias,
+			},
+		},
 		build: {
 			rollupOptions: {
 				input: { index: path.resolve(__dirname, "src/main/index.ts") },
@@ -42,6 +50,11 @@ export default defineConfig({
 	preload: {
 		// No externalizeDepsPlugin — sandboxed preloads must bundle all deps.
 		// Output CJS because Electron sandboxed preloads cannot use ESM.
+		resolve: {
+			alias: {
+				"@devo-ai/sdk/v2/client": sdkClientAlias,
+			},
+		},
 		build: {
 			rollupOptions: {
 				input: { index: path.resolve(__dirname, "src/preload/index.ts") },
@@ -58,10 +71,7 @@ export default defineConfig({
 			alias: {
 				"@": path.resolve(__dirname, "src/renderer"),
 				"@devo/ui": path.resolve(__dirname, "packages/ui/src"),
-				"@devo-ai/sdk/v2/client": path.resolve(
-					__dirname,
-					"packages/devo-ai-sdk/src/v2/client.ts",
-				),
+				"@devo-ai/sdk/v2/client": sdkClientAlias,
 			},
 		},
 		worker: {
