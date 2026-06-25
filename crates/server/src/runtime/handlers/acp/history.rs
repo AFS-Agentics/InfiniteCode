@@ -120,7 +120,6 @@ fn history_tool_call_id(index: usize, item: &SessionHistoryItem) -> String {
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
-    use serde_json::json;
 
     fn history_item(kind: SessionHistoryItemKind, title: &str, body: &str) -> SessionHistoryItem {
         SessionHistoryItem::new(None, kind, title.to_string(), body.to_string())
@@ -139,13 +138,7 @@ mod tests {
             panic!("expected user message chunk");
         };
         assert_eq!(message_id, Some("history-3".to_string()));
-        assert_eq!(
-            meta,
-            Some(AcpMeta::from([(
-                DEVO_HISTORY_INDEX_META.to_string(),
-                json!(3),
-            )]))
-        );
+        assert_eq!(meta, Some(history_meta(3, None)));
     }
 
     #[test]
@@ -163,12 +156,6 @@ mod tests {
             panic!("expected tool call");
         };
         assert_eq!(tool_call_id, "read-real-a");
-        assert_eq!(
-            meta,
-            Some(AcpMeta::from([
-                (DEVO_HISTORY_INDEX_META.to_string(), json!(4)),
-                (DEVO_PARENT_MESSAGE_ID_META.to_string(), json!("history-0"),),
-            ]))
-        );
+        assert_eq!(meta, Some(history_meta(4, Some("history-0"))));
     }
 }

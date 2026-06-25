@@ -162,6 +162,7 @@ function parseTimestampMs(value: unknown): number | undefined {
 type LoadedSessionLimit = number | null
 const HISTORY_MESSAGE_ID_RE = /^(?:tool-)?history-(\d+)$/
 const DEVO_TURN_ID_META = "devo/turnId"
+const DEVO_ACTIVITY_AT_META = "devo/activityAt"
 const DEVO_HISTORY_INDEX_META = "devo/historyIndex"
 const DEVO_PARENT_MESSAGE_ID_META = "devo/parentMessageId"
 
@@ -618,9 +619,9 @@ class AcpClient {
 		const parsedUpdated = parseTimestampMs(meta?.updated_at ?? info.updatedAt)
 		const updated = parsedUpdated ?? existing?.time.updated ?? created
 		const parsedLastActivity = parseTimestampMs(
-			meta?.last_activity_at ?? info.updatedAt ?? meta?.updated_at ?? meta?.created_at,
+			meta?.last_activity_at ?? (meta ? undefined : info.updatedAt),
 		)
-		const lastActivity = parsedLastActivity ?? existing?.time.lastActivity ?? updated ?? created
+		const lastActivity = parsedLastActivity ?? existing?.time.lastActivity ?? created
 		const session: Session = {
 			id: info.sessionId,
 			title: info.title ?? existing?.title ?? "New session",
@@ -878,31 +879,14 @@ class AcpClient {
 		if (kind === "session_info_update" || kind === "sessionInfoUpdate") {
 			if (typeof update.title === "string") session.title = update.title
 			const meta = sessionMeta(update._meta)
-			const metadataUpdated = parseTimestampMs(meta?.updated_at)
+			const metadataUpdated = parseTimestampMs(meta?.updated_at ?? update.updatedAt)
 			if (metadataUpdated !== undefined) session.time.updated = metadataUpdated
 
-			let activity = parseTimestampMs(meta?.last_activity_at)
-			if (activity === undefined && meta === undefined) activity = parseTimestampMs(update.updatedAt)
-			if (activity === undefined) {
-				const original = notification._meta?.["devo/originalEvent"]
-				const originalEvent = objectRecord(original) ?? {}
-				const turnValue = objectRecord(originalEvent.turn) ?? {}
-				const completedAt =
-					typeof turnValue.completed_at === "string"
-						? turnValue.completed_at
-						: typeof turnValue.completedAt === "string"
-							? turnValue.completedAt
-							: undefined
-				const startedAt =
-					typeof turnValue.started_at === "string"
-						? turnValue.started_at
-						: typeof turnValue.startedAt === "string"
-							? turnValue.startedAt
-							: undefined
-				activity = parseTimestampMs(completedAt ?? startedAt)
-			}
+			const activity = parseTimestampMs(meta?.last_activity_at)
 			if (activity !== undefined) session.time.lastActivity = activity
 		}
+		const activityAt = parseTimestampMs(updateMeta(update)?.[DEVO_ACTIVITY_AT_META])
+		if (activityAt !== undefined) session.time.lastActivity = activityAt
 		this.emit(directory, { type: "session.updated", properties: { info: session, session } })
 		this.handleOriginalEvent(sessionId, directory, notification)
 
