@@ -71,8 +71,8 @@ function deriveAgentStatus(
 	}
 }
 
-export function formatRelativeTime(timestampMs: number): string {
-	const seconds = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000))
+export function formatRelativeTime(timestampMs: number, nowMs = Date.now()): string {
+	const seconds = Math.max(0, Math.floor((nowMs - timestampMs) / 1000))
 	if (seconds < 60) return "now"
 	const minutes = Math.floor(seconds / 60)
 	if (minutes < 60) return `${minutes}m`
