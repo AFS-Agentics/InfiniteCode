@@ -79,10 +79,20 @@ mock.module("./notification-watcher", () => ({
 
 class FakeTray {
 	readonly events: string[] = []
+	private readonly listeners = new Map<string, Array<() => void>>()
 
-	on(event: string, _listener: () => void): this {
+	on(event: string, listener: () => void): this {
 		this.events.push(event)
+		const listeners = this.listeners.get(event) ?? []
+		listeners.push(listener)
+		this.listeners.set(event, listeners)
 		return this
+	}
+
+	emit(event: string): void {
+		for (const listener of this.listeners.get(event) ?? []) {
+			listener()
+		}
 	}
 }
 
@@ -99,18 +109,43 @@ afterEach(async () => {
 })
 
 describe("installTrayIconInteractions", () => {
-	test("does not focus the desktop window when the tray icon itself is clicked", async () => {
+	test("opens the desktop window when the Windows tray icon is clicked", async () => {
 		const { installTrayIconInteractions } = await import("./tray")
 		const tray = new FakeTray()
 		let showWindowCalls = 0
 
-		installTrayIconInteractions(tray, {
-			showWindow: () => {
-				showWindowCalls += 1
+		installTrayIconInteractions(
+			tray,
+			{
+				showWindow: () => {
+					showWindowCalls += 1
+				},
 			},
-		})
+			"win32",
+		)
 
-		expect(tray.events).not.toContain("click")
+		expect(tray.events).toEqual(["click"])
+		tray.emit("click")
+		expect(showWindowCalls).toBe(1)
+	})
+
+	test("does not bind tray icon clicks off Windows", async () => {
+		const { installTrayIconInteractions } = await import("./tray")
+		const tray = new FakeTray()
+		let showWindowCalls = 0
+
+		installTrayIconInteractions(
+			tray,
+			{
+				showWindow: () => {
+					showWindowCalls += 1
+				},
+			},
+			"darwin",
+		)
+
+		expect(tray.events).toEqual([])
+		tray.emit("click")
 		expect(showWindowCalls).toBe(0)
 	})
 })

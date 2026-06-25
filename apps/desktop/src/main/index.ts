@@ -2,7 +2,7 @@ import { execSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { app, BrowserWindow, dialog, Menu, nativeImage, session, shell } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, session, shell } from "electron"
 import { initAutomations, shutdownAutomations } from "./automation"
 import { initCredentialStore } from "./credential-store"
 import { getOpaqueWindowsPref, registerIpcHandlers } from "./ipc-handlers"
@@ -16,7 +16,7 @@ import {
 	createWorkingSessionsQuitDialogOptions,
 	shouldPromptBeforeQuit,
 } from "./quit-guard"
-import { initSettingsStore } from "./settings-store"
+import { getSettings, initSettingsStore } from "./settings-store"
 import { startEnvResolution } from "./shell-env"
 import { desktopTerminalManager } from "./terminal-manager"
 import { isTerminalToggleInput } from "./terminal-shortcut"
@@ -25,6 +25,7 @@ import { initAutoUpdater, stopAutoUpdater } from "./updater"
 
 const log = createLogger("app")
 const appName = "Devo"
+let isQuitting = false
 
 app.setName(appName)
 process.title = appName
@@ -43,13 +44,54 @@ startEnvResolution()
 // Minimal menu — required on macOS for Cmd+C/V/X/A to work in web contents.
 // A null menu kills native Edit shortcuts on macOS. This minimal template is
 // negligible overhead compared to the full default menu.
+const appMenuItems = {
+	edit: { role: "editMenu" as const },
+	view: { role: "viewMenu" as const },
+	window: { role: "windowMenu" as const },
+}
+
+type AppMenuId = keyof typeof appMenuItems
+
+function isAppMenuId(value: unknown): value is AppMenuId {
+	return value === "edit" || value === "view" || value === "window"
+}
+
 const menuTemplate: Electron.MenuItemConstructorOptions[] = [
 	...(process.platform === "darwin" ? [{ role: "appMenu" as const }] : []),
-	{ role: "editMenu" as const },
-	{ role: "viewMenu" as const },
-	{ role: "windowMenu" as const },
+	appMenuItems.edit,
+	appMenuItems.view,
+	appMenuItems.window,
 ]
 Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate))
+
+ipcMain.handle(
+	"app-menu:popup",
+	(event, request: { id?: unknown; x?: unknown; y?: unknown } | undefined) => {
+		if (!isAppMenuId(request?.id)) {
+			return { success: false }
+		}
+
+		const win = BrowserWindow.fromWebContents(event.sender)
+		if (!win) {
+			return { success: false }
+		}
+
+		const menuItem = Menu.buildFromTemplate([appMenuItems[request.id]]).items[0]
+		const submenu = menuItem?.submenu
+		if (!submenu) {
+			return { success: false }
+		}
+
+		const popupOptions: Electron.PopupOptions = { window: win }
+		if (typeof request.x === "number" && typeof request.y === "number") {
+			popupOptions.x = Math.round(request.x)
+			popupOptions.y = Math.round(request.y)
+		}
+
+		submenu.popup(popupOptions)
+		return { success: true }
+	},
+)
 
 // Collect Chromium feature flags — must be merged into a single --disable-features
 // switch because Electron's appendSwitch overwrites (not appends) duplicate keys.
@@ -182,9 +224,13 @@ async function createWindow(): Promise<BrowserWindow> {
 
 	const isMac = process.platform === "darwin"
 
-	// Resolve window chrome tier: liquid glass > vibrancy > opaque
+	// Resolve window chrome tier: liquid glass > vibrancy > Windows transparency > opaque
 	const isOpaque = getOpaqueWindowsPref()
-	const chrome = await resolveWindowChrome(isOpaque)
+	const colorScheme = getSettings().appearance.colorScheme
+	const chrome = await resolveWindowChrome({
+		isOpaque,
+		isDarkMode: colorScheme === "dark" || (colorScheme === "system" && nativeTheme.shouldUseDarkColors),
+	})
 
 	// Resolve the window icon for Linux/Windows. macOS uses the .app bundle icon.
 	// Linux: use 256x256 icon — GTK's GdkPixbuf can choke on the full 1024x1024
@@ -204,10 +250,10 @@ async function createWindow(): Promise<BrowserWindow> {
 		title,
 		width: 1200,
 		height: 800,
-		// Transparent background for macOS glass/vibrancy tiers.
-		// On Linux/Windows (always opaque tier) use a solid background to prevent
-		// the window from being see-through while the renderer loads.
-		backgroundColor: isMac ? "#00000000" : "#000000",
+		autoHideMenuBar: process.platform === "win32",
+		// Transparent background for macOS glass/vibrancy tiers. Windows acrylic
+		// keeps a non-transparent BrowserWindow so native resize/maximize work.
+		backgroundColor: chrome.usesTransparentBackground ? "#00000000" : "#000000",
 		// Don't show the window until the renderer has painted its first frame.
 		// Prevents a flash of transparent/empty content, especially on Wayland.
 		show: false,
@@ -223,6 +269,13 @@ async function createWindow(): Promise<BrowserWindow> {
 			spellcheck: false,
 			v8CacheOptions: "bypassHeatCheckAndEagerCompile",
 		},
+	})
+
+	win.on("close", (event) => {
+		if (process.platform !== "win32" || isQuitting) return
+
+		event.preventDefault()
+		win.hide()
 	})
 
 	// Show the window once the renderer has painted — avoids a flash of
@@ -296,6 +349,7 @@ if (!gotLock) {
 		const win = BrowserWindow.getAllWindows()[0]
 		if (win) {
 			if (win.isMinimized()) win.restore()
+			win.show()
 			win.focus()
 		}
 	})
@@ -334,9 +388,9 @@ if (!gotLock) {
 		})
 	})
 
-	// On macOS, closing all windows keeps the app alive (dock/tray). The server
-	// and background services (automations) continue running so agents
-	// can finish their work. On other platforms, closing all windows quits.
+	// On macOS, closing all windows keeps the app alive (dock/tray). On Windows,
+	// the main window close button is intercepted above and hides to tray. If a
+	// window is actually closed on other platforms, keep the existing quit behavior.
 	app.on("window-all-closed", () => {
 		if (process.platform !== "darwin") app.quit()
 	})
@@ -345,12 +399,15 @@ if (!gotLock) {
 	// or system-initiated quit (macOS logout SIGTERM). This is the single
 	// source of truth for teardown -- stopServer() etc. are idempotent.
 	app.on("before-quit", (event) => {
+		isQuitting = true
+
 		const sessions = getSessionStates()
 		if (shouldPromptBeforeQuit({ sessions, quitConfirmed: quitConfirmedWithWorkingSessions })) {
 			const response = dialog.showMessageBoxSync(
 				createWorkingSessionsQuitDialogOptions(countWorkingRootSessions(sessions)),
 			)
 			if (response !== CONFIRM_QUIT_BUTTON_INDEX) {
+				isQuitting = false
 				event.preventDefault()
 				return
 			}

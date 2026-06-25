@@ -106,11 +106,208 @@ describe("DesktopTerminalManager", () => {
 		expect(received).toEqual([{ id: "terminal-1", data: "hello\r\n" }]);
 	});
 
+	test("uses the Windows Terminal default PowerShell Core profile", async () => {
+		const createOptions: TerminalCreateProcessOptions[] = [];
+		const process = new FakeTerminalProcess();
+		const settingsPath =
+			"C:\\Users\\tester\\AppData\\Local\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json";
+		const manager = new DesktopTerminalManager({
+			createProcess: (options) => {
+				createOptions.push(options);
+				return process;
+			},
+			defaultCwd: "C:\\Users\\tester",
+			env: {
+				LOCALAPPDATA: "C:\\Users\\tester\\AppData\\Local",
+				PATH: "C:\\Program Files\\PowerShell\\7",
+				PATHEXT: ".EXE",
+			},
+			platform: "win32",
+			idFactory: () => "terminal-pwsh",
+			exists: (path) => {
+				return (
+					path === settingsPath ||
+					path === "C:\\Program Files\\PowerShell\\7\\pwsh.exe"
+				);
+			},
+			readFile: () =>
+				JSON.stringify({
+					defaultProfile: "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
+					profiles: {
+						list: [
+							{
+								guid: "{574e775e-4f2a-5b96-ac1e-a2962a402336}",
+								name: "PowerShell",
+								source: "Windows.Terminal.PowershellCore",
+							},
+						],
+					},
+				}),
+		});
+
+		const session = await manager.create({
+			cwd: "C:\\repo\\devo",
+			cols: 120,
+			rows: 40,
+		});
+
+		expect(session).toEqual({
+			id: "terminal-pwsh",
+			cwd: "C:\\repo\\devo",
+			shell: "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+			cols: 120,
+			rows: 40,
+		});
+		expect(createOptions).toEqual([
+			{
+				shell: "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+				args: [],
+				cwd: "C:\\repo\\devo",
+				env: {
+					COLORTERM: "truecolor",
+					DISABLE_AUTO_UPDATE: "true",
+					LOCALAPPDATA: "C:\\Users\\tester\\AppData\\Local",
+					PATH: "C:\\Program Files\\PowerShell\\7",
+					PATHEXT: ".EXE",
+					TERM: "xterm-256color",
+				},
+				cols: 120,
+				rows: 40,
+			},
+		]);
+	});
+
+	test("parses Windows Terminal commandline profiles with env vars and args", async () => {
+		const createOptions: TerminalCreateProcessOptions[] = [];
+		const process = new FakeTerminalProcess();
+		const settingsPath =
+			"C:\\Users\\tester\\AppData\\Local\\Packages\\Microsoft.WindowsTerminal_8wekyb3d8bbwe\\LocalState\\settings.json";
+		const manager = new DesktopTerminalManager({
+			createProcess: (options) => {
+				createOptions.push(options);
+				return process;
+			},
+			defaultCwd: "C:\\Users\\tester",
+			env: {
+				LOCALAPPDATA: "C:\\Users\\tester\\AppData\\Local",
+				SystemRoot: "C:\\Windows",
+			},
+			platform: "win32",
+			idFactory: () => "terminal-windows-powershell",
+			exists: (path) => path === settingsPath,
+			readFile: () =>
+				JSON.stringify({
+					defaultProfile: "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
+					profiles: {
+						list: [
+							{
+								commandline:
+									'"%SystemRoot%\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -NoLogo',
+								guid: "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}",
+								name: "Windows PowerShell",
+							},
+						],
+					},
+				}),
+		});
+
+		await manager.create({ cwd: "C:\\repo\\devo" });
+
+		expect(createOptions).toEqual([
+			{
+				shell:
+					"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+				args: ["-NoLogo"],
+				cwd: "C:\\repo\\devo",
+				env: {
+					COLORTERM: "truecolor",
+					DISABLE_AUTO_UPDATE: "true",
+					LOCALAPPDATA: "C:\\Users\\tester\\AppData\\Local",
+					SystemRoot: "C:\\Windows",
+					TERM: "xterm-256color",
+				},
+				cols: 80,
+				rows: 24,
+			},
+		]);
+	});
+
+	test("falls back through PATH shells before ComSpec on Windows", async () => {
+		const createOptions: TerminalCreateProcessOptions[] = [];
+		const firstProcess = new FakeTerminalProcess();
+		const secondProcess = new FakeTerminalProcess();
+		const processQueue = [firstProcess, secondProcess];
+		const manager = new DesktopTerminalManager({
+			createProcess: (options) => {
+				createOptions.push(options);
+				const process = processQueue.shift();
+				if (!process) throw new Error("expected a queued terminal process");
+				return process;
+			},
+			defaultCwd: "C:\\Users\\tester",
+			env: {
+				ComSpec: "C:\\Windows\\System32\\cmd.exe",
+				PATH: "C:\\Program Files\\PowerShell\\7;C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
+				PATHEXT: ".EXE",
+			},
+			platform: "win32",
+			idFactory: (() => {
+				let next = 0;
+				return () => `terminal-fallback-${++next}`;
+			})(),
+			exists: (path) => {
+				return path === "C:\\Program Files\\PowerShell\\7\\pwsh.exe";
+			},
+			readFile: () => {
+				throw new Error("Windows Terminal settings should not be read");
+			},
+		});
+
+		await manager.create({});
+		manager.closeAll();
+
+		const powershellManager = new DesktopTerminalManager({
+			createProcess: (options) => {
+				createOptions.push(options);
+				return new FakeTerminalProcess();
+			},
+			defaultCwd: "C:\\Users\\tester",
+			env: {
+				ComSpec: "C:\\Windows\\System32\\cmd.exe",
+				PATH: "C:\\Program Files\\PowerShell\\7;C:\\Windows\\System32\\WindowsPowerShell\\v1.0",
+				PATHEXT: ".EXE",
+			},
+			platform: "win32",
+			idFactory: () => "terminal-fallback-powershell",
+			exists: (path) => {
+				return (
+					path ===
+					"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+				);
+			},
+			readFile: () => {
+				throw new Error("Windows Terminal settings should not be read");
+			},
+		});
+
+		await powershellManager.create({});
+
+		expect(createOptions.map((options) => options.shell)).toEqual([
+			"C:\\Program Files\\PowerShell\\7\\pwsh.exe",
+			"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+		]);
+		expect(createOptions.map((options) => options.args)).toEqual([[], []]);
+	});
+
 	test("writes, resizes, and removes sessions when they close", async () => {
+		const createOptions: TerminalCreateProcessOptions[] = [];
 		const process = new FakeTerminalProcess();
 		const exited: { id: string; exitCode: number; signal?: number }[] = [];
 		const manager = new DesktopTerminalManager({
-			createProcess: () => process,
+			createProcess: (options) => {
+				createOptions.push(options);
+				return process;
+			},
 			defaultCwd: "/Users/tester",
 			env: { ComSpec: "C:\\Windows\\System32\\cmd.exe" },
 			platform: "win32",
@@ -124,6 +321,9 @@ describe("DesktopTerminalManager", () => {
 
 		expect(process.writes).toEqual(["pwd\r"]);
 		expect(process.resizes).toEqual([{ cols: 120, rows: 40 }]);
+		expect(createOptions.map((options) => options.shell)).toEqual([
+			"C:\\Windows\\System32\\cmd.exe",
+		]);
 
 		process.emitExit({ exitCode: 0 });
 		expect(exited).toEqual([{ id: "terminal-2", exitCode: 0 }]);

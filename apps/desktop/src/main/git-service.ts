@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises"
 import path from "node:path"
 import type { BranchSummary, StatusResult } from "simple-git"
 import simpleGit from "simple-git"
@@ -12,6 +13,15 @@ import simpleGit from "simple-git"
 
 function getGit(directory: string) {
 	return simpleGit({ baseDir: directory, trimmed: true })
+}
+
+function emptyBranchInfo(): GitBranchInfo {
+	return {
+		current: "",
+		detached: false,
+		local: [],
+		remote: [],
+	}
 }
 
 // ============================================================
@@ -63,19 +73,22 @@ export interface GitStashResult {
  * Lists all local and remote branches for a directory.
  */
 export async function listBranches(directory: string): Promise<GitBranchInfo> {
-	const git = getGit(directory)
 	let summary: BranchSummary
 	try {
+		const directoryStats = await stat(directory).catch((error: NodeJS.ErrnoException) => {
+			if (error.code === "ENOENT" || error.code === "ENOTDIR") return null
+			throw error
+		})
+		if (!directoryStats?.isDirectory()) return emptyBranchInfo()
+		const git = getGit(directory)
 		summary = await git.branch(["-a"])
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error)
-		if (message.includes("not a git repository")) {
-			return {
-				current: "",
-				detached: false,
-				local: [],
-				remote: [],
-			}
+		if (
+			message.includes("not a git repository") ||
+			message.includes("Cannot use simple-git on a directory that does not exist")
+		) {
+			return emptyBranchInfo()
 		}
 		throw error
 	}
@@ -423,8 +436,8 @@ export async function applyChangesToLocal(
  * Returns null if no remote is configured.
  */
 export async function getRemoteUrl(directory: string, remote = "origin"): Promise<string | null> {
-	const git = getGit(directory)
 	try {
+		const git = getGit(directory)
 		const url = await git.raw(["remote", "get-url", remote])
 		return url.trim() || null
 	} catch {
@@ -441,8 +454,8 @@ export async function getRemoteUrl(directory: string, remote = "origin"): Promis
  * Works from subdirectories and existing worktrees.
  */
 export async function getGitRoot(directory: string): Promise<string | null> {
-	const git = getGit(directory)
 	try {
+		const git = getGit(directory)
 		const root = await git.raw(["rev-parse", "--show-toplevel"])
 		return root.trim()
 	} catch {

@@ -1,8 +1,6 @@
 /**
  * Detects installed editors, terminals, and file managers on the system
  * and provides the ability to open a directory in any of them.
- *
- * Currently supports macOS only; other platforms return an empty list.
  */
 
 import { execFileSync, spawn } from "node:child_process"
@@ -40,23 +38,24 @@ export interface OpenInTargetsResult {
 
 interface TargetDef {
 	id: string
-	label: string
+	label: string | (() => string)
 	/** Returns the path to the binary if found, or null. */
 	detect: () => string | null
-	/** Returns the .app bundle path if found, for runtime icon extraction. */
+	/** Returns an app/binary path if found, for runtime icon extraction. */
 	appPath?: () => string | null
 	/** Returns the arguments to pass to the binary to open a directory. */
 	args: (dir: string) => string[]
 }
 
 /**
- * Check if any of the given paths exist. Also checks ~/Applications/ variants.
+ * Check if any of the given paths exist. On macOS, also checks
+ * ~/Applications/ variants.
  */
 function findPath(paths: string[]): string | null {
-	if (process.platform !== "darwin") return null
 	const home = homedir()
 	for (const p of paths) {
-		const variants = [p, p.replace("/Applications/", `${home}/Applications/`)]
+		const variants =
+			process.platform === "darwin" ? [p, p.replace("/Applications/", `${home}/Applications/`)] : [p]
 		for (const v of variants) {
 			if (existsSync(v)) return v
 		}
@@ -64,16 +63,142 @@ function findPath(paths: string[]): string | null {
 	return null
 }
 
+function windowsProgramPaths(...segments: string[]): string[] {
+	if (process.platform !== "win32") return []
+	return ["LOCALAPPDATA", "ProgramFiles", "ProgramFiles(x86)"].flatMap((name) => {
+		const base = process.env[name]
+		if (!base) return []
+		if (name === "LOCALAPPDATA") {
+			return [join(base, ...segments), join(base, "Programs", ...segments)]
+		}
+		return [join(base, ...segments)]
+	})
+}
+
+interface WindowsUninstallEntry {
+	displayIcon?: string
+	displayName?: string
+	installLocation?: string
+}
+
+const WINDOWS_UNINSTALL_ROOTS = [
+	"HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+	"HKLM\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+	"HKLM\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+]
+
+let windowsUninstallCache: WindowsUninstallEntry[] | null = null
+
+function scanWindowsUninstallApps(): WindowsUninstallEntry[] {
+	if (windowsUninstallCache) return windowsUninstallCache
+	if (process.platform !== "win32") {
+		windowsUninstallCache = []
+		return windowsUninstallCache
+	}
+
+	const entries: WindowsUninstallEntry[] = []
+	for (const root of WINDOWS_UNINSTALL_ROOTS) {
+		try {
+			const output = execFileSync("reg.exe", ["query", root, "/s"], {
+				encoding: "utf-8",
+				timeout: 5000,
+				stdio: ["ignore", "pipe", "ignore"],
+			})
+			entries.push(...parseWindowsUninstallEntries(output))
+		} catch {
+			// Registry roots can be missing or inaccessible; PATH and fixed-path detection still apply.
+		}
+	}
+
+	windowsUninstallCache = entries
+	return entries
+}
+
+function parseWindowsUninstallEntries(output: string): WindowsUninstallEntry[] {
+	const entries: WindowsUninstallEntry[] = []
+	let current: WindowsUninstallEntry = {}
+
+	const flush = () => {
+		if (current.displayName || current.installLocation || current.displayIcon) {
+			entries.push(current)
+		}
+		current = {}
+	}
+
+	for (const line of output.split(/\r?\n/)) {
+		if (line.startsWith("HKEY_")) {
+			flush()
+			continue
+		}
+
+		const match = /^\s+(.+?)\s+REG_\w+\s+(.*)$/.exec(line)
+		if (!match) continue
+
+		const [, name, value] = match
+		if (name === "DisplayName") current.displayName = value.trim()
+		if (name === "InstallLocation") current.installLocation = value.trim()
+		if (name === "DisplayIcon") current.displayIcon = value.trim()
+	}
+	flush()
+
+	return entries
+}
+
+function normalizeWindowsDisplayIconPath(value: string): string | null {
+	const trimmed = value.trim()
+	if (!trimmed) return null
+
+	const quoted = /^"([^"]+)"/.exec(trimmed)
+	if (quoted?.[1]) return quoted[1]
+
+	return trimmed.replace(/,\s*-?\d+$/, "").trim()
+}
+
+function findWindowsUninstallAppPath(
+	displayNamePattern: RegExp,
+	relativePaths: string[],
+): string | null {
+	if (process.platform !== "win32") return null
+
+	for (const entry of scanWindowsUninstallApps()) {
+		if (!entry.displayName || !displayNamePattern.test(entry.displayName)) continue
+
+		const candidates = [
+			...(entry.installLocation
+				? relativePaths.map((relativePath) => join(entry.installLocation as string, relativePath))
+				: []),
+			...(entry.displayIcon ? [normalizeWindowsDisplayIconPath(entry.displayIcon)] : []),
+		].filter((path): path is string => Boolean(path))
+
+		const path = findPath(candidates)
+		if (path) return path
+	}
+
+	return null
+}
+
 /**
- * Check if a binary exists on PATH using `which`.
+ * Check if a binary exists on PATH.
  */
 function whichSync(binary: string): string | null {
 	try {
-		return execFileSync("which", [binary], {
+		const output = execFileSync(process.platform === "win32" ? "where.exe" : "which", [binary], {
 			encoding: "utf-8",
 			timeout: 3000,
 			stdio: ["ignore", "pipe", "ignore"],
-		}).trim()
+		})
+			.trim()
+			.split(/\r?\n/)
+			.map((line) => line.trim())
+			.filter(Boolean)
+
+		if (process.platform === "win32") {
+			return (
+				output.find((path) => /\.(?:exe|cmd|bat|com)$/i.test(path)) ?? output[0] ?? null
+			)
+		}
+
+		return output[0] ?? null
 	} catch {
 		return null
 	}
@@ -83,7 +208,25 @@ function whichSync(binary: string): string | null {
  * Detect a VS Code-like editor by checking the standard install path
  * and looking for the CLI binary inside the .app bundle.
  */
-function detectVSCodeLike(appPath: string, cliBinaryName: string): string | null {
+function detectVSCodeLike(
+	appPath: string,
+	cliBinaryName: string,
+	windowsPaths: string[] = [],
+	windowsRegistry?: { displayNamePattern: RegExp; relativePaths: string[] },
+): string | null {
+	if (process.platform === "win32") {
+		return (
+			whichSync(cliBinaryName) ??
+			findPath(windowsPaths) ??
+			(windowsRegistry
+				? findWindowsUninstallAppPath(
+						windowsRegistry.displayNamePattern,
+						windowsRegistry.relativePaths,
+					)
+				: null)
+		)
+	}
+
 	const appDir = findPath([appPath])
 	if (!appDir) return null
 	const cli = join(appDir, "Contents", "Resources", "app", "bin", cliBinaryName)
@@ -94,6 +237,7 @@ function detectVSCodeLike(appPath: string, cliBinaryName: string): string | null
  * Detect a macOS .app by name in common locations.
  */
 function detectApp(appName: string): string | null {
+	if (process.platform !== "darwin") return null
 	const paths = [
 		`/Applications/${appName}.app`,
 		`/System/Applications/${appName}.app`,
@@ -108,6 +252,10 @@ function detectApp(appName: string): string | null {
 let jetbrainsCache: Map<string, string> | null = null
 function scanJetBrainsToolbox(): Map<string, string> {
 	if (jetbrainsCache) return jetbrainsCache
+	if (process.platform !== "darwin") {
+		jetbrainsCache = new Map()
+		return jetbrainsCache
+	}
 	const toolboxDir = join(
 		homedir(),
 		"Library",
@@ -182,60 +330,121 @@ const TARGETS: TargetDef[] = [
 	{
 		id: "vscode",
 		label: "VS Code",
-		detect: () => detectVSCodeLike("/Applications/Visual Studio Code.app", "code"),
-		appPath: () => findPath(["/Applications/Visual Studio Code.app"]),
+		detect: () =>
+			detectVSCodeLike("/Applications/Visual Studio Code.app", "code", [
+				...windowsProgramPaths("Microsoft VS Code", "bin", "code.cmd"),
+				...windowsProgramPaths("Microsoft VS Code", "Code.exe"),
+			], {
+				displayNamePattern: /^Microsoft Visual Studio Code(?: \(User\))?$/i,
+				relativePaths: [join("bin", "code.cmd"), "Code.exe"],
+			}),
+		appPath: () =>
+			findPath([
+				"/Applications/Visual Studio Code.app",
+				...windowsProgramPaths("Microsoft VS Code", "Code.exe"),
+			]),
 		args: (dir) => ["--goto", dir],
 	},
 	{
 		id: "vscodeInsiders",
 		label: "VS Code Insiders",
 		detect: () =>
-			detectVSCodeLike("/Applications/Visual Studio Code - Insiders.app", "code-insiders"),
-		appPath: () => findPath(["/Applications/Visual Studio Code - Insiders.app"]),
+			detectVSCodeLike("/Applications/Visual Studio Code - Insiders.app", "code-insiders", [
+				...windowsProgramPaths("Microsoft VS Code Insiders", "bin", "code-insiders.cmd"),
+				...windowsProgramPaths("Microsoft VS Code Insiders", "Code - Insiders.exe"),
+			], {
+				displayNamePattern: /Visual Studio Code.*Insiders/i,
+				relativePaths: [join("bin", "code-insiders.cmd"), "Code - Insiders.exe"],
+			}),
+		appPath: () =>
+			findPath([
+				"/Applications/Visual Studio Code - Insiders.app",
+				...windowsProgramPaths("Microsoft VS Code Insiders", "Code - Insiders.exe"),
+			]),
 		args: (dir) => ["--goto", dir],
 	},
 	{
 		id: "cursor",
 		label: "Cursor",
-		detect: () => detectVSCodeLike("/Applications/Cursor.app", "cursor"),
-		appPath: () => findPath(["/Applications/Cursor.app"]),
+		detect: () =>
+			detectVSCodeLike("/Applications/Cursor.app", "cursor", [
+				...windowsProgramPaths("Cursor", "resources", "app", "bin", "cursor.cmd"),
+				...windowsProgramPaths("Cursor", "Cursor.exe"),
+			], {
+				displayNamePattern: /^Cursor(?: \(User\))?$/i,
+				relativePaths: [join("resources", "app", "bin", "cursor.cmd"), "Cursor.exe"],
+			}),
+		appPath: () =>
+			findPath(["/Applications/Cursor.app", ...windowsProgramPaths("Cursor", "Cursor.exe")]),
 		args: (dir) => ["--goto", dir],
 	},
 	{
 		id: "windsurf",
 		label: "Windsurf",
-		detect: () => detectVSCodeLike("/Applications/Windsurf.app", "windsurf"),
-		appPath: () => findPath(["/Applications/Windsurf.app"]),
+		detect: () =>
+			detectVSCodeLike("/Applications/Windsurf.app", "windsurf", [
+				...windowsProgramPaths("Windsurf", "bin", "windsurf.cmd"),
+				...windowsProgramPaths("Windsurf", "Windsurf.exe"),
+			], {
+				displayNamePattern: /^Windsurf/i,
+				relativePaths: [join("bin", "windsurf.cmd"), "Windsurf.exe"],
+			}),
+		appPath: () =>
+			findPath(["/Applications/Windsurf.app", ...windowsProgramPaths("Windsurf", "Windsurf.exe")]),
 		args: (dir) => ["--goto", dir],
 	},
 	{
 		id: "zed",
 		label: "Zed",
-		detect: () => whichSync("zed") ?? findPath(["/Applications/Zed.app"]),
-		appPath: () => findPath(["/Applications/Zed.app"]),
+		detect: () =>
+			whichSync("zed") ??
+			findPath([
+				"/Applications/Zed.app",
+				...windowsProgramPaths("Zed", "bin", "zed.exe"),
+				...windowsProgramPaths("Zed", "Zed.exe"),
+				...windowsProgramPaths("Zed", "zed.exe"),
+			]) ??
+			findWindowsUninstallAppPath(/^Zed/i, [join("bin", "zed.exe"), "Zed.exe", "zed.exe"]),
+		appPath: () =>
+			findPath([
+				"/Applications/Zed.app",
+				...windowsProgramPaths("Zed", "Zed.exe"),
+				...windowsProgramPaths("Zed", "zed.exe"),
+				...windowsProgramPaths("Zed", "bin", "zed.exe"),
+			]),
 		args: (dir) => [dir],
 	},
 
 	// --- File manager ---
 	{
 		id: "finder",
-		label: "Finder",
-		detect: () => (process.platform === "darwin" ? "open" : null),
-		appPath: () => findPath(["/System/Library/CoreServices/Finder.app"]),
-		args: (dir) => ["-R", dir],
+		label: () => (process.platform === "win32" ? "File Explorer" : "Finder"),
+		detect: () =>
+			process.platform === "darwin"
+				? "open"
+				: process.platform === "win32"
+					? whichSync("explorer.exe") ?? findPath(["C:\\Windows\\explorer.exe"])
+					: null,
+		appPath: () =>
+			findPath([
+				"/System/Library/CoreServices/Finder.app",
+				...(process.platform === "win32" ? ["C:\\Windows\\explorer.exe"] : []),
+			]),
+		args: (dir) => (process.platform === "win32" ? [dir] : ["-R", dir]),
 	},
 
 	// --- Terminals ---
 	{
 		id: "terminal",
-		label: "Terminal",
-		detect: () => detectApp("Terminal") ?? null,
+		label: () => (process.platform === "win32" ? "Windows Terminal" : "Terminal"),
+		detect: () => (process.platform === "win32" ? whichSync("wt.exe") : detectApp("Terminal")),
 		appPath: () =>
 			findPath([
 				"/System/Applications/Utilities/Terminal.app",
 				"/Applications/Utilities/Terminal.app",
+				...(process.platform === "win32" ? [whichSync("wt.exe") ?? ""] : []),
 			]),
-		args: (dir) => ["-a", "Terminal", dir],
+		args: (dir) => (process.platform === "win32" ? ["-d", dir] : ["-a", "Terminal", dir]),
 	},
 	{
 		id: "iterm2",
@@ -377,22 +586,31 @@ export function resolvePreferredTargetId(
  * the .icns file to PNG. Falls back to Electron's app.getFileIcon() API.
  * Returns a data URL (PNG) or undefined.
  */
-async function resolveAppIcon(targetDef: TargetDef): Promise<string | undefined> {
+async function resolveAppIcon(
+	targetDef: TargetDef,
+	detectedPath?: string,
+): Promise<string | undefined> {
 	const cached = iconCache.get(targetDef.id)
 	if (cached) return cached
 
-	const appBundlePath = targetDef.appPath?.()
+	const appBundlePath =
+		targetDef.appPath?.() ??
+		(process.platform === "win32" && detectedPath && /\.(?:exe|cmd|bat|com)$/i.test(detectedPath)
+			? detectedPath
+			: null)
 	if (!appBundlePath) return undefined
 
 	try {
-		// Try converting the .icns file to PNG via sips (macOS built-in tool).
-		// This avoids Electron's nativeImage.createFromPath() which can crash
-		// on certain macOS / Electron version combinations with .icns files.
-		const pngData = convertIcnsToPng(appBundlePath)
-		if (pngData) {
-			const dataUrl = `data:image/png;base64,${pngData}`
-			iconCache.set(targetDef.id, dataUrl)
-			return dataUrl
+		if (process.platform === "darwin") {
+			// Try converting the .icns file to PNG via sips (macOS built-in tool).
+			// This avoids Electron's nativeImage.createFromPath() which can crash
+			// on certain macOS / Electron version combinations with .icns files.
+			const pngData = convertIcnsToPng(appBundlePath)
+			if (pngData) {
+				const dataUrl = `data:image/png;base64,${pngData}`
+				iconCache.set(targetDef.id, dataUrl)
+				return dataUrl
+			}
 		}
 
 		// Fallback to Electron's file icon API
@@ -458,11 +676,7 @@ function convertIcnsToPng(appBundlePath: string): string | null {
  * Resolves app icons at runtime from installed .app bundles.
  */
 export async function getOpenInTargets(): Promise<OpenInTargetsResult> {
-	if (process.platform !== "darwin") {
-		return { targets: [], availableTargets: [], preferredTarget: null }
-	}
-
-	const { ids } = detectAvailable()
+	const { ids, map } = detectAvailable()
 	const availableSet = new Set(ids)
 	const preferredTargetId = getSettings().openIn.preferredTargetId
 
@@ -473,7 +687,7 @@ export async function getOpenInTargets(): Promise<OpenInTargetsResult> {
 	const iconResults = await Promise.allSettled(
 		TARGETS.filter((t) => availableSet.has(t.id)).map(async (t) => ({
 			id: t.id,
-			iconDataUrl: await resolveAppIcon(t),
+			iconDataUrl: await resolveAppIcon(t, map.get(t.id)),
 		})),
 	)
 	const iconMap = new Map<string, string>()
@@ -485,7 +699,7 @@ export async function getOpenInTargets(): Promise<OpenInTargetsResult> {
 
 	const targets: OpenInTarget[] = TARGETS.map((t) => ({
 		id: t.id,
-		label: t.label,
+		label: typeof t.label === "function" ? t.label() : t.label,
 		available: availableSet.has(t.id),
 		iconDataUrl: iconMap.get(t.id),
 	}))
@@ -505,10 +719,6 @@ export async function openInTarget(
 	targetId: string,
 	options?: { persistPreferred?: boolean },
 ): Promise<{ success: boolean }> {
-	if (process.platform !== "darwin") {
-		throw new Error("Open-in targets are only supported on macOS")
-	}
-
 	const target = TARGETS.find((t) => t.id === targetId)
 	if (!target) throw new Error(`Unknown open target: "${targetId}"`)
 
@@ -522,9 +732,11 @@ export async function openInTarget(
 	}
 
 	// For terminal and file manager targets, use `open` command
-	const isTerminalOrFinder = ["finder", "terminal", "iterm2", "ghostty", "warp"].includes(targetId)
+	const isMacOpenTarget =
+		process.platform === "darwin" &&
+		["finder", "terminal", "iterm2", "ghostty", "warp"].includes(targetId)
 
-	if (isTerminalOrFinder) {
+	if (isMacOpenTarget) {
 		await spawnAsync("open", target.args(directory))
 	} else if (binary.endsWith(".app")) {
 		await spawnAsync("open", ["-a", binary, directory])
@@ -548,7 +760,14 @@ export function setPreferredTarget(targetId: string): void {
 
 function spawnAsync(command: string, args: string[]): Promise<void> {
 	return new Promise((resolve, reject) => {
-		const proc = spawn(command, args, { stdio: "ignore", detached: true })
+		const isWindowsCommandShim =
+			process.platform === "win32" && /\.(?:cmd|bat)$/i.test(command)
+		const proc = isWindowsCommandShim
+			? spawn("cmd.exe", ["/d", "/s", "/c", command, ...args], {
+					stdio: "ignore",
+					detached: true,
+				})
+			: spawn(command, args, { stdio: "ignore", detached: true })
 		proc.unref()
 		proc.on("error", reject)
 		// Resolve immediately — we don't wait for the app to close

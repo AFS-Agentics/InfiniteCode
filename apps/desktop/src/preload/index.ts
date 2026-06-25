@@ -13,12 +13,17 @@ contextBridge.exposeInMainWorld("devo", {
 	/** Returns app version and dev/production mode. */
 	getAppInfo: () => ipcRenderer.invoke("app:info"),
 
+	appMenu: {
+		popup: (id: "edit" | "view" | "window", position?: { x: number; y: number }) =>
+			ipcRenderer.invoke("app-menu:popup", { id, ...position }),
+	},
+
 	// --- Window chrome / liquid glass ---
 
 	/**
 	 * Subscribes to the window chrome tier notification from the main process.
 	 * Fired once after the window finishes loading.
-	 * Tier values: "liquid-glass" | "vibrancy" | "opaque"
+	 * Tier values: "liquid-glass" | "vibrancy" | "transparent" | "opaque"
 	 */
 	onChromeTier: (callback: (tier: string) => void) => {
 		const listener = (_event: unknown, tier: string) => callback(tier)
@@ -192,9 +197,9 @@ contextBridge.exposeInMainWorld("devo", {
 		setPreferred: (targetId: string) => ipcRenderer.invoke("open-in:set-preferred", targetId),
 	},
 
-	// --- Native theme (syncs macOS glass tint to app color scheme) ---
+	// --- Native theme (syncs OS chrome to app color scheme) ---
 
-	/** Set the native theme source to control macOS glass tint color. */
+	/** Set the native theme source to control OS chrome tint and symbols. */
 	setNativeTheme: (source: string) => ipcRenderer.invoke("theme:set-native", source),
 
 	/** Get the system accent color as an 8-char hex RRGGBBAA string, or null if unavailable. */

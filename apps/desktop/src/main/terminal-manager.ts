@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { waitForEnv } from "./shell-env";
 
@@ -38,17 +39,32 @@ type TerminalProcessFactory = (
 	options: TerminalCreateProcessOptions,
 ) => TerminalProcess | Promise<TerminalProcess>;
 
+type FileExists = (path: string) => boolean;
+type FileReader = (path: string) => string;
+
 interface DesktopTerminalManagerOptions {
 	createProcess?: TerminalProcessFactory;
 	defaultCwd?: string;
 	env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
 	platform?: NodeJS.Platform;
 	idFactory?: () => string;
+	exists?: FileExists;
+	readFile?: FileReader;
 }
 
 interface TerminalSession {
 	info: TerminalSessionInfo;
 	process: TerminalProcess;
+}
+
+interface ShellCommand {
+	shell: string;
+	args: string[];
+}
+
+interface ShellResolutionDeps {
+	exists: FileExists;
+	readFile: FileReader;
 }
 
 function createTerminalId(): string {
@@ -65,20 +81,247 @@ function normalizeEnv(
 	return normalized;
 }
 
-function resolveShell(
-	platform: NodeJS.Platform,
-	env: Record<string, string>,
-): string {
-	if (platform === "win32") {
-		return env.ComSpec || "C:\\Windows\\System32\\cmd.exe";
+function getEnvValue(env: Record<string, string>, key: string): string | undefined {
+	const exact = env[key];
+	if (exact !== undefined) return exact;
+	const normalizedKey = key.toLowerCase();
+	for (const [name, value] of Object.entries(env)) {
+		if (name.toLowerCase() === normalizedKey) return value;
 	}
-	if (env.SHELL) return env.SHELL;
-	if (platform === "darwin") return "/bin/zsh";
-	return "/bin/bash";
+	return undefined;
 }
 
-function shellArgs(platform: NodeJS.Platform): string[] {
-	return platform === "win32" ? [] : ["-l"];
+function joinWindowsPath(base: string, ...segments: string[]): string {
+	let path = base.replace(/[\\/]$/, "");
+	for (const segment of segments) {
+		path += `\\${segment}`;
+	}
+	return path;
+}
+
+function windowsTerminalSettingsPaths(env: Record<string, string>): string[] {
+	const localAppData = getEnvValue(env, "LOCALAPPDATA");
+	if (!localAppData) return [];
+	return [
+		joinWindowsPath(
+			localAppData,
+			"Packages",
+			"Microsoft.WindowsTerminal_8wekyb3d8bbwe",
+			"LocalState",
+			"settings.json",
+		),
+		joinWindowsPath(
+			localAppData,
+			"Packages",
+			"Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe",
+			"LocalState",
+			"settings.json",
+		),
+	];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readWindowsTerminalSettings(
+	env: Record<string, string>,
+	deps: ShellResolutionDeps,
+): Record<string, unknown> | null {
+	for (const settingsPath of windowsTerminalSettingsPaths(env)) {
+		if (!deps.exists(settingsPath)) continue;
+		try {
+			const parsed = JSON.parse(deps.readFile(settingsPath));
+			if (isRecord(parsed)) return parsed;
+		} catch {
+			// Ignore malformed profile settings and keep looking for a usable shell.
+		}
+	}
+	return null;
+}
+
+function windowsTerminalProfiles(
+	settings: Record<string, unknown>,
+): Record<string, unknown>[] {
+	const profiles = settings.profiles;
+	if (!isRecord(profiles) || !Array.isArray(profiles.list)) return [];
+	return profiles.list.filter(isRecord);
+}
+
+function expandWindowsEnvVars(
+	value: string,
+	env: Record<string, string>,
+): string {
+	return value.replace(/%([^%]+)%/g, (match, key: string) => {
+		return getEnvValue(env, key) ?? match;
+	});
+}
+
+function splitWindowsCommandLine(commandLine: string): string[] {
+	const parts: string[] = [];
+	let current = "";
+	let inQuotes = false;
+
+	for (const char of commandLine.trim()) {
+		if (char === '"') {
+			inQuotes = !inQuotes;
+			continue;
+		}
+		if (/\s/.test(char) && !inQuotes) {
+			if (current) {
+				parts.push(current);
+				current = "";
+			}
+			continue;
+		}
+		current += char;
+	}
+
+	if (current) parts.push(current);
+	return parts;
+}
+
+function parseWindowsCommandLine(
+	commandLine: string,
+	env: Record<string, string>,
+): ShellCommand | null {
+	const parts = splitWindowsCommandLine(expandWindowsEnvVars(commandLine, env));
+	if (parts.length === 0) return null;
+
+	let executableParts = [parts[0]];
+	let args = parts.slice(1);
+	if (!parts[0].toLowerCase().endsWith(".exe")) {
+		const executableEnd = parts.findIndex((part, index) => {
+			return index > 0 && part.toLowerCase().endsWith(".exe");
+		});
+		if (executableEnd !== -1) {
+			executableParts = parts.slice(0, executableEnd + 1);
+			args = parts.slice(executableEnd + 1);
+		}
+	}
+
+	return { shell: executableParts.join(" "), args };
+}
+
+function findExecutableOnPath(
+	executable: string,
+	env: Record<string, string>,
+	deps: ShellResolutionDeps,
+): string | null {
+	const pathValue = getEnvValue(env, "PATH");
+	if (!pathValue) return null;
+	const hasExtension = /\.[^\\/]+$/.test(executable);
+	const pathExtensions = (getEnvValue(env, "PATHEXT") ?? ".COM;.EXE;.BAT;.CMD")
+		.split(";")
+		.filter(Boolean);
+	const names = hasExtension
+		? [executable]
+		: [executable, ...pathExtensions.map((extension) => `${executable}${extension}`)];
+
+	for (const directory of pathValue.split(";")) {
+		const normalizedDirectory = directory.trim().replace(/^"|"$/g, "");
+		if (!normalizedDirectory) continue;
+		for (const name of names) {
+			const candidate = joinWindowsPath(normalizedDirectory, name);
+			if (deps.exists(candidate)) return candidate;
+		}
+	}
+
+	return null;
+}
+
+function resolveWindowsTerminalSourceShell(
+	source: string,
+	env: Record<string, string>,
+	deps: ShellResolutionDeps,
+): ShellCommand | null {
+	if (source === "Windows.Terminal.PowershellCore") {
+		return {
+			shell: findExecutableOnPath("pwsh.exe", env, deps) ?? "pwsh.exe",
+			args: [],
+		};
+	}
+	if (source === "Windows.Terminal.WindowsPowerShell") {
+		return {
+			shell:
+				findExecutableOnPath("powershell.exe", env, deps) ?? "powershell.exe",
+			args: [],
+		};
+	}
+	if (source === "Windows.Terminal.CommandPrompt") {
+		return {
+			shell: getEnvValue(env, "ComSpec") ?? "cmd.exe",
+			args: [],
+		};
+	}
+	return null;
+}
+
+function resolveWindowsTerminalShell(
+	env: Record<string, string>,
+	deps: ShellResolutionDeps,
+): ShellCommand | null {
+	const settings = readWindowsTerminalSettings(env, deps);
+	const defaultProfile =
+		typeof settings?.defaultProfile === "string"
+			? settings.defaultProfile.toLowerCase()
+			: null;
+	if (!settings || !defaultProfile) return null;
+
+	const profile = windowsTerminalProfiles(settings).find((candidate) => {
+		const guid =
+			typeof candidate.guid === "string" ? candidate.guid.toLowerCase() : null;
+		const name =
+			typeof candidate.name === "string" ? candidate.name.toLowerCase() : null;
+		return guid === defaultProfile || name === defaultProfile;
+	});
+	if (!profile) return null;
+
+	if (typeof profile.commandline === "string") {
+		const command = parseWindowsCommandLine(profile.commandline, env);
+		if (command) return command;
+	}
+	if (typeof profile.source === "string") {
+		return resolveWindowsTerminalSourceShell(profile.source, env, deps);
+	}
+	return null;
+}
+
+function resolveWindowsShellCommand(
+	env: Record<string, string>,
+	deps: ShellResolutionDeps,
+): ShellCommand {
+	const windowsTerminalShell = resolveWindowsTerminalShell(env, deps);
+	if (windowsTerminalShell) return windowsTerminalShell;
+
+	const configuredShell = getEnvValue(env, "SHELL");
+	if (configuredShell) return { shell: configuredShell, args: [] };
+
+	const pwsh = findExecutableOnPath("pwsh.exe", env, deps);
+	if (pwsh) return { shell: pwsh, args: [] };
+
+	const powershell = findExecutableOnPath("powershell.exe", env, deps);
+	if (powershell) return { shell: powershell, args: [] };
+
+	return {
+		shell:
+			getEnvValue(env, "ComSpec") ?? "C:\\Windows\\System32\\cmd.exe",
+		args: [],
+	};
+}
+
+function resolveShellCommand(
+	platform: NodeJS.Platform,
+	env: Record<string, string>,
+	deps: ShellResolutionDeps,
+): ShellCommand {
+	if (platform === "win32") {
+		return resolveWindowsShellCommand(env, deps);
+	}
+	return {
+		shell: env.SHELL ?? (platform === "darwin" ? "/bin/zsh" : "/bin/bash"),
+		args: ["-l"],
+	};
 }
 
 async function createNodePtyProcess(
@@ -112,6 +355,7 @@ export class DesktopTerminalManager {
 	private readonly env: NodeJS.ProcessEnv | Record<string, string | undefined>;
 	private readonly platform: NodeJS.Platform;
 	private readonly idFactory: () => string;
+	private readonly shellDeps: ShellResolutionDeps;
 	private readonly sessions = new Map<string, TerminalSession>();
 	private readonly dataListeners = new Set<
 		(id: string, data: string) => void
@@ -126,6 +370,14 @@ export class DesktopTerminalManager {
 		this.env = options.env ?? process.env;
 		this.platform = options.platform ?? process.platform;
 		this.idFactory = options.idFactory ?? createTerminalId;
+		this.shellDeps = {
+			exists: options.exists ?? existsSync,
+			readFile:
+				options.readFile ??
+				((path) => {
+					return readFileSync(path, "utf-8");
+				}),
+		};
 	}
 
 	onData(listener: (id: string, data: string) => void): () => void {
@@ -156,17 +408,17 @@ export class DesktopTerminalManager {
 		const cols = options.cols ?? 80;
 		const rows = options.rows ?? 24;
 		const cwd = options.cwd || this.defaultCwd;
-		const shell = resolveShell(this.platform, env);
+		const shellCommand = resolveShellCommand(this.platform, env, this.shellDeps);
 		const id = this.idFactory();
 		const terminalProcess = await this.createProcess({
-			shell,
-			args: shellArgs(this.platform),
+			shell: shellCommand.shell,
+			args: shellCommand.args,
 			cwd,
 			env,
 			cols,
 			rows,
 		});
-		const info = { id, cwd, shell, cols, rows };
+		const info = { id, cwd, shell: shellCommand.shell, cols, rows };
 
 		terminalProcess.onData((data) => {
 			for (const listener of this.dataListeners) {

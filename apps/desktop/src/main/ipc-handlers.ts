@@ -30,7 +30,7 @@ import {
 	stashAndCheckout,
 	stashPop,
 } from "./git-service"
-import { getResolvedChromeTier } from "./liquid-glass"
+import { getResolvedChromeTier, resolveWindowsTitleBarOverlay } from "./liquid-glass"
 import { createLogger } from "./logger"
 import { readModelState, updateModelRecent } from "./model-state"
 import { dismissNotification, updateBadgeCount } from "./notifications"
@@ -69,6 +69,14 @@ const log = createLogger("ipc")
 
 /** Read the opaque windows preference for use at window creation time. */
 export { getOpaqueWindows as getOpaqueWindowsPref } from "./settings-store"
+
+function updateWindowsTitleBarOverlay(): void {
+	if (process.platform !== "win32") return
+	const titleBarOverlay = resolveWindowsTitleBarOverlay(nativeTheme.shouldUseDarkColors)
+	for (const win of BrowserWindow.getAllWindows()) {
+		win.setTitleBarOverlay(titleBarOverlay)
+	}
+}
 
 // ============================================================
 // Serialized fetch types — used to pass Request/Response over IPC
@@ -482,7 +490,10 @@ export function registerIpcHandlers(): void {
 		} else {
 			nativeTheme.themeSource = "system"
 		}
+		updateWindowsTitleBarOverlay()
 	})
+
+	nativeTheme.on("updated", updateWindowsTitleBarOverlay)
 
 	// --- System accent color (macOS / Windows) ---
 

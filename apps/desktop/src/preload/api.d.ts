@@ -38,6 +38,13 @@ export interface UpdateState {
 	canAutoInstall: boolean
 }
 
+export type AppMenuId = "edit" | "view" | "window"
+
+export interface AppMenuPosition {
+	x: number
+	y: number
+}
+
 // ============================================================
 // Git types
 // ============================================================
@@ -264,7 +271,7 @@ export interface AppInfo {
 	isDev: boolean
 }
 
-export type WindowChromeTier = "liquid-glass" | "vibrancy" | "opaque"
+export type WindowChromeTier = "liquid-glass" | "vibrancy" | "transparent" | "opaque"
 
 export interface TerminalSessionInfo {
 	id: string
@@ -387,6 +394,9 @@ export interface DevoAPI {
 	/** The host platform: "darwin", "win32", or "linux". */
 	platform: NodeJS.Platform
 	getAppInfo: () => Promise<AppInfo>
+	appMenu: {
+		popup: (id: AppMenuId, position?: AppMenuPosition) => Promise<{ success: boolean }>
+	}
 
 	/** Subscribe to chrome tier notification (fired once on load). */
 	onChromeTier: (callback: (tier: WindowChromeTier) => void) => () => void
@@ -477,8 +487,8 @@ export interface DevoAPI {
 		setPreferred: (targetId: string) => Promise<{ success: boolean }>
 	}
 
-	// Native theme (syncs macOS glass tint to app color scheme)
-	/** Set the native theme source ("light" | "dark" | "system") to control macOS glass tint. */
+	// Native theme (syncs OS chrome to app color scheme)
+	/** Set the native theme source ("light" | "dark" | "system") to control OS chrome tint and symbols. */
 	setNativeTheme: (source: string) => Promise<void>
 
 	// System accent color

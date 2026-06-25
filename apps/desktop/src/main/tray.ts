@@ -136,10 +136,14 @@ export function createTrayIcon(
 }
 
 export function installTrayIconInteractions(
-	_tray: TrayInteractionTarget,
-	_handlers: TrayInteractionHandlers,
+	tray: TrayInteractionTarget,
+	handlers: TrayInteractionHandlers,
+	platform: NodeJS.Platform = process.platform,
 ): void {
-	// The tray icon itself only opens the native menu; focusing the window stays explicit via Open Devo.
+	if (platform !== "win32") return
+
+	// Windows users expect a left-click on the tray icon to restore the app.
+	tray.on("click", handlers.showWindow)
 }
 
 export function destroyTray(): void {

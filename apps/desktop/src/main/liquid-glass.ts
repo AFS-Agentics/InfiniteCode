@@ -4,11 +4,12 @@
  * Implements progressive transparency for macOS:
  *   Tier 1: Liquid Glass (macOS 26+ Tahoe) — native NSGlassEffectView
  *   Tier 2: Vibrancy fallback (older macOS) — NSVisualEffectView via Electron
- *   Tier 3: Opaque (user preference or non-macOS) — solid background
+ *   Windows: Transparent acrylic — resizable BrowserWindow with native backdrop
+ *   Tier 3: Opaque (user preference or Linux) — solid background
  *
  */
 
-import type { BrowserWindow, BrowserWindowConstructorOptions } from "electron"
+import type { BrowserWindow, BrowserWindowConstructorOptions, TitleBarOverlay } from "electron"
 import { createLogger } from "./logger"
 
 const log = createLogger("liquid-glass")
@@ -17,11 +18,34 @@ const log = createLogger("liquid-glass")
 // Types
 // ============================================================
 
-export type WindowChromeTier = "liquid-glass" | "vibrancy" | "opaque"
+export type WindowChromeTier = "liquid-glass" | "vibrancy" | "transparent" | "opaque"
 
 export interface WindowChromeResult {
 	tier: WindowChromeTier
+	usesTransparentWindow: boolean
+	usesTransparentBackground: boolean
 	options: Partial<BrowserWindowConstructorOptions>
+}
+
+export interface ResolveWindowChromeOptions {
+	isOpaque: boolean
+	isDarkMode?: boolean
+	platform?: NodeJS.Platform
+}
+
+const WINDOWS_TITLE_BAR_OVERLAY_HEIGHT = 40
+const WINDOWS_TITLE_BAR_OVERLAY_COLOR = "#00000000"
+const WINDOWS_TITLE_BAR_OVERLAY_DARK_SYMBOL_COLOR = "#111111"
+const WINDOWS_TITLE_BAR_OVERLAY_LIGHT_SYMBOL_COLOR = "#f4f4f5"
+
+export function resolveWindowsTitleBarOverlay(isDarkMode: boolean): TitleBarOverlay {
+	return {
+		color: WINDOWS_TITLE_BAR_OVERLAY_COLOR,
+		symbolColor: isDarkMode
+			? WINDOWS_TITLE_BAR_OVERLAY_LIGHT_SYMBOL_COLOR
+			: WINDOWS_TITLE_BAR_OVERLAY_DARK_SYMBOL_COLOR,
+		height: WINDOWS_TITLE_BAR_OVERLAY_HEIGHT,
+	}
 }
 
 // ============================================================
@@ -81,18 +105,61 @@ function getGlassModule() {
  * Resolves the window chrome configuration based on platform capabilities
  * and user preferences.
  *
- * @param isOpaque - Whether the user has opted for opaque windows
+ * @param options.isOpaque - Whether the user has opted for opaque windows
+ * @param options.platform - Host platform, injectable for tests
  * @returns BrowserWindow options to spread into the constructor
  */
-export async function resolveWindowChrome(isOpaque: boolean): Promise<WindowChromeResult> {
-	const isMac = process.platform === "darwin"
+export async function resolveWindowChrome({
+	isOpaque,
+	isDarkMode = false,
+	platform = process.platform,
+}: ResolveWindowChromeOptions): Promise<WindowChromeResult> {
+	const isMac = platform === "darwin"
+	const isWindows = platform === "win32"
 
-	// Tier 3: Opaque — user preference or non-macOS
+	if (isWindows) {
+		if (isOpaque) {
+			log.info("Using opaque window chrome on Windows")
+			_resolvedTier = "opaque"
+			return {
+				tier: "opaque",
+				usesTransparentWindow: false,
+				usesTransparentBackground: false,
+				options: {
+					titleBarStyle: "hidden" as const,
+					titleBarOverlay: resolveWindowsTitleBarOverlay(isDarkMode),
+				},
+			}
+		}
+
+		log.info("Using transparent acrylic window chrome on Windows")
+		_resolvedTier = "transparent"
+		return {
+			tier: "transparent",
+			usesTransparentWindow: false,
+			usesTransparentBackground: false,
+			options: {
+				backgroundMaterial: "acrylic" as const,
+				resizable: true,
+				maximizable: true,
+				minimizable: true,
+				fullscreenable: true,
+				thickFrame: true,
+				roundedCorners: true,
+				titleBarStyle: "hidden" as const,
+				titleBarOverlay: resolveWindowsTitleBarOverlay(isDarkMode),
+			},
+		}
+	}
+
+	// Tier 3: Opaque — user preference or Linux
 	if (isOpaque || !isMac) {
 		log.info("Using opaque window chrome (tier 3)")
 		_resolvedTier = "opaque"
 		return {
 			tier: "opaque",
+			usesTransparentWindow: false,
+			usesTransparentBackground: false,
 			options: {
 				...(isMac && {
 					titleBarStyle: "hiddenInset" as const,
@@ -111,6 +178,8 @@ export async function resolveWindowChrome(isOpaque: boolean): Promise<WindowChro
 		_resolvedTier = "liquid-glass"
 		return {
 			tier: "liquid-glass",
+			usesTransparentWindow: true,
+			usesTransparentBackground: true,
 			options: {
 				transparent: true,
 				titleBarStyle: "hiddenInset" as const,
@@ -124,6 +193,8 @@ export async function resolveWindowChrome(isOpaque: boolean): Promise<WindowChro
 	_resolvedTier = "vibrancy"
 	return {
 		tier: "vibrancy",
+		usesTransparentWindow: false,
+		usesTransparentBackground: true,
 		options: {
 			vibrancy: "menu" as const,
 			visualEffectState: "active" as const,
