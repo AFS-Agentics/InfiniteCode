@@ -206,6 +206,18 @@ enum ResearchStageCapture<'a> {
     FinalReport(&'a mut ResearchQueryCapture),
 }
 
+struct ResearchQueryEventContext<'a> {
+    session_id: SessionId,
+    turn_id: TurnId,
+    usage_ledger: &'a ResearchUsageLedgerRef,
+    context_window: Option<u64>,
+}
+
+struct ResearchArtifactEventContext<'a> {
+    query: ResearchQueryEventContext<'a>,
+    artifact: &'a StreamedResearchArtifact,
+}
+
 struct PendingResearchToolCall {
     item_id: ItemId,
     item_seq: u64,
@@ -1004,13 +1016,16 @@ impl ServerRuntime {
                 tokio::select! {
                     maybe_event = rx.recv(), if !event_channel_closed => {
                         if let Some(event) = maybe_event {
+                            let context = ResearchQueryEventContext {
+                                session_id: runtime.session_id,
+                                turn_id: runtime.turn_id,
+                                usage_ledger: runtime.usage_ledger,
+                                context_window: Some(stage_turn_config.model.context_window as u64),
+                            };
                             self.handle_research_stage_query_event(
-                                runtime.session_id,
-                                runtime.turn_id,
+                                context,
                                 stage,
                                 &mut capture,
-                                runtime.usage_ledger,
-                                Some(stage_turn_config.model.context_window as u64),
                                 artifact.as_ref(),
                                 event,
                             )
@@ -1027,13 +1042,16 @@ impl ServerRuntime {
         };
         query_result?;
         while let Some(event) = rx.recv().await {
+            let context = ResearchQueryEventContext {
+                session_id: runtime.session_id,
+                turn_id: runtime.turn_id,
+                usage_ledger: runtime.usage_ledger,
+                context_window: Some(stage_turn_config.model.context_window as u64),
+            };
             self.handle_research_stage_query_event(
-                runtime.session_id,
-                runtime.turn_id,
+                context,
                 stage,
                 &mut capture,
-                runtime.usage_ledger,
-                Some(stage_turn_config.model.context_window as u64),
                 artifact.as_ref(),
                 event,
             )
@@ -1044,66 +1062,40 @@ impl ServerRuntime {
 
     async fn handle_research_stage_query_event(
         &self,
-        session_id: SessionId,
-        turn_id: TurnId,
+        context: ResearchQueryEventContext<'_>,
         stage: ResearchStageKind,
         capture: &mut ResearchStageCapture<'_>,
-        usage_ledger: &ResearchUsageLedgerRef,
-        context_window: Option<u64>,
         artifact: Option<&StreamedResearchArtifact>,
         event: QueryEvent,
     ) -> anyhow::Result<()> {
         match capture {
             ResearchStageCapture::Clarification(capture) => {
-                self.handle_clarification_query_event(
-                    session_id,
-                    turn_id,
-                    capture,
-                    usage_ledger,
-                    context_window,
-                    event,
-                )
-                .await;
+                self.handle_clarification_query_event(context, capture, event)
+                    .await;
             }
             ResearchStageCapture::Artifact(capture) => {
                 let artifact = artifact
                     .ok_or_else(|| anyhow::anyhow!("research {stage:?} missing artifact"))?;
-                self.handle_research_artifact_query_event(
-                    session_id,
-                    turn_id,
-                    stage,
-                    capture,
-                    usage_ledger,
-                    context_window,
+                let artifact_context = ResearchArtifactEventContext {
+                    query: context,
                     artifact,
-                    event,
-                )
-                .await;
+                };
+                self.handle_research_artifact_query_event(artifact_context, stage, capture, event)
+                    .await;
             }
             ResearchStageCapture::Supervisor(capture) => {
                 let artifact = artifact
                     .ok_or_else(|| anyhow::anyhow!("research supervisor missing artifact"))?;
-                self.handle_supervisor_query_event(
-                    session_id,
-                    turn_id,
-                    capture,
-                    usage_ledger,
-                    context_window,
+                let artifact_context = ResearchArtifactEventContext {
+                    query: context,
                     artifact,
-                    event,
-                )
-                .await;
+                };
+                self.handle_supervisor_query_event(artifact_context, capture, event)
+                    .await;
             }
             ResearchStageCapture::FinalReport(capture) => {
-                self.handle_final_report_query_event(
-                    session_id,
-                    turn_id,
-                    capture,
-                    usage_ledger,
-                    context_window,
-                    event,
-                )
-                .await;
+                self.handle_final_report_query_event(context, capture, event)
+                    .await;
             }
         }
         Ok(())
@@ -1111,15 +1103,15 @@ impl ServerRuntime {
 
     async fn handle_research_artifact_query_event(
         &self,
-        session_id: SessionId,
-        turn_id: TurnId,
+        context: ResearchArtifactEventContext<'_>,
         stage: ResearchStageKind,
         capture: &mut ResearchArtifactQueryCapture,
-        usage_ledger: &ResearchUsageLedgerRef,
-        context_window: Option<u64>,
-        artifact: &StreamedResearchArtifact,
         event: QueryEvent,
     ) {
+        let session_id = context.query.session_id;
+        let turn_id = context.query.turn_id;
+        let usage_ledger = context.query.usage_ledger;
+        let context_window = context.query.context_window;
         match event {
             QueryEvent::TextDelta(text) => {
                 capture.text.push_str(&text);
@@ -1127,7 +1119,7 @@ impl ServerRuntime {
                     session_id,
                     turn_id,
                     &mut capture.artifact,
-                    artifact,
+                    context.artifact,
                     text,
                 )
                 .await;
@@ -1185,14 +1177,14 @@ impl ServerRuntime {
 
     async fn handle_supervisor_query_event(
         &self,
-        session_id: SessionId,
-        turn_id: TurnId,
+        context: ResearchArtifactEventContext<'_>,
         capture: &mut SupervisorQueryCapture,
-        usage_ledger: &ResearchUsageLedgerRef,
-        context_window: Option<u64>,
-        artifact: &StreamedResearchArtifact,
         event: QueryEvent,
     ) {
+        let session_id = context.query.session_id;
+        let turn_id = context.query.turn_id;
+        let usage_ledger = context.query.usage_ledger;
+        let context_window = context.query.context_window;
         match event {
             QueryEvent::TextDelta(text) => {
                 capture.text.push_str(&text);
@@ -1200,7 +1192,7 @@ impl ServerRuntime {
                     session_id,
                     turn_id,
                     &mut capture.artifact,
-                    artifact,
+                    context.artifact,
                     text,
                 )
                 .await;
@@ -1380,13 +1372,14 @@ impl ServerRuntime {
 
     async fn handle_final_report_query_event(
         &self,
-        session_id: SessionId,
-        turn_id: TurnId,
+        context: ResearchQueryEventContext<'_>,
         capture: &mut ResearchQueryCapture,
-        usage_ledger: &ResearchUsageLedgerRef,
-        context_window: Option<u64>,
         event: QueryEvent,
     ) {
+        let session_id = context.session_id;
+        let turn_id = context.turn_id;
+        let usage_ledger = context.usage_ledger;
+        let context_window = context.context_window;
         match event {
             QueryEvent::TextDelta(text) => {
                 capture.text.push_str(&text);
@@ -1530,13 +1523,14 @@ impl ServerRuntime {
 
     async fn handle_clarification_query_event(
         &self,
-        session_id: SessionId,
-        turn_id: TurnId,
+        context: ResearchQueryEventContext<'_>,
         capture: &mut ClarificationQueryCapture,
-        usage_ledger: &ResearchUsageLedgerRef,
-        context_window: Option<u64>,
         event: QueryEvent,
     ) {
+        let session_id = context.session_id;
+        let turn_id = context.turn_id;
+        let usage_ledger = context.usage_ledger;
+        let context_window = context.context_window;
         match event {
             QueryEvent::TextDelta(text) => {
                 capture.text.push_str(&text);
@@ -2824,37 +2818,6 @@ fn truncate_chars(text: &str, max_chars: usize) -> String {
         .collect::<String>();
     truncated.push_str("\n[truncated]");
     truncated
-}
-
-#[cfg(test)]
-fn extract_source_url(input: &serde_json::Value, output: &serde_json::Value) -> Option<String> {
-    input
-        .get("url")
-        .and_then(serde_json::Value::as_str)
-        .or_else(|| output.get("url").and_then(serde_json::Value::as_str))
-        .map(str::trim)
-        .filter(|url| !url.is_empty())
-        .map(ToOwned::to_owned)
-}
-
-#[cfg(test)]
-fn extract_source_title(
-    output: &serde_json::Value,
-    display_content: Option<&str>,
-) -> Option<String> {
-    output
-        .get("title")
-        .and_then(serde_json::Value::as_str)
-        .or_else(|| {
-            output
-                .get("metadata")
-                .and_then(|metadata| metadata.get("title"))
-                .and_then(serde_json::Value::as_str)
-        })
-        .or(display_content)
-        .map(str::trim)
-        .filter(|title| !title.is_empty())
-        .map(|title| truncate_chars(title, 240))
 }
 
 fn research_display_input(display_input: &str) -> String {

@@ -1269,6 +1269,9 @@ mod tests {
     use devo_core::ProviderVendorCatalog;
     use devo_core::SkillsConfig;
     use devo_core::tools::ToolRegistry;
+    use devo_protocol::DEVO_ACTIVITY_AT_META;
+    use devo_protocol::DEVO_ITEM_ID_META;
+    use devo_protocol::DEVO_TURN_ID_META;
     use devo_protocol::ModelRequest;
     use devo_protocol::ModelResponse;
     use devo_protocol::StreamEvent;
@@ -1327,6 +1330,34 @@ mod tests {
                 )),
             ),
         )
+    }
+
+    fn assert_agent_message_chunk_update(
+        update: &serde_json::Value,
+        turn_id: TurnId,
+        item_id: ItemId,
+    ) {
+        assert!(update["_meta"][DEVO_ACTIVITY_AT_META].is_string());
+        let mut stable_update = update.clone();
+        stable_update["_meta"]
+            .as_object_mut()
+            .expect("ACP update meta")
+            .remove(DEVO_ACTIVITY_AT_META);
+        assert_eq!(
+            stable_update,
+            serde_json::json!({
+                "sessionUpdate": "agent_message_chunk",
+                "content": {
+                    "type": "text",
+                    "text": "hello",
+                },
+                "messageId": item_id.to_string(),
+                "_meta": {
+                    DEVO_TURN_ID_META: turn_id.to_string(),
+                    DEVO_ITEM_ID_META: item_id.to_string(),
+                },
+            })
+        );
     }
 
     #[test]
@@ -1610,17 +1641,7 @@ mod tests {
         let owner_message = tokio::time::timeout(Duration::from_secs(1), owner_receiver.recv())
             .await?
             .expect("owner receives live agent delta");
-        assert_eq!(
-            owner_message["params"]["update"],
-            serde_json::json!({
-                "sessionUpdate": "agent_message_chunk",
-                "content": {
-                    "type": "text",
-                    "text": "hello",
-                },
-                "messageId": item_id.to_string(),
-            })
-        );
+        assert_agent_message_chunk_update(&owner_message["params"]["update"], turn_id, item_id);
         assert!(
             tokio::time::timeout(Duration::from_millis(50), observer_receiver.recv())
                 .await
@@ -1682,16 +1703,8 @@ mod tests {
         let watcher_message = tokio::time::timeout(Duration::from_secs(1), watcher_receiver.recv())
             .await?
             .expect("regular stdio watcher receives live agent delta");
-        let expected_update = serde_json::json!({
-            "sessionUpdate": "agent_message_chunk",
-            "content": {
-                "type": "text",
-                "text": "hello",
-            },
-            "messageId": item_id.to_string(),
-        });
-        assert_eq!(owner_message["params"]["update"], expected_update);
-        assert_eq!(watcher_message["params"]["update"], expected_update);
+        assert_agent_message_chunk_update(&owner_message["params"]["update"], turn_id, item_id);
+        assert_agent_message_chunk_update(&watcher_message["params"]["update"], turn_id, item_id);
 
         Ok(())
     }

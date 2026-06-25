@@ -96,9 +96,7 @@ mod tests {
             meta.remove(DEVO_ACTIVITY_AT_META);
         }
     }
-    fn strip_update_activity_at(
-        mut update: Option<AcpSessionUpdate>,
-    ) -> Option<AcpSessionUpdate> {
+    fn strip_update_activity_at(mut update: Option<AcpSessionUpdate>) -> Option<AcpSessionUpdate> {
         if let Some(update) = &mut update {
             match update {
                 AcpSessionUpdate::UserMessageChunk { meta, .. }
@@ -117,7 +115,10 @@ mod tests {
         update
     }
     fn strip_json_activity_at(update: &mut serde_json::Value) {
-        if let Some(meta) = update.get_mut("_meta").and_then(serde_json::Value::as_object_mut) {
+        if let Some(meta) = update
+            .get_mut("_meta")
+            .and_then(serde_json::Value::as_object_mut)
+        {
             meta.remove(DEVO_ACTIVITY_AT_META);
         }
     }
@@ -1106,10 +1107,7 @@ mod tests {
         assert_activity_at(&started_update);
         strip_json_activity_at(&mut started_update);
 
-        assert_eq!(
-            started_update["status"],
-            serde_json::json!("pending")
-        );
+        assert_eq!(started_update["status"], serde_json::json!("pending"));
         assert_eq!(
             started_update["_meta"],
             serde_json::json!({

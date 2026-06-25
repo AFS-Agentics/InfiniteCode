@@ -281,7 +281,8 @@ mod tests {
 
         assert!(prompt.contains("Stage: delegated deep research worker."));
         assert!(prompt.contains("parent supervisor"));
-        assert!(prompt.contains("not a final\nuser-facing"));
+        assert!(prompt.contains("not a final"));
+        assert!(prompt.contains("user-facing report"));
         assert!(prompt.contains("Do not write files"));
         assert!(prompt.contains("assistant text only"));
         assert!(prompt.contains("Agent coordination tools are not available"));

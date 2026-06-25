@@ -190,6 +190,24 @@ pub(super) fn validate_acp_session_roots(
     Ok(())
 }
 
+pub(super) fn encode_session_list_cursor(start: usize) -> String {
+    URL_SAFE_NO_PAD.encode(format!("{ACP_SESSION_LIST_CURSOR_PREFIX}{start}"))
+}
+
+pub(super) fn decode_session_list_cursor(cursor: &str) -> Result<usize, String> {
+    let bytes = URL_SAFE_NO_PAD
+        .decode(cursor)
+        .map_err(|_| "session/list cursor is invalid".to_string())?;
+    let value =
+        std::str::from_utf8(&bytes).map_err(|_| "session/list cursor is invalid".to_string())?;
+    let start = value
+        .strip_prefix(ACP_SESSION_LIST_CURSOR_PREFIX)
+        .ok_or_else(|| "session/list cursor is invalid".to_string())?;
+    start
+        .parse::<usize>()
+        .map_err(|_| "session/list cursor is invalid".to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,22 +248,4 @@ mod tests {
 
         assert_eq!(history_replay_start(&items, Some(2)), 0);
     }
-}
-
-pub(super) fn encode_session_list_cursor(start: usize) -> String {
-    URL_SAFE_NO_PAD.encode(format!("{ACP_SESSION_LIST_CURSOR_PREFIX}{start}"))
-}
-
-pub(super) fn decode_session_list_cursor(cursor: &str) -> Result<usize, String> {
-    let bytes = URL_SAFE_NO_PAD
-        .decode(cursor)
-        .map_err(|_| "session/list cursor is invalid".to_string())?;
-    let value =
-        std::str::from_utf8(&bytes).map_err(|_| "session/list cursor is invalid".to_string())?;
-    let start = value
-        .strip_prefix(ACP_SESSION_LIST_CURSOR_PREFIX)
-        .ok_or_else(|| "session/list cursor is invalid".to_string())?;
-    start
-        .parse::<usize>()
-        .map_err(|_| "session/list cursor is invalid".to_string())
 }
