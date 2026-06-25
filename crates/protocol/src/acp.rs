@@ -91,6 +91,42 @@ mod tests {
             ),
         ])
     }
+    fn strip_activity_at(meta: &mut Option<AcpMeta>) {
+        if let Some(meta) = meta {
+            meta.remove(DEVO_ACTIVITY_AT_META);
+        }
+    }
+    fn strip_update_activity_at(
+        mut update: Option<AcpSessionUpdate>,
+    ) -> Option<AcpSessionUpdate> {
+        if let Some(update) = &mut update {
+            match update {
+                AcpSessionUpdate::UserMessageChunk { meta, .. }
+                | AcpSessionUpdate::AgentMessageChunk { meta, .. }
+                | AcpSessionUpdate::AgentThoughtChunk { meta, .. }
+                | AcpSessionUpdate::ToolCall { meta, .. }
+                | AcpSessionUpdate::ToolCallUpdate { meta, .. }
+                | AcpSessionUpdate::Plan { meta, .. }
+                | AcpSessionUpdate::AvailableCommandsUpdate { meta, .. }
+                | AcpSessionUpdate::CurrentModeUpdate { meta, .. }
+                | AcpSessionUpdate::ConfigOptionUpdate { meta, .. }
+                | AcpSessionUpdate::SessionInfoUpdate { meta, .. }
+                | AcpSessionUpdate::UsageUpdate { meta, .. } => strip_activity_at(meta),
+            }
+        }
+        update
+    }
+    fn strip_json_activity_at(update: &mut serde_json::Value) {
+        if let Some(meta) = update.get_mut("_meta").and_then(serde_json::Value::as_object_mut) {
+            meta.remove(DEVO_ACTIVITY_AT_META);
+        }
+    }
+    fn assert_activity_at(update: &serde_json::Value) {
+        let activity_at = update["_meta"][DEVO_ACTIVITY_AT_META]
+            .as_str()
+            .expect("activity timestamp");
+        chrono::DateTime::parse_from_rfc3339(activity_at).expect("activity timestamp is RFC3339");
+    }
     use crate::acp_event_to_update::file_change_tool_content;
     use crate::acp_event_to_update::tool_result_content;
     use crate::acp_session_update::*;
@@ -757,7 +793,7 @@ mod tests {
         });
 
         assert_eq!(
-            acp_update_from_server_event(&event),
+            strip_update_activity_at(acp_update_from_server_event(&event)),
             Some(AcpSessionUpdate::ToolCallUpdate {
                 tool_call_id: "call-1".to_string(),
                 title: Some("apply_patch".to_string()),
@@ -929,7 +965,7 @@ mod tests {
         });
 
         assert_eq!(
-            acp_update_from_server_event(&event),
+            strip_update_activity_at(acp_update_from_server_event(&event)),
             Some(AcpSessionUpdate::ToolCallUpdate {
                 tool_call_id: "call-1".to_string(),
                 title: Some("cargo test".to_string()),
@@ -990,7 +1026,7 @@ mod tests {
         });
 
         assert_eq!(
-            acp_update_from_server_event(&event),
+            strip_update_activity_at(acp_update_from_server_event(&event)),
             Some(AcpSessionUpdate::ToolCallUpdate {
                 tool_call_id: "call-1".to_string(),
                 title: Some("Command executed".to_string()),
@@ -1066,13 +1102,16 @@ mod tests {
             },
         });
         let (_, started_value) = acp_notification_from_server_event("item/started", &started);
+        let mut started_update = started_value["update"].clone();
+        assert_activity_at(&started_update);
+        strip_json_activity_at(&mut started_update);
 
         assert_eq!(
-            started_value["update"]["status"],
+            started_update["status"],
             serde_json::json!("pending")
         );
         assert_eq!(
-            started_value["update"]["_meta"],
+            started_update["_meta"],
             serde_json::json!({
                 "devo/turnId": turn_id.to_string(),
                 "devo/itemId": item_id.to_string()
@@ -1088,9 +1127,12 @@ mod tests {
         });
         let (_, update_value) =
             acp_notification_from_server_event("tool_call/status_updated", &update);
+        let mut update_json = update_value["update"].clone();
+        assert_activity_at(&update_json);
+        strip_json_activity_at(&mut update_json);
 
         assert_eq!(
-            update_value["update"],
+            update_json,
             serde_json::json!({
                 "sessionUpdate": "tool_call_update",
                 "toolCallId": "call-1",
@@ -1115,9 +1157,12 @@ mod tests {
         });
         let (_, update_value) =
             acp_notification_from_server_event("tool_call/status_updated", &update);
+        let mut update_json = update_value["update"].clone();
+        assert_activity_at(&update_json);
+        strip_json_activity_at(&mut update_json);
 
         assert_eq!(
-            update_value["update"],
+            update_json,
             serde_json::json!({
                 "sessionUpdate": "tool_call_update",
                 "toolCallId": "call-1",
@@ -1159,8 +1204,11 @@ mod tests {
             serde_json::from_value(value.clone()).expect("deserialize ACP notification");
 
         assert_eq!(method, ACP_SESSION_UPDATE_METHOD);
+        let mut update_json = value["update"].clone();
+        assert_activity_at(&update_json);
+        strip_json_activity_at(&mut update_json);
         assert_eq!(
-            value["update"],
+            update_json,
             serde_json::json!({
                 "sessionUpdate": "agent_message_chunk",
                 "content": {
@@ -1198,8 +1246,11 @@ mod tests {
             serde_json::from_value(value.clone()).expect("deserialize ACP notification");
 
         assert_eq!(method, ACP_SESSION_UPDATE_METHOD);
+        let mut update_json = value["update"].clone();
+        assert_activity_at(&update_json);
+        strip_json_activity_at(&mut update_json);
         assert_eq!(
-            value["update"],
+            update_json,
             serde_json::json!({
                 "sessionUpdate": "agent_thought_chunk",
                 "content": {
