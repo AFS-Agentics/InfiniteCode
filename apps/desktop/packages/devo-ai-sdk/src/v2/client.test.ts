@@ -1,0 +1,1111 @@
+import { afterEach, describe, expect, test } from "bun:test"
+import { createDevoClient, type DevoAcpTransport, type DevoAcpTransportEvent } from "./client"
+import type {
+	AcpRequestPermissionParams,
+	AcpSessionConfigOption,
+	AcpSessionInfo,
+	AcpSessionNotification,
+	RequestUserInputRespondParams,
+} from "./generated"
+
+class FakeTransport implements DevoAcpTransport {
+	readonly requests: Array<{ method: string; params: unknown; directory?: string }> = []
+	readonly responses: Array<{ id: string | number; result: unknown }> = []
+	private listeners: Array<(event: DevoAcpTransportEvent) => void> = []
+
+	constructor(
+		private readonly handler: (
+			method: string,
+			params: unknown,
+			directory?: string,
+			transport?: FakeTransport,
+		) => unknown,
+	) {}
+
+	async request(method: string, params?: unknown, directory?: string): Promise<unknown> {
+		this.requests.push({ method, params, directory })
+		return this.handler(method, params, directory, this)
+	}
+
+	async respond(id: string | number, result: unknown): Promise<void> {
+		this.responses.push({ id, result })
+	}
+
+	subscribe(listener: (event: DevoAcpTransportEvent) => void): () => void {
+		this.listeners.push(listener)
+		return () => {
+			this.listeners = this.listeners.filter((item) => item !== listener)
+		}
+	}
+
+	connected(): boolean {
+		return true
+	}
+
+	emitSessionUpdate(params: unknown): void {
+		for (const listener of this.listeners) {
+			listener({ type: "notification", method: "session/update", params })
+		}
+	}
+
+	emitRequest(id: string | number, method: string, params: unknown): void {
+		for (const listener of this.listeners) {
+			listener({ type: "request", id, method, params })
+		}
+	}
+}
+
+const sessionInfo = {
+	sessionId: "s1",
+	cwd: "/repo",
+	title: "Existing session",
+	updatedAt: "2026-06-24T00:00:00.000Z",
+} satisfies AcpSessionInfo
+
+const configOptions = [
+	{
+		type: "select",
+		id: "model",
+		name: "Model",
+		category: "model",
+		currentValue: "test-openai",
+		options: [
+			{ value: "test-openai", name: "Test OpenAI", description: "OpenAI: test-model" },
+			{ value: "alt-openai", name: "Alt OpenAI", description: "OpenAI: alt-model" },
+		],
+	},
+] satisfies AcpSessionConfigOption[]
+
+const initializeResult = {
+	protocolVersion: 1,
+	agentCapabilities: {},
+	authMethods: [],
+}
+
+const originalNow = Date.now
+
+afterEach(() => {
+	Date.now = originalNow
+})
+
+async function nextPayload(stream: AsyncIterator<any>, label: string): Promise<any> {
+	const result = await Promise.race([
+		stream.next(),
+		new Promise<IteratorResult<any>>((resolve) =>
+			setTimeout(() => resolve({ value: { payload: { type: `timeout:${label}` } }, done: false }), 20),
+		),
+	])
+	return result.value.payload
+}
+
+describe("ACP desktop SDK session mapping", () => {
+	test("loads ACP history and returns grouped messages with accumulated text parts", async () => {
+		Date.now = () => 1_772_000_000_000
+		const transport = new FakeTransport((method, _params, _directory, tx) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "session/load") {
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "user_message_chunk",
+						messageId: "u1",
+						content: { type: "text", text: "hello" },
+					},
+				} satisfies AcpSessionNotification)
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "agent_message_chunk",
+						messageId: "a1",
+						content: { type: "text", text: "hi " },
+					},
+				} satisfies AcpSessionNotification)
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "agent_message_chunk",
+						messageId: "a1",
+						content: { type: "text", text: "there" },
+					},
+				} satisfies AcpSessionNotification)
+				return { configOptions }
+			}
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+
+		await client.session.list()
+		const result = await client.session.messages({ sessionID: "s1" })
+
+		expect(transport.requests.map((request) => request.method)).toEqual([
+			"initialize",
+			"session/list",
+			"session/load",
+		])
+		expect(result.data).toEqual([
+			{
+				info: {
+					id: "u1",
+					sessionID: "s1",
+					role: "user",
+					time: { created: 1_772_000_000_000 },
+				},
+				parts: [
+					{
+						id: "u1-text",
+						sessionID: "s1",
+						messageID: "u1",
+						type: "text",
+						text: "hello",
+						time: { start: 1_772_000_000_000 },
+					},
+				],
+			},
+			{
+				info: {
+					id: "a1",
+					sessionID: "s1",
+					role: "assistant",
+					parentID: "u1",
+					time: { created: 1_772_000_000_001 },
+				},
+				parts: [
+					{
+						id: "a1-text",
+						sessionID: "s1",
+						messageID: "a1",
+						type: "text",
+						text: "hi there",
+						time: { start: 1_772_000_000_001 },
+					},
+				],
+			},
+		])
+	})
+
+	test("normalizes reasoning and tool parts for renderer time/output assumptions", async () => {
+		Date.now = () => 1_772_000_000_000
+		const transport = new FakeTransport((method, _params, _directory, tx) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "session/load") {
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "user_message_chunk",
+						messageId: "u1",
+						content: { type: "text", text: "hello" },
+					},
+				} satisfies AcpSessionNotification)
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "agent_thought_chunk",
+						messageId: "a1",
+						content: { type: "text", text: "thinking" },
+					},
+				} satisfies AcpSessionNotification)
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "tool_call_update",
+						toolCallId: "tool1",
+						title: "Read file",
+					},
+				} satisfies AcpSessionNotification)
+				return { configOptions }
+			}
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+
+		await client.session.list()
+		const result = await client.session.messages({ sessionID: "s1" })
+
+		expect(result.data.at(-2).parts[0]).toEqual({
+			id: "a1-reasoning",
+			sessionID: "s1",
+			messageID: "a1",
+			type: "reasoning",
+			text: "thinking",
+			time: { start: 1_772_000_000_001 },
+		})
+		expect(result.data.at(-1).parts[0]).toEqual({
+			id: "tool-tool1-part",
+			sessionID: "s1",
+			messageID: "tool-tool1",
+			type: "tool",
+			callID: "tool1",
+			tool: "read",
+			state: {
+				status: "completed",
+				input: {},
+				output: "",
+				title: "Read file",
+				metadata: {},
+				time: { start: 1_772_000_000_002, end: 1_772_000_000_002 },
+			},
+		})
+	})
+
+	test("uses ACP config options for model list and applies selected model before prompting", async () => {
+		const transport = new FakeTransport((method, _params, _directory, tx) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "session/load") {
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "user_message_chunk",
+						messageId: "u1",
+						content: { type: "text", text: "hello" },
+					},
+				} satisfies AcpSessionNotification)
+				return { configOptions }
+			}
+			if (method === "session/set_config_option") return { configOptions }
+			if (method === "session/prompt") return { stopReason: "end_turn" }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+
+		await client.session.list()
+		await client.session.messages({ sessionID: "s1" })
+		const providers = await client.config.providers()
+		await client.session.promptAsync({
+			sessionID: "s1",
+			parts: [{ type: "text", text: "use another model" }],
+			model: { providerID: "session", modelID: "alt-openai" },
+		})
+
+		expect(providers.data).toEqual({
+			default: { session: "test-openai" },
+			providers: [
+				{
+					id: "session",
+					name: "Session",
+					models: {
+						"test-openai": {
+							name: "Test OpenAI",
+							description: "OpenAI: test-model",
+							capabilities: {
+								reasoning: false,
+								input: { image: false, pdf: false },
+								attachment: false,
+							},
+						},
+						"alt-openai": {
+							name: "Alt OpenAI",
+							description: "OpenAI: alt-model",
+							capabilities: {
+								reasoning: false,
+								input: { image: false, pdf: false },
+								attachment: false,
+							},
+						},
+					},
+				},
+			],
+		})
+		expect(transport.requests.at(-2)).toEqual({
+			method: "session/set_config_option",
+			directory: "/repo",
+			params: { sessionId: "s1", configId: "model", value: "alt-openai" },
+		})
+		expect(transport.requests.at(-1)).toEqual({
+			method: "session/prompt",
+			directory: "/repo",
+			params: {
+				sessionId: "s1",
+				prompt: [{ type: "text", text: "use another model" }],
+			},
+		})
+	})
+
+	test("starts ACP prompt without waiting for the final turn response", async () => {
+		const transport = new FakeTransport((method, _params, _directory, tx) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "session/load") {
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "user_message_chunk",
+						messageId: "u1",
+						content: { type: "text", text: "hello" },
+					},
+				} satisfies AcpSessionNotification)
+				return { configOptions }
+			}
+			if (method === "session/prompt") return new Promise(() => {})
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+
+		await client.session.list()
+		await client.session.messages({ sessionID: "s1" })
+		const result = await Promise.race([
+			client.session
+				.promptAsync({
+					sessionID: "s1",
+					parts: [{ type: "text", text: "stream now" }],
+				})
+				.then(() => "returned"),
+			new Promise((resolve) => setTimeout(() => resolve("pending"), 10)),
+		])
+
+		expect(result).toBe("returned")
+		expect(transport.requests.at(-1)).toEqual({
+			method: "session/prompt",
+			directory: "/repo",
+			params: {
+				sessionId: "s1",
+				prompt: [{ type: "text", text: "stream now" }],
+			},
+		})
+	})
+
+	test("emits busy and idle status around detached ACP prompt lifecycle", async () => {
+		let resolvePrompt: (value: unknown) => void = () => {}
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "session/prompt") {
+				return new Promise((resolve) => {
+					resolvePrompt = resolve
+				})
+			}
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		await client.session.list()
+		await client.session.promptAsync({
+			sessionID: "s1",
+			parts: [{ type: "text", text: "stream now" }],
+		})
+
+		expect(await nextPayload(stream, "busy")).toEqual({
+			type: "session.status",
+			properties: {
+				sessionID: "s1",
+				status: { type: "busy" },
+			},
+		})
+
+		resolvePrompt({ stopReason: "end_turn" })
+
+		expect(await nextPayload(stream, "idle")).toEqual({
+			type: "session.status",
+			properties: {
+				sessionID: "s1",
+				status: { type: "idle" },
+			},
+		})
+	})
+
+	test("does not parent assistant updates to a stale user after a new prompt", async () => {
+		Date.now = () => 1_772_000_000_000
+		const transport = new FakeTransport((method, _params, _directory, tx) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "session/load") {
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "user_message_chunk",
+						messageId: "u1",
+						content: { type: "text", text: "old prompt" },
+					},
+				} satisfies AcpSessionNotification)
+				return { configOptions }
+			}
+			if (method === "session/prompt") return { stopReason: "end_turn" }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+
+		await client.session.list()
+		await client.session.messages({ sessionID: "s1" })
+		await client.session.promptAsync({
+			sessionID: "s1",
+			parts: [{ type: "text", text: "new prompt without user echo" }],
+		})
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: {
+				sessionUpdate: "agent_message_chunk",
+				messageId: "a2",
+				content: { type: "text", text: "new answer" },
+			},
+		} satisfies AcpSessionNotification)
+
+		const result = await client.session.messages({ sessionID: "s1" })
+
+		expect(result.data).toEqual([
+			{
+				info: {
+					id: "u1",
+					sessionID: "s1",
+					role: "user",
+					time: { created: 1_772_000_000_000 },
+				},
+				parts: [
+					{
+						id: "u1-text",
+						sessionID: "s1",
+						messageID: "u1",
+						type: "text",
+						text: "old prompt",
+						time: { start: 1_772_000_000_000 },
+					},
+				],
+			},
+			{
+				info: {
+					id: "a2",
+					sessionID: "s1",
+					role: "assistant",
+					time: { created: 1_772_000_000_001 },
+				},
+				parts: [
+					{
+						id: "a2-text",
+						sessionID: "s1",
+						messageID: "a2",
+						type: "text",
+						text: "new answer",
+						time: { start: 1_772_000_000_001 },
+					},
+				],
+			},
+		])
+	})
+
+	test("preserves file prompt parts as ACP resource links", async () => {
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "session/prompt") return { stopReason: "end_turn" }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+
+		await client.session.list()
+		await client.session.promptAsync({
+			sessionID: "s1",
+			parts: [
+				{ type: "text", text: "read this" },
+				{
+					type: "file",
+					url: "file:///repo/src/main.rs",
+					filename: "main.rs",
+					mime: "text/x-rust",
+				},
+			],
+		})
+
+		expect(transport.requests.at(-1)).toEqual({
+			method: "session/prompt",
+			directory: "/repo",
+			params: {
+				sessionId: "s1",
+				prompt: [
+					{ type: "text", text: "read this" },
+					{
+						type: "resource_link",
+						uri: "file:///repo/src/main.rs",
+						name: "main.rs",
+						mimeType: "text/x-rust",
+					},
+				],
+			},
+		})
+	})
+
+	test("maps ACP reasoning effort options to model variants and applies selected effort", async () => {
+		const optionsWithReasoning = [
+			...configOptions,
+			{
+				type: "select",
+				id: "thought_level",
+				name: "Reasoning effort",
+				category: "thought_level",
+				currentValue: "medium",
+				options: [
+					{ value: "low", name: "Low", description: "Fast responses" },
+					{ value: "medium", name: "Medium", description: "Balanced responses" },
+					{ value: "high", name: "High", description: "Deeper reasoning" },
+				],
+			},
+		] satisfies AcpSessionConfigOption[]
+		const transport = new FakeTransport((method, _params, _directory, tx) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "session/load") {
+				tx?.emitSessionUpdate({
+					sessionId: "s1",
+					update: {
+						sessionUpdate: "user_message_chunk",
+						messageId: "u1",
+						content: { type: "text", text: "hello" },
+					},
+				} satisfies AcpSessionNotification)
+				return { configOptions: optionsWithReasoning }
+			}
+			if (method === "session/set_config_option") return { configOptions: optionsWithReasoning }
+			if (method === "session/prompt") return { stopReason: "end_turn" }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+
+		await client.session.list()
+		await client.session.messages({ sessionID: "s1" })
+		const providers = await client.config.providers()
+		await client.session.promptAsync({
+			sessionID: "s1",
+			parts: [{ type: "text", text: "think harder" }],
+			variant: "high",
+		})
+
+		expect(providers.data.providers[0].models["test-openai"]).toEqual({
+			name: "Test OpenAI",
+			description: "OpenAI: test-model",
+			capabilities: {
+				reasoning: true,
+				input: { image: false, pdf: false },
+				attachment: false,
+			},
+			variants: {
+				low: { name: "Low", description: "Fast responses" },
+				medium: { name: "Medium", description: "Balanced responses" },
+				high: { name: "High", description: "Deeper reasoning" },
+			},
+			currentVariant: "medium",
+			allowDefaultVariant: false,
+		})
+		expect(transport.requests.at(-2)).toEqual({
+			method: "session/set_config_option",
+			directory: "/repo",
+			params: { sessionId: "s1", configId: "thought_level", value: "high" },
+		})
+		expect(transport.requests.at(-1)).toEqual({
+			method: "session/prompt",
+			directory: "/repo",
+			params: {
+				sessionId: "s1",
+				prompt: [{ type: "text", text: "think harder" }],
+			},
+		})
+	})
+
+	test("maps ACP plan updates to todo events", async () => {
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		await client.session.list()
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: {
+				sessionUpdate: "plan",
+				entries: [
+					{ content: "Inspect", status: "completed", priority: "medium" },
+					{ content: "Patch", status: "in_progress", priority: "medium" },
+				],
+			},
+		} satisfies AcpSessionNotification)
+
+		const first = await stream.next()
+		const second = await stream.next()
+
+		expect(first.value.payload.type).toBe("session.updated")
+		expect(second.value.payload).toEqual({
+			type: "todo.updated",
+			properties: {
+				sessionID: "s1",
+				todos: [
+					{ content: "Inspect", status: "completed" },
+					{ content: "Patch", status: "in_progress" },
+				],
+			},
+		})
+	})
+
+	test("maps ACP command, mode, usage, and rich tool updates", async () => {
+		Date.now = () => 1_772_000_000_000
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		await client.session.list()
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: {
+				sessionUpdate: "available_commands_update",
+				availableCommands: [{ name: "compact", description: "Compact session" }],
+			},
+		} satisfies AcpSessionNotification)
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: { sessionUpdate: "current_mode_update", currentModeId: "plan" },
+		} satisfies AcpSessionNotification)
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: { sessionUpdate: "usage_update", used: 42, size: 100 },
+		} satisfies AcpSessionNotification)
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: {
+				sessionUpdate: "tool_call",
+				toolCallId: "tool-rich",
+				title: "Patch file",
+				kind: "edit",
+				status: "completed",
+				rawInput: {},
+				content: [
+					{ type: "diff", path: "src/main.rs", oldText: "old\n", newText: "new\n" },
+					{ type: "terminal", terminalId: "term-1" },
+					{ type: "content", content: { type: "text", text: "applied" } },
+				],
+				locations: [{ path: "src/main.rs", line: 12 }],
+			},
+		} satisfies AcpSessionNotification)
+
+		expect((await nextPayload(stream, "commands-session")).type).toBe("session.updated")
+		expect(await nextPayload(stream, "commands")).toEqual({
+			type: "session.commands.updated",
+			properties: {
+				sessionID: "s1",
+				commands: [{ name: "compact", description: "Compact session" }],
+			},
+		})
+		expect((await nextPayload(stream, "mode-session")).type).toBe("session.updated")
+		expect(await nextPayload(stream, "mode")).toEqual({
+			type: "session.mode.updated",
+			properties: { sessionID: "s1", modeID: "plan" },
+		})
+		expect((await nextPayload(stream, "usage-session")).type).toBe("session.updated")
+		expect(await nextPayload(stream, "usage")).toEqual({
+			type: "session.usage.updated",
+			properties: { sessionID: "s1", used: 42, size: 100, cost: undefined },
+		})
+		expect((await nextPayload(stream, "tool-session")).type).toBe("session.updated")
+		expect((await nextPayload(stream, "tool-message")).type).toBe("message.updated")
+		expect(await nextPayload(stream, "tool-part")).toEqual({
+			type: "message.part.updated",
+			properties: {
+				part: {
+					id: "tool-tool-rich-part",
+					sessionID: "s1",
+					messageID: "tool-tool-rich",
+					type: "tool",
+					callID: "tool-rich",
+					tool: "edit",
+					state: {
+						status: "completed",
+						input: {
+							filePath: "src/main.rs",
+							oldString: "old\n",
+							newString: "new\n",
+							path: "src/main.rs",
+						},
+						output: "applied\n\nTerminal term-1",
+						title: "Patch file",
+						metadata: {
+							acpContent: [
+								{ type: "diff", path: "src/main.rs", oldText: "old\n", newText: "new\n" },
+								{ type: "terminal", terminalId: "term-1" },
+								{ type: "content", content: { type: "text", text: "applied" } },
+							],
+							acpLocations: [{ path: "src/main.rs", line: 12 }],
+						},
+						time: { start: 1_772_000_000_000, end: 1_772_000_000_000 },
+					},
+				},
+			},
+		})
+	})
+
+	test("maps ACP permission requests to permission events and replies", async () => {
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+		const permissionRequest = {
+			sessionId: "s1",
+			toolCall: {
+				toolCallId: "tool1",
+				title: "Run command",
+				kind: "execute",
+				rawInput: { command: "pnpm test" },
+			},
+			options: [
+				{ optionId: "allow-once", name: "Allow once", kind: "allow_once" },
+				{ optionId: "reject-once", name: "Reject", kind: "reject_once" },
+			],
+		} satisfies AcpRequestPermissionParams
+
+		await client.session.list()
+		transport.emitRequest(7, "session/request_permission", permissionRequest)
+		const event = await stream.next()
+		await client.permission.reply({ requestID: "acp-permission-7", reply: "once" })
+
+		expect(event.value.payload).toEqual({
+			type: "permission.asked",
+			properties: {
+				id: "acp-permission-7",
+				requestID: "acp-permission-7",
+				sessionID: "s1",
+				permission: "Run command",
+				metadata: {
+					tool: "execute",
+					command: "pnpm test",
+				},
+			},
+		})
+		expect(transport.responses).toEqual([
+			{
+				id: 7,
+				result: { outcome: { outcome: "selected", optionId: "allow-once" } },
+			},
+		])
+	})
+
+	test("maps original request_user_input events to questions and replies through runtime API", async () => {
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "_devo/request_user_input/respond") return { request_id: "rq1" }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		await client.session.list()
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: { sessionUpdate: "session_info_update" },
+			_meta: {
+				"devo/originalEvent": {
+					RequestUserInput: {
+						request: {
+							request_id: "rq1",
+							session_id: "s1",
+							turn_id: "t1",
+							item_id: null,
+						},
+						questions: [
+							{
+								id: "scope",
+								header: "Scope",
+								question: "Which scope?",
+								options: [{ label: "Repo", description: "Current repository" }],
+							},
+						],
+					},
+				},
+			},
+		} satisfies AcpSessionNotification)
+
+		const first = await stream.next()
+		const second = await stream.next()
+		await client.question.reply({ requestID: "rq1", answers: [["Repo"]] })
+		const expectedRespondParams = {
+			session_id: "s1",
+			turn_id: "t1",
+			request_id: "rq1",
+			response: {
+				answers: {
+					scope: { answers: ["Repo"] },
+				},
+			},
+		} satisfies RequestUserInputRespondParams
+
+		expect(first.value.payload.type).toBe("session.updated")
+		expect(second.value.payload).toEqual({
+			type: "question.asked",
+			properties: {
+				id: "rq1",
+				requestID: "rq1",
+				sessionID: "s1",
+				questions: [
+					{
+						id: "scope",
+						header: "Scope",
+						question: "Which scope?",
+						options: [{ label: "Repo", description: "Current repository" }],
+					},
+				],
+			},
+		})
+		expect(transport.requests.at(-1)).toEqual({
+			method: "_devo/request_user_input/respond",
+			directory: "/repo",
+			params: expectedRespondParams,
+		})
+	})
+
+	test("updates session title from ACP session info updates", async () => {
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		await client.session.list()
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: {
+				sessionUpdate: "session_info_update",
+				title: "Renamed by server",
+				updatedAt: "2026-06-24T01:00:00.000Z",
+			},
+		} satisfies AcpSessionNotification)
+
+		expect(await nextPayload(stream, "title")).toEqual({
+			type: "session.updated",
+			properties: {
+				info: {
+					id: "s1",
+					title: "Renamed by server",
+					directory: "/repo",
+					parentID: undefined,
+					time: {
+						created: Date.parse("2026-06-24T00:00:00.000Z"),
+						updated: Date.parse("2026-06-24T01:00:00.000Z"),
+					},
+					totalInputTokens: 0,
+					totalOutputTokens: 0,
+					totalTokens: 0,
+					totalCacheCreationTokens: 0,
+					totalCacheReadTokens: 0,
+					promptTokenEstimate: 0,
+					lastQueryTotalTokens: 0,
+				},
+				session: {
+					id: "s1",
+					title: "Renamed by server",
+					directory: "/repo",
+					parentID: undefined,
+					time: {
+						created: Date.parse("2026-06-24T00:00:00.000Z"),
+						updated: Date.parse("2026-06-24T01:00:00.000Z"),
+					},
+					totalInputTokens: 0,
+					totalOutputTokens: 0,
+					totalTokens: 0,
+					totalCacheCreationTokens: 0,
+					totalCacheReadTokens: 0,
+					promptTokenEstimate: 0,
+					lastQueryTotalTokens: 0,
+				},
+			},
+		})
+	})
+
+	test("keeps session update time stable when replaying loaded history", async () => {
+		Date.now = () => Date.parse("2026-06-24T02:00:00.000Z")
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		await client.session.list()
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: {
+				sessionUpdate: "user_message_chunk",
+				messageId: "u1",
+				content: { type: "text", text: "hello" },
+			},
+		} satisfies AcpSessionNotification)
+
+		expect(await nextPayload(stream, "history replay")).toEqual({
+			type: "session.updated",
+			properties: {
+				info: {
+					id: "s1",
+					title: "Existing session",
+					directory: "/repo",
+					parentID: undefined,
+					time: {
+						created: Date.parse("2026-06-24T00:00:00.000Z"),
+						updated: Date.parse("2026-06-24T00:00:00.000Z"),
+					},
+					totalInputTokens: 0,
+					totalOutputTokens: 0,
+					totalTokens: 0,
+					totalCacheCreationTokens: 0,
+					totalCacheReadTokens: 0,
+					promptTokenEstimate: 0,
+					lastQueryTotalTokens: 0,
+				},
+				session: {
+					id: "s1",
+					title: "Existing session",
+					directory: "/repo",
+					parentID: undefined,
+					time: {
+						created: Date.parse("2026-06-24T00:00:00.000Z"),
+						updated: Date.parse("2026-06-24T00:00:00.000Z"),
+					},
+					totalInputTokens: 0,
+					totalOutputTokens: 0,
+					totalTokens: 0,
+					totalCacheCreationTokens: 0,
+					totalCacheReadTokens: 0,
+					promptTokenEstimate: 0,
+					lastQueryTotalTokens: 0,
+				},
+			},
+		})
+	})
+
+	test("uses ACP extension method for title updates and emits deletion events", async () => {
+		const transport = new FakeTransport((method, params) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			if (method === "_devo/session/title/update") {
+				return {
+					session: {
+						session_id: (params as { session_id: string }).session_id,
+						cwd: "/repo",
+						created_at: "2026-06-24T01:00:00.000Z",
+						updated_at: "2026-06-24T01:00:00.000Z",
+						title: "New title",
+						title_state: { Final: "UserRename" },
+						ephemeral: false,
+						model: null,
+						reasoning_effort: null,
+						total_input_tokens: 0,
+						total_output_tokens: 0,
+						total_tokens: 0,
+						total_cache_creation_tokens: 0,
+						total_cache_read_tokens: 0,
+						prompt_token_estimate: 0,
+						last_query_total_tokens: 0,
+						status: "idle",
+					},
+				}
+			}
+			if (method === "session/delete") return {}
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		await client.session.list()
+		await client.session.update({ sessionID: "s1", title: "New title" })
+		await client.session.delete({ sessionID: "s1" })
+
+		expect(transport.requests.at(-2)).toEqual({
+			method: "_devo/session/title/update",
+			directory: "/repo",
+			params: { session_id: "s1", title: "New title" },
+		})
+		expect(await nextPayload(stream, "renamed")).toEqual({
+			type: "session.updated",
+			properties: {
+				info: {
+					id: "s1",
+					title: "New title",
+					directory: "/repo",
+					parentID: undefined,
+					time: {
+						created: Date.parse("2026-06-24T01:00:00.000Z"),
+						updated: Date.parse("2026-06-24T01:00:00.000Z"),
+					},
+					totalInputTokens: 0,
+					totalOutputTokens: 0,
+					totalTokens: 0,
+					totalCacheCreationTokens: 0,
+					totalCacheReadTokens: 0,
+					promptTokenEstimate: 0,
+					lastQueryTotalTokens: 0,
+				},
+				session: {
+					id: "s1",
+					title: "New title",
+					directory: "/repo",
+					parentID: undefined,
+					time: {
+						created: Date.parse("2026-06-24T01:00:00.000Z"),
+						updated: Date.parse("2026-06-24T01:00:00.000Z"),
+					},
+					totalInputTokens: 0,
+					totalOutputTokens: 0,
+					totalTokens: 0,
+					totalCacheCreationTokens: 0,
+					totalCacheReadTokens: 0,
+					promptTokenEstimate: 0,
+					lastQueryTotalTokens: 0,
+				},
+			},
+		})
+		expect(await nextPayload(stream, "deleted")).toEqual({
+			type: "session.deleted",
+			properties: {
+				info: {
+					id: "s1",
+					directory: "/repo",
+				},
+			},
+		})
+	})
+
+	test("follows ACP session list pagination until caller limit is satisfied", async () => {
+		const pages = new Map<string | undefined, AcpSessionInfo[]>([
+			[undefined, [sessionInfo]],
+			[
+				"page-2",
+				[
+					{
+						sessionId: "s2",
+						cwd: "/repo",
+						title: "Second session",
+						updatedAt: "2026-06-24T00:01:00.000Z",
+					},
+				],
+			],
+		])
+		const transport = new FakeTransport((method, params) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") {
+				const cursor = (params as { cursor?: string }).cursor
+				return {
+					sessions: pages.get(cursor) ?? [],
+					nextCursor: cursor ? null : "page-2",
+				}
+			}
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+
+		const result = await client.session.list({ limit: 2 })
+
+		expect(result.data.map((session) => session.id)).toEqual(["s1", "s2"])
+		expect(transport.requests.filter((request) => request.method === "session/list")).toEqual([
+			{ method: "session/list", directory: "/repo", params: { cwd: "/repo" } },
+			{ method: "session/list", directory: "/repo", params: { cwd: "/repo", cursor: "page-2" } },
+		])
+	})
+})
