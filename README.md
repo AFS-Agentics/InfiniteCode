@@ -136,6 +136,16 @@ devo upgrade
 The upgrade command runs the same platform installer, and the installer prints
 the version transition, for example `Version: v0.1.12 -> v0.1.15`.
 
+### macOS Desktop App
+
+**If macOS reports that `Devo.app` is damaged and cannot be opened, this is
+expected.** Current macOS Desktop builds are unsigned, so after installing,
+run the following command so macOS can launch the app:
+
+```bash
+sudo xattr -dr com.apple.quarantine /Applications/Devo.app
+```
+
 <details>
 <summary>Offline Installation</summary>
 

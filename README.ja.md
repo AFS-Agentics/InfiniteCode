@@ -126,6 +126,16 @@ devo upgrade
 アップグレードコマンドは同じプラットフォーム用インストーラーを実行し、
 インストーラーは `Version: v0.1.12 -> v0.1.15` のようにバージョン遷移を表示します。
 
+### macOS デスクトップアプリ
+
+**macOS に「Devo」は壊れているため開けません、と表示される場合がありますが、これは想定された動作です。**
+現在の macOS Desktop builds は署名されていないため、インストール後に次のコマンドを実行すると
+macOS でアプリを起動できます:
+
+```bash
+sudo xattr -dr com.apple.quarantine /Applications/Devo.app
+```
+
 <details>
 <summary>オフラインインストール</summary>
 

@@ -124,6 +124,15 @@ devo upgrade
 升級命令會執行同一套平台安裝器，安裝器會列印版本變化，例如
 `Version: v0.1.12 -> v0.1.15`。
 
+### macOS 桌面應用
+
+**如果 macOS 提示「Devo」已損壞，無法打開，這是正常現象。**目前 macOS
+Desktop builds 尚未簽名，因此安裝後需要執行下面的命令，macOS 才能啟動應用：
+
+```bash
+sudo xattr -dr com.apple.quarantine /Applications/Devo.app
+```
+
 <details>
 <summary>離線安裝</summary>
 
