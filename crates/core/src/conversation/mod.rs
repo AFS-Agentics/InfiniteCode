@@ -6,6 +6,7 @@ pub use records::{
     ItemLine, ItemRecord, MessageEditRecordedLine, ResearchArtifactItem, ResearchArtifactType,
     RolloutLine, SessionMetaLine, SessionRecord, SessionRollbackLine, SessionTitleUpdatedLine,
     TextItem, ToolCallItem, ToolProgressItem, ToolResultItem, TurnError, TurnItem, TurnLine,
-    TurnRecord, TurnSupersededLine, TurnWorkspaceRestoreCompletedLine,
+    TurnRecord, TurnSupersededLine, TurnWorkspaceChangeRecordedLine,
+    TurnWorkspaceCheckpointRecordedLine, TurnWorkspaceRestoreCompletedLine,
     TurnWorkspaceRestoreStartedLine, Worklog,
 };

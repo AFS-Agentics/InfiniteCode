@@ -46,6 +46,10 @@ use devo_core::TurnRecord;
 use devo_core::TurnStatus;
 use devo_core::TurnSupersededLine;
 use devo_core::TurnSupersededRecord;
+use devo_core::TurnWorkspaceChangeRecordedLine;
+use devo_core::TurnWorkspaceChangeRecordedRecord;
+use devo_core::TurnWorkspaceCheckpointRecordedLine;
+use devo_core::TurnWorkspaceCheckpointRecordedRecord;
 use devo_core::TurnWorkspaceRestoreCompletedLine;
 use devo_core::TurnWorkspaceRestoreCompletedRecord;
 use devo_core::TurnWorkspaceRestoreStartedLine;
@@ -258,6 +262,38 @@ impl RolloutStore {
             &RolloutLine::TurnWorkspaceRestoreStarted(Box::new(TurnWorkspaceRestoreStartedLine {
                 timestamp: Utc::now(),
                 record: restore,
+            })),
+        )
+    }
+
+    /// Appends one workspace-checkpoint record to the durable rollout journal.
+    pub(crate) fn append_workspace_checkpoint_recorded(
+        &self,
+        record: &SessionRecord,
+        checkpoint: TurnWorkspaceCheckpointRecordedRecord,
+    ) -> Result<()> {
+        self.append_line(
+            &record.rollout_path,
+            &RolloutLine::TurnWorkspaceCheckpointRecorded(Box::new(
+                TurnWorkspaceCheckpointRecordedLine {
+                    timestamp: Utc::now(),
+                    record: checkpoint,
+                },
+            )),
+        )
+    }
+
+    /// Appends one workspace-change record to the durable rollout journal.
+    pub(crate) fn append_workspace_change_recorded(
+        &self,
+        record: &SessionRecord,
+        change: TurnWorkspaceChangeRecordedRecord,
+    ) -> Result<()> {
+        self.append_line(
+            &record.rollout_path,
+            &RolloutLine::TurnWorkspaceChangeRecorded(Box::new(TurnWorkspaceChangeRecordedLine {
+                timestamp: Utc::now(),
+                record: change,
             })),
         )
     }
@@ -611,6 +647,30 @@ impl ReplayState {
                     "turn superseded line",
                 )?;
                 self.apply_turn_superseded(line.record);
+            }
+            RolloutLine::TurnWorkspaceCheckpointRecorded(line) => {
+                self.apply_record_timestamp(
+                    line.record.session_id,
+                    line.timestamp,
+                    "workspace checkpoint line",
+                )?;
+                self.apply_activity_timestamp(
+                    line.record.session_id,
+                    line.timestamp,
+                    "workspace checkpoint line",
+                )?;
+            }
+            RolloutLine::TurnWorkspaceChangeRecorded(line) => {
+                self.apply_record_timestamp(
+                    line.record.session_id,
+                    line.timestamp,
+                    "workspace change line",
+                )?;
+                self.apply_activity_timestamp(
+                    line.record.session_id,
+                    line.timestamp,
+                    "workspace change line",
+                )?;
             }
             RolloutLine::TurnWorkspaceRestoreStarted(line) => {
                 self.apply_record_timestamp(

@@ -790,6 +790,8 @@ impl ServerRuntime {
             status = ?interrupted_turn.status,
             "interrupted turn"
         );
+        self.finalize_turn_workspace_changes(params.session_id, &interrupted_turn)
+            .await;
         self.broadcast_event(ServerEvent::TurnInterrupted(TurnEventPayload {
             session_id: params.session_id,
             turn: interrupted_turn.clone(),

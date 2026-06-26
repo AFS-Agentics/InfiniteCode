@@ -220,6 +220,21 @@ pub fn generate_protocol_typescript() -> String {
     push_decl::<TurnSteerParams>(&cfg, &mut output);
     push_decl::<TurnSteerResult>(&cfg, &mut output);
     push_decl::<TurnKind>(&cfg, &mut output);
+    push_decl::<WorkspaceChangeScope>(&cfg, &mut output);
+    push_decl::<WorkspaceDiffDetail>(&cfg, &mut output);
+    push_decl::<WorkspaceChangeViewStatus>(&cfg, &mut output);
+    push_decl::<WorkspaceChangeCoverage>(&cfg, &mut output);
+    push_decl::<WorkspaceChangeSetStatus>(&cfg, &mut output);
+    push_decl::<WorkspaceChangedFileStatus>(&cfg, &mut output);
+    push_decl::<WorkspaceCheckpointBackend>(&cfg, &mut output);
+    push_decl::<WorkspaceChangeBase>(&cfg, &mut output);
+    push_decl::<WorkspaceChangeAttribution>(&cfg, &mut output);
+    push_decl::<WorkspaceChangedFile>(&cfg, &mut output);
+    push_decl::<WorkspaceChangeStats>(&cfg, &mut output);
+    push_decl::<WorkspaceChangeView>(&cfg, &mut output);
+    push_decl::<WorkspaceChangesReadParams>(&cfg, &mut output);
+    push_decl::<WorkspaceChangesReadResult>(&cfg, &mut output);
+    push_decl::<WorkspaceChangesUpdatedPayload>(&cfg, &mut output);
 
     push_decl::<ApprovalResponseParams>(&cfg, &mut output);
     push_decl::<ApprovalDecisionValue>(&cfg, &mut output);
@@ -675,6 +690,9 @@ fn register_devo_protocol_schemas(
     schema::<TurnInterruptResult>(schemas);
     schema::<TurnSteerParams>(schemas);
     schema::<TurnSteerResult>(schemas);
+    schema::<WorkspaceChangesReadParams>(schemas);
+    schema::<WorkspaceChangesReadResult>(schemas);
+    schema::<WorkspaceChangesUpdatedPayload>(schemas);
     schema::<RequestUserInputRespondParams>(schemas);
     schema::<ReferenceSearchStartParams>(schemas);
     schema::<ReferenceSearchStartResult>(schemas);
@@ -775,6 +793,11 @@ fn register_devo_protocol_schemas(
     devo_method::<ShellCommandParams, ShellCommandResult>(methods, ClientMethod::TurnShellCommand);
     devo_method::<TurnInterruptParams, TurnInterruptResult>(methods, ClientMethod::TurnInterrupt);
     devo_method::<TurnSteerParams, TurnSteerResult>(methods, ClientMethod::TurnSteer);
+    devo_method::<WorkspaceChangesReadParams, WorkspaceChangesReadResult>(
+        methods,
+        ClientMethod::WorkspaceChangesRead,
+    );
+    devo_notification::<WorkspaceChangesUpdatedPayload>(methods, "workspace/changes/updated");
     devo_request_only::<RequestUserInputRespondParams>(
         methods,
         ClientMethod::RequestUserInputRespond,
@@ -867,6 +890,20 @@ fn devo_request_only<P: JsonSchema>(
             ..MethodSchemaBinding::default()
         },
     );
+}
+
+fn devo_notification<P: JsonSchema>(
+    methods: &mut BTreeMap<String, MethodSchemaBinding>,
+    method_name: &'static str,
+) {
+    let binding = MethodSchemaBinding {
+        incoming_notification: Some(Box::leak(P::schema_name().into_boxed_str())),
+        ..MethodSchemaBinding::default()
+    };
+    methods
+        .entry(method_name.to_string())
+        .or_insert_with(|| binding.clone());
+    methods.insert(devo_extension_method(method_name), binding);
 }
 
 fn devo_method_named(

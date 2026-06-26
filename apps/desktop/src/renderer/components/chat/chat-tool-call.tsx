@@ -47,6 +47,12 @@ import { detectContentLanguage, detectLanguage, prettyPrintJson } from "../../li
 import type { FilePart, ToolPart, ToolStateCompleted } from "../../lib/types"
 import { SubAgentCard } from "./sub-agent-card"
 import { getToolCategory, ToolCard } from "./tool-card"
+import {
+	formatToolPathForDisplay,
+	getFirstApplyPatchPath,
+	shortenPathForDisplay,
+	type ToolPathDisplayOptions,
+} from "./tool-paths"
 
 // ============================================================
 // Constants
@@ -247,7 +253,10 @@ function getPendingLabel(tool: string): string {
  * Falls back to a "Preparing ..." label when the tool is in the `pending` state
  * and no input fields have been parsed yet (the model is still streaming arguments).
  */
-export function getToolSubtitle(part: ToolPart): string | undefined {
+export function getToolSubtitle(
+	part: ToolPart,
+	options: ToolPathDisplayOptions = {},
+): string | undefined {
 	const state = part.state
 	const input = state.input
 	const rawTitle = "title" in state && typeof state.title === "string" ? state.title : undefined
@@ -258,8 +267,11 @@ export function getToolSubtitle(part: ToolPart): string | undefined {
 	switch (part.tool) {
 		case "read":
 			subtitle =
-				shortenPath((input.filePath as string) ?? (input.path as string)) ??
-				shortenPath(extractFromRaw(state, "filePath", "path"))
+				formatToolPathForDisplay(
+					(input.filePath as string | undefined) ?? (input.path as string | undefined),
+					options,
+				) ??
+				formatToolPathForDisplay(extractFromRaw(state, "filePath", "path"), options)
 			break
 		case "glob":
 			subtitle =
@@ -282,17 +294,32 @@ export function getToolSubtitle(part: ToolPart): string | undefined {
 			break
 		case "edit":
 			subtitle =
-				shortenPath((input.filePath as string) ?? (input.path as string)) ??
-				shortenPath(extractFromRaw(state, "filePath", "path"))
+				formatToolPathForDisplay(
+					(input.filePath as string | undefined) ?? (input.path as string | undefined),
+					options,
+				) ??
+				formatToolPathForDisplay(extractFromRaw(state, "filePath", "path"), options)
 			break
 		case "write":
 			subtitle =
-				shortenPath((input.filePath as string) ?? (input.path as string)) ??
-				shortenPath(extractFromRaw(state, "filePath", "path"))
+				formatToolPathForDisplay(
+					(input.filePath as string | undefined) ?? (input.path as string | undefined),
+					options,
+				) ??
+				formatToolPathForDisplay(extractFromRaw(state, "filePath", "path"), options)
 			break
-		case "apply_patch":
-			subtitle = title
+		case "apply_patch": {
+			const rawPatch = extractFromRaw(state, "patch", "diff")
+			const patchPath =
+				(input.filePath as string | undefined) ??
+				(input.path as string | undefined) ??
+				getFirstApplyPatchPath(input.patch as string | undefined) ??
+				getFirstApplyPatchPath(input.diff as string | undefined) ??
+				getFirstApplyPatchPath(rawPatch?.replace(/\\r\\n|\\n/g, "\n")) ??
+				extractFromRaw(state, "filePath", "path")
+			subtitle = formatToolPathForDisplay(patchPath, options) ?? title
 			break
+		}
 		case "webfetch":
 			subtitle = (input.url as string) ?? extractFromRaw(state, "url")
 			break
@@ -345,14 +372,6 @@ function formatInputParams(input: Record<string, unknown>): string | undefined {
 
 	if (parts.length === 0) return undefined
 	return `[${parts.join(", ")}]`
-}
-
-/** Shorten a file path to just filename or last 2 segments */
-function shortenPath(path: string | undefined): string | undefined {
-	if (!path) return undefined
-	const parts = path.split("/")
-	if (parts.length <= 2) return path
-	return parts.slice(-2).join("/")
 }
 
 /** Compute completed tool duration from the SDK tool-state timestamps. */
@@ -605,7 +624,7 @@ function ReadContent({ part }: { part: ToolPart }) {
 			code={displayContent}
 			language={language}
 			showLineNumbers
-			className="max-h-96 border-0 shadow-none rounded-none text-[11px]"
+			className="devo-read-output max-h-96 border-0 shadow-none rounded-none"
 		>
 			<CodeBlockContent
 				code={displayContent}
@@ -639,7 +658,7 @@ function SearchContent({ part }: { part: ToolPart }) {
 				)}
 				{path && (
 					<span>
-						in: <span className="font-mono text-foreground/60">{shortenPath(path)}</span>
+						in: <span className="font-mono text-foreground/60">{shortenPathForDisplay(path)}</span>
 					</span>
 				)}
 			</div>
@@ -893,6 +912,8 @@ interface ChatToolCallProps {
 	turnHasError?: boolean
 	/** Delete this tool part (for error recovery) */
 	onDelete?: (part: ToolPart) => void
+	/** Project root used only for display-only path labels. */
+	projectRoot?: string | null
 }
 
 /**
@@ -937,6 +958,7 @@ export const ChatToolCall = memo(
 		isActiveTurn = false,
 		turnHasError = false,
 		onDelete,
+		projectRoot,
 	}: ChatToolCallProps) {
 		const viewFileInDiff = useSetAtom(viewFileInDiffPanelAtom)
 
@@ -1081,7 +1103,7 @@ export const ChatToolCall = memo(
 
 		// --- All other tools (including todos): ToolCard ---
 		const { icon: Icon, title } = getToolInfo(part.tool)
-		const subtitle = getToolSubtitle(part)
+		const subtitle = getToolSubtitle(part, { projectRoot })
 		const category = getToolCategory(part.tool)
 		const hasContent = hasExpandableContent(part)
 		const defaultOpen = isActiveTurn ? shouldDefaultOpen(part.tool, status) : false
@@ -1116,6 +1138,7 @@ export const ChatToolCall = memo(
 		if (!areToolPartsEqual(prev.part, next.part)) return false
 		if (prev.isActiveTurn !== next.isActiveTurn) return false
 		if (prev.turnHasError !== next.turnHasError) return false
+		if (prev.projectRoot !== next.projectRoot) return false
 		// onDelete is a callback ref - skip reference comparison to avoid
 		// re-renders from parent creating new closures
 		return true

@@ -56,6 +56,11 @@ use devo_core::tools::ToolPermissionRequest;
 use devo_core::tools::ToolRegistry;
 use devo_core::tools::ToolRuntime;
 use devo_core::tools::ToolRuntimeContext;
+use devo_protocol::{
+    WorkspaceChangeAttribution, WorkspaceChangeScope, WorkspaceChangeView,
+    WorkspaceChangesReadParams, WorkspaceChangesReadResult, WorkspaceChangesUpdatedPayload,
+    WorkspaceDiffDetail,
+};
 use devo_safety::PermissionMode;
 use devo_util_shell_command::parse_command::parse_command;
 
@@ -144,6 +149,7 @@ use crate::subagent::SubagentMailbox;
 use crate::subagent::SubagentMetadata;
 use crate::subagent::SubagentOutputBuffer;
 use crate::subagent::SubagentStatus;
+use crate::workspace_changes::ActiveWorkspaceBaseline;
 
 mod acp_fs;
 mod acp_terminal;
@@ -168,6 +174,7 @@ mod skills;
 mod turn_exec;
 mod turn_reservation;
 mod user_input;
+mod workspace_baseline;
 
 pub(crate) use connection::CONNECTION_NOTIFICATION_CHANNEL_CAPACITY;
 pub(crate) use connection::ConnectionRuntime;
@@ -210,6 +217,8 @@ pub struct ServerRuntime {
         Mutex<HashMap<devo_protocol::ReferenceSearchId, reference_search::ReferenceSearchState>>,
     /// Live client-owned shell/process sessions.
     command_exec_manager: command_exec::CommandExecManager,
+    /// Turn-scoped workspace baselines captured at actual execution start.
+    active_workspace_baselines: Mutex<HashMap<TurnId, ActiveWorkspaceBaseline>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -321,6 +330,7 @@ impl ServerRuntime {
             research_child_agents: Mutex::new(HashMap::new()),
             reference_searches: Mutex::new(HashMap::new()),
             command_exec_manager: command_exec::CommandExecManager::new(),
+            active_workspace_baselines: Mutex::new(HashMap::new()),
         })
     }
 }

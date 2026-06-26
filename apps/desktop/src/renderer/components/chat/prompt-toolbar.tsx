@@ -193,8 +193,6 @@ interface ModelSelectorProps {
 	/** Whether the user has explicitly overridden the model */
 	hasOverride: boolean
 	onSelectModel: (model: ModelRef | null) => void
-	/** Recent models from model.json (most recently used first) */
-	recentModels?: ModelRef[]
 	variants?: string[]
 	selectedVariant?: string | undefined
 	currentVariant?: string | undefined
@@ -207,7 +205,6 @@ export function ModelSelector({
 	providers,
 	effectiveModel,
 	onSelectModel,
-	recentModels,
 	variants = [],
 	selectedVariant,
 	currentVariant,
@@ -216,17 +213,6 @@ export function ModelSelector({
 	disabled,
 }: ModelSelectorProps) {
 	const models = useMemo(() => (providers ? flattenModels(providers.providers) : []), [providers])
-
-	// Build "Last used" group from recentModels (up to 3, only models that exist in providers)
-	const lastUsedModels = useMemo(() => {
-		if (!recentModels || recentModels.length === 0) return []
-		return recentModels
-			.slice(0, 3)
-			.map((ref) =>
-				models.find((m) => m.providerID === ref.providerID && m.modelID === ref.modelID),
-			)
-			.filter((m): m is ModelOption => m != null)
-	}, [recentModels, models])
 
 	const activeValue = effectiveModel
 		? `${effectiveModel.providerID}/${effectiveModel.modelID}`
@@ -310,7 +296,6 @@ export function ModelSelector({
 						<SearchableListPopoverSearch placeholder="Search models..." />
 						<ModelSelectorList
 							models={models}
-							lastUsedModels={lastUsedModels}
 							activeValue={activeValue}
 							onSelect={handleSelect}
 						/>
@@ -335,12 +320,10 @@ export function ModelSelector({
 /** Inner list component — reads search from context */
 function ModelSelectorList({
 	models,
-	lastUsedModels,
 	activeValue,
 	onSelect,
 }: {
 	models: ModelOption[]
-	lastUsedModels: ModelOption[]
 	activeValue: string | null
 	onSelect: (value: string) => void
 }) {
@@ -365,22 +348,6 @@ function ModelSelectorList({
 				<SearchableListPopoverEmpty>No models found</SearchableListPopoverEmpty>
 			) : (
 				<>
-					{/* Last used group — only shown when not searching */}
-					{!search && lastUsedModels.length > 0 && (
-						<SearchableListPopoverGroup label="Last used">
-							{lastUsedModels.map((model) => (
-								<ModelSelectorOptionRow
-									key={`recent-${model.value}`}
-									displayName={model.displayName}
-									providerName={model.providerName}
-									reasoning={model.reasoning}
-									selected={model.value === activeValue}
-									onSelect={() => onSelect(model.value)}
-								/>
-							))}
-						</SearchableListPopoverGroup>
-					)}
-
 					{/* Provider-grouped models */}
 					{Array.from(grouped.entries()).map(([providerName, providerModels]) => {
 						// Get the provider ID from the first model in the group to look up the icon
@@ -517,9 +484,6 @@ export interface PromptToolbarProps {
 	hasModelOverride: boolean
 	onSelectModel: (model: ModelRef | null) => void
 
-	/** Recent models from model.json */
-	recentModels?: ModelRef[]
-
 	/** Currently selected variant */
 	selectedVariant: string | undefined
 	onSelectVariant: (variant: string | undefined) => void
@@ -540,7 +504,6 @@ export function PromptToolbar({
 	effectiveModel,
 	hasModelOverride,
 	onSelectModel,
-	recentModels,
 	selectedVariant,
 	onSelectVariant,
 	disabled,
@@ -588,7 +551,6 @@ export function PromptToolbar({
 				effectiveModel={effectiveModel}
 				hasOverride={hasModelOverride}
 				onSelectModel={onSelectModel}
-				recentModels={recentModels}
 				variants={variants}
 				selectedVariant={selectedVariant}
 				currentVariant={currentVariant}

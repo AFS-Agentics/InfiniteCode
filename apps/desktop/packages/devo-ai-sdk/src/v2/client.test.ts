@@ -48,6 +48,12 @@ class FakeTransport implements DevoAcpTransport {
 		}
 	}
 
+	emitNotification(method: string, params: unknown): void {
+		for (const listener of this.listeners) {
+			listener({ type: "notification", method, params })
+		}
+	}
+
 	emitRequest(id: string | number, method: string, params: unknown): void {
 		for (const listener of this.listeners) {
 			listener({ type: "request", id, method, params })
@@ -80,6 +86,36 @@ const initializeResult = {
 	protocolVersion: 1,
 	agentCapabilities: {},
 	authMethods: [],
+}
+
+const workspaceChangeView = {
+	scope: "turn",
+	status: "ready",
+	workspace_root: "/repo",
+	base: {
+		kind: "turn_checkpoint",
+		turn_id: "t1",
+		checkpoint_id: "checkpoint-1",
+		backend: "git_ghost_commit",
+	},
+	coverage: "git_visible",
+	attribution: "workspace_net",
+	change_set_status: "finalized",
+	files: [
+		{
+			path: "src/main.rs",
+			status: "modified",
+			additions: 2,
+			deletions: 1,
+			binary: false,
+			diff_truncated: false,
+		},
+	],
+	stats: { files_changed: 1, additions: 2, deletions: 1 },
+	unified_diff:
+		"diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1 +1 @@\n-old\n+new\n",
+	warnings: [],
+	generated_at: "2026-06-26T00:00:00Z",
 }
 
 const originalNow = Date.now
@@ -1027,6 +1063,119 @@ describe("ACP desktop SDK session mapping", () => {
 				result: { outcome: { outcome: "selected", optionId: "allow-once" } },
 			},
 		])
+	})
+
+	test("reads workspace changes through the runtime workspace API", async () => {
+		const transport = new FakeTransport((method, params, directory) => {
+			if (method === "_devo/workspace/changes/read") {
+				expect(directory).toBe("/repo")
+				expect(params).toEqual({
+					session_id: "s1",
+					scopes: ["turn"],
+					diff_detail: "full",
+					turn_id: "t1",
+					max_diff_bytes: 2_000_000,
+				})
+				return { views: [workspaceChangeView] }
+			}
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+
+		const result = await client.workspace.changes.read({
+			sessionID: "s1",
+			scopes: ["turn"],
+			turnID: "t1",
+			diffDetail: "full",
+			maxDiffBytes: 2_000_000,
+		})
+
+		expect(result.data).toEqual({ views: [workspaceChangeView] })
+	})
+
+	test("emits workspace change events from direct workspace notifications", async () => {
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		transport.emitNotification("workspace/changes/updated", {
+			session_id: "s1",
+			turn_id: "t1",
+			scope: "turn",
+			status: "ready",
+			coverage: "git_visible",
+			change_set_status: "finalized",
+			stats: { files_changed: 1, additions: 2, deletions: 1 },
+			version: 42,
+			generated_at: "2026-06-26T00:00:00Z",
+		})
+
+		expect(await nextPayload(stream, "workspace-direct")).toEqual({
+			type: "workspace.changes.updated",
+			properties: {
+				sessionID: "s1",
+				turnID: "t1",
+				scope: "turn",
+				status: "ready",
+				coverage: "git_visible",
+				changeSetStatus: "finalized",
+				stats: { filesChanged: 1, additions: 2, deletions: 1 },
+				version: 42,
+				generatedAt: "2026-06-26T00:00:00Z",
+			},
+		})
+	})
+
+	test("emits workspace change events from wrapped original server events", async () => {
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		await client.session.list()
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: { sessionUpdate: "session_info_update" },
+			_meta: {
+				"devo/originalEvent": {
+					kind: "workspace_changes_updated",
+					session_id: "s1",
+					turn_id: "t1",
+					scope: "turn",
+					status: "ready",
+					coverage: "git_visible",
+					change_set_status: "finalized",
+					stats: { files_changed: 1, additions: 2, deletions: 1 },
+					version: 43,
+					generated_at: "2026-06-26T00:00:01Z",
+				},
+			},
+		} satisfies AcpSessionNotification)
+
+		expect(await nextPayload(stream, "workspace-session-update")).toEqual({
+			type: "session.updated",
+			properties: { info: expect.any(Object), session: expect.any(Object) },
+		})
+		expect(await nextPayload(stream, "workspace-wrapped")).toEqual({
+			type: "workspace.changes.updated",
+			properties: {
+				sessionID: "s1",
+				turnID: "t1",
+				scope: "turn",
+				status: "ready",
+				coverage: "git_visible",
+				changeSetStatus: "finalized",
+				stats: { filesChanged: 1, additions: 2, deletions: 1 },
+				version: 43,
+				generatedAt: "2026-06-26T00:00:01Z",
+			},
+		})
 	})
 
 	test("maps original request_user_input events to questions and replies through runtime API", async () => {

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::conversation::{ItemId, SessionId, SessionTitleState, TurnId, TurnStatus, TurnUsage};
 use crate::{
     MessageEditRecordedRecord, SessionContext, TurnContext, TurnKind, TurnSupersededRecord,
+    TurnWorkspaceChangeRecordedRecord, TurnWorkspaceCheckpointRecordedRecord,
     TurnWorkspaceRestoreCompletedRecord, TurnWorkspaceRestoreStartedRecord,
 };
 use devo_protocol::{StopReason, TurnFailureReason};
@@ -456,6 +457,24 @@ pub struct TurnSupersededLine {
     pub record: TurnSupersededRecord,
 }
 
+/// Stores one workspace-checkpoint record in the rollout file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TurnWorkspaceCheckpointRecordedLine {
+    /// The time when this rollout line was persisted.
+    pub timestamp: DateTime<Utc>,
+    /// The workspace-checkpoint payload carried by the line.
+    pub record: TurnWorkspaceCheckpointRecordedRecord,
+}
+
+/// Stores one workspace-change record in the rollout file.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TurnWorkspaceChangeRecordedLine {
+    /// The time when this rollout line was persisted.
+    pub timestamp: DateTime<Utc>,
+    /// The workspace-change payload carried by the line.
+    pub record: TurnWorkspaceChangeRecordedRecord,
+}
+
 /// Stores one workspace-restore-start record in the rollout file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TurnWorkspaceRestoreStartedLine {
@@ -491,6 +510,10 @@ pub enum RolloutLine {
     MessageEditRecorded(Box<MessageEditRecordedLine>),
     /// Turn-superseded marker line.
     TurnSuperseded(Box<TurnSupersededLine>),
+    /// Workspace-checkpoint record line.
+    TurnWorkspaceCheckpointRecorded(Box<TurnWorkspaceCheckpointRecordedLine>),
+    /// Workspace-change record line.
+    TurnWorkspaceChangeRecorded(Box<TurnWorkspaceChangeRecordedLine>),
     /// Workspace-restore-start record line.
     TurnWorkspaceRestoreStarted(Box<TurnWorkspaceRestoreStartedLine>),
     /// Workspace-restore-completed record line.

@@ -34,6 +34,15 @@ import type {
 	ModelConfigParams,
 	ModelConfigResult,
 	RequestUserInputRespondParams,
+	WorkspaceChangeCoverage,
+	WorkspaceChangeScope,
+	WorkspaceChangeSetStatus,
+	WorkspaceChangeStats,
+	WorkspaceChangeViewStatus,
+	WorkspaceChangesReadParams,
+	WorkspaceChangesReadResult,
+	WorkspaceChangesUpdatedPayload,
+	WorkspaceDiffDetail,
 } from "./generated/protocol"
 import {
 	ProtocolValidationError,
@@ -122,6 +131,48 @@ export type ToolState = any
 export type ToolStateCompleted = any
 export type UserMessage = any
 export type Worktree = any
+export type {
+	WorkspaceChangeAttribution,
+	WorkspaceChangeBase,
+	WorkspaceChangeCoverage,
+	WorkspaceChangeScope,
+	WorkspaceChangeSetStatus,
+	WorkspaceChangeStats,
+	WorkspaceChangeView,
+	WorkspaceChangeViewStatus,
+	WorkspaceChangedFile,
+	WorkspaceChangedFileStatus,
+	WorkspaceChangesReadParams,
+	WorkspaceChangesReadResult,
+	WorkspaceChangesUpdatedPayload,
+	WorkspaceDiffDetail,
+} from "./generated/protocol"
+
+export type WorkspaceChangesReadOptions = {
+	sessionID: string
+	cwd?: string
+	scopes: WorkspaceChangeScope[]
+	baseBranch?: string
+	turnID?: string
+	diffDetail?: WorkspaceDiffDetail
+	maxDiffBytes?: number | bigint
+}
+
+export type WorkspaceChangesUpdatedEventProperties = {
+	sessionID: string
+	turnID: string
+	scope: WorkspaceChangeScope
+	status: WorkspaceChangeViewStatus
+	coverage: WorkspaceChangeCoverage
+	changeSetStatus: WorkspaceChangeSetStatus
+	stats: {
+		filesChanged: number
+		additions: number
+		deletions: number
+	}
+	version: number
+	generatedAt: string
+}
 
 interface GlobalEvent {
 	directory: string
@@ -151,6 +202,71 @@ function objectRecord(value: unknown): Record<string, unknown> | undefined {
 function sessionMeta(value: unknown): Record<string, unknown> | undefined {
 	const meta = objectRecord(value)
 	return objectRecord(meta?.["devo/session"])
+}
+
+function numberFromProtocol(value: unknown): number {
+	if (typeof value === "number" && Number.isFinite(value)) return value
+	if (typeof value === "bigint") return Number(value)
+	if (typeof value === "string") {
+		const parsed = Number(value)
+		if (Number.isFinite(parsed)) return parsed
+	}
+	return 0
+}
+
+function workspaceChangeStats(value: unknown): WorkspaceChangeStats {
+	const stats = objectRecord(value)
+	return {
+		files_changed: numberFromProtocol(stats?.files_changed ?? stats?.filesChanged),
+		additions: numberFromProtocol(stats?.additions),
+		deletions: numberFromProtocol(stats?.deletions),
+	}
+}
+
+function workspaceChangesUpdatedFromOriginalEvent(
+	original: unknown,
+): WorkspaceChangesUpdatedPayload | null {
+	const event = objectRecord(original)
+	if (!event) return null
+	const payload =
+		event.kind === "workspace_changes_updated"
+			? event
+			: objectRecord(event.WorkspaceChangesUpdated) ??
+				objectRecord(event.workspace_changes_updated)
+	if (!payload) return null
+	return {
+		session_id: String(payload.session_id ?? payload.sessionId ?? ""),
+		turn_id: String(payload.turn_id ?? payload.turnId ?? ""),
+		scope: String(payload.scope ?? "turn") as WorkspaceChangeScope,
+		status: String(payload.status ?? "ready") as WorkspaceChangeViewStatus,
+		coverage: String(payload.coverage ?? "none") as WorkspaceChangeCoverage,
+		change_set_status: String(
+			payload.change_set_status ?? payload.changeSetStatus ?? "finalized",
+		) as WorkspaceChangeSetStatus,
+		stats: workspaceChangeStats(payload.stats),
+		version: numberFromProtocol(payload.version),
+		generated_at: String(payload.generated_at ?? payload.generatedAt ?? ""),
+	}
+}
+
+function workspaceChangesUpdatedEventProperties(
+	payload: WorkspaceChangesUpdatedPayload,
+): WorkspaceChangesUpdatedEventProperties {
+	return {
+		sessionID: payload.session_id,
+		turnID: payload.turn_id,
+		scope: payload.scope,
+		status: payload.status,
+		coverage: payload.coverage,
+		changeSetStatus: payload.change_set_status,
+		stats: {
+			filesChanged: numberFromProtocol(payload.stats.files_changed),
+			additions: numberFromProtocol(payload.stats.additions),
+			deletions: numberFromProtocol(payload.stats.deletions),
+		},
+		version: numberFromProtocol(payload.version),
+		generatedAt: payload.generated_at,
+	}
 }
 
 function parseTimestampMs(value: unknown): number | undefined {
@@ -441,6 +557,29 @@ class AcpClient {
 		},
 	}
 
+	workspace = {
+		changes: {
+			read: async (params: WorkspaceChangesReadOptions) => {
+				const wireParams: WorkspaceChangesReadParams = {
+					session_id: params.sessionID,
+					scopes: params.scopes,
+					diff_detail: params.diffDetail ?? "summary",
+				}
+				if (params.cwd !== undefined) wireParams.cwd = params.cwd
+				if (params.baseBranch !== undefined) wireParams.base_branch = params.baseBranch
+				if (params.turnID !== undefined) wireParams.turn_id = params.turnID
+				if (params.maxDiffBytes !== undefined) {
+					wireParams.max_diff_bytes = Number(params.maxDiffBytes)
+				}
+				const data = (await this.request(
+					"_devo/workspace/changes/read",
+					wireParams,
+				)) as WorkspaceChangesReadResult
+				return { data }
+			},
+		},
+	}
+
 	command = {
 		list: async () => ({ data: [{ name: "compact", description: "Compact the session" }] }),
 	}
@@ -718,6 +857,21 @@ class AcpClient {
 			this.handleSessionUpdate(notification)
 			return
 		}
+		if (
+			event.type === "notification" &&
+			(event.method === "workspace/changes/updated" ||
+				event.method === "_devo/workspace/changes/updated") &&
+			event.params
+		) {
+			const payload = this.validateTransportPayload<WorkspaceChangesUpdatedPayload>(
+				event.method,
+				"incomingNotification",
+				event.params,
+			)
+			if (!payload) return
+			this.handleWorkspaceChangesUpdated(payload)
+			return
+		}
 		if (event.type === "request" && event.id !== undefined && event.method) {
 			const params = this.validateTransportPayload(event.method, "incomingRequest", event.params)
 			if (!params) return
@@ -973,6 +1127,10 @@ class AcpClient {
 			const payload = (original as { RequestUserInput: Record<string, unknown> }).RequestUserInput
 			this.handleRequestUserInput(sessionId, directory, payload)
 		}
+		const workspaceChanges = workspaceChangesUpdatedFromOriginalEvent(original)
+		if (workspaceChanges) {
+			this.handleWorkspaceChangesUpdated(workspaceChanges, directory)
+		}
 		if ("ServerRequestResolved" in original) {
 			const payload = (original as { ServerRequestResolved: Record<string, unknown> })
 				.ServerRequestResolved
@@ -985,6 +1143,20 @@ class AcpClient {
 				properties: { sessionID: pending.sessionId, requestID: requestId },
 			})
 		}
+	}
+
+	private handleWorkspaceChangesUpdated(
+		payload: WorkspaceChangesUpdatedPayload,
+		directory?: string,
+	): void {
+		const event = workspaceChangesUpdatedEventProperties(payload)
+		if (!event.sessionID) return
+		const emitDirectory =
+			directory ?? this.sessionDirectories.get(event.sessionID) ?? this.options.directory ?? defaultCwd()
+		this.emit(emitDirectory, {
+			type: "workspace.changes.updated",
+			properties: event,
+		})
 	}
 
 	private handleRequestUserInput(

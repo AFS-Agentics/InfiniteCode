@@ -631,6 +631,8 @@ impl ServerRuntime {
             question,
             cwd,
         } = input;
+        self.capture_turn_workspace_baseline(session_id, turn.turn_id, PathBuf::from(cwd.clone()))
+            .await;
         let usage_ledger = self.research_usage_ledger(session_id).await;
         let result = self
             .run_research_pipeline(
@@ -2334,6 +2336,8 @@ impl ServerRuntime {
         {
             tracing::warn!(session_id = %session_id, error = %error, "failed to persist research turn finish");
         }
+        self.finalize_turn_workspace_changes(session_id, &turn)
+            .await;
         match status {
             TurnStatus::Completed => {
                 self.broadcast_event(ServerEvent::TurnCompleted(TurnEventPayload {

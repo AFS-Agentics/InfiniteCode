@@ -40,7 +40,8 @@ import { toast } from "sonner"
 import type { Automation } from "../../../preload/api"
 import { discoveryProjectsAtom } from "../../atoms/discovery"
 import {
-	useModelState,
+	getModelVariants,
+	type ModelRef,
 	useDevoAgents,
 	useProviders,
 } from "../../hooks/use-devo-data"
@@ -51,10 +52,8 @@ import {
 	runAutomationNow,
 	updateAutomation,
 } from "../../services/backend"
-import type { ModelRef } from "../../hooks/use-devo-data"
 import { AgentSelector, ModelSelector, VariantSelector } from "../chat/prompt-toolbar"
 import { SchedulePicker } from "./schedule-picker"
-import { getModelVariants } from "../../hooks/use-devo-data"
 
 interface CreateAutomationDialogProps {
 	open: boolean
@@ -124,7 +123,6 @@ export function CreateAutomationDialog({
 
 	const { data: providers } = useProviders(directory)
 	const { agents } = useDevoAgents(directory)
-	const { recentModels } = useModelState()
 
 	// Compute available variants for the selected model
 	const variants = useMemo(() => {
@@ -459,7 +457,6 @@ export function CreateAutomationDialog({
 								effectiveModel={selectedModel}
 								hasOverride={selectedModel !== null}
 								onSelectModel={setSelectedModel}
-								recentModels={recentModels}
 							/>
 							{variants.length > 0 && (
 								<>

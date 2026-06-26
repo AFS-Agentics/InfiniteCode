@@ -1,7 +1,13 @@
-import type { DevoClient } from "@devo-ai/sdk/v2/client"
+import type {
+	DevoClient,
+	WorkspaceChangeScope,
+	WorkspaceChangesReadResult,
+	WorkspaceDiffDetail,
+} from "@devo-ai/sdk/v2/client"
 import { createDevoClient } from "@devo-ai/sdk/v2/client"
 import type { Event, DevoProject, QuestionAnswer, Session, SessionStatus } from "../lib/types"
 import { createLogger } from "../lib/logger"
+import { workspacePatchFilesFromView } from "../lib/workspace-diff"
 
 export type { DevoClient }
 
@@ -151,8 +157,46 @@ export async function getSession(client: DevoClient, sessionId: string): Promise
  * Get file diffs for a session.
  */
 export async function getSessionDiff(client: DevoClient, sessionId: string) {
-	const result = await client.session.diff({ sessionID: sessionId })
-	return result.data ?? []
+	const result = await getWorkspaceChanges(client, {
+		sessionId,
+		scopes: ["turn"],
+		diffDetail: "full",
+		maxDiffBytes: 2_000_000,
+	})
+	const view = result.views.find((item) => item.scope === "turn")
+	return workspacePatchFilesFromView(view).map((file) => ({
+		file: file.file,
+		status: file.status,
+		additions: file.additions,
+		deletions: file.deletions,
+		before: "",
+		after: "",
+		diff: file.patch ?? "",
+	}))
+}
+
+export async function getWorkspaceChanges(
+	client: DevoClient,
+	params: {
+		sessionId: string
+		scopes: WorkspaceChangeScope[]
+		cwd?: string
+		baseBranch?: string
+		turnId?: string
+		diffDetail?: WorkspaceDiffDetail
+		maxDiffBytes?: number
+	},
+): Promise<WorkspaceChangesReadResult> {
+	const result = await client.workspace.changes.read({
+		sessionID: params.sessionId,
+		scopes: params.scopes,
+		cwd: params.cwd,
+		baseBranch: params.baseBranch,
+		turnID: params.turnId,
+		diffDetail: params.diffDetail,
+		maxDiffBytes: params.maxDiffBytes,
+	})
+	return result.data as WorkspaceChangesReadResult
 }
 
 /**

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import {
 	getResolvedChromeTier,
+	resolveTitleBarOverlay,
 	resolveWindowChrome,
-	resolveWindowsTitleBarOverlay,
 } from "./liquid-glass"
 
 describe("resolveWindowChrome", () => {
@@ -59,14 +59,25 @@ describe("resolveWindowChrome", () => {
 		expect(getResolvedChromeTier()).toBe("opaque")
 	})
 
-	test("keeps Linux opaque even when opaque windows are disabled", async () => {
-		const chrome = await resolveWindowChrome({ isOpaque: false, platform: "linux" })
+	test("uses hidden titlebar overlay on Linux while keeping the opaque tier", async () => {
+		const chrome = await resolveWindowChrome({
+			isOpaque: false,
+			isDarkMode: true,
+			platform: "linux",
+		})
 
 		expect(chrome).toEqual({
 			tier: "opaque",
 			usesTransparentWindow: false,
 			usesTransparentBackground: false,
-			options: {},
+			options: {
+				titleBarStyle: "hidden",
+				titleBarOverlay: {
+					color: "#00000000",
+					symbolColor: "#f4f4f5",
+					height: 40,
+				},
+			},
 		})
 		expect(getResolvedChromeTier()).toBe("opaque")
 	})
@@ -86,8 +97,8 @@ describe("resolveWindowChrome", () => {
 		expect(getResolvedChromeTier()).toBe("opaque")
 	})
 
-	test("uses dark titlebar overlay symbols in light mode on Windows", () => {
-		expect(resolveWindowsTitleBarOverlay(false)).toEqual({
+	test("uses dark titlebar overlay symbols in light mode", () => {
+		expect(resolveTitleBarOverlay(false)).toEqual({
 			color: "#00000000",
 			symbolColor: "#111111",
 			height: 40,

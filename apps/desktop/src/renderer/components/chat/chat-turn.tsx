@@ -457,13 +457,17 @@ function groupPartsForStream(ordered: RenderablePart[]): StreamItem[] {
  * Generates a human-readable summary for a group of tools in the same category.
  * Returns text like "Read 3 files", "Edited foo.tsx, bar.tsx", "Ran 2 commands".
  */
-function describeToolGroup(category: ToolCategory, tools: ToolPart[]): string {
+function describeToolGroup(
+	category: ToolCategory,
+	tools: ToolPart[],
+	projectRoot?: string | null,
+): string {
 	const count = tools.length
 
 	// For small groups, list specific targets
 	if (count <= 3) {
 		const details = tools
-			.map((t) => getToolSubtitle(t))
+			.map((t) => getToolSubtitle(t, { projectRoot }))
 			.filter(Boolean)
 			.map((s) => {
 				// Shorten file paths to just the filename
@@ -535,13 +539,15 @@ const ToolGroupSummary = memo(function ToolGroupSummary({
 	category,
 	tools,
 	isActiveTurn,
+	projectRoot,
 }: {
 	category: ToolCategory
 	tools: ToolPart[]
 	isActiveTurn: boolean
+	projectRoot?: string | null
 }) {
 	const [expanded, setExpanded] = useState(false)
-	const description = describeToolGroup(category, tools)
+	const description = describeToolGroup(category, tools, projectRoot)
 	const running = isGroupRunning(tools)
 	const hasError = isGroupError(tools)
 	const { icon: GroupIcon } = getToolInfo(tools[0].tool)
@@ -575,7 +581,12 @@ const ToolGroupSummary = memo(function ToolGroupSummary({
 			{expanded && (
 				<div className="space-y-2 pl-3">
 					{tools.map((tool) => (
-						<ChatToolCall key={tool.id} part={tool} isActiveTurn={isActiveTurn} />
+						<ChatToolCall
+							key={tool.id}
+							part={tool}
+							isActiveTurn={isActiveTurn}
+							projectRoot={projectRoot}
+						/>
 					))}
 				</div>
 			)}
@@ -669,6 +680,7 @@ export const ChatTurnComponent = memo(
 		const [uncontrolledStepsExpanded, setUncontrolledStepsExpanded] = useState(false)
 		const [copied, setCopied] = useState(false)
 		const displayMode = useDisplayMode()
+		const toolPathRoot = agent?.worktreePath ?? agent?.directory ?? agent?.projectDirectory
 		const turnRef = useRef<HTMLDivElement>(null)
 		const stepsExpanded = controlledStepsExpanded ?? uncontrolledStepsExpanded
 		const setStepsExpanded = useCallback(
@@ -949,7 +961,11 @@ export const ChatTurnComponent = memo(
 															if (processItem.kind === "tool") {
 																return (
 																	<div key={processItem.part.id} className="pl-3">
-																		<ChatToolCall part={processItem.part} isActiveTurn={isActiveTurn} />
+																		<ChatToolCall
+																			part={processItem.part}
+																			isActiveTurn={isActiveTurn}
+																			projectRoot={toolPathRoot}
+																		/>
 																	</div>
 																)
 															}
@@ -967,6 +983,7 @@ export const ChatTurnComponent = memo(
 													key={item.tools[0].id}
 													part={item.tools[0]}
 													isActiveTurn={isActiveTurn}
+													projectRoot={toolPathRoot}
 												/>
 											)
 										}
@@ -976,6 +993,7 @@ export const ChatTurnComponent = memo(
 												category={item.category}
 												tools={item.tools}
 												isActiveTurn={isActiveTurn}
+												projectRoot={toolPathRoot}
 											/>
 										)
 									}
@@ -1005,6 +1023,7 @@ export const ChatTurnComponent = memo(
 												isActiveTurn={isActiveTurn}
 												turnHasError={!!errorText}
 												onDelete={onDeletePart ? handleDeleteToolPart : undefined}
+												projectRoot={toolPathRoot}
 											/>
 										)
 									}
@@ -1129,6 +1148,9 @@ export const ChatTurnComponent = memo(
 		if (prev.isLast !== next.isLast) return false
 		if (prev.isWorking !== next.isWorking) return false
 		if (prev.agent?.sessionId !== next.agent?.sessionId) return false
+		if (prev.agent?.directory !== next.agent?.directory) return false
+		if (prev.agent?.projectDirectory !== next.agent?.projectDirectory) return false
+		if (prev.agent?.worktreePath !== next.agent?.worktreePath) return false
 		if (prev.isConnected !== next.isConnected) return false
 		if (prev.stepsExpanded !== next.stepsExpanded) return false
 		if (

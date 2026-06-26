@@ -78,6 +78,16 @@ behavior that is not represented by the portable ACP method set.
 - `_devo/turn/interrupt`: interrupt the active Devo turn.
 - `_devo/turn/steer`: send steering input into a running turn.
 
+### Workspace extensions
+
+- `_devo/workspace/changes/read`: read branch, uncommitted, or turn-scoped
+  workspace change views. Git workspaces support branch and uncommitted scopes;
+  non-Git workspaces report those scopes as unsupported and only expose
+  turn-scoped bounded filesystem snapshots.
+- `workspace/changes/updated`: notify subscribed clients that the turn-scoped
+  workspace change summary was finalized or updated. The notification carries a
+  summary only; clients call `_devo/workspace/changes/read` for full diffs.
+
 ### Provider and model extensions
 
 - `_devo/provider/list`: list configured provider vendors.

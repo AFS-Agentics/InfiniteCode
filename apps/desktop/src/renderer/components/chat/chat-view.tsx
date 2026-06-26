@@ -1114,7 +1114,7 @@ function ChatInputSection({
 		}
 	}, [sessionMessages, agent.sessionId, agent.directory, projectModels])
 
-	const { recentModels, addRecent: addRecentModel } = useModelState()
+	const { addRecent: addRecentModel } = useModelState()
 
 	const activeDevoAgent = useMemo(() => {
 		const agentName = selectedAgent ?? config?.defaultAgent
@@ -1625,7 +1625,6 @@ function ChatInputSection({
 												effectiveModel={effectiveModel}
 												hasModelOverride={!!selectedModel}
 												onSelectModel={handleModelSelect}
-												recentModels={recentModels}
 												selectedVariant={selectedVariant}
 												onSelectVariant={setSelectedVariant}
 												disabled={!isConnected}

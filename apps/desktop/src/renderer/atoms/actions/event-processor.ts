@@ -20,6 +20,7 @@ import { appStore } from "../store"
 import { isStreamingField, streamingVersionFamily } from "../streaming"
 import { todosFamily } from "../todos"
 import { setSessionDiffAtom } from "../ui"
+import { applyWorkspaceChangesUpdatedAtom } from "../workspace-changes"
 
 const log = createLogger("event-processor")
 
@@ -265,6 +266,10 @@ export function processEvent(event: Event): void {
 			}
 			break
 		}
+
+		case "workspace.changes.updated":
+			set(applyWorkspaceChangesUpdatedAtom, event.properties)
+			break
 
 		// --- Worktree lifecycle events (from Devo experimental API) ---
 

@@ -69,6 +69,7 @@ pub enum ClientMethod {
     TurnShellCommand,
     TurnInterrupt,
     TurnSteer,
+    WorkspaceChangesRead,
     RequestUserInputRespond,
     SearchStart,
     SearchUpdate,
@@ -118,6 +119,7 @@ impl ClientMethod {
             Self::TurnShellCommand => "turn/shell_command",
             Self::TurnInterrupt => "turn/interrupt",
             Self::TurnSteer => "turn/steer",
+            Self::WorkspaceChangesRead => "workspace/changes/read",
             Self::RequestUserInputRespond => "request_user_input/respond",
             Self::SearchStart => "search/start",
             Self::SearchUpdate => "search/update",
@@ -167,6 +169,7 @@ impl ClientMethod {
             "turn/shell_command" => Self::TurnShellCommand,
             "turn/interrupt" => Self::TurnInterrupt,
             "turn/steer" => Self::TurnSteer,
+            "workspace/changes/read" => Self::WorkspaceChangesRead,
             "request_user_input/respond" => Self::RequestUserInputRespond,
             "search/start" => Self::SearchStart,
             "search/update" => Self::SearchUpdate,
@@ -585,6 +588,18 @@ mod tests {
         assert_eq!(
             ClientMethod::MessageEditPrevious.as_str(),
             "message/editPrevious"
+        );
+    }
+
+    #[test]
+    fn client_method_recognizes_workspace_changes_read() {
+        assert_eq!(
+            ClientMethod::parse("workspace/changes/read"),
+            Some(ClientMethod::WorkspaceChangesRead)
+        );
+        assert_eq!(
+            ClientMethod::WorkspaceChangesRead.as_str(),
+            "workspace/changes/read"
         );
     }
 

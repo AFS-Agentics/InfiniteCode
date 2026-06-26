@@ -23,7 +23,12 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react"
 import type { OpenInTarget } from "../../preload/api"
 import { terminalPanelOpenAtom } from "../atoms/terminal"
-import { reviewPanelOpenAtom, reviewPanelSettingsAtom, sessionDiffStatsFamily } from "../atoms/ui"
+import { reviewPanelOpenAtom, reviewPanelSettingsAtom } from "../atoms/ui"
+import {
+	latestWorkspaceTurnIdFamily,
+	workspaceChangesKey,
+	workspaceChangesStateFamily,
+} from "../atoms/workspace-changes"
 import type {
 	ConfigData,
 	ModelRef,
@@ -34,6 +39,7 @@ import type {
 import type { ChatTurn } from "../hooks/use-session-chat"
 import { formatShortcut } from "../lib/shortcut-display"
 import type { Agent, FileAttachment, QuestionAnswer } from "../lib/types"
+import { workspaceChangeStats } from "../lib/workspace-diff"
 import {
 	fetchOpenInTargets,
 	isElectron,
@@ -45,6 +51,28 @@ import { ReviewPanel } from "./review/review-panel"
 import { SessionMetricsBar } from "./session-metrics-bar"
 import { WorktreeActions } from "./worktree-actions"
 
+function useTurnWorkspaceChangeStats(sessionId: string): {
+	fileCount: number
+	additions: number
+	deletions: number
+} {
+	const latestTurnId = useAtomValue(latestWorkspaceTurnIdFamily(sessionId))
+	const key = workspaceChangesKey({
+		sessionId,
+		scope: "turn",
+		turnId: latestTurnId,
+	})
+	const state = useAtomValue(workspaceChangesStateFamily(key))
+	if (state.view) return workspaceChangeStats(state.view)
+	if (state.summary) {
+		return {
+			fileCount: state.summary.stats.files_changed,
+			additions: state.summary.stats.additions,
+			deletions: state.summary.stats.deletions,
+		}
+	}
+	return { fileCount: 0, additions: 0, deletions: 0 }
+}
 
 interface AgentDetailProps {
 	agent: Agent
@@ -162,7 +190,7 @@ export function AgentDetail({
 
 	// Close review panel when navigating to a session with no diffs
 	const prevSessionIdRef = useRef(agent.sessionId)
-	const diffStats = useAtomValue(sessionDiffStatsFamily(agent.sessionId))
+	const diffStats = useTurnWorkspaceChangeStats(agent.sessionId)
 	useEffect(() => {
 		if (prevSessionIdRef.current !== agent.sessionId) {
 			prevSessionIdRef.current = agent.sessionId
@@ -327,7 +355,7 @@ function SessionPanelHeader({
 	onToggleReviewPanel: () => void
 }) {
 	const navigate = useNavigate()
-	const diffStats = useAtomValue(sessionDiffStatsFamily(agent.sessionId))
+	const diffStats = useTurnWorkspaceChangeStats(agent.sessionId)
 	const toggleReviewPanelShortcut = formatShortcut(["shift", "mod", "D"])
 
 	return (

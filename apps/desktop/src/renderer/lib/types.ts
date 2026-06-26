@@ -36,6 +36,18 @@ export type {
 	ToolState,
 	ToolStateCompleted,
 	UserMessage,
+	WorkspaceChangeAttribution,
+	WorkspaceChangeBase,
+	WorkspaceChangeCoverage,
+	WorkspaceChangeScope,
+	WorkspaceChangeSetStatus,
+	WorkspaceChangeView,
+	WorkspaceChangeViewStatus,
+	WorkspaceChangedFile,
+	WorkspaceChangedFileStatus,
+	WorkspaceChangesReadResult,
+	WorkspaceChangesUpdatedEventProperties,
+	WorkspaceDiffDetail,
 } from "@devo-ai/sdk/v2/client"
 
 // ============================================================

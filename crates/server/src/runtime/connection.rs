@@ -400,6 +400,9 @@ impl ServerRuntime {
             Some(ClientMethod::TurnSteer) => {
                 Some(self.handle_turn_steer(connection_id, id?, params).await)
             }
+            Some(ClientMethod::WorkspaceChangesRead) => {
+                Some(self.handle_workspace_changes_read(id?, params).await)
+            }
             Some(ClientMethod::RequestUserInputRespond) => {
                 Some(self.handle_request_user_input_respond(id?, params).await)
             }

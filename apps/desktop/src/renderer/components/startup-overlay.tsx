@@ -80,7 +80,7 @@ export function StartupOverlay() {
 	return (
 		<div
 			data-slot="startup-overlay"
-			className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity ${isVisible ? "opacity-100" : "opacity-0"}`}
+			className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background text-foreground transition-opacity ${isVisible ? "opacity-100" : "opacity-0"}`}
 			style={{
 				transitionDuration: `${FADE_DURATION_MS}ms`,
 				transitionTimingFunction: "ease-out",

@@ -8,6 +8,16 @@
     <title>Devo</title>
     <style>
       /* Splash screen styles -- inlined so they render before any JS loads. */
+      html {
+        --devo-startup-background: #181818;
+        background: var(--devo-startup-background);
+      }
+      html.light {
+        --devo-startup-background: #ffffff;
+      }
+      body {
+        background: var(--devo-startup-background);
+      }
       #splash {
         position: fixed;
         inset: 0;
@@ -16,9 +26,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        /* Transparent so macOS glass/vibrancy shows through. The native
-           window chrome provides the visual backdrop. */
-        background: transparent;
+        background: var(--devo-startup-background);
         transition: opacity 300ms ease-out;
         /* Allow dragging the window from the splash on macOS */
         -webkit-app-region: drag;

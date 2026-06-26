@@ -8,3 +8,4 @@ mod message_edit;
 mod message_edit_restore;
 mod session;
 mod turn;
+mod workspace_changes;

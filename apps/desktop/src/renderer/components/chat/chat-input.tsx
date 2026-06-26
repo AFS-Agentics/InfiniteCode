@@ -178,7 +178,7 @@ export function ChatInput({
 	const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
 	const [selectedVariant, setSelectedVariant] = useState<string | undefined>(undefined)
 
-	const { recentModels, addRecent: addRecentModel } = useModelState()
+	const { addRecent: addRecentModel } = useModelState()
 
 	// Resolve effective model
 
@@ -396,7 +396,6 @@ export function ChatInput({
 										if (m) addRecentModel(m)
 									})
 								}
-								recentModels={recentModels}
 								selectedVariant={selectedVariant}
 								onSelectVariant={(v) => startTransition(() => setSelectedVariant(v))}
 								disabled={!isConnected}

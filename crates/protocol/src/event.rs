@@ -9,6 +9,7 @@ use crate::reference_search::{ReferenceSearchFailedPayload, ReferenceSearchSnaps
 use crate::request_user_input::RequestUserInputQuestion;
 use crate::session::{SessionMetadata, SessionRuntimeStatus};
 use crate::turn::TurnMetadata;
+use crate::workspace_changes::WorkspaceChangesUpdatedPayload;
 use crate::{ItemId, SessionId, TurnId, TurnUsage};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -332,6 +333,7 @@ pub enum ServerEvent {
     TurnPlanUpdated(TurnPlanUpdatedPayload),
     TurnDiffUpdated(TurnEventPayload),
     TurnUsageUpdated(TurnUsageUpdatedPayload),
+    WorkspaceChangesUpdated(WorkspaceChangesUpdatedPayload),
     ToolCallStatusUpdated(ToolCallStatusUpdatedPayload),
     RequestUserInput(RequestUserInputPayload),
     InputQueueUpdated(InputQueueUpdatedPayload),
@@ -373,6 +375,7 @@ impl ServerEvent {
             | Self::TurnDiffUpdated(payload) => Some(payload.session_id),
             Self::TurnPlanUpdated(payload) => Some(payload.session_id),
             Self::TurnUsageUpdated(payload) => Some(payload.session_id),
+            Self::WorkspaceChangesUpdated(payload) => Some(payload.session_id),
             Self::ToolCallStatusUpdated(payload) => Some(payload.session_id),
             Self::RequestUserInput(payload) => Some(payload.request.session_id),
             Self::InputQueueUpdated(payload) => Some(payload.session_id),
@@ -412,6 +415,7 @@ impl ServerEvent {
             Self::TurnPlanUpdated(_) => "turn/plan/updated",
             Self::TurnDiffUpdated(_) => "turn/diff/updated",
             Self::TurnUsageUpdated(_) => "turn/usage/updated",
+            Self::WorkspaceChangesUpdated(_) => "workspace/changes/updated",
             Self::ToolCallStatusUpdated(_) => "tool_call/status_updated",
             Self::RequestUserInput(_) => "item/tool/requestUserInput",
             Self::InputQueueUpdated(_) => "inputQueue/updated",
@@ -447,6 +451,7 @@ impl ServerEvent {
             }
             Self::ItemDelta { payload, .. } => payload.context.seq = seq,
             Self::TurnUsageUpdated(_)
+            | Self::WorkspaceChangesUpdated(_)
             | Self::ToolCallStatusUpdated(_)
             | Self::RequestUserInput(_)
             | Self::InputQueueUpdated(_)
@@ -471,6 +476,10 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
+    use crate::workspace_changes::{
+        WorkspaceChangeCoverage, WorkspaceChangeScope, WorkspaceChangeSetStatus,
+        WorkspaceChangeStats, WorkspaceChangeViewStatus,
+    };
 
     #[test]
     fn input_queue_updated_event_roundtrips() {
@@ -632,6 +641,29 @@ mod tests {
         });
         assert_eq!(event.method_name(), "steer/accepted");
         assert!(event.session_id().is_some());
+    }
+
+    #[test]
+    fn workspace_changes_updated_method_name() {
+        let session_id = SessionId::new();
+        let event = ServerEvent::WorkspaceChangesUpdated(WorkspaceChangesUpdatedPayload {
+            session_id,
+            turn_id: TurnId::new(),
+            scope: WorkspaceChangeScope::Turn,
+            status: WorkspaceChangeViewStatus::Ready,
+            coverage: WorkspaceChangeCoverage::GitVisible,
+            change_set_status: WorkspaceChangeSetStatus::Finalized,
+            stats: WorkspaceChangeStats {
+                files_changed: 1,
+                additions: 2,
+                deletions: 0,
+            },
+            version: 1,
+            generated_at: Utc::now(),
+        });
+
+        assert_eq!(event.method_name(), "workspace/changes/updated");
+        assert_eq!(event.session_id(), Some(session_id));
     }
 
     #[test]

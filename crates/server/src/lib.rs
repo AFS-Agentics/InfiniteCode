@@ -23,6 +23,7 @@ mod titles;
 mod tool_actions;
 mod transport;
 mod turn;
+mod workspace_changes;
 
 pub use approval::*;
 pub use bootstrap::*;

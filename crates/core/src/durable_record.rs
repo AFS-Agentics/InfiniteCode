@@ -780,6 +780,16 @@ pub struct TurnWorkspaceCheckpointRecordedRecord {
     pub checkpoint_id: String,
     pub pre_turn_hash: String,
     pub files: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_root: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage: Option<ChangeSetCoverage>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_ref: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -794,6 +804,20 @@ pub struct TurnWorkspaceChangeRecordedRecord {
     pub post_hash: String,
     pub inverse_ref: Option<String>,
     pub display_diff_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_root: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backend: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage: Option<ChangeSetCoverage>,
+    #[serde(default)]
+    pub warnings: Vec<String>,
+    #[serde(default)]
+    pub changed_files: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change_set_status: Option<ChangeSetStatus>,
     pub recorded_at: DateTime<Utc>,
 }
 

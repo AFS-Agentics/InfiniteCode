@@ -4,6 +4,19 @@
 	--devo-windows-unfocused-chrome-bg: #f2f4f5;
 }
 
+:root[data-platform="win32"].dark {
+	--devo-windows-focus-chrome-bg: color-mix(
+		in srgb,
+		var(--background) 92%,
+		var(--foreground) 8%
+	);
+	--devo-windows-unfocused-chrome-bg: color-mix(
+		in srgb,
+		var(--background) 96%,
+		var(--foreground) 4%
+	);
+}
+
 :root[data-platform="win32"].electron-transparent {
 	--glass-body: 58%;
 	--glass-sidebar: 62%;

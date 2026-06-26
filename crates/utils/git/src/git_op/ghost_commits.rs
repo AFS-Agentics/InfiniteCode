@@ -423,6 +423,29 @@ pub fn create_ghost_commit_with_report(
     ))
 }
 
+/// Diff two ghost commits using git's normal tree-to-tree diff machinery.
+pub fn diff_ghost_commits(
+    repo_path: &Path,
+    before_commit: &GhostCommit,
+    after_commit: &GhostCommit,
+) -> Result<String, GitToolingError> {
+    ensure_git_repository(repo_path)?;
+    let repo_root = resolve_repository_root(repo_path)?;
+    run_git_for_stdout_all(
+        repo_root.as_path(),
+        [
+            "diff",
+            "--no-textconv",
+            "--no-ext-diff",
+            "--binary",
+            before_commit.id(),
+            after_commit.id(),
+            "--",
+        ],
+        /*env*/ None,
+    )
+}
+
 /// Restore the working tree to match the provided ghost commit.
 pub fn restore_ghost_commit(repo_path: &Path, commit: &GhostCommit) -> Result<(), GitToolingError> {
     restore_ghost_commit_with_options(&RestoreGhostCommitOptions::new(repo_path), commit)

@@ -12,6 +12,52 @@ body {
 	min-height: 100vh;
 }
 
+:root.electron-transparent [data-slot="startup-overlay"],
+:root.electron-vibrancy [data-slot="startup-overlay"] {
+	background: color-mix(in srgb, var(--background) var(--glass-body), transparent) !important;
+}
+
+:root.dark .devo-message-response {
+	--devo-markdown-surface: color-mix(in srgb, var(--card) 92%, transparent);
+	--devo-markdown-surface-subtle: color-mix(in srgb, var(--muted) 86%, transparent);
+	--devo-markdown-code-bg: var(--background);
+}
+
+:root.dark .devo-message-response [data-streamdown="code-block"],
+:root.dark .devo-message-response [data-streamdown="mermaid-block"] {
+	background: var(--devo-markdown-surface);
+	border-color: var(--border);
+}
+
+:root.dark .devo-message-response [data-streamdown="code-block-body"] {
+	background: var(--devo-markdown-code-bg);
+	border-color: var(--border);
+}
+
+:root.dark .devo-message-response [data-streamdown="code-block-actions"],
+:root.dark .devo-message-response [data-streamdown="mermaid-block-actions"] {
+	background: var(--devo-markdown-surface-subtle);
+	border-color: var(--border);
+}
+
+:root.dark .devo-message-response [data-streamdown^="table"] {
+	border-color: var(--border);
+}
+
+:root.dark .devo-message-response [data-streamdown="table-header"] {
+	background: var(--devo-markdown-surface-subtle);
+}
+
+.devo-read-output pre,
+.devo-read-output code {
+	font-size: 11px;
+	line-height: 1.35;
+}
+
+.devo-read-output pre {
+	padding: 0.75rem;
+}
+
 .devo-splash-brand {
 	display: inline-flex;
 	align-items: center;

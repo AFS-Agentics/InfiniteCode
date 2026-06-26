@@ -925,6 +925,8 @@ impl ServerRuntime {
         command: String,
         cwd: std::path::PathBuf,
     ) {
+        self.capture_turn_workspace_baseline(session_id, turn.turn_id, cwd.clone())
+            .await;
         if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
             session_arc.lock().await.turn_approval_cache =
                 crate::execution::ApprovalGrantCache::default();
@@ -1106,6 +1108,8 @@ impl ServerRuntime {
         {
             tracing::warn!(session_id = %session_id, error = %error, "failed to persist shell command turn line");
         }
+        self.finalize_turn_workspace_changes(session_id, &final_turn)
+            .await;
         if is_error {
             self.broadcast_event(ServerEvent::TurnFailed(TurnEventPayload {
                 session_id,
@@ -1140,6 +1144,17 @@ impl ServerRuntime {
             collaboration_mode,
             input_mode,
         } = request;
+        let baseline_cwd = {
+            let session_arc = self.sessions.lock().await.get(&session_id).cloned();
+            match session_arc {
+                Some(session_arc) => Some(session_arc.lock().await.summary.cwd.clone()),
+                None => None,
+            }
+        };
+        if let Some(cwd) = baseline_cwd {
+            self.capture_turn_workspace_baseline(session_id, turn.turn_id, cwd)
+                .await;
+        }
         if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
             session_arc.lock().await.turn_approval_cache =
                 crate::execution::ApprovalGrantCache::default();
@@ -2268,6 +2283,8 @@ impl ServerRuntime {
         {
             tracing::warn!(session_id = %session_id, error = %error, "failed to persist terminal turn line");
         }
+        self.finalize_turn_workspace_changes(session_id, &final_turn)
+            .await;
         // Emit the terminal result before we look at queued follow-up input.
         if let Err(error) = result {
             tracing::warn!(

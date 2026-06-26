@@ -42,6 +42,7 @@ mod slash_command;
 mod truncation;
 mod turn;
 pub mod user_input;
+mod workspace_changes;
 
 pub use acp::*;
 pub use acp_auth::*;
@@ -78,3 +79,4 @@ pub use slash_command::*;
 pub use truncation::*;
 pub use turn::*;
 pub use user_input::*;
+pub use workspace_changes::*;

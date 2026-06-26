@@ -11,7 +11,7 @@
  * 7. Only the active theme (light/dark) is rendered, not both
  */
 import { cn } from "@devo/ui/lib/utils"
-import { MultiFileDiff, useWorkerPool, WorkerPoolContextProvider } from "@pierre/diffs/react"
+import { PatchDiff, useWorkerPool, WorkerPoolContextProvider } from "@pierre/diffs/react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
@@ -46,9 +46,13 @@ import {
 	reviewPanelSelectedFileAtom,
 	reviewPanelSettingsAtom,
 } from "../../atoms/ui"
-import { useSessionDiff } from "../../hooks/use-session-diff"
-import type { FileDiff } from "../../lib/types"
-import { DiffCommentButton, ReviewPanelComments, useDiffComments } from "./review-comments"
+import { useWorkspaceChanges } from "../../hooks/use-workspace-changes"
+import type { WorkspaceChangeScope, WorkspaceChangeView } from "../../lib/types"
+import {
+	type WorkspacePatchFile,
+	workspaceChangeStats,
+	workspacePatchFilesFromView,
+} from "../../lib/workspace-diff"
 
 // ============================================================
 // Constants
@@ -66,6 +70,20 @@ const LARGE_DIFF_LINE_THRESHOLD = 1500
 
 /** Estimated height (px) of a collapsed diff section (header only). */
 const COLLAPSED_ROW_HEIGHT = 32
+
+const WORKSPACE_CHANGE_SCOPES: Array<{ scope: WorkspaceChangeScope; label: string }> = [
+	{ scope: "turn", label: "Turn" },
+	{ scope: "branch", label: "Branch" },
+	{ scope: "uncommitted", label: "Uncommitted" },
+]
+
+function statsFromView(view: WorkspaceChangeView | null | undefined): {
+	fileCount: number
+	additions: number
+	deletions: number
+} {
+	return workspaceChangeStats(view)
+}
 
 // ============================================================
 // Generated / vendor file detection
@@ -106,7 +124,7 @@ function isGeneratedFile(filePath: string): boolean {
 	return GENERATED_FILE_PATTERNS.some((p) => p.test(filePath))
 }
 
-function isLargeDiff(diff: FileDiff): boolean {
+function isLargeDiff(diff: WorkspacePatchFile): boolean {
 	return diff.additions + diff.deletions > LARGE_DIFF_LINE_THRESHOLD
 }
 
@@ -171,11 +189,15 @@ export const ReviewPanel = memo(function ReviewPanel({
 	directory,
 	className,
 }: ReviewPanelProps) {
-	const { diffs, stats, loading } = useSessionDiff(sessionId, directory)
+	const [scope, setScope] = useState<WorkspaceChangeScope>("turn")
 	const [settings, setSettings] = useAtom(reviewPanelSettingsAtom)
-	const setOpen = useAtom(reviewPanelOpenAtom)[1]
+	const [panelOpen, setOpen] = useAtom(reviewPanelOpenAtom)
 	const [selectedFile, setSelectedFile] = useState<string | null>(null)
-	const { comments, addComment, removeComment, clearComments } = useDiffComments(sessionId)
+	const { view, loading, error } = useWorkspaceChanges(sessionId, directory, scope, {
+		enabled: panelOpen,
+	})
+	const diffs = useMemo(() => workspacePatchFilesFromView(view), [view])
+	const stats = useMemo(() => statsFromView(view), [view])
 
 	// --- External file selection (e.g. "View diff" button in tool cards) ---
 	const externalFile = useAtomValue(reviewPanelSelectedFileAtom)
@@ -206,7 +228,7 @@ export const ReviewPanel = memo(function ReviewPanel({
 	const manyFiles = diffs.length > AUTO_COLLAPSE_THRESHOLD
 
 	const getIsCollapsed = useCallback(
-		(diff: FileDiff): boolean => {
+		(diff: WorkspacePatchFile): boolean => {
 			// User override takes priority
 			if (diff.file in userToggles) return !userToggles[diff.file]
 			// Auto-collapse rules
@@ -253,6 +275,11 @@ export const ReviewPanel = memo(function ReviewPanel({
 		}
 	}, [sessionId])
 
+	useEffect(() => {
+		setSelectedFile(null)
+		setUserToggles({})
+	}, [scope])
+
 	// --- Handlers ---
 	const handleClose = useCallback(() => setOpen(false), [setOpen])
 	const handleToggleExpanded = useCallback(
@@ -281,6 +308,7 @@ export const ReviewPanel = memo(function ReviewPanel({
 			<div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
 				<div className="flex items-center gap-2">
 					<h3 className="text-xs font-semibold text-foreground">Changes</h3>
+					<ScopeSegmentedControl scope={scope} onScopeChange={setScope} />
 					{stats.fileCount > 0 && (
 						<span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
 							<span className="flex items-center gap-0.5 text-green-500">
@@ -358,10 +386,7 @@ export const ReviewPanel = memo(function ReviewPanel({
 				</div>
 			)}
 
-			{/* Comment pills */}
-			{comments.length > 0 && (
-				<ReviewPanelComments comments={comments} onRemove={removeComment} onClear={clearComments} />
-			)}
+			<WorkspaceChangeNotice view={view} error={error} />
 
 			{/* Diff content -- virtualized */}
 			<div className="min-h-0 flex-1">
@@ -371,14 +396,13 @@ export const ReviewPanel = memo(function ReviewPanel({
 						<span className="ml-2 text-sm text-muted-foreground">Loading changes...</span>
 					</div>
 				) : diffs.length === 0 ? (
-					<EmptyState />
+					<EmptyState scope={scope} view={view} error={error} />
 				) : (
 					<VirtualizedDiffList
 						diffs={displayedDiffs}
 						diffStyle={settings.diffStyle}
 						getIsCollapsed={getIsCollapsed}
 						onToggle={toggleFile}
-						onAddComment={addComment}
 					/>
 				)}
 			</div>
@@ -386,21 +410,74 @@ export const ReviewPanel = memo(function ReviewPanel({
 	)
 })
 
+function ScopeSegmentedControl({
+	scope,
+	onScopeChange,
+}: {
+	scope: WorkspaceChangeScope
+	onScopeChange: (scope: WorkspaceChangeScope) => void
+}) {
+	return (
+		<div className="flex rounded-md bg-muted p-0.5">
+			{WORKSPACE_CHANGE_SCOPES.map((item) => (
+				<button
+					key={item.scope}
+					type="button"
+					onClick={() => onScopeChange(item.scope)}
+					className={cn(
+						"rounded px-2 py-0.5 text-[10px] font-medium transition-colors",
+						scope === item.scope
+							? "bg-background text-foreground shadow-sm"
+							: "text-muted-foreground hover:text-foreground",
+					)}
+				>
+					{item.label}
+				</button>
+			))}
+		</div>
+	)
+}
+
+function WorkspaceChangeNotice({
+	view,
+	error,
+}: {
+	view: WorkspaceChangeView | null
+	error: string | null
+}) {
+	const warnings = view?.warnings ?? []
+	if (!error && warnings.length === 0 && view?.status !== "partial") return null
+	return (
+		<div className="border-b border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+			{error ? (
+				<div className="flex items-center gap-1.5 text-red-500">
+					<AlertTriangleIcon className="size-3.5" />
+					<span>{error}</span>
+				</div>
+			) : (
+				<div className="flex flex-wrap items-center gap-1.5">
+					<AlertTriangleIcon className="size-3.5 text-amber-500" />
+					<span className="text-amber-500">Partial change view</span>
+					{warnings.map((warning) => (
+						<span key={warning} className="rounded bg-muted px-1.5 py-0.5">
+							{warning}
+						</span>
+					))}
+				</div>
+			)}
+		</div>
+	)
+}
+
 // ============================================================
 // Virtualized diff list using TanStack Virtual
 // ============================================================
 
 interface VirtualizedDiffListProps {
-	diffs: FileDiff[]
+	diffs: WorkspacePatchFile[]
 	diffStyle: DiffStyle
-	getIsCollapsed: (diff: FileDiff) => boolean
+	getIsCollapsed: (diff: WorkspacePatchFile) => boolean
 	onToggle: (file: string) => void
-	onAddComment: (comment: {
-		filePath: string
-		lineNumber: number
-		side: "additions" | "deletions"
-		content: string
-	}) => void
 }
 
 const VirtualizedDiffList = memo(function VirtualizedDiffList({
@@ -408,11 +485,10 @@ const VirtualizedDiffList = memo(function VirtualizedDiffList({
 	diffStyle,
 	getIsCollapsed,
 	onToggle,
-	onAddComment,
 }: VirtualizedDiffListProps) {
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const isDark = useIsDarkMode()
-	const [pinnedDiff, setPinnedDiff] = useState<FileDiff | null>(null)
+	const [pinnedDiff, setPinnedDiff] = useState<WorkspacePatchFile | null>(null)
 	const pinnedFileRef = useRef<string | null>(null)
 
 	const theme = isDark ? ("one-dark-pro" as const) : ("one-light" as const)
@@ -462,7 +538,7 @@ const VirtualizedDiffList = memo(function VirtualizedDiffList({
 				}
 				// Find the expanded file whose header has fully scrolled out of view
 				// but whose body still extends below the viewport top
-				let found: FileDiff | null = null
+				let found: WorkspacePatchFile | null = null
 				for (const item of virtualizer.getVirtualItems()) {
 					const diff = diffs[item.index]
 					if (getIsCollapsed(diff)) continue
@@ -547,7 +623,6 @@ const VirtualizedDiffList = memo(function VirtualizedDiffList({
 										diffStyle={diffStyle}
 										collapsed={collapsed}
 										onToggle={onToggle}
-										onAddComment={onAddComment}
 									/>
 								</div>
 							)
@@ -592,7 +667,7 @@ const FileList = memo(function FileList({
 	selectedFile,
 	onSelectFile,
 }: {
-	diffs: FileDiff[]
+	diffs: WorkspacePatchFile[]
 	selectedFile: string | null
 	onSelectFile: (file: string | null) => void
 }) {
@@ -688,16 +763,10 @@ const FileListItem = memo(function FileListItem({
 // ============================================================
 
 interface FileDiffSectionProps {
-	diff: FileDiff
+	diff: WorkspacePatchFile
 	diffStyle: DiffStyle
 	collapsed: boolean
 	onToggle: (file: string) => void
-	onAddComment: (comment: {
-		filePath: string
-		lineNumber: number
-		side: "additions" | "deletions"
-		content: string
-	}) => void
 }
 
 const FileDiffSection = memo(function FileDiffSection({
@@ -705,7 +774,6 @@ const FileDiffSection = memo(function FileDiffSection({
 	diffStyle,
 	collapsed,
 	onToggle,
-	onAddComment,
 }: FileDiffSectionProps) {
 	const generated = isGeneratedFile(diff.file)
 	const large = isLargeDiff(diff)
@@ -720,26 +788,6 @@ const FileDiffSection = memo(function FileDiffSection({
 			expandUnchanged: false,
 		}),
 		[diffStyle],
-	)
-
-	const oldFile = useMemo(
-		() => ({ name: diff.file, contents: diff.before }),
-		[diff.file, diff.before],
-	)
-	const newFile = useMemo(
-		() => ({ name: diff.file, contents: diff.after }),
-		[diff.file, diff.after],
-	)
-
-	const renderHoverUtility = useCallback(
-		(getHoveredLine: () => { lineNumber: number; side: "additions" | "deletions" } | undefined) => (
-			<DiffCommentButton
-				filePath={diff.file}
-				getHoveredLine={getHoveredLine}
-				onAddComment={onAddComment}
-			/>
-		),
-		[diff.file, onAddComment],
 	)
 
 	const handleToggle = useCallback(() => onToggle(diff.file), [diff.file, onToggle])
@@ -763,12 +811,11 @@ const FileDiffSection = memo(function FileDiffSection({
 			// syntax highlighting from the background -- no manual queue needed.
 			body = (
 				<div className="overflow-x-auto">
-					<MultiFileDiff
-						options={options}
-						oldFile={oldFile}
-						newFile={newFile}
-							renderGutterUtility={renderHoverUtility}
-					/>
+					{diff.patch ? (
+						<PatchDiff options={options} patch={diff.patch} />
+					) : (
+						<MetadataOnlyPlaceholder warnings={diff.warnings} />
+					)}
 				</div>
 			)
 		}
@@ -818,6 +865,26 @@ function LargeDiffPlaceholder({
 			>
 				Load diff
 			</button>
+		</div>
+	)
+}
+
+function MetadataOnlyPlaceholder({ warnings }: { warnings: string[] }) {
+	return (
+		<div className="flex flex-col gap-1.5 bg-muted/10 px-4 py-5 text-xs text-muted-foreground">
+			<div className="flex items-center gap-1.5 text-amber-500">
+				<AlertTriangleIcon className="size-3.5" />
+				<span>Text diff is not available for this file</span>
+			</div>
+			{warnings.length > 0 && (
+				<div className="flex flex-wrap gap-1">
+					{warnings.map((warning) => (
+						<span key={warning} className="rounded bg-muted px-1.5 py-0.5">
+							{warning}
+						</span>
+					))}
+				</div>
+			)}
 		</div>
 	)
 }
@@ -921,17 +988,34 @@ function StatusBadge({ status }: { status: "added" | "deleted" | "modified" }) {
 // Empty state
 // ============================================================
 
-function EmptyState() {
+function EmptyState({
+	scope,
+	view,
+	error,
+}: {
+	scope: WorkspaceChangeScope
+	view: WorkspaceChangeView | null
+	error: string | null
+}) {
+	const scopeLabel = WORKSPACE_CHANGE_SCOPES.find((item) => item.scope === scope)?.label ?? "Changes"
+	const title = error
+		? "Unable to load changes"
+		: view?.status === "unsupported"
+			? `${scopeLabel} changes unavailable`
+			: "No changes yet"
+	const detail = error
+		? error
+		: view?.status === "unsupported"
+			? (view.warnings[0] ?? "This workspace does not support that change scope")
+			: "File changes will appear here as the agent works"
 	return (
 		<div className="flex flex-col items-center justify-center gap-3 py-16">
 			<div className="flex size-10 items-center justify-center rounded-lg border border-border/50 bg-muted/30">
 				<FileIcon className="size-4 text-muted-foreground" />
 			</div>
 			<div className="text-center">
-				<p className="text-sm font-medium text-foreground">No changes yet</p>
-				<p className="mt-1 text-xs text-muted-foreground">
-					File changes will appear here as the agent works
-				</p>
+				<p className="text-sm font-medium text-foreground">{title}</p>
+				<p className="mt-1 text-xs text-muted-foreground">{detail}</p>
 			</div>
 		</div>
 	)
