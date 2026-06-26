@@ -33,18 +33,18 @@ export interface ResolveWindowChromeOptions {
 	platform?: NodeJS.Platform
 }
 
-const WINDOWS_TITLE_BAR_OVERLAY_HEIGHT = 40
-const WINDOWS_TITLE_BAR_OVERLAY_COLOR = "#00000000"
-const WINDOWS_TITLE_BAR_OVERLAY_DARK_SYMBOL_COLOR = "#111111"
-const WINDOWS_TITLE_BAR_OVERLAY_LIGHT_SYMBOL_COLOR = "#f4f4f5"
+const TITLE_BAR_OVERLAY_HEIGHT = 40
+const TITLE_BAR_OVERLAY_COLOR = "#00000000"
+const TITLE_BAR_OVERLAY_DARK_SYMBOL_COLOR = "#111111"
+const TITLE_BAR_OVERLAY_LIGHT_SYMBOL_COLOR = "#f4f4f5"
 
-export function resolveWindowsTitleBarOverlay(isDarkMode: boolean): TitleBarOverlay {
+export function resolveTitleBarOverlay(isDarkMode: boolean): TitleBarOverlay {
 	return {
-		color: WINDOWS_TITLE_BAR_OVERLAY_COLOR,
+		color: TITLE_BAR_OVERLAY_COLOR,
 		symbolColor: isDarkMode
-			? WINDOWS_TITLE_BAR_OVERLAY_LIGHT_SYMBOL_COLOR
-			: WINDOWS_TITLE_BAR_OVERLAY_DARK_SYMBOL_COLOR,
-		height: WINDOWS_TITLE_BAR_OVERLAY_HEIGHT,
+			? TITLE_BAR_OVERLAY_LIGHT_SYMBOL_COLOR
+			: TITLE_BAR_OVERLAY_DARK_SYMBOL_COLOR,
+		height: TITLE_BAR_OVERLAY_HEIGHT,
 	}
 }
 
@@ -116,6 +116,7 @@ export async function resolveWindowChrome({
 }: ResolveWindowChromeOptions): Promise<WindowChromeResult> {
 	const isMac = platform === "darwin"
 	const isWindows = platform === "win32"
+	const isLinux = platform === "linux"
 
 	if (isWindows) {
 		if (isOpaque) {
@@ -127,7 +128,7 @@ export async function resolveWindowChrome({
 				usesTransparentBackground: false,
 				options: {
 					titleBarStyle: "hidden" as const,
-					titleBarOverlay: resolveWindowsTitleBarOverlay(isDarkMode),
+					titleBarOverlay: resolveTitleBarOverlay(isDarkMode),
 				},
 			}
 		}
@@ -147,7 +148,7 @@ export async function resolveWindowChrome({
 				thickFrame: true,
 				roundedCorners: true,
 				titleBarStyle: "hidden" as const,
-				titleBarOverlay: resolveWindowsTitleBarOverlay(isDarkMode),
+				titleBarOverlay: resolveTitleBarOverlay(isDarkMode),
 			},
 		}
 	}
@@ -161,6 +162,10 @@ export async function resolveWindowChrome({
 			usesTransparentWindow: false,
 			usesTransparentBackground: false,
 			options: {
+				...(isLinux && {
+					titleBarStyle: "hidden" as const,
+					titleBarOverlay: resolveTitleBarOverlay(isDarkMode),
+				}),
 				...(isMac && {
 					titleBarStyle: "hiddenInset" as const,
 					trafficLightPosition: { x: 15, y: 15 },

@@ -29,7 +29,7 @@ function declarationsForSelector(
 					const separatorIndex = declaration.indexOf(":");
 					return [
 						declaration.slice(0, separatorIndex).trim(),
-						declaration.slice(separatorIndex + 1).trim(),
+						declaration.slice(separatorIndex + 1).replace(/\s+/g, " ").trim(),
 					];
 				}),
 		);
@@ -39,6 +39,30 @@ function declarationsForSelector(
 }
 
 describe("desktop chrome CSS", () => {
+	test("Windows dark mode uses dark chrome background tokens", async () => {
+		const css = await readFile(cssPath, "utf8");
+		const lightDeclarations = declarationsForSelector(
+			css,
+			':root[data-platform="win32"]',
+		);
+		const darkDeclarations = declarationsForSelector(
+			css,
+			':root[data-platform="win32"].dark',
+		);
+
+		expect(lightDeclarations).toEqual({
+			"--devo-titlebar-height": "40px",
+			"--devo-windows-focus-chrome-bg": "#ecf5f9",
+			"--devo-windows-unfocused-chrome-bg": "#f2f4f5",
+		});
+		expect(darkDeclarations).toEqual({
+			"--devo-windows-focus-chrome-bg":
+				"color-mix( in srgb, var(--background) 92%, var(--foreground) 8% )",
+			"--devo-windows-unfocused-chrome-bg":
+				"color-mix( in srgb, var(--background) 96%, var(--foreground) 4% )",
+		});
+	});
+
 	test("macOS glass sidebar inset extends to the right and bottom window edges", async () => {
 		const css = await readFile(cssPath, "utf8");
 		const selectors = [
