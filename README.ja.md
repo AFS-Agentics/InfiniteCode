@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="./.github/assets/devo-readme-logo.png" alt="Devo" width="220" />
+<img src="./.github/assets/devo-readme-brand.svg" alt="Devo desktop coding agent app icon and wordmark" width="360" />
 
 </div>
 
 <div align="center">
 
-**単一バイナリとして動作する、軽量でモデル中立なコーディングエージェント。高速で token 効率が高く、柔軟にカスタマイズできます。**
+**Devo は、プライベート、エンタープライズ、OpenAI 互換モデル環境向けの、オープンソースでモデル中立な Agent Desktop / Runtime です。DeepSeek、Qwen、Kimi、Anthropic 互換 API、ローカルゲートウェイ、独自モデル endpoint に接続できます。**
 
 [![Stars](https://img.shields.io/github/stars/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/stargazers)
 [![Language](https://img.shields.io/badge/language-Rust-E57324?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -17,11 +17,29 @@
 
 [English](./README.md) | [简体中文](./README.zh-Hans.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-[機能](#機能) · [検証済みモデル](#検証済みモデル) · [検証済みプラットフォーム](#検証済みプラットフォーム) · [インストール](#インストール) · [クイックスタート](#クイックスタート) · [ドキュメント](#docs)
+[Devo を選ぶ理由](#devo-を選ぶ理由) · [機能](#機能) · [検証済みモデル](#検証済みモデル) · [検証済みプラットフォーム](#検証済みプラットフォーム) · [インストール](#インストール) · [クイックスタート](#クイックスタート) · [ドキュメント](#docs)
 
 </div>
 
 ---
+
+## Devo を選ぶ理由
+
+Devo は、単一のホスト型モデルエコシステムに縛られず、モデル選択、
+ランタイムの動作、ワークスペースでの実行境界を自分たちで制御したい
+チームのための coding agent です。
+
+- **任意のモデルを接続** - provider/model binding により、OpenAI 互換 Chat
+  Completions、OpenAI 互換 Responses、Anthropic Messages、DeepSeek、
+  Qwen、Kimi、またはプライベートモデルゲートウェイを接続できます。
+- **プライベート環境やイントラネット環境に対応** - 単一のローカル Rust
+  バイナリとして動作し、オフラインインストール経路をサポートし、
+  ホスト型 agent service に依存せず内部 endpoint を指定できます。
+- **Desktop と CLI の両方に対応** - Desktop app でオンボーディングと日常の
+  coding を行い、端末ネイティブな自動化が必要なときは CLI/TUI を使えます。
+- **Agent Runtime として拡張可能** - MCP server、再利用可能な skills、
+  ローカルのセマンティックコード検索、監査可能なセッション、権限管理、
+  マルチエージェント flow は、一回限りの prompt ではなくランタイム機能です。
 
 ## 機能
 
@@ -88,22 +106,53 @@ HarmonyOS サポートはロードマップ上にあります。HarmonyOS デバ
 
 ## インストール
 
-### Linux / macOS
+Devo には 2 つのインストール形態があります。Desktop app、端末ネイティブな
+TUI/CLI、またはその両方を同じマシンにインストールできます。
+
+### オプション 1: Desktop App
+
+グラフィカルな Devo 体験を使いたい場合は、まず
+[GitHub Releases](https://github.com/7df-lab/devo/releases/latest)
+から最新の Devo Desktop package をダウンロードし、OS とアーキテクチャに合う
+asset を選んでください:
+
+- **macOS** - `devo-desktop-...-mac-...` の `.dmg` または `.zip` asset をダウンロードします。
+- **Windows** - `devo-desktop-...-windows-...` の `.exe` asset をダウンロードします。
+- **Linux** - `devo-desktop-...-linux-...` の `.AppImage`、`.deb`、または
+  `.rpm` asset をダウンロードします。
+
+**macOS に「Devo」は壊れているため開けません、と表示される場合がありますが、これは想定された動作です。**
+現在の macOS Desktop builds は署名されていないため、インストール後に次のコマンドを実行すると
+macOS でアプリを起動できます:
+
+```bash
+sudo xattr -dr com.apple.quarantine /Applications/Devo.app
+```
+
+### オプション 2: TUI / CLI
+
+端末 TUI を使いたい場合、shell automation が必要な場合、または Desktop app と
+併用したい場合は、端末ネイティブな `devo` command をインストールしてください。
+
+Linux / macOS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
 ```
 
-### Windows
+Windows:
 
 ```powershell
 irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
 ```
 
 オンラインインストーラーは `devo` を Devo home ディレクトリに配置し、高速なリポジトリ検索に使う
-`rg` sidecar をインストールします。また、`code_search` が使うローカル Hugging Face モデルを事前インストールできます。
+`rg` sidecar をインストールします。また、`code_search` が使うローカルモデルの任意設定にも対応しています。
 
-ローカルの `code_search` モデルを事前インストールするには:
+<details>
+<summary>任意: ローカルの <code>code_search</code> モデルを事前インストール</summary>
+
+インストール時に Hugging Face モデルをダウンロードしたい場合だけ使用してください。
 
 Linux / macOS:
 
@@ -117,6 +166,8 @@ Windows:
 $env:DEVO_INSTALL_CODE_SEARCH_MODEL = "1"; irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
 ```
 
+</details>
+
 既存のインストールを最新 release にアップグレードするには:
 
 ```bash
@@ -126,53 +177,8 @@ devo upgrade
 アップグレードコマンドは同じプラットフォーム用インストーラーを実行し、
 インストーラーは `Version: v0.1.12 -> v0.1.15` のようにバージョン遷移を表示します。
 
-### macOS デスクトップアプリ
-
-**macOS に「Devo」は壊れているため開けません、と表示される場合がありますが、これは想定された動作です。**
-現在の macOS Desktop builds は署名されていないため、インストール後に次のコマンドを実行すると
-macOS でアプリを起動できます:
-
-```bash
-sudo xattr -dr com.apple.quarantine /Applications/Devo.app
-```
-
-<details>
-<summary>オフラインインストール</summary>
-
-多くのエンタープライズ環境やイントラネット環境ではインターネットにアクセスできません。
-Devo のインストーラーはオフラインモードをサポートしており、必要なすべてのアセットをインストーラースクリプトと同じディレクトリから読み込み、ネットワークには接続しません。
-
-インターネットにアクセスできるマシンで:
-
-1. インストーラースクリプトをダウンロードします。Linux/macOS は `install.sh`、Windows は `install.ps1` です。
-2. 対象 CPU と OS 向けの最新 Devo release asset をダウンロードします。例: `x86_64`
-   と `aarch64`/`arm64`。
-3. ローカルセマンティック `code_search` が使う Hugging Face `minishlab/potion-code-16M`
-   モデルファイルをダウンロードします: `config.json`、`model.safetensors`、`tokenizer.json`。
-4. 対象 CPU と OS に合う `ripgrep` release asset をダウンロードします。
-
-これらのファイルをインストーラースクリプトの隣に置きます。モデルファイルはスクリプトの隣に直接置いても、
-`minishlab--potion-code-16M/` サブディレクトリに置いても構いません。
-
-Linux / macOS:
-
-```bash
-sh ./install.sh --offline
-```
-
-Windows:
-
-```powershell
-.\install.ps1 -Offline
-```
-
-オフラインモードでは、モデルは
-`<DEVO_HOME>/local-models/minishlab--potion-code-16M` にインストールされます。
-これはランタイムの code-search provider が使用するディレクトリです。
-`DEVO_HOME` が設定されていない場合は
-`~/.devo/local-models/minishlab--potion-code-16M` になります。
-
-</details>
+イントラネット環境やオフライン環境でインストールする場合は、
+[オフラインインストール](./docs/offline-installation.ja.md) を参照してください。
 
 ## クイックスタート
 
@@ -192,95 +198,14 @@ devo resume <session-id>
 
 ## 設定
 
-`devo onboard` が推奨されるセットアップ方法です。手動で設定する場合、Devo は次の順序で設定をマージします:
+`devo onboard` が推奨されるセットアップ方法です。手動の `config.toml`
+パス、provider/model binding フィールド、カスタムモデルカタログの例は
+[設定](./docs/configuration.ja.md) を参照してください。
 
-1. 組み込みデフォルト
-2. `DEVO_HOME/config.toml` - ユーザーレベル設定。デフォルトでは macOS/Linux で
-   `~/.devo/config.toml`、Windows で `C:\Users\yourname\.devo\config.toml`
-3. `<workspace>/.devo/config.toml` - プロジェクトレベル設定
-4. CLI flags
+## Docs
 
-認証情報は `DEVO_HOME/auth.json` に分離して保存されます。
-`config.toml` には API key を直接保存せず、credential id を参照させてください。
-
-最小構成:
-
-```toml
-[defaults]
-model_binding = "deepseek-v4-flash-api-deepseek-com"
-
-[providers."api.deepseek.com"]
-enabled = true
-name = "api.deepseek.com"
-base_url = "https://api.deepseek.com"
-credential = "api_deepseek_com_api_key"
-wire_apis = ["openai_chat_completions"]
-
-[model_bindings.deepseek-v4-flash-api-deepseek-com]
-enabled = true
-model_slug = "deepseek-v4-flash"
-provider = "api.deepseek.com"
-model_name = "deepseek-v4-flash"
-display_name = "DeepSeek V4 Flash"
-invocation_method = "openai_chat_completions"
-default_reasoning_effort = "high"
-```
-
-重要な分離は次のとおりです:
-
-- `model_slug` は `models.json` から Devo のローカルモデルメタデータを選択します。
-- `provider` は設定済みの接続レコードを選択します。
-- `model_name` はプロバイダーへ送信される、そのプロバイダー固有のモデル文字列です。
-- `invocation_method` はプロバイダープロトコルを選択します。例:
-  [`openai_chat_completions`](https://developers.openai.com/api/reference/chat-completions/overview)、
-  [`openai_responses`](https://developers.openai.com/api/reference/responses/overview)、
-  [`anthropic_messages`](https://platform.claude.com/docs/en/api/messages)。
-
-### カスタムモデル
-
-使いたいモデルが組み込みリストにない場合は、`models.json` に追加してから
-`config.toml` でバインドします。
-
-ユーザーレベルのモデルカタログ:
-
-- macOS/Linux: `~/.devo/models.json`
-- Windows: `C:\Users\yourname\.devo\models.json`
-
-プロジェクトレベルの上書きは `<workspace>/.devo/models.json` に配置できます。
-`models.json` の `provider` は、そのモデルのデフォルト wire API メタデータです。
-実際のエンドポイントは引き続き `config.toml` の `provider` フィールドで選択されます。
-
-`models.json` エントリの例:
-
-```json
-[
-  {
-    "slug": "my-coding-model",
-    "display_name": "My Coding Model",
-    "channel": "Custom",
-    "provider": "openai_chat_completions",
-    "description": "Custom OpenAI-compatible coding model.",
-    "reasoning_capability": "unsupported",
-    "context_window": 200000,
-    "effective_context_window_percent": 95,
-    "max_tokens": 4096,
-    "input_modalities": ["text"],
-    "base_instructions": "You are Devo, a coding agent. Help the user edit and understand code."
-  }
-]
-```
-
-次に、その `slug` を model binding から参照します:
-
-```toml
-[model_bindings.my-coding-model-example]
-enabled = true
-model_slug = "my-coding-model"
-provider = "my.provider"
-model_name = "provider-specific-model-name"
-display_name = "My Coding Model"
-invocation_method = "openai_chat_completions"
-```
+- [オフラインインストール](./docs/offline-installation.ja.md)
+- [設定](./docs/configuration.ja.md)
 
 ## よくある質問
 

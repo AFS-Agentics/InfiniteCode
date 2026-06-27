@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="./.github/assets/devo-readme-logo.png" alt="Devo" width="220" />
+<img src="./.github/assets/devo-readme-brand.svg" alt="Devo desktop coding agent app icon and wordmark" width="360" />
 
 </div>
 
 <div align="center">
 
-**Легковесный модельно-нейтральный агент для программирования, который работает как единый бинарный файл. Быстрый, token-эффективный и гибко настраиваемый.**
+**Открытый модельно-нейтральный Agent Desktop / Runtime для приватных, корпоративных и OpenAI-совместимых модельных сред. Подключайте DeepSeek, Qwen, Kimi, Anthropic-совместимые API, локальные шлюзы или собственные endpoint моделей.**
 
 [![Stars](https://img.shields.io/github/stars/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/stargazers)
 [![Language](https://img.shields.io/badge/language-Rust-E57324?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
@@ -17,11 +17,29 @@
 
 [English](./README.md) | [简体中文](./README.zh-Hans.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-[Возможности](#возможности) · [Проверенные модели](#проверенные-модели) · [Проверенные платформы](#проверенные-платформы) · [Установка](#установка) · [Быстрый старт](#быстрый-старт) · [Документация](#docs)
+[Почему Devo](#почему-devo) · [Возможности](#возможности) · [Проверенные модели](#проверенные-модели) · [Проверенные платформы](#проверенные-платформы) · [Установка](#установка) · [Быстрый старт](#быстрый-старт) · [Документация](#docs)
 
 </div>
 
 ---
+
+## Почему Devo
+
+Devo предназначен для команд, которым нужен coding agent вне единой hosted
+экосистемы моделей. Он оставляет выбор модели, поведение runtime и выполнение
+в workspace под вашим контролем.
+
+- **Подключайте свою модель** - Через provider/model bindings можно подключать
+  OpenAI-compatible Chat Completions, OpenAI-compatible Responses, Anthropic
+  Messages, DeepSeek, Qwen, Kimi или приватные model gateways.
+- **Подходит для приватных и intranet-сред** - Devo запускается как единый
+  локальный Rust binary, поддерживает offline installation paths и может
+  указывать на внутренние endpoint без зависимости от hosted agent service.
+- **Desktop и CLI workflow** - Используйте Desktop app для onboarding и
+  повседневного coding, либо CLI/TUI, когда нужна terminal-native automation.
+- **Расширяемый agent runtime** - MCP servers, reusable skills, локальный
+  semantic code search, аудируемые сессии, permissions и multi-agent flows
+  являются возможностями runtime, а не одноразовыми prompt.
 
 ## Возможности
 
@@ -99,23 +117,55 @@ Devo протестирован на macOS, Linux, Windows и Kylin OS.
 
 ## Установка
 
-### Linux / macOS
+Devo можно установить в двух формах. Вы можете установить Desktop app,
+terminal-native TUI/CLI или оба варианта на одной машине.
+
+### Вариант 1: Desktop App
+
+Начните здесь, если хотите использовать графический интерфейс Devo. Скачайте
+последний Devo Desktop package со страницы
+[GitHub Releases](https://github.com/7df-lab/devo/releases/latest), затем
+выберите asset для вашей операционной системы и архитектуры:
+
+- **macOS** - скачайте `.dmg` или `.zip` asset вида
+  `devo-desktop-...-mac-...`.
+- **Windows** - скачайте `.exe` asset вида `devo-desktop-...-windows-...`.
+- **Linux** - скачайте `.AppImage`, `.deb` или `.rpm` asset вида
+  `devo-desktop-...-linux-...`.
+
+**Если macOS сообщает, что `Devo.app` повреждено и не может быть открыто, это
+ожидаемо.** Текущие macOS Desktop builds не подписаны, поэтому после установки
+выполните следующую команду, чтобы macOS могла запустить приложение:
+
+```bash
+sudo xattr -dr com.apple.quarantine /Applications/Devo.app
+```
+
+### Вариант 2: TUI / CLI
+
+Установите terminal-native команду `devo`, если предпочитаете TUI, хотите
+shell automation или хотите использовать Devo вместе с Desktop app.
+
+Linux / macOS:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
 ```
 
-### Windows
+Windows:
 
 ```powershell
 irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
 ```
 
 Онлайн-установщик размещает `devo` в Devo home directory, устанавливает
-вспомогательный `rg` sidecar для быстрого поиска по репозиторию и может заранее
-установить локальную модель Hugging Face, которую использует `code_search`.
+вспомогательный `rg` sidecar для быстрого поиска по репозиторию и поддерживает
+дополнительную настройку локальной модели, которую использует `code_search`.
 
-Предварительная установка локальной модели `code_search`:
+<details>
+<summary>Необязательно: предварительно установить локальную модель <code>code_search</code></summary>
+
+Используйте это только если хотите скачать модель Hugging Face во время установки.
 
 Linux / macOS:
 
@@ -129,6 +179,8 @@ Windows:
 $env:DEVO_INSTALL_CODE_SEARCH_MODEL = "1"; irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
 ```
 
+</details>
+
 Обновление существующей установки до последнего release:
 
 ```bash
@@ -138,56 +190,8 @@ devo upgrade
 Команда обновления запускает тот же установщик для текущей платформы, а
 установщик выводит переход версии, например `Version: v0.1.12 -> v0.1.15`.
 
-### Настольное приложение macOS
-
-**Если macOS сообщает, что `Devo.app` повреждено и не может быть открыто, это
-ожидаемо.** Текущие macOS Desktop builds не подписаны, поэтому после установки
-выполните следующую команду, чтобы macOS могла запустить приложение:
-
-```bash
-sudo xattr -dr com.apple.quarantine /Applications/Devo.app
-```
-
-<details>
-<summary>Офлайн-установка</summary>
-
-Многие корпоративные и intranet-среды не имеют доступа к интернету. Установщики
-Devo поддерживают офлайн-режим: они читают все необходимые assets из того же
-каталога, что и скрипт установщика, и не обращаются к сети.
-
-На машине с доступом к интернету:
-
-1. Скачайте скрипт установщика: `install.sh` для Linux/macOS или `install.ps1`
-   для Windows.
-2. Скачайте последний Devo release asset для целевой CPU и OS, например
-   `x86_64` или `aarch64`/`arm64`.
-3. Скачайте файлы модели Hugging Face `minishlab/potion-code-16M`, которую
-   использует локальный семантический `code_search`: `config.json`,
-   `model.safetensors` и `tokenizer.json`.
-4. Скачайте соответствующий `ripgrep` release asset для целевой CPU и OS.
-
-Положите эти файлы рядом со скриптом установщика. Файлы модели можно положить
-непосредственно рядом со скриптом или в подкаталог
-`minishlab--potion-code-16M/`.
-
-Linux / macOS:
-
-```bash
-sh ./install.sh --offline
-```
-
-Windows:
-
-```powershell
-.\install.ps1 -Offline
-```
-
-Офлайн-режим устанавливает модель в
-`<DEVO_HOME>/local-models/minishlab--potion-code-16M`; это каталог, который
-использует runtime code-search provider. Если `DEVO_HOME` не задан, путь будет
-`~/.devo/local-models/minishlab--potion-code-16M`.
-
-</details>
+Для intranet-сред или установки без доступа к сети см.
+[Офлайн-установку](./docs/offline-installation.ru.md).
 
 ## Быстрый старт
 
@@ -207,98 +211,14 @@ devo resume <session-id>
 
 ## Конфигурация
 
-`devo onboard` - рекомендуемый путь настройки. Для ручной конфигурации Devo
-объединяет настройки в таком порядке:
+`devo onboard` - рекомендуемый путь настройки. Пути ручного `config.toml`,
+поля provider/model binding и примеры custom model catalog описаны в
+[Конфигурации](./docs/configuration.ru.md).
 
-1. Встроенные значения по умолчанию
-2. `DEVO_HOME/config.toml` - пользовательская конфигурация, по умолчанию
-   `~/.devo/config.toml` на macOS/Linux и
-   `C:\Users\yourname\.devo\config.toml` на Windows
-3. `<workspace>/.devo/config.toml` - конфигурация уровня проекта
-4. CLI flags
+## Docs
 
-Учетные данные хранятся отдельно в `DEVO_HOME/auth.json`; `config.toml` должен
-ссылаться на credential id, а не хранить API key напрямую.
-
-Минимальная структура:
-
-```toml
-[defaults]
-model_binding = "deepseek-v4-flash-api-deepseek-com"
-
-[providers."api.deepseek.com"]
-enabled = true
-name = "api.deepseek.com"
-base_url = "https://api.deepseek.com"
-credential = "api_deepseek_com_api_key"
-wire_apis = ["openai_chat_completions"]
-
-[model_bindings.deepseek-v4-flash-api-deepseek-com]
-enabled = true
-model_slug = "deepseek-v4-flash"
-provider = "api.deepseek.com"
-model_name = "deepseek-v4-flash"
-display_name = "DeepSeek V4 Flash"
-invocation_method = "openai_chat_completions"
-default_reasoning_effort = "high"
-```
-
-Важное разделение:
-
-- `model_slug` выбирает локальные метаданные модели Devo из `models.json`.
-- `provider` выбирает настроенную запись подключения.
-- `model_name` - строка модели, специфичная для поставщика и отправляемая по wire.
-- `invocation_method` выбирает протокол поставщика, например
-  [`openai_chat_completions`](https://developers.openai.com/api/reference/chat-completions/overview),
-  [`openai_responses`](https://developers.openai.com/api/reference/responses/overview)
-  или [`anthropic_messages`](https://platform.claude.com/docs/en/api/messages).
-
-### Пользовательские модели
-
-Если нужной модели нет во встроенном списке, добавьте ее в `models.json`, затем
-привяжите через `config.toml`.
-
-Пользовательский каталог моделей:
-
-- macOS/Linux: `~/.devo/models.json`
-- Windows: `C:\Users\yourname\.devo\models.json`
-
-Переопределения уровня проекта также можно поместить в
-`<workspace>/.devo/models.json`. В `models.json` поле `provider` является
-метаданными wire API по умолчанию для модели; фактический endpoint по-прежнему
-выбирается полем `provider` в `config.toml`.
-
-Пример записи `models.json`:
-
-```json
-[
-  {
-    "slug": "my-coding-model",
-    "display_name": "My Coding Model",
-    "channel": "Custom",
-    "provider": "openai_chat_completions",
-    "description": "Custom OpenAI-compatible coding model.",
-    "reasoning_capability": "unsupported",
-    "context_window": 200000,
-    "effective_context_window_percent": 95,
-    "max_tokens": 4096,
-    "input_modalities": ["text"],
-    "base_instructions": "You are Devo, a coding agent. Help the user edit and understand code."
-  }
-]
-```
-
-Затем сошлитесь на этот `slug` из model binding:
-
-```toml
-[model_bindings.my-coding-model-example]
-enabled = true
-model_slug = "my-coding-model"
-provider = "my.provider"
-model_name = "provider-specific-model-name"
-display_name = "My Coding Model"
-invocation_method = "openai_chat_completions"
-```
+- [Офлайн-установка](./docs/offline-installation.ru.md)
+- [Конфигурация](./docs/configuration.ru.md)
 
 ## Часто задаваемые вопросы
 

@@ -67,6 +67,16 @@ Provider-related fields are flattened into the top level:
 | `disable_response_storage` | Optional response-storage switch. |
 | `preferred_auth_method` | Preferred provider auth method. Currently API key based. |
 
+## `[provider_http]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `proxy_url` | string | Optional proxy URL for provider requests, local web fetch/search, and code search model downloads. Supports `http://`, `https://`, `socks5://`, and `socks5h://`. |
+| `no_proxy` | string | Optional comma-separated host bypass list, such as `localhost,127.0.0.1,::1`. |
+
+Desktop Server network proxy settings override these values only inside the
+Desktop-managed runtime process. They do not modify `config.toml`.
+
 ## `[server]`
 
 | Field | Type | Meaning |

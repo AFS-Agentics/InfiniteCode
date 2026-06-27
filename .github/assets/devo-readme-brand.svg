@@ -1,0 +1,49 @@
+<svg width="720" height="220" viewBox="0 0 720 220" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Devo desktop coding agent app icon and wordmark</title>
+  <desc id="desc">A Devo desktop app icon beside the Devo wordmark.</desc>
+  <defs>
+    <linearGradient id="icon-bg" x1="50" y1="30" x2="190" y2="190" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827" />
+      <stop offset="1" stop-color="#020617" />
+    </linearGradient>
+    <path
+      id="orbit"
+      d="M120 58.656C135.859 67.078 144.281 84.141 140.344 101.641C123.719 102.516 109.391 94.094 103.375 78.984C106.766 68.703 112.563 61.813 120 58.656Z"
+    />
+    <filter id="icon-shadow" x="26" y="10" width="188" height="202" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse">
+      <feFlood flood-opacity="0" result="BackgroundImageFix" />
+      <feColorMatrix in="SourceAlpha" result="hardAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" />
+      <feOffset dy="4" />
+      <feGaussianBlur stdDeviation="12" />
+      <feComposite in2="hardAlpha" operator="out" />
+      <feColorMatrix type="matrix" values="0 0 0 0 0.06 0 0 0 0 0.09 0 0 0 0 0.16 0 0 0 0.18 0" />
+      <feBlend in2="BackgroundImageFix" mode="normal" result="effect1_dropShadow" />
+      <feBlend in="SourceGraphic" in2="effect1_dropShadow" mode="normal" result="shape" />
+    </filter>
+  </defs>
+
+  <g filter="url(#icon-shadow)">
+    <rect x="50" y="30" width="140" height="140" rx="32" fill="url(#icon-bg)" />
+    <rect x="50.5" y="30.5" width="139" height="139" rx="31.5" stroke="#1E293B" />
+    <g fill="none" stroke="#F8F5EF" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
+      <use href="#orbit" />
+      <use href="#orbit" transform="rotate(60 120 100)" />
+      <use href="#orbit" transform="rotate(120 120 100)" />
+      <use href="#orbit" transform="rotate(180 120 100)" />
+      <use href="#orbit" transform="rotate(240 120 100)" />
+      <use href="#orbit" transform="rotate(300 120 100)" />
+    </g>
+    <circle cx="120" cy="100" r="12" fill="#60A5FA" />
+  </g>
+
+  <text
+    x="236"
+    y="128"
+    fill="#60A5FA"
+    font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="86"
+    font-weight="700"
+    letter-spacing="0"
+  >Devo</text>
+  <path d="M237 153H484" stroke="#BFDBFE" stroke-linecap="round" stroke-width="3" />
+</svg>

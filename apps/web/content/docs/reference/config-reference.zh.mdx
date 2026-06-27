@@ -65,6 +65,16 @@ Provider 相关字段被 flatten 到顶层：
 | `disable_response_storage` | 可选 response-storage switch。 |
 | `preferred_auth_method` | Preferred provider auth method。目前基于 API key。 |
 
+## `[provider_http]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `proxy_url` | string | Provider requests、local web fetch/search 以及 code search 模型下载使用的可选代理 URL。支持 `http://`、`https://`、`socks5://` 和 `socks5h://`。 |
+| `no_proxy` | string | 可选 comma-separated host bypass list，例如 `localhost,127.0.0.1,::1`。 |
+
+Desktop Server network proxy settings 只在 Desktop-managed runtime process 内
+override 这些值，不会修改 `config.toml`。
+
 ## `[server]`
 
 | Field | Type | Meaning |
