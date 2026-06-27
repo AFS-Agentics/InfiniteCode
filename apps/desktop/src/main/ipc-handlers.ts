@@ -13,8 +13,9 @@ import {
 	updateAutomation,
 } from "./automation"
 import type { CreateAutomationInput, UpdateAutomationInput } from "./automation/types"
-import { installCli, isCliInstalled, uninstallCli } from "./cli-install"
 import { deleteCredential, getCredential, storeCredential } from "./credential-store"
+import { checkDesktopRuntime } from "./desktop-runtime-check"
+import { createDesktopFolder, statDesktopFolders } from "./desktop-folders"
 import {
 	applyChangesToLocal,
 	applyDiffTextToLocal,
@@ -36,10 +37,8 @@ import { readModelState, updateModelRecent } from "./model-state"
 import { dismissNotification, updateBadgeCount } from "./notifications"
 import type { MigrationProvider } from "./onboarding"
 import {
-	checkDevoInstallation,
 	detectProviders,
 	executeMigration,
-	installDevo,
 	previewMigration,
 	restoreMigrationBackup,
 	scanProvider,
@@ -47,6 +46,7 @@ import {
 import { getOpenInTargets, openInTarget, setPreferredTarget } from "./open-in-targets"
 import {
 	ensureServer,
+	getAcpTrafficLogState,
 	getServerUrl,
 	isAcpConnected,
 	requestAcp,
@@ -223,6 +223,8 @@ export function registerIpcHandlers(): void {
 
 	ipcMain.handle("acp:connected", () => isAcpConnected())
 
+	ipcMain.handle("acp-traffic-log:state", () => getAcpTrafficLogState())
+
 	subscribeAcp((event) => {
 		for (const win of BrowserWindow.getAllWindows()) {
 			win.webContents.send("acp:event", event)
@@ -398,17 +400,26 @@ export function registerIpcHandlers(): void {
 		}),
 	)
 
+	ipcMain.handle(
+		"desktop-folders:stat",
+		withLogging(
+			"desktop-folders:stat",
+			async (_, directories: string[]) => await statDesktopFolders(directories),
+		),
+	)
+
+	ipcMain.handle(
+		"desktop-folders:create",
+		withLogging(
+			"desktop-folders:create",
+			async (_, input: { parentDirectory: string; name: string }) =>
+				await createDesktopFolder(input),
+		),
+	)
+
 	// --- Fetch proxy (bypasses Chromium connection limits) ---
 
 	ipcMain.handle("fetch:request", withLogging("fetch:request", handleFetchProxy))
-
-	// --- CLI install ---
-
-	ipcMain.handle("cli:is-installed", () => isCliInstalled())
-
-	ipcMain.handle("cli:install", () => installCli())
-
-	ipcMain.handle("cli:uninstall", () => uninstallCli())
 
 	// --- Open in external app ---
 
@@ -516,12 +527,7 @@ export function registerIpcHandlers(): void {
 
 	ipcMain.handle(
 		"onboarding:check-devo",
-		withLogging("onboarding:check-devo", async () => await checkDevoInstallation()),
-	)
-
-	ipcMain.handle(
-		"onboarding:install-devo",
-		withLogging("onboarding:install-devo", async () => await installDevo()),
+		withLogging("onboarding:check-devo", async () => await checkDesktopRuntime()),
 	)
 
 	ipcMain.handle(

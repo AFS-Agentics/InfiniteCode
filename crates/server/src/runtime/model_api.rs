@@ -3,11 +3,15 @@ use devo_core::ModelCatalogParams;
 use devo_core::ModelCatalogResult;
 use devo_core::ModelConfigParams;
 use devo_core::ModelConfigResult;
+use devo_core::ModelConfigSetParams;
 use devo_core::ModelSavedEntry;
 use devo_core::ModelSavedParams;
 use devo_core::ModelSavedResult;
 use devo_core::ProviderWireApi;
 
+use crate::runtime::handlers::acp_config_options::{
+    ACP_MODEL_CONFIG_ID, ACP_REASONING_EFFORT_CONFIG_ID, select_options_contain_value,
+};
 use crate::{ProtocolErrorCode, SuccessResponse};
 
 use super::ServerRuntime;
@@ -60,6 +64,127 @@ impl ServerRuntime {
             result: ModelConfigResult { config_options },
         })
         .expect("serialize model/config response")
+    }
+
+    pub(super) async fn handle_model_config_set(
+        &self,
+        request_id: serde_json::Value,
+        params: serde_json::Value,
+    ) -> serde_json::Value {
+        let params = match serde_json::from_value::<ModelConfigSetParams>(params) {
+            Ok(params) => params,
+            Err(error) => {
+                return self.error_response(
+                    request_id,
+                    ProtocolErrorCode::InvalidParams,
+                    format!("invalid model/config/set params: {error}"),
+                );
+            }
+        };
+
+        let runtime_context = match params.cwd.as_deref() {
+            Some(cwd) if !cwd.is_absolute() => {
+                return self.error_response(
+                    request_id,
+                    ProtocolErrorCode::InvalidParams,
+                    "model/config/set cwd must be an absolute path".to_string(),
+                );
+            }
+            Some(cwd) => match self.deps.context_for_workspace(cwd).await {
+                Ok(context) => context,
+                Err(error) => {
+                    return self.error_response(
+                        request_id,
+                        ProtocolErrorCode::InternalError,
+                        format!(
+                            "failed to load model config for cwd {}: {error}",
+                            cwd.display()
+                        ),
+                    );
+                }
+            },
+            None => self.deps.process_context.clone(),
+        };
+
+        match params.config_id.as_str() {
+            ACP_MODEL_CONFIG_ID | ACP_REASONING_EFFORT_CONFIG_ID => {}
+            _ => {
+                return self.error_response(
+                    request_id,
+                    ProtocolErrorCode::InvalidParams,
+                    format!("unknown model config option '{}'", params.config_id),
+                );
+            }
+        }
+
+        let config_options = self.acp_model_config_options_for_context(&runtime_context);
+        let Some(config_option) = config_options.iter().find(|option| match option {
+            devo_core::AcpSessionConfigOption::Select { id, .. } => id == &params.config_id,
+        }) else {
+            return self.error_response(
+                request_id,
+                ProtocolErrorCode::InvalidParams,
+                format!("unknown model config option '{}'", params.config_id),
+            );
+        };
+        let value_is_allowed = match config_option {
+            devo_core::AcpSessionConfigOption::Select { options, .. } => {
+                select_options_contain_value(options, &params.value)
+            }
+        };
+        if !value_is_allowed {
+            return self.error_response(
+                request_id,
+                ProtocolErrorCode::InvalidParams,
+                format!(
+                    "invalid value '{}' for model config option '{}'",
+                    params.value, params.config_id
+                ),
+            );
+        }
+
+        let config_file = {
+            let store = runtime_context
+                .config_store
+                .lock()
+                .expect("app config store mutex should not be poisoned");
+            store
+                .user_config_dir()
+                .join("config.toml")
+                .display()
+                .to_string()
+        };
+        if let Some(reason) = self
+            .config_change_hook_block_reason("user_settings", Some(config_file))
+            .await
+        {
+            return self.error_response(
+                request_id,
+                ProtocolErrorCode::PolicyDenied,
+                format!("config change blocked by hook: {reason}"),
+            );
+        }
+
+        {
+            let mut store = runtime_context
+                .config_store
+                .lock()
+                .expect("app config store mutex should not be poisoned");
+            if let Err(error) = store.set_model_config_option(&params.config_id, &params.value) {
+                return self.error_response(
+                    request_id,
+                    ProtocolErrorCode::InvalidParams,
+                    error.to_string(),
+                );
+            }
+        }
+
+        let config_options = self.acp_model_config_options_for_context(&runtime_context);
+        serde_json::to_value(SuccessResponse {
+            id: request_id,
+            result: ModelConfigResult { config_options },
+        })
+        .expect("serialize model/config/set response")
     }
 
     pub(super) async fn handle_model_catalog(

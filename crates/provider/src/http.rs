@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
+use devo_network_proxy::NetworkProxyConfig;
 use reqwest::Client;
 use reqwest::RequestBuilder;
 use reqwest::Response;
@@ -15,22 +16,34 @@ use tracing::warn;
 /// HTTP options shared by model-provider adapters.
 #[derive(Clone, Debug, Default)]
 pub struct ProviderHttpOptions {
-    proxy_url: Option<String>,
+    network_proxy: NetworkProxyConfig,
     custom_headers: HeaderMap,
 }
 
 impl ProviderHttpOptions {
     /// Builds provider HTTP options from raw config fields.
     pub fn from_raw(proxy_url: Option<String>, headers: Option<String>) -> Result<Self> {
+        Self::from_raw_with_no_proxy(proxy_url, None, headers)
+    }
+
+    /// Builds provider HTTP options from raw proxy, bypass, and header fields.
+    pub fn from_raw_with_no_proxy(
+        proxy_url: Option<String>,
+        no_proxy: Option<String>,
+        headers: Option<String>,
+    ) -> Result<Self> {
         Ok(Self {
-            proxy_url: proxy_url.and_then(non_empty_owned_string),
+            network_proxy: NetworkProxyConfig {
+                proxy_url: proxy_url.and_then(non_empty_owned_string),
+                no_proxy: no_proxy.and_then(non_empty_owned_string),
+            },
             custom_headers: parse_custom_headers(headers)?,
         })
     }
 
     /// Returns the configured proxy URL, when present.
     pub fn proxy_url(&self) -> Option<&str> {
-        self.proxy_url.as_deref()
+        self.network_proxy.proxy_url.as_deref()
     }
 
     pub(crate) fn build_client(&self, timeout: Option<Duration>) -> Result<Client> {
@@ -38,12 +51,7 @@ impl ProviderHttpOptions {
         if let Some(timeout) = timeout {
             builder = builder.timeout(timeout);
         }
-        if let Some(proxy_url) = &self.proxy_url {
-            let proxy = reqwest::Proxy::all(proxy_url)
-                .with_context(|| format!("invalid provider HTTP proxy URL `{proxy_url}`"))?;
-            builder = builder.proxy(proxy);
-        }
-        builder
+        devo_network_proxy::apply_proxy_config(builder, &self.network_proxy)?
             .build()
             .context("failed to build provider HTTP client")
     }

@@ -5,6 +5,7 @@ import type {
 	Model as SdkModel,
 	Provider as SdkProvider,
 	ProviderAuthMethod as SdkProviderAuthMethod,
+	ProviderVendor as SdkProviderVendor,
 } from "@devo-ai/sdk/v2/client"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useAtomValue } from "jotai"
@@ -12,6 +13,7 @@ import { useCallback } from "react"
 import { serverConnectedAtom } from "../atoms/connection"
 import { isMockModeAtom } from "../atoms/mock-mode"
 import { MOCK_AGENTS, MOCK_CONFIG, MOCK_PROVIDERS } from "../lib/mock-data"
+import type { GitBranchInfo, GitBranchState } from "../../preload/api"
 import { fetchGitBranches, fetchModelState, isElectron, updateModelRecent } from "../services/backend"
 import { getBaseClient, getProjectClient } from "../services/connection-manager"
 
@@ -20,6 +22,7 @@ import { getBaseClient, getProjectClient } from "../services/connection-manager"
 // ============================================================
 
 export type { SdkAgent, SdkCommand, SdkConfig, SdkModel, SdkProvider, SdkProviderAuthMethod }
+export type { SdkProviderVendor }
 
 // ============================================================
 // Derived types for our UI layer
@@ -32,6 +35,8 @@ export interface ProvidersData {
 
 export interface VcsData {
 	branch: string
+	state: GitBranchState
+	detached: boolean
 }
 
 export interface CompactionConfig {
@@ -175,7 +180,7 @@ export function getModelInputCapabilities(
 
 interface LoadVcsDataOptions {
 	isElectron?: boolean
-	fetchBranches?: (directory: string) => Promise<{ current?: string | null }>
+	fetchBranches?: (directory: string) => Promise<GitBranchInfo>
 	getClient?: (directory: string) => { vcs: { get: () => Promise<{ data?: unknown }> } } | null
 }
 
@@ -185,14 +190,26 @@ export async function loadVcsData(
 ): Promise<VcsData> {
 	if (options.isElectron ?? isElectron) {
 		const branches = await (options.fetchBranches ?? fetchGitBranches)(directory)
-		return { branch: branches.current ?? "" }
+		return {
+			branch: branches.current ?? "",
+			state: branches.state,
+			detached: branches.detached,
+		}
 	}
 
 	const client = (options.getClient ?? getProjectClient)(directory)
 	if (!client) throw new Error("No client for directory")
 	const result = await client.vcs.get()
-	const raw = result.data as { branch?: string } | null | undefined
-	return { branch: raw?.branch ?? "" }
+	const raw = result.data as
+		| { branch?: string; state?: GitBranchState; detached?: boolean }
+		| null
+		| undefined
+	const branch = raw?.branch ?? ""
+	return {
+		branch,
+		state: raw?.state ?? (branch ? "branch" : "not_git"),
+		detached: raw?.detached ?? false,
+	}
 }
 
 // ============================================================
@@ -208,6 +225,7 @@ export const queryKeys = {
 	modelState: ["modelState"] as const,
 	allProviders: ["allProviders"] as const,
 	connectedProviders: ["connectedProviders"] as const,
+	providerVendors: ["providerVendors"] as const,
 	providerAuthMethods: ["providerAuthMethods"] as const,
 }
 
@@ -477,6 +495,39 @@ export function useServerCommands(directory: string | null): SdkCommand[] {
 	})
 
 	return data ?? []
+}
+
+export function useProviderVendors(): {
+	data: SdkProviderVendor[] | null
+	loading: boolean
+	error: string | null
+	reload: () => void
+} {
+	const connected = useAtomValue(serverConnectedAtom)
+	const isMockMode = useAtomValue(isMockModeAtom)
+	const queryClient = useQueryClient()
+
+	const { data, isLoading, error } = useQuery({
+		queryKey: queryKeys.providerVendors,
+		queryFn: async (): Promise<SdkProviderVendor[]> => {
+			const client = getBaseClient()
+			if (!client) throw new Error("Not connected to server")
+			const result = await client.provider.list()
+			return result.data.provider_vendors ?? []
+		},
+		enabled: connected && !isMockMode,
+	})
+
+	const reload = useCallback(() => {
+		queryClient.invalidateQueries({ queryKey: queryKeys.providerVendors })
+	}, [queryClient])
+
+	return {
+		data: data ?? null,
+		loading: isLoading,
+		error: error ? (error instanceof Error ? error.message : "Failed to load providers") : null,
+		reload,
+	}
 }
 
 // ============================================================

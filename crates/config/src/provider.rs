@@ -112,6 +112,7 @@ invocation_method = "openai_responses"
                 base_url: Some("https://xxxxx/v1".to_string()),
                 api_key: Some("secret-value".to_string()),
                 proxy_url: None,
+                no_proxy: None,
                 headers: None,
                 model_auto_compact_token_limit: Some(970000),
                 model_context_window: Some(997500),

@@ -19,8 +19,8 @@ use devo_protocol::PermissionPreset;
 use devo_protocol::SessionId;
 
 const ACP_MODE_CONFIG_ID: &str = "mode";
-const ACP_MODEL_CONFIG_ID: &str = "model";
-const ACP_REASONING_EFFORT_CONFIG_ID: &str = "thought_level";
+pub(crate) const ACP_MODEL_CONFIG_ID: &str = "model";
+pub(crate) const ACP_REASONING_EFFORT_CONFIG_ID: &str = "thought_level";
 
 impl ServerRuntime {
     pub(super) async fn acp_session_config_options(
@@ -456,7 +456,10 @@ fn persist_session_config_summary(
     Ok(())
 }
 
-fn select_options_contain_value(options: &AcpSessionConfigSelectOptions, value: &str) -> bool {
+pub(crate) fn select_options_contain_value(
+    options: &AcpSessionConfigSelectOptions,
+    value: &str,
+) -> bool {
     match options {
         AcpSessionConfigSelectOptions::Ungrouped(options) => {
             options.iter().any(|option| option.value == value)

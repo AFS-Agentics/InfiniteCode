@@ -79,6 +79,7 @@ describe("VCS data loading", () => {
 		const result = await loadVcsData("/Users/tsiao/Desktop/devo_feat_desktop", {
 			isElectron: true,
 			fetchBranches: async () => ({
+				state: "branch",
 				current: "feat/desktop",
 				detached: false,
 				local: ["feat/desktop"],
@@ -89,7 +90,7 @@ describe("VCS data loading", () => {
 			},
 		})
 
-		expect(result).toEqual({ branch: "feat/desktop" })
+		expect(result).toEqual({ branch: "feat/desktop", state: "branch", detached: false })
 	})
 
 	test("handles missing SDK VCS data without hiding the rest of the toolbar", async () => {
@@ -103,6 +104,6 @@ describe("VCS data loading", () => {
 				}) as never,
 		})
 
-		expect(result).toEqual({ branch: "" })
+		expect(result).toEqual({ branch: "", state: "not_git", detached: false })
 	})
 })

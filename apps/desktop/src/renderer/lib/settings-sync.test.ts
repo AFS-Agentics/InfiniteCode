@@ -51,9 +51,17 @@ const defaultSettings: AppSettings = {
 	openIn: {
 		preferredTargetId: null,
 	},
+	desktopFolders: {
+		folders: [],
+	},
 	servers: {
 		servers: [{ id: "local", name: "This Mac", type: "local" }],
 		activeServerId: "local",
+		networkProxy: {
+			mode: "system",
+			proxyUrl: "",
+			noProxy: "localhost,127.0.0.1,::1",
+		},
 	},
 }
 

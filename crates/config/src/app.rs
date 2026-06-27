@@ -43,6 +43,10 @@ use crate::upsert_user_auth_api_key;
 use crate::write_atomic;
 use crate::write_provider_config;
 
+pub const DESKTOP_NETWORK_PROXY_MODE_ENV: &str = "DEVO_DESKTOP_NETWORK_PROXY_MODE";
+pub const DESKTOP_NETWORK_PROXY_URL_ENV: &str = "DEVO_DESKTOP_NETWORK_PROXY_URL";
+pub const DESKTOP_NETWORK_NO_PROXY_ENV: &str = "DEVO_DESKTOP_NETWORK_NO_PROXY";
+
 /// Stores the fully normalized runtime configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -332,6 +336,49 @@ impl AppConfigStore {
         ))
     }
 
+    /// Persists a user-level model default option and refreshes effective config.
+    pub fn set_model_config_option(&mut self, config_id: &str, value: &str) -> anyhow::Result<()> {
+        let value = value.trim();
+        if value.is_empty() {
+            anyhow::bail!("model config value must not be empty");
+        }
+
+        let target_config_file = self.user_config_file.as_path();
+        if let Some(parent) = target_config_file.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let mut config = read_provider_config(target_config_file)?;
+
+        match config_id {
+            "model" => {
+                let binding = config
+                    .model_bindings
+                    .get(value)
+                    .ok_or_else(|| anyhow::anyhow!("model binding `{value}` does not exist"))?;
+                if !binding.enabled {
+                    anyhow::bail!("model binding `{value}` is disabled");
+                }
+                config.defaults.model_binding = Some(value.to_string());
+                config.model_provider = Some(binding.provider.clone());
+                config.model = Some(binding.model_slug.clone());
+            }
+            "thought_level" => {
+                config.model_reasoning_effort_selection = Some(value.to_string());
+            }
+            _ => {
+                anyhow::bail!("unknown model config option `{config_id}`");
+            }
+        }
+
+        write_provider_config(target_config_file, &config)?;
+
+        self.config = self
+            .loader
+            .load(self.workspace_root.as_deref())
+            .map_err(|error| anyhow::anyhow!(error))?;
+        Ok(())
+    }
+
     /// Persists a path-based skill enablement override in the user config.
     pub fn set_skill_enabled(&mut self, path: PathBuf, enabled: bool) -> anyhow::Result<()> {
         if path.as_os_str().is_empty() {
@@ -446,6 +493,10 @@ mod app_tests {
     }
 }
 
+#[cfg(test)]
+#[path = "app_store_tests.rs"]
+mod app_store_tests;
+
 impl AppConfig {
     /// Resolves the active provider settings from this already-merged config.
     ///
@@ -458,6 +509,7 @@ impl AppConfig {
         let auth = read_user_auth_config(&user_config_dir.join(AUTH_CONFIG_FILE_NAME))?;
         let mut resolved = resolve_provider_settings_from_config_and_auth(&self.provider, &auth)?;
         resolved.proxy_url = self.provider_http.proxy_url.clone();
+        resolved.no_proxy = self.provider_http.no_proxy.clone();
         Ok(resolved)
     }
 
@@ -538,6 +590,56 @@ pub struct FileSystemAppConfigLoader {
     config_folder_home: PathBuf,
     /// Command-line overrides applied on top of file-backed config.
     cli_overrides: toml::Value,
+    /// Desktop-managed runtime proxy override read from private process env.
+    desktop_network_proxy_env: DesktopNetworkProxyEnv,
+}
+
+/// Desktop-managed runtime network proxy override values.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DesktopNetworkProxyEnv {
+    mode: Option<String>,
+    proxy_url: Option<String>,
+    no_proxy: Option<String>,
+}
+
+impl DesktopNetworkProxyEnv {
+    pub fn from_process_env() -> Self {
+        Self::from_env_fn(|key| std::env::var(key))
+    }
+
+    pub fn from_env_fn<F>(env: F) -> Self
+    where
+        F: Fn(&str) -> Result<String, std::env::VarError>,
+    {
+        Self {
+            mode: env(DESKTOP_NETWORK_PROXY_MODE_ENV)
+                .ok()
+                .and_then(|value| non_empty_string(&value)),
+            proxy_url: env(DESKTOP_NETWORK_PROXY_URL_ENV)
+                .ok()
+                .and_then(|value| non_empty_string(&value)),
+            no_proxy: env(DESKTOP_NETWORK_NO_PROXY_ENV)
+                .ok()
+                .and_then(|value| non_empty_string(&value)),
+        }
+    }
+
+    pub fn custom(proxy_url: impl Into<String>, no_proxy: Option<&str>) -> Self {
+        let proxy_url = proxy_url.into();
+        Self {
+            mode: Some("custom".to_string()),
+            proxy_url: non_empty_string(&proxy_url),
+            no_proxy: no_proxy.and_then(non_empty_string),
+        }
+    }
+
+    pub fn off() -> Self {
+        Self {
+            mode: Some("off".to_string()),
+            proxy_url: None,
+            no_proxy: None,
+        }
+    }
 }
 
 impl FileSystemAppConfigLoader {
@@ -546,12 +648,18 @@ impl FileSystemAppConfigLoader {
         Self {
             config_folder_home,
             cli_overrides: toml::Value::Table(Default::default()),
+            desktop_network_proxy_env: DesktopNetworkProxyEnv::from_process_env(),
         }
     }
 
     /// Returns a loader that applies CLI overrides with the highest priority.
     pub fn with_cli_overrides(mut self, cli_overrides: toml::Value) -> Self {
         self.cli_overrides = cli_overrides;
+        self
+    }
+
+    pub fn with_desktop_network_proxy_env(mut self, env: DesktopNetworkProxyEnv) -> Self {
+        self.desktop_network_proxy_env = env;
         self
     }
 
@@ -610,8 +718,26 @@ impl AppConfigLoader for FileSystemAppConfigLoader {
                     message: source.to_string(),
                 })?;
         config.provider = provider_config;
+        apply_desktop_network_proxy_env_override(&mut config, &self.desktop_network_proxy_env);
         validate_app_config(&config)?;
         Ok(config)
+    }
+}
+
+fn apply_desktop_network_proxy_env_override(config: &mut AppConfig, env: &DesktopNetworkProxyEnv) {
+    match env.mode.as_deref() {
+        Some("custom") => {
+            if let Some(proxy_url) = env.proxy_url.clone() {
+                config.provider_http.proxy_url = Some(proxy_url);
+                config.provider_http.no_proxy = env.no_proxy.clone();
+            }
+        }
+        Some("off") => {
+            config.provider_http.proxy_url = None;
+            config.provider_http.no_proxy = None;
+        }
+        Some("system") | None => {}
+        Some(_) => {}
     }
 }
 

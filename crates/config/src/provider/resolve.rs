@@ -136,6 +136,7 @@ pub fn resolve_provider_settings_from_config_and_auth(
             base_url: provider_config.base_url.clone(),
             api_key,
             proxy_url: None,
+            no_proxy: None,
             headers: provider_config.headers.clone(),
             model_auto_compact_token_limit: file.model_auto_compact_token_limit,
             model_context_window: file.model_context_window,

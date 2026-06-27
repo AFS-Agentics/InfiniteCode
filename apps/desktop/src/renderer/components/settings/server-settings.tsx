@@ -3,20 +3,56 @@
  */
 
 import { Button } from "@devo/ui/components/button"
-import { RefreshCwIcon, SquareIcon, TerminalIcon } from "lucide-react"
-import { useState } from "react"
+import { Input } from "@devo/ui/components/input"
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@devo/ui/components/select"
+import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from "lucide-react"
+import { useEffect, useState } from "react"
 import { useAtomValue } from "jotai"
+import type { AcpTrafficLogState, NetworkProxyMode } from "../../../preload/api"
+import { normalizeProxyUrl } from "../../../shared/network-proxy"
 import { serverConnectedAtom, serverUrlAtom } from "../../atoms/connection"
+import { useSettings } from "../../hooks/use-settings"
 import { SettingsRow } from "./settings-row"
 import { SettingsSection } from "./settings-section"
 
 const isElectron = typeof window !== "undefined" && "devo" in window
 
-export function ServerSettings() {
+interface ServerSettingsProps {
+	initialAcpTrafficLogState?: AcpTrafficLogState | null
+}
+
+export function ServerSettings({ initialAcpTrafficLogState = null }: ServerSettingsProps = {}) {
 	const connected = useAtomValue(serverConnectedAtom)
 	const url = useAtomValue(serverUrlAtom)
+	const { settings, updateSettings } = useSettings()
 	const [restarting, setRestarting] = useState(false)
-	const [stopping, setStopping] = useState(false)
+	const [acpTrafficLogState, setAcpTrafficLogState] = useState<AcpTrafficLogState | null>(
+		initialAcpTrafficLogState,
+	)
+	const networkProxy = settings.servers.networkProxy
+	const customProxyUrl = normalizeProxyUrl(networkProxy.proxyUrl)
+
+	useEffect(() => {
+		if (!isElectron) return
+		let cancelled = false
+		void window.devo.acpTraffic
+			.getState()
+			.then((state) => {
+				if (!cancelled) setAcpTrafficLogState(state)
+			})
+			.catch((error) => {
+				console.error("Failed to load ACP traffic log state:", error)
+			})
+		return () => {
+			cancelled = true
+		}
+	}, [])
 
 	async function restart() {
 		if (!isElectron) return
@@ -25,16 +61,6 @@ export function ServerSettings() {
 			await window.devo.restartDevo()
 		} finally {
 			setRestarting(false)
-		}
-	}
-
-	async function stop() {
-		if (!isElectron) return
-		setStopping(true)
-		try {
-			await window.devo.stopDevo()
-		} finally {
-			setStopping(false)
 		}
 	}
 
@@ -59,12 +85,92 @@ export function ServerSettings() {
 						<span className="text-muted-foreground">{connected ? "Connected" : "Offline"}</span>
 					</div>
 				</SettingsRow>
+			</SettingsSection>
+
+			<SettingsSection
+				title="Network proxy"
+				description="Restart runtime to apply proxy changes."
+			>
 				<SettingsRow
-					label="Transport"
-					description="ACP over child-process stdin/stdout"
+					label="Proxy mode"
+					description="Use inherited environment proxy settings, a custom proxy, or no proxy"
 				>
-					<TerminalIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+					<Select
+						value={networkProxy.mode}
+						onValueChange={(value) => {
+							updateSettings({
+								servers: {
+									networkProxy: {
+										mode: value as NetworkProxyMode,
+									},
+								},
+							})
+						}}
+						items={{
+							system: "System",
+							custom: "Custom",
+							off: "Off",
+						}}
+					>
+						<SelectTrigger className="min-w-[140px]">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value="system">System</SelectItem>
+							<SelectItem value="custom">Custom</SelectItem>
+							<SelectItem value="off">Off</SelectItem>
+						</SelectContent>
+					</Select>
 				</SettingsRow>
+				{networkProxy.mode === "custom" && (
+					<>
+						<SettingsRow
+							label="Proxy URL"
+							description="http, https, socks5, or socks5h"
+							htmlFor="server-network-proxy-url"
+						>
+							<div className="flex w-72 flex-col gap-1">
+								<Input
+									id="server-network-proxy-url"
+									value={networkProxy.proxyUrl}
+									placeholder="socks5h://127.0.0.1:7890"
+									onChange={(event) => {
+										updateSettings({
+											servers: {
+												networkProxy: {
+													proxyUrl: event.currentTarget.value,
+												},
+											},
+										})
+									}}
+								/>
+								{networkProxy.proxyUrl.trim() && !customProxyUrl && (
+									<span className="text-xs text-destructive">Invalid proxy URL</span>
+								)}
+							</div>
+						</SettingsRow>
+						<SettingsRow
+							label="Bypass"
+							description="Comma-separated hosts that should connect directly"
+							htmlFor="server-network-no-proxy"
+						>
+							<Input
+								id="server-network-no-proxy"
+								className="w-72"
+								value={networkProxy.noProxy}
+								onChange={(event) => {
+									updateSettings({
+										servers: {
+											networkProxy: {
+												noProxy: event.currentTarget.value,
+											},
+										},
+									})
+								}}
+							/>
+						</SettingsRow>
+					</>
+				)}
 			</SettingsSection>
 
 			<SettingsSection>
@@ -80,16 +186,61 @@ export function ServerSettings() {
 						Restart
 					</Button>
 				</SettingsRow>
-				<SettingsRow
-					label="Stop runtime"
-					description="Stop the managed Devo child process"
-				>
-					<Button size="sm" variant="outline" onClick={stop} disabled={stopping}>
-						<SquareIcon aria-hidden="true" className="size-3.5" />
-						Stop
-					</Button>
-				</SettingsRow>
 			</SettingsSection>
+
+			<AcpTrafficLogStatus state={acpTrafficLogState} />
 		</div>
+	)
+}
+
+export function AcpTrafficLogStatus({
+	state,
+	initialExpanded = false,
+}: {
+	state: AcpTrafficLogState | null
+	initialExpanded?: boolean
+}) {
+	const [expanded, setExpanded] = useState(initialExpanded)
+
+	if (!state?.enabled) return null
+
+	const ToggleIcon = expanded ? ChevronDownIcon : ChevronRightIcon
+
+	return (
+		<SettingsSection
+			title="Developer options"
+			description="Tools for inspecting the managed local runtime."
+		>
+			<SettingsRow
+				label="ACP traffic log"
+				description="View the current JSONL log location"
+			>
+				<Button
+					type="button"
+					size="sm"
+					variant="ghost"
+					aria-expanded={expanded}
+					onClick={() => setExpanded((value) => !value)}
+				>
+					<ToggleIcon aria-hidden="true" className="size-3.5" />
+					{expanded ? "Hide" : "Show"}
+				</Button>
+			</SettingsRow>
+			{expanded && (
+				<div className="space-y-2 px-4 py-3">
+					<div className="text-sm font-medium">Current log file</div>
+					{state.path ? (
+						<code className="block truncate rounded bg-muted px-2 py-1.5 text-xs text-muted-foreground">
+							{state.path}
+						</code>
+					) : (
+						<p className="text-sm text-muted-foreground">No log file path is available.</p>
+					)}
+					<p className="text-xs text-muted-foreground">
+						The log may include prompts, paths, tool arguments, and provider details.
+					</p>
+				</div>
+			)}
+		</SettingsSection>
 	)
 }

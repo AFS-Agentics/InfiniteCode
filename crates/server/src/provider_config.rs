@@ -13,6 +13,7 @@ use devo_core::LegacyModelProviderConfig;
 use devo_core::ModelCatalog;
 use devo_core::PresetModelCatalog;
 use devo_core::ProviderConfigSection;
+use devo_core::ProviderHttpConfig;
 use devo_core::ProviderWireApi;
 use devo_core::UserAuthConfigFile;
 use devo_core::read_user_auth_config;
@@ -80,11 +81,15 @@ pub fn load_server_provider(
             resolved.wire_api,
             resolved.base_url,
             resolved.api_key,
-            ProviderHttpOptions::from_raw(resolved.proxy_url, resolved.headers)?,
+            ProviderHttpOptions::from_raw_with_no_proxy(
+                resolved.proxy_url,
+                resolved.no_proxy,
+                resolved.headers,
+            )?,
         )?;
         let provider_router = build_multi_provider_router(
             &app_config.provider,
-            app_config.provider_http.proxy_url.clone(),
+            &app_config.provider_http,
             &auth,
             Arc::clone(&provider),
         )?;
@@ -156,7 +161,11 @@ fn load_legacy_server_provider(
         resolved.model,
         resolved.base_url,
         resolved.api_key,
-        ProviderHttpOptions::from_raw(app_config.provider_http.proxy_url.clone(), None)?,
+        ProviderHttpOptions::from_raw_with_no_proxy(
+            app_config.provider_http.proxy_url.clone(),
+            app_config.provider_http.no_proxy.clone(),
+            None,
+        )?,
     )
 }
 
@@ -219,7 +228,7 @@ fn build_provider_adapter(
 
 fn build_multi_provider_router(
     provider_config: &ProviderConfigSection,
-    proxy_url: Option<String>,
+    provider_http: &ProviderHttpConfig,
     auth: &UserAuthConfigFile,
     default_provider: Arc<dyn ModelProviderSDK>,
 ) -> Result<Arc<dyn ProviderRouter>> {
@@ -245,7 +254,7 @@ fn build_multi_provider_router(
             &binding.provider,
             provider,
             auth,
-            proxy_url.clone(),
+            provider_http,
         ) {
             Ok(provider) => provider,
             Err(error) => Arc::new(UnavailableProvider::new(error.to_string())),
@@ -265,13 +274,17 @@ fn build_provider_route(
     provider_id: &str,
     provider: &devo_core::ProviderVendorConfig,
     auth: &UserAuthConfigFile,
-    proxy_url: Option<String>,
+    provider_http: &ProviderHttpConfig,
 ) -> Result<Arc<dyn ModelProviderSDK>> {
     build_provider_adapter(
         wire_api,
         base_url,
         resolve_provider_api_key(provider_id, provider, auth)?,
-        ProviderHttpOptions::from_raw(proxy_url, provider.headers.clone())?,
+        ProviderHttpOptions::from_raw_with_no_proxy(
+            provider_http.proxy_url.clone(),
+            provider_http.no_proxy.clone(),
+            provider.headers.clone(),
+        )?,
     )
 }
 

@@ -6,6 +6,7 @@
  */
 
 import type { LocalServerConfig, ServerSettings } from "../preload/api"
+import { DEFAULT_NETWORK_PROXY_SETTINGS } from "./network-proxy"
 
 /** The built-in local server entry. Always present, cannot be deleted. */
 export const DEFAULT_LOCAL_SERVER: LocalServerConfig = {
@@ -18,4 +19,5 @@ export const DEFAULT_LOCAL_SERVER: LocalServerConfig = {
 export const DEFAULT_SERVER_SETTINGS: ServerSettings = {
 	servers: [DEFAULT_LOCAL_SERVER],
 	activeServerId: "local",
+	networkProxy: DEFAULT_NETWORK_PROXY_SETTINGS,
 }

@@ -2,6 +2,7 @@ use anyhow::Context;
 use devo_core::AUTH_CONFIG_FILE_NAME;
 use devo_core::Model;
 use devo_core::ModelCatalog;
+use devo_core::ProviderHttpConfig;
 use devo_core::ProviderValidateParams;
 use devo_core::ProviderValidateResult;
 use devo_core::ProviderVendorConfig;
@@ -154,16 +155,17 @@ impl ServerRuntime {
             }
         };
 
-        let proxy_url = {
+        let provider_http = {
             let store = self
                 .deps
                 .config_store
                 .lock()
                 .expect("app config store mutex should not be poisoned");
-            store.effective_config().provider_http.proxy_url.clone()
+            store.effective_config().provider_http.clone()
         };
 
-        match validate_provider_candidate(params, self.deps.model_catalog.as_ref(), proxy_url).await
+        match validate_provider_candidate(params, self.deps.model_catalog.as_ref(), provider_http)
+            .await
         {
             Ok(reply_preview) => serde_json::to_value(SuccessResponse {
                 id: request_id,
@@ -191,7 +193,7 @@ fn normalized_provider_id(name: &str) -> Option<String> {
 async fn validate_provider_candidate(
     params: ProviderValidateParams,
     catalog: &dyn ModelCatalog,
-    proxy_url: Option<String>,
+    provider_http: ProviderHttpConfig,
 ) -> anyhow::Result<String> {
     let provider_id = normalized_provider_id(&params.provider_vendor.name)
         .context("provider name cannot be empty")?;
@@ -223,7 +225,11 @@ async fn validate_provider_candidate(
         params.model_binding.invocation_method,
         params.provider_vendor.base_url,
         api_key,
-        ProviderHttpOptions::from_raw(proxy_url, params.provider_vendor.headers.clone())?,
+        ProviderHttpOptions::from_raw_with_no_proxy(
+            provider_http.proxy_url,
+            provider_http.no_proxy,
+            params.provider_vendor.headers.clone(),
+        )?,
     )?;
 
     tokio::time::timeout(
@@ -427,7 +433,7 @@ mod tests {
         };
         let catalog = PresetModelCatalog::new(Vec::new());
 
-        let error = validate_provider_candidate(params, &catalog, None)
+        let error = validate_provider_candidate(params, &catalog, ProviderHttpConfig::default())
             .await
             .expect_err("invalid headers should reject validation");
 

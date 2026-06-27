@@ -1,6 +1,7 @@
 import { useSetAtom } from "jotai"
 import { useCallback, useEffect } from "react"
 import type { AppSettings } from "../../preload/api"
+import { desktopFoldersAtom } from "../atoms/desktop-folders"
 import { colorSchemeAtom, displayModeAtom, opaqueWindowsAtom, themeAtom } from "../atoms/preferences"
 import { buildRendererPreferencesMigrationPatch } from "../lib/settings-sync"
 
@@ -13,6 +14,7 @@ export function useDesktopSettingsSync() {
 	const setTheme = useSetAtom(themeAtom)
 	const setDisplayMode = useSetAtom(displayModeAtom)
 	const setOpaqueWindows = useSetAtom(opaqueWindowsAtom)
+	const setDesktopFolders = useSetAtom(desktopFoldersAtom)
 
 	const applySettings = useCallback(
 		(settings: AppSettings) => {
@@ -20,8 +22,9 @@ export function useDesktopSettingsSync() {
 			setTheme(settings.appearance.themeId)
 			setDisplayMode(settings.appearance.displayMode)
 			setOpaqueWindows(settings.opaqueWindows)
+			setDesktopFolders(settings.desktopFolders.folders)
 		},
-		[setColorScheme, setDisplayMode, setOpaqueWindows, setTheme],
+		[setColorScheme, setDesktopFolders, setDisplayMode, setOpaqueWindows, setTheme],
 	)
 
 	useEffect(() => {

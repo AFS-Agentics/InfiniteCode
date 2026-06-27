@@ -9,6 +9,7 @@ version.workspace = true
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
+devo-network-proxy = { workspace = true }
 devo-protocol = { workspace = true }
 futures = { workspace = true }
 reqwest = { workspace = true }

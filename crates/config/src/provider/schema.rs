@@ -392,11 +392,13 @@ impl ProviderDefaultsConfig {
 pub struct ProviderHttpConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxy_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub no_proxy: Option<String>,
 }
 
 impl ProviderHttpConfig {
     pub fn is_empty(&self) -> bool {
-        self.proxy_url.is_none()
+        self.proxy_url.is_none() && self.no_proxy.is_none()
     }
 }
 
@@ -415,6 +417,8 @@ pub struct ResolvedProviderSettings {
     pub api_key: Option<String>,
     /// Optional global provider HTTP proxy URL.
     pub proxy_url: Option<String>,
+    /// Optional provider HTTP proxy bypass list.
+    pub no_proxy: Option<String>,
     /// Optional raw provider custom header JSON object string.
     pub headers: Option<String>,
     /// Optional active model auto-compaction threshold in tokens.

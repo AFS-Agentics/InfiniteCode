@@ -12,6 +12,11 @@ export interface DevoServerInfo {
 	managed: boolean
 }
 
+export interface AcpTrafficLogState {
+	enabled: boolean
+	path: string | null
+}
+
 export interface ModelRef {
 	providerID: string
 	modelID: string
@@ -49,7 +54,10 @@ export interface AppMenuPosition {
 // Git types
 // ============================================================
 
+export type GitBranchState = "branch" | "detached" | "missing" | "not_directory" | "not_git"
+
 export interface GitBranchInfo {
+	state: GitBranchState
 	current: string
 	detached: boolean
 	local: string[]
@@ -134,11 +142,21 @@ export type ServerConfig = LocalServerConfig
 /** The default built-in local server entry (defined in server-config.ts). */
 export declare const DEFAULT_LOCAL_SERVER: LocalServerConfig
 
+export type NetworkProxyMode = "system" | "custom" | "off"
+
+export interface NetworkProxySettings {
+	mode: NetworkProxyMode
+	proxyUrl: string
+	noProxy: string
+}
+
 export interface ServerSettings {
 	/** Ordered list of configured servers. The local server is always first. */
 	servers: ServerConfig[]
 	/** ID of the currently active server. */
 	activeServerId: string
+	/** Network proxy settings for the Desktop-managed private runtime. */
+	networkProxy: NetworkProxySettings
 }
 
 // ============================================================
@@ -168,6 +186,34 @@ export interface OpenInSettings {
 	preferredTargetId: string | null
 }
 
+export type DesktopFolderStatus = "available" | "missing" | "not_directory"
+
+export interface DesktopFolder {
+	id: string
+	directory: string
+	name?: string
+	addedAt: number
+}
+
+export interface DesktopFolderSettings {
+	folders: DesktopFolder[]
+}
+
+export interface DesktopFolderStat {
+	directory: string
+	status: DesktopFolderStatus
+}
+
+export interface CreateDesktopFolderInput {
+	parentDirectory: string
+	name: string
+}
+
+export interface CreateDesktopFolderResult {
+	directory: string
+	name: string
+}
+
 export interface AppSettings {
 	notifications: NotificationSettings
 	/** Whether the user prefers opaque (solid) windows. Read at window creation time. */
@@ -176,17 +222,10 @@ export interface AppSettings {
 	appearance: AppearanceSettings
 	/** External app target preferences for opening projects. */
 	openIn: OpenInSettings
+	/** User-managed folders shown in Devo Desktop. */
+	desktopFolders: DesktopFolderSettings
 	/** Server connection configuration. */
 	servers: ServerSettings
-}
-
-// ============================================================
-// CLI install types
-// ============================================================
-
-export interface CliInstallResult {
-	success: boolean
-	error?: string
 }
 
 // ============================================================
@@ -203,7 +242,7 @@ export interface DevoCheckResult {
 }
 
 /** Supported migration source providers. */
-export type MigrationProvider = "claude-code" | "cursor" | "devo"
+export type MigrationProvider = "claude-code" | "cursor" | "devo" | "opencode"
 
 /** Detection result for a single provider. */
 export interface ProviderDetection {
@@ -418,6 +457,9 @@ export interface DevoAPI {
 		connected: () => Promise<boolean>
 		subscribe: (callback: (event: unknown) => void) => () => void
 	}
+	acpTraffic: {
+		getState: () => Promise<AcpTrafficLogState>
+	}
 	terminal: {
 		create: (options: { cwd?: string; cols?: number; rows?: number }) => Promise<TerminalSessionInfo>
 		write: (id: string, data: string) => void
@@ -473,13 +515,6 @@ export interface DevoAPI {
 	/** Relaunch the app (used after toggling transparency). */
 	relaunch: () => Promise<void>
 
-	// CLI install
-	cli: {
-		isInstalled: () => Promise<boolean>
-		install: () => Promise<CliInstallResult>
-		uninstall: () => Promise<CliInstallResult>
-	}
-
 	// Open in external app
 	openIn: {
 		getTargets: () => Promise<OpenInTargetsResult>
@@ -499,6 +534,10 @@ export interface DevoAPI {
 
 	// Directory picker
 	pickDirectory: () => Promise<string | null>
+	desktopFolders: {
+		stat: (directories: string[]) => Promise<DesktopFolderStat[]>
+		create: (input: CreateDesktopFolderInput) => Promise<CreateDesktopFolderResult>
+	}
 
 	// Fetch proxy (bypasses Chromium connection limits)
 	fetch: (req: {
@@ -531,7 +570,6 @@ export interface DevoAPI {
 	/** Subscribe to settings changes pushed from the main process. */
 	onSettingsChanged: (callback: (settings: AppSettings) => void) => () => void
 
-	// Onboarding
 	// Automations
 	automation: {
 		list: () => Promise<Automation[]>
@@ -551,9 +589,7 @@ export interface DevoAPI {
 
 	onboarding: {
 		checkDevo: () => Promise<DevoCheckResult>
-		installDevo: () => Promise<{ success: boolean; error?: string }>
-		onInstallOutput: (callback: (text: string) => void) => () => void
-		/** Quick-detect all supported providers (Claude Code, Cursor, Devo). */
+		/** Quick-detect all supported providers (Claude Code, Cursor, Devo, OpenCode). */
 		detectProviders: () => Promise<ProviderDetection[]>
 		/** Full scan of a specific provider's configuration. */
 		scanProvider: (

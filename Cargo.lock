@@ -1539,6 +1539,7 @@ version = "0.1.22"
 dependencies = [
  "anyhow",
  "bm25",
+ "devo-network-proxy",
  "devo-util-paths",
  "dirs",
  "hf-hub",
@@ -1549,6 +1550,7 @@ dependencies = [
  "pathdiff",
  "pretty_assertions",
  "rayon",
+ "reqwest 0.13.4",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -1718,6 +1720,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
+ "devo-network-proxy",
  "devo-protocol",
  "futures",
  "pretty_assertions",

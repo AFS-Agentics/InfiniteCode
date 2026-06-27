@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import { mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { DEFAULT_SERVER_SETTINGS } from "../shared/server-config"
@@ -36,7 +36,17 @@ function expectedSettings() {
 		openIn: {
 			preferredTargetId: null,
 		},
-		servers: DEFAULT_SERVER_SETTINGS,
+		desktopFolders: {
+			folders: [],
+		},
+		servers: {
+			...DEFAULT_SERVER_SETTINGS,
+			networkProxy: {
+				mode: "system",
+				proxyUrl: "",
+				noProxy: "localhost,127.0.0.1,::1",
+			},
+		},
 	}
 }
 
@@ -72,6 +82,22 @@ describe("settings-store", () => {
 			openIn: {
 				preferredTargetId: "cursor",
 			},
+			desktopFolders: {
+				folders: [
+					{
+						id: "folder-1",
+						directory: "/Users/tester/project",
+						name: "project",
+						addedAt: 1_783_000_000_000,
+					},
+				],
+			},
+			servers: {
+				networkProxy: {
+					mode: "custom",
+					proxyUrl: "socks5h://127.0.0.1:7890",
+				},
+			},
 		})
 
 		expect(updated).toEqual({
@@ -85,6 +111,24 @@ describe("settings-store", () => {
 			openIn: {
 				preferredTargetId: "cursor",
 			},
+			desktopFolders: {
+				folders: [
+					{
+						id: "folder-1",
+						directory: "/Users/tester/project",
+						name: "project",
+						addedAt: 1_783_000_000_000,
+					},
+				],
+			},
+			servers: {
+				...DEFAULT_SERVER_SETTINGS,
+				networkProxy: {
+					mode: "custom",
+					proxyUrl: "socks5h://127.0.0.1:7890",
+					noProxy: "localhost,127.0.0.1,::1",
+				},
+			},
 		})
 
 		const persisted = JSON.parse(readFileSync(join(userDataDir, "settings.json"), "utf-8"))
@@ -94,5 +138,32 @@ describe("settings-store", () => {
 		reloaded.initSettingsStore()
 
 		expect(reloaded.getSettings()).toEqual(updated)
+	})
+
+	test("preserves display mode from persisted appearance settings", async () => {
+		writeFileSync(
+			join(userDataDir, "settings.json"),
+			JSON.stringify({
+				appearance: {
+					colorScheme: "system",
+					themeId: "cortex",
+					displayMode: "verbose",
+				},
+			}),
+		)
+
+		const store = await loadSettingsStore("legacy-display-mode")
+
+		store.initSettingsStore()
+
+		expect(store.getSettings()).toEqual({
+			...expectedSettings(),
+			appearance: {
+				colorScheme: "system",
+				themeId: "cortex",
+				displayMode: "verbose",
+				rendererPreferencesMigrated: false,
+			},
+		})
 	})
 })

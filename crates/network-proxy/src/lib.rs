@@ -18,6 +18,8 @@ pub const NO_PROXY_ENV_KEYS: &[&str] = &["NO_PROXY", "no_proxy"];
 pub struct NetworkProxyConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proxy_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub no_proxy: Option<String>,
 }
 
 /// Applies the configured proxy, or proxy environment variables when config is empty.
@@ -28,9 +30,29 @@ pub fn apply_proxy(
     apply_proxy_with_env(builder, config_proxy_url, |key| std::env::var(key))
 }
 
+/// Applies a full proxy config, or proxy environment variables when config is empty.
+pub fn apply_proxy_config(
+    builder: reqwest::ClientBuilder,
+    config: &NetworkProxyConfig,
+) -> Result<reqwest::ClientBuilder> {
+    apply_proxy_with_env_options(
+        builder,
+        config.proxy_url.as_deref(),
+        config.no_proxy.as_deref(),
+        |key| std::env::var(key),
+    )
+}
+
 /// Builds a reqwest client using the configured proxy or proxy environment variables.
 pub fn build_client(config_proxy_url: Option<&str>) -> Result<reqwest::Client> {
     apply_proxy(reqwest::Client::builder(), config_proxy_url)?
+        .build()
+        .context("failed to build proxied HTTP client")
+}
+
+/// Builds a reqwest client using a full proxy config or proxy environment variables.
+pub fn build_client_config(config: &NetworkProxyConfig) -> Result<reqwest::Client> {
+    apply_proxy_config(reqwest::Client::builder(), config)?
         .build()
         .context("failed to build proxied HTTP client")
 }
@@ -43,9 +65,23 @@ fn apply_proxy_with_env<F>(
 where
     F: Fn(&str) -> std::result::Result<String, std::env::VarError>,
 {
+    apply_proxy_with_env_options(builder, config_proxy_url, None, env)
+}
+
+fn apply_proxy_with_env_options<F>(
+    builder: reqwest::ClientBuilder,
+    config_proxy_url: Option<&str>,
+    config_no_proxy: Option<&str>,
+    env: F,
+) -> Result<reqwest::ClientBuilder>
+where
+    F: Fn(&str) -> std::result::Result<String, std::env::VarError>,
+{
     if let Some(proxy_url) = non_empty(config_proxy_url) {
+        let no_proxy = non_empty(config_no_proxy).and_then(reqwest::NoProxy::from_string);
         return reqwest::Proxy::all(proxy_url)
             .with_context(|| format!("invalid proxy URL `{proxy_url}`"))
+            .map(|proxy| proxy.no_proxy(no_proxy))
             .map(|proxy| builder.proxy(proxy));
     }
 
@@ -245,6 +281,34 @@ mod tests {
             reqwest::Client::builder().timeout(Duration::from_secs(5)),
             None,
             env,
+        )
+        .expect("proxy config")
+        .build()
+        .expect("client");
+        let body = client
+            .get(target_url)
+            .send()
+            .await
+            .expect("direct response")
+            .text()
+            .await
+            .expect("response body");
+
+        assert_eq!(body, "direct");
+    }
+
+    #[tokio::test]
+    async fn no_proxy_bypasses_matching_configured_proxy() {
+        let target_url = spawn_response_server("direct").await;
+        let proxy_url = spawn_response_server("proxied").await;
+        let config = NetworkProxyConfig {
+            proxy_url: Some(proxy_url),
+            no_proxy: Some("127.0.0.1".to_string()),
+        };
+
+        let client = apply_proxy_config(
+            reqwest::Client::builder().timeout(Duration::from_secs(5)),
+            &config,
         )
         .expect("proxy config")
         .build()

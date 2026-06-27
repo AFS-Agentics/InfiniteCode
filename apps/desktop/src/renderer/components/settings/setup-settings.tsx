@@ -28,6 +28,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 	"claude-code": "Claude Code",
 	cursor: "Cursor",
 	devo: "Devo",
+	opencode: "OpenCode",
 }
 
 export function SetupSettings() {
@@ -45,7 +46,7 @@ export function SetupSettings() {
 }
 
 // ============================================================
-// Devo CLI status
+// Devo runtime status
 // ============================================================
 
 function DevoStatusSection() {
@@ -70,7 +71,7 @@ function DevoStatusSection() {
 	}, [checkStatus])
 
 	return (
-		<SettingsSection title="Devo CLI">
+		<SettingsSection title="Desktop Runtime">
 			<SettingsRow label="Version" description={result?.path ?? "Checking..."}>
 				<div className="flex items-center gap-2">
 					{checking ? (

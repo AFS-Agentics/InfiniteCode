@@ -13,6 +13,9 @@ import type {
 	Automation,
 	AutomationRun,
 	CreateAutomationInput,
+	CreateDesktopFolderInput,
+	CreateDesktopFolderResult,
+	DesktopFolderStat,
 	GitApplyResult,
 	GitBranchInfo,
 	GitCheckoutResult,
@@ -139,6 +142,22 @@ export async function pickDirectory(): Promise<string | null> {
 		return window.devo.pickDirectory()
 	}
 	throw new Error("Directory picker is only available in Electron mode")
+}
+
+export async function statDesktopFolders(directories: string[]): Promise<DesktopFolderStat[]> {
+	if (isElectron && window.devo.desktopFolders?.stat) {
+		return window.devo.desktopFolders.stat(directories)
+	}
+	return directories.map((directory) => ({ directory, status: "available" }))
+}
+
+export async function createDesktopFolder(
+	input: CreateDesktopFolderInput,
+): Promise<CreateDesktopFolderResult> {
+	if (isElectron && window.devo.desktopFolders?.create) {
+		return window.devo.desktopFolders.create(input)
+	}
+	throw new Error("Folder creation requires the updated desktop bridge. Restart Devo Desktop and try again.")
 }
 
 // ============================================================

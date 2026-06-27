@@ -71,6 +71,10 @@ contextBridge.exposeInMainWorld("devo", {
 		},
 	},
 
+	acpTraffic: {
+		getState: () => ipcRenderer.invoke("acp-traffic-log:state"),
+	},
+
 	terminal: {
 		create: (options: { cwd?: string; cols?: number; rows?: number }) =>
 			ipcRenderer.invoke("terminal:create", options),
@@ -177,17 +181,6 @@ contextBridge.exposeInMainWorld("devo", {
 	/** Relaunch the app (used after toggling transparency, which requires a restart). */
 	relaunch: () => ipcRenderer.invoke("app:relaunch"),
 
-	// --- CLI install ---
-
-	cli: {
-		/** Checks whether the `devo` CLI command is installed. */
-		isInstalled: () => ipcRenderer.invoke("cli:is-installed"),
-		/** Installs the `devo` CLI command (symlinks to /usr/local/bin). */
-		install: () => ipcRenderer.invoke("cli:install"),
-		/** Uninstalls the `devo` CLI command. */
-		uninstall: () => ipcRenderer.invoke("cli:uninstall"),
-	},
-
 	// --- Open in external app ---
 
 	openIn: {
@@ -218,6 +211,12 @@ contextBridge.exposeInMainWorld("devo", {
 
 	/** Opens a native folder picker dialog. Returns the selected path, or null if cancelled. */
 	pickDirectory: () => ipcRenderer.invoke("dialog:open-directory"),
+
+	desktopFolders: {
+		stat: (directories: string[]) => ipcRenderer.invoke("desktop-folders:stat", directories),
+		create: (input: { parentDirectory: string; name: string }) =>
+			ipcRenderer.invoke("desktop-folders:create", input),
+	},
 
 	// --- Fetch proxy (bypasses Chromium connection limits) ---
 
@@ -310,18 +309,8 @@ contextBridge.exposeInMainWorld("devo", {
 	// --- Onboarding ---
 
 	onboarding: {
-		/** Check if Devo CLI is installed and compatible. */
+		/** Check if the bundled Devo runtime is installed and compatible. */
 		checkDevo: () => ipcRenderer.invoke("onboarding:check-devo"),
-		/** Install Devo CLI via the official install script. */
-		installDevo: () => ipcRenderer.invoke("onboarding:install-devo"),
-		/** Subscribe to install output lines (streamed from the install script). */
-		onInstallOutput: (callback: (text: string) => void) => {
-			const listener = (_event: unknown, text: string) => callback(text)
-			ipcRenderer.on("onboarding:install-output", listener)
-			return () => {
-				ipcRenderer.removeListener("onboarding:install-output", listener)
-			}
-		},
 		/** Quick detect all supported providers (Claude Code, Cursor, Devo). */
 		detectProviders: () => ipcRenderer.invoke("onboarding:detect-providers"),
 		/** Full scan of a specific provider's configuration. */

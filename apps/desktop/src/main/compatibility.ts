@@ -1,5 +1,5 @@
 /**
- * Devo CLI version compatibility definitions for Devo.
+ * Devo runtime version compatibility definitions for Desktop.
  *
  * Updated with each Devo release to reflect tested Devo versions.
  * The environment check in the onboarding flow uses these ranges to
@@ -40,6 +40,19 @@ export interface DevoCheckResult {
 	message: string | null
 }
 
+export type ExecFileForCheck = (
+	cmd: string,
+	args: string[],
+	options: { env: Record<string, string | undefined>; timeout: number },
+	callback: (err: Error | null, stdout: string) => void,
+) => void
+
+export interface CheckDevoProgramOptions {
+	program: string
+	env?: Record<string, string | undefined>
+	execFile?: ExecFileForCheck
+}
+
 // ============================================================
 // Binary detection
 // ============================================================
@@ -56,9 +69,10 @@ function execAsync(
 	cmd: string,
 	args: string[],
 	env: Record<string, string | undefined>,
+	execFileImpl: ExecFileForCheck = execFile as unknown as ExecFileForCheck,
 ): Promise<string | null> {
 	return new Promise((resolve) => {
-		execFile(cmd, args, { env, timeout: 5000 }, (err, stdout) => {
+		execFileImpl(cmd, args, { env, timeout: 5000 }, (err, stdout) => {
 			if (err) {
 				resolve(null)
 				return
@@ -124,6 +138,38 @@ export async function checkDevo(): Promise<DevoCheckResult> {
 
 	log.info("Devo found", { version, path: binaryPath })
 
+	return compatibilityResult(version, binaryPath)
+}
+
+export async function checkDevoProgram({
+	program,
+	env = process.env,
+	execFile: execFileImpl,
+}: CheckDevoProgramOptions): Promise<DevoCheckResult> {
+	log.info("Checking Devo runtime...", { program })
+	const versionOutput = await execAsync(program, ["--version"], env, execFileImpl)
+	if (!versionOutput) {
+		return {
+			installed: false,
+			version: null,
+			path: program,
+			compatible: false,
+			compatibility: "unknown",
+			message: `Devo runtime not found at ${program}`,
+		}
+	}
+
+	const version = parseDevoVersion(versionOutput)
+	log.info("Devo runtime found", { version, path: program })
+	return compatibilityResult(version, program)
+}
+
+function parseDevoVersion(versionOutput: string): string {
+	const match = versionOutput.match(/v?(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?)/)
+	return match ? match[1] : versionOutput.trim()
+}
+
+function compatibilityResult(version: string, binaryPath: string | null): DevoCheckResult {
 	// Coerce loose version strings (e.g. "1.3" -> "1.3.0") into valid semver.
 	// Non-semver versions (e.g. "local", "dev", "unknown") are assumed compatible --
 	// these are typically local/dev builds where the user knows what they're doing.
