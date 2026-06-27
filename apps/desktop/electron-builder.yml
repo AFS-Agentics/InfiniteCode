@@ -11,13 +11,13 @@ files:
   # Must be included because externalizeDepsPlugin keeps it external.
   - "node_modules/electron-liquid-glass/**/*"
 
-# Bundle the CLI launcher script into the app package.
-# macOS: Contents/Resources/bin/devo
-# Linux: resources/bin/devo
-# Windows: resources/bin/devo.cmd
+# Bundle the private Devo runtime into the app package.
+# macOS: Contents/Resources/runtime/bin/devo
+# Linux: resources/runtime/bin/devo
+# Windows: resources/runtime/bin/devo.exe
 extraResources:
-  - from: resources/bin
-    to: bin
+  - from: resources/runtime
+    to: runtime
     filter:
       - "**/*"
   # Tray icon assets — must be at the root of process.resourcesPath
@@ -46,9 +46,7 @@ mac:
   icon: resources/icon.icns
   target:
     - target: dmg
-      arch: [arm64, x64]
     - target: zip
-      arch: [arm64, x64]
   category: public.app-category.developer-tools
   hardenedRuntime: true
   gatekeeperAssess: false
@@ -60,18 +58,14 @@ win:
   icon: resources/icon.ico
   target:
     - target: nsis
-      arch: [x64, arm64]
 
 linux:
   executableName: devo
   icon: resources/linux-icons
   target:
     - target: AppImage
-      arch: [x64, arm64]
     - target: deb
-      arch: [x64, arm64]
     - target: rpm
-      arch: [x64, arm64]
   category: Development
   maintainer: devo
   desktop:

@@ -103,29 +103,67 @@ jobs:
 
   # ── Desktop app builds ───────────────────────────────────────────────────
   desktop:
-    name: Build desktop ${{ matrix.platform }}
+    name: Build desktop ${{ matrix.platform }} ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: macos-latest
             platform: mac
-            script: package:mac
+            arch: arm64
+            target: aarch64-apple-darwin
+            rg_target: aarch64-apple-darwin
+            script: package:mac:arm64
+          - os: macos-latest
+            platform: mac
+            arch: x64
+            target: x86_64-apple-darwin
+            rg_target: x86_64-apple-darwin
+            script: package:mac:x64
           - os: windows-latest
             platform: windows
-            script: package:win
+            arch: x64
+            target: x86_64-pc-windows-msvc
+            rg_target: x86_64-pc-windows-msvc
+            script: package:win:x64
+          - os: windows-latest
+            platform: windows
+            arch: arm64
+            target: aarch64-pc-windows-msvc
+            rg_target: aarch64-pc-windows-msvc
+            script: package:win:arm64
           - os: ubuntu-latest
             platform: linux
-            script: package:linux
+            arch: x64
+            target: x86_64-unknown-linux-musl
+            rg_target: x86_64-unknown-linux-musl
+            script: package:linux:x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: arm64
+            target: aarch64-unknown-linux-musl
+            rg_target: aarch64-unknown-linux-gnu
+            script: package:linux:arm64
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2
         with:
-          key: desktop-${{ matrix.platform }}
+          key: desktop-${{ matrix.target }}
+
+      - uses: mlugg/setup-zig@v2
+        if: runner.os == 'Linux'
+
+      - name: Install cargo-zigbuild
+        uses: taiki-e/install-action@v2
+        if: runner.os == 'Linux'
+        with:
+          tool: cargo-zigbuild@0.22.3
 
       - uses: oven-sh/setup-bun@v2
 
@@ -134,6 +172,53 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y rpm
+
+      - name: Download ripgrep sidecar (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rg_version="$(curl -fsSL https://api.github.com/repos/BurntSushi/ripgrep/releases/latest \
+            | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
+            | sed -n '1p')"
+          if [ -z "$rg_version" ]; then
+            echo "Failed to resolve latest ripgrep release version" >&2
+            exit 1
+          fi
+          archive="ripgrep-${rg_version}-${{ matrix.rg_target }}.tar.gz"
+          tmp_dir="$(mktemp -d)"
+          curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/download/${rg_version}/${archive}" -o "${tmp_dir}/${archive}"
+          tar -xzf "${tmp_dir}/${archive}" -C "$tmp_dir"
+          rg_bin="$(find "$tmp_dir" -type f -name rg | sed -n '1p')"
+          if [ -z "$rg_bin" ]; then
+            echo "rg not found in ${archive}" >&2
+            exit 1
+          fi
+          chmod +x "$rg_bin"
+          "$rg_bin" --version
+          echo "DEVO_DESKTOP_RUNTIME_RG_BIN=$rg_bin" >> "$GITHUB_ENV"
+
+      - name: Download ripgrep sidecar (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/BurntSushi/ripgrep/releases/latest"
+          $rgVersion = $release.tag_name
+          if ([string]::IsNullOrWhiteSpace($rgVersion)) {
+              throw "Failed to resolve latest ripgrep release version"
+          }
+          $archive = "ripgrep-$rgVersion-${{ matrix.rg_target }}.zip"
+          $tmpDir = Join-Path $env:RUNNER_TEMP "ripgrep"
+          New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+          $archivePath = Join-Path $tmpDir $archive
+          Invoke-WebRequest -Uri "https://github.com/BurntSushi/ripgrep/releases/download/$rgVersion/$archive" -OutFile $archivePath
+          Expand-Archive -Path $archivePath -DestinationPath $tmpDir -Force
+          $rg = Get-ChildItem -Recurse -Filter "rg.exe" -Path $tmpDir | Select-Object -First 1
+          if (-not $rg) {
+              throw "rg.exe not found in $archive"
+          }
+          & $rg.FullName --version
+          "DEVO_DESKTOP_RUNTIME_RG_BIN=$($rg.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install desktop dependencies
         working-directory: apps/desktop
@@ -147,7 +232,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: devo-desktop-${{ github.ref_name }}-${{ matrix.platform }}
+          name: devo-desktop-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.blockmap

@@ -4,4 +4,5 @@
 __pycache__/
 node_modules
 /apps/desktop/out/
+/apps/desktop/resources/runtime/
 /apps/desktop/packages/devo-ai-sdk/src/v2/generated/
