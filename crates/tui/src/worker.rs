@@ -3581,7 +3581,8 @@ fn project_history_items(items: &[SessionHistoryItem]) -> Vec<TranscriptItem> {
                     index += 1;
                     continue;
                 }
-                SessionHistoryMetadata::Edited { .. } => {}
+                SessionHistoryMetadata::Edited { .. }
+                | SessionHistoryMetadata::ResearchArtifact { .. } => {}
             }
         }
         if item.kind == SessionHistoryItemKind::ToolCall

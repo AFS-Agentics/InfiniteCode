@@ -34,6 +34,9 @@ pub const DEVO_ITEM_ID_META: &str = "devo/itemId";
 pub const DEVO_ACTIVITY_AT_META: &str = "devo/activityAt";
 pub const DEVO_HISTORY_INDEX_META: &str = "devo/historyIndex";
 pub const DEVO_PARENT_MESSAGE_ID_META: &str = "devo/parentMessageId";
+pub const DEVO_ITEM_KIND_META: &str = "devo/itemKind";
+pub const DEVO_RESEARCH_ARTIFACT_TYPE_META: &str = "devo/researchArtifactType";
+pub const DEVO_RESEARCH_ARTIFACT_TITLE_META: &str = "devo/researchArtifactTitle";
 
 pub type AcpMeta = serde_json::Map<String, serde_json::Value>;
 

@@ -396,6 +396,9 @@ const DEVO_ACTIVITY_AT_META = "devo/activityAt"
 const DEVO_HISTORY_INDEX_META = "devo/historyIndex"
 const DEVO_PARENT_MESSAGE_ID_META = "devo/parentMessageId"
 const DEVO_TURN_DURATION_MS_META = "devo/turnDurationMs"
+const DEVO_ITEM_KIND_META = "devo/itemKind"
+const DEVO_RESEARCH_ARTIFACT_TYPE_META = "devo/researchArtifactType"
+const DEVO_RESEARCH_ARTIFACT_TITLE_META = "devo/researchArtifactTitle"
 
 function normalizedHistoryLimit(limit: unknown): number | undefined {
 	if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) return undefined
@@ -422,6 +425,27 @@ function updateMeta(update: Record<string, unknown>): Record<string, unknown> | 
 function updateMetaString(update: Record<string, unknown>, key: string): string | undefined {
 	const value = updateMeta(update)?.[key]
 	return typeof value === "string" && value ? value : undefined
+}
+
+function textPartMetadataFromUpdate(
+	update: Record<string, unknown>,
+	existingPart?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+	const existing = objectRecord(existingPart?.metadata)
+	const metadata = existing ? { ...existing } : {}
+	const meta = updateMeta(update)
+	if (meta?.[DEVO_ITEM_KIND_META] === "research_artifact") {
+		metadata[DEVO_ITEM_KIND_META] = "research_artifact"
+		const artifactType = meta[DEVO_RESEARCH_ARTIFACT_TYPE_META]
+		if (typeof artifactType === "string" && artifactType) {
+			metadata[DEVO_RESEARCH_ARTIFACT_TYPE_META] = artifactType
+		}
+		const title = meta[DEVO_RESEARCH_ARTIFACT_TITLE_META]
+		if (typeof title === "string" && title) {
+			metadata[DEVO_RESEARCH_ARTIFACT_TITLE_META] = title
+		}
+	}
+	return Object.keys(metadata).length > 0 ? metadata : undefined
 }
 
 function updateHistoryCreatedAt(update: Record<string, unknown>): number | undefined {
@@ -1566,12 +1590,14 @@ class AcpClient {
 				? ""
 				: existingPart[field]
 		const partEventTime = updateHistoryCreatedAt(update) ?? now
+		const metadata = textPartMetadataFromUpdate(update, existingPart)
 		const part = {
 			id: partId,
 			sessionID: sessionId,
 			messageID: messageId,
 			type: partType,
 			[field]: `${existingText}${text}`,
+			...(metadata ? { metadata } : {}),
 			time: partTime(existingPart, partEventTime),
 		} as TextPart | ReasoningPart
 		this.appendPart(sessionId, messageId, part)

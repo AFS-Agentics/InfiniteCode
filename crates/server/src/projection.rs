@@ -2,7 +2,10 @@ use devo_core::{
     CommandExecutionItem, ContentBlock, Message, ResearchArtifactItem, SessionRecord, TextItem,
     ToolCallItem, ToolResultItem, TurnItem, TurnRecord,
 };
-use devo_protocol::{SessionHistoryMetadata, SessionPlanStep, SessionPlanStepStatus};
+use devo_protocol::{
+    SessionHistoryMetadata, SessionHistoryResearchArtifactType, SessionPlanStep,
+    SessionPlanStepStatus,
+};
 use devo_util_git::extract_paths_from_patch;
 use devo_util_shell_command::parse_command::parse_command;
 
@@ -179,13 +182,44 @@ pub(crate) fn history_item_from_turn_item(item: &TurnItem) -> Option<SessionHist
             artifact_type: devo_core::ResearchArtifactType::FinalReportMetadata,
             ..
         }) => None,
-        TurnItem::ResearchArtifact(ResearchArtifactItem { title, content, .. }) => {
-            Some(SessionHistoryItem::new(
-                None,
-                SessionHistoryItemKind::Assistant,
-                title.clone(),
-                content.clone(),
-            ))
+        TurnItem::ResearchArtifact(ResearchArtifactItem {
+            artifact_type,
+            title,
+            content,
+        }) => {
+            let history_artifact_type = match artifact_type {
+                devo_core::ResearchArtifactType::Clarification => {
+                    SessionHistoryResearchArtifactType::Clarification
+                }
+                devo_core::ResearchArtifactType::Brief => SessionHistoryResearchArtifactType::Brief,
+                devo_core::ResearchArtifactType::Plan => SessionHistoryResearchArtifactType::Plan,
+                devo_core::ResearchArtifactType::Finding => {
+                    SessionHistoryResearchArtifactType::Finding
+                }
+                devo_core::ResearchArtifactType::CompressedFinding => {
+                    SessionHistoryResearchArtifactType::CompressedFinding
+                }
+                devo_core::ResearchArtifactType::WebpageSummary => {
+                    SessionHistoryResearchArtifactType::WebpageSummary
+                }
+                devo_core::ResearchArtifactType::Failure => {
+                    SessionHistoryResearchArtifactType::Failure
+                }
+                devo_core::ResearchArtifactType::FinalReportMetadata => unreachable!(
+                    "final report metadata is hidden before research history metadata projection"
+                ),
+            };
+            Some(
+                SessionHistoryItem::new(
+                    None,
+                    SessionHistoryItemKind::Assistant,
+                    title.clone(),
+                    content.clone(),
+                )
+                .with_metadata(SessionHistoryMetadata::ResearchArtifact {
+                    artifact_type: history_artifact_type,
+                }),
+            )
         }
         TurnItem::ContextCompaction(TextItem { .. }) => None,
         TurnItem::Reasoning(TextItem { text }) => Some(SessionHistoryItem::new(
@@ -559,7 +593,10 @@ mod tests {
     use crate::session::SessionHistoryItemKind;
     use devo_core::{CommandExecutionItem, TextItem, ToolCallItem, ToolResultItem};
     use devo_core::{ResearchArtifactItem, ResearchArtifactType, TurnItem};
-    use devo_protocol::{SessionHistoryMetadata, SessionHistoryToolIo, SessionPlanStepStatus};
+    use devo_protocol::{
+        SessionHistoryMetadata, SessionHistoryResearchArtifactType, SessionHistoryToolIo,
+        SessionPlanStepStatus,
+    };
 
     #[test]
     fn history_projection_prefers_tool_result_display_content() {
@@ -703,6 +740,12 @@ mod tests {
         assert_eq!(history_item.kind, SessionHistoryItemKind::Assistant);
         assert_eq!(history_item.title, "Research Brief");
         assert_eq!(history_item.body, "brief body");
+        assert_eq!(
+            history_item.metadata,
+            Some(SessionHistoryMetadata::ResearchArtifact {
+                artifact_type: SessionHistoryResearchArtifactType::Brief,
+            })
+        );
     }
 
     #[test]

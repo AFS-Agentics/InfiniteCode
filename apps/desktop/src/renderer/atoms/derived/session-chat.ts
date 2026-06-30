@@ -1,6 +1,9 @@
 import type { Message, Part } from "../../lib/types"
 import { getStreamingPartsForSession } from "../streaming"
 
+const DEVO_ITEM_KIND_META = "devo/itemKind"
+const DEVO_RESEARCH_ARTIFACT_TITLE_META = "devo/researchArtifactTitle"
+
 // ============================================================
 // Types — wrappers around SDK Message + Part
 // ============================================================
@@ -29,9 +32,18 @@ function messageFingerprint(entry: ChatMessageEntry): string {
 	const completed = entry.info.role === "assistant" ? (entry.info.time.completed ?? 0) : 0
 	let textLen = 0
 	const toolSegments: string[] = []
+	const textMetadataSegments: string[] = []
 	for (const part of entry.parts) {
 		if (part.type === "text" || part.type === "reasoning") {
 			textLen += part.text.length
+			if (part.type === "text") {
+				const metadata = (part as { metadata?: Record<string, unknown> }).metadata
+				if (metadata?.[DEVO_ITEM_KIND_META] === "research_artifact") {
+					textMetadataSegments.push(
+						`${part.id}:${metadata[DEVO_ITEM_KIND_META]}:${metadata[DEVO_RESEARCH_ARTIFACT_TITLE_META] ?? ""}`,
+					)
+				}
+			}
 		} else if (part.type === "tool") {
 			const outLen =
 				part.state.status === "completed"
@@ -42,7 +54,7 @@ function messageFingerprint(entry: ChatMessageEntry): string {
 			toolSegments.push(`${part.id}:${part.state.status}:${outLen}`)
 		}
 	}
-	return `${entry.info.id}:${completed}:${entry.parts.length}:${lastPart?.id ?? ""}:${textLen}:${toolSegments.join(",")}`
+	return `${entry.info.id}:${completed}:${entry.parts.length}:${lastPart?.id ?? ""}:${textLen}:${textMetadataSegments.join(",")}:${toolSegments.join(",")}`
 }
 
 function turnFingerprint(turn: ChatTurn): string {

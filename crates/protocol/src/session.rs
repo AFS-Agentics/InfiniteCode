@@ -134,6 +134,18 @@ pub struct SessionPlanStep {
     pub status: SessionPlanStepStatus,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionHistoryResearchArtifactType {
+    Clarification,
+    Brief,
+    Plan,
+    Finding,
+    CompressedFinding,
+    WebpageSummary,
+    Failure,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema, TS)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SessionHistoryMetadata {
@@ -146,6 +158,9 @@ pub enum SessionHistoryMetadata {
     PlanUpdate {
         explanation: Option<String>,
         steps: Vec<SessionPlanStep>,
+    },
+    ResearchArtifact {
+        artifact_type: SessionHistoryResearchArtifactType,
     },
 }
 

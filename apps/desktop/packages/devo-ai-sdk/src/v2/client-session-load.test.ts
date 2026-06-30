@@ -281,6 +281,54 @@ describe("ACP desktop SDK session cwd discovery", () => {
 		])
 	})
 
+	test("preserves replayed research artifact metadata on text parts", async () => {
+		const transport = new FakeTransport((method, _params, _directory, tx) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [storedSession] }
+			if (method === "session/load") {
+				tx?.emitSessionUpdate({
+					sessionId: "stored-session",
+					update: {
+						sessionUpdate: "user_message_chunk",
+						messageId: "history-0",
+						content: { type: "text", text: "research topic" },
+						_meta: { "devo/historyIndex": 0 },
+					},
+				} satisfies AcpSessionNotification)
+				tx?.emitSessionUpdate({
+					sessionId: "stored-session",
+					update: {
+						sessionUpdate: "agent_message_chunk",
+						messageId: "history-1",
+						content: { type: "text", text: "brief body" },
+						_meta: {
+							"devo/historyIndex": 1,
+							"devo/parentMessageId": "history-0",
+							"devo/itemKind": "research_artifact",
+							"devo/researchArtifactType": "brief",
+							"devo/researchArtifactTitle": "Research Brief",
+						},
+					},
+				} satisfies AcpSessionNotification)
+				return {}
+			}
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ transport })
+
+		const result = await client.session.messages({ sessionID: "stored-session" })
+
+		expect(result.data[1]?.parts[0]).toMatchObject({
+			type: "text",
+			text: "brief body",
+			metadata: {
+				"devo/itemKind": "research_artifact",
+				"devo/researchArtifactType": "brief",
+				"devo/researchArtifactTitle": "Research Brief",
+			},
+		})
+	})
+
 	test("keeps locally limited cached history windows on turn boundaries", async () => {
 		const transport = new FakeTransport((method, _params, _directory, tx) => {
 			if (method === "initialize") return initializeResult

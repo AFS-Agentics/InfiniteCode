@@ -127,7 +127,7 @@ impl ChatWidget {
                 } else {
                     None
                 };
-                match metadata {
+                let handled_metadata = match metadata {
                     SessionHistoryMetadata::PlanUpdate { explanation, steps } => {
                         self.on_plan_updated(
                             explanation.clone(),
@@ -152,9 +152,11 @@ impl ChatWidget {
                                 })
                                 .collect(),
                         );
+                        true
                     }
                     SessionHistoryMetadata::Edited { changes } => {
                         self.add_restored_file_change_item(item, changes.clone());
+                        true
                     }
                     SessionHistoryMetadata::Explored { actions } => {
                         self.restore_explored_history_item(item, actions.clone());
@@ -165,9 +167,13 @@ impl ChatWidget {
                                     .then_some(item)
                             });
                         self.apply_restored_exec_tool_io(item, result_item);
+                        true
                     }
+                    SessionHistoryMetadata::ResearchArtifact { .. } => false,
+                };
+                if handled_metadata {
+                    continue;
                 }
-                continue;
             }
 
             if let Some(changes) = Self::edited_changes_from_history_item(item) {

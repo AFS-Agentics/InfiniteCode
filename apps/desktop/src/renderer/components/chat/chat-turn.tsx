@@ -60,6 +60,9 @@ import { getToolCategory, type ToolCategory } from "./tool-card"
 // Utility functions
 // ============================================================
 
+const DEVO_ITEM_KIND_META = "devo/itemKind"
+const DEVO_RESEARCH_ARTIFACT_TITLE_META = "devo/researchArtifactTitle"
+
 /**
  * Formats a timestamp (milliseconds) to relative or absolute time.
  */
@@ -266,7 +269,7 @@ function AttachmentThumbnail({
 /** A renderable part — either a tool call, an intermediate text block, or reasoning */
 type RenderablePart =
 	| { kind: "tool"; part: ToolPart }
-	| { kind: "text"; id: string; text: string }
+	| { kind: "text"; id: string; text: string; metadata?: Record<string, unknown> }
 	| { kind: "reasoning"; part: ReasoningPart }
 
 type TextRenderablePart = Extract<RenderablePart, { kind: "text" }>
@@ -292,7 +295,8 @@ function getPartsAndTools(assistantMessages: ChatMessageEntry[]): {
 				ordered.push({ kind: "tool", part })
 			} else if (part.type === "text" && !part.synthetic && part.text.trim()) {
 				if (isCompactionStatusText(part.text)) continue
-				ordered.push({ kind: "text", id: part.id, text: part.text })
+				const metadata = (part as { metadata?: Record<string, unknown> }).metadata
+				ordered.push({ kind: "text", id: part.id, text: part.text, metadata })
 			} else if (part.type === "reasoning") {
 				// Strip OpenRouter's encrypted [REDACTED] chunks
 				const cleaned = part.text.replace("[REDACTED]", "").trim()
@@ -342,6 +346,39 @@ function splitCompletedTurnParts(orderedParts: RenderablePart[]): {
 	const finalResponsePart = orderedParts[finalResponseIndex] as TextRenderablePart
 	const completedProcessParts = orderedParts.filter((_, index) => index !== finalResponseIndex)
 	return { completedProcessParts, finalResponsePart }
+}
+
+function researchArtifactTitle(item: TextRenderablePart): string | undefined {
+	const metadata = item.metadata
+	if (metadata?.[DEVO_ITEM_KIND_META] !== "research_artifact") return undefined
+	const title = metadata[DEVO_RESEARCH_ARTIFACT_TITLE_META]
+	return typeof title === "string" && title.trim() ? title : undefined
+}
+
+function ResearchArtifactBlock({ item }: { item: TextRenderablePart }) {
+	const title = researchArtifactTitle(item)
+	if (!title) {
+		return (
+			<Message from="assistant">
+				<MessageContent>
+					<MessageResponse>{item.text}</MessageResponse>
+				</MessageContent>
+			</Message>
+		)
+	}
+	return (
+		<div className="border-l border-primary/30 pl-3">
+			<div className="mb-1 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+				<FileIcon className="size-3" aria-hidden="true" />
+				<span>{title}</span>
+			</div>
+			<Message from="assistant">
+				<MessageContent>
+					<MessageResponse>{item.text}</MessageResponse>
+				</MessageContent>
+			</Message>
+		</div>
+	)
 }
 
 function getError(assistantMessages: ChatMessageEntry[]): string | undefined {
@@ -411,9 +448,18 @@ function messageEntryFingerprint(entry: ChatMessageEntry): string {
 	const completed = entry.info.role === "assistant" ? (entry.info.time.completed ?? 0) : 0
 	let textLen = 0
 	const toolSegments: string[] = []
+	const textMetadataSegments: string[] = []
 	for (const part of entry.parts) {
 		if (part.type === "text" || part.type === "reasoning") {
 			textLen += part.text.length
+			if (part.type === "text") {
+				const metadata = (part as { metadata?: Record<string, unknown> }).metadata
+				if (metadata?.[DEVO_ITEM_KIND_META] === "research_artifact") {
+					textMetadataSegments.push(
+						`${part.id}:${metadata[DEVO_ITEM_KIND_META]}:${metadata[DEVO_RESEARCH_ARTIFACT_TITLE_META] ?? ""}`,
+					)
+				}
+			}
 		} else if (part.type === "tool") {
 			const outLen =
 				part.state.status === "completed"
@@ -424,7 +470,7 @@ function messageEntryFingerprint(entry: ChatMessageEntry): string {
 			toolSegments.push(`${part.id}:${part.state.status}:${outLen}`)
 		}
 	}
-	return `${entry.info.id}:${completed}:${entry.parts.length}:${lastPart?.id ?? ""}:${textLen}:${toolSegments.join(",")}`
+	return `${entry.info.id}:${completed}:${entry.parts.length}:${lastPart?.id ?? ""}:${textLen}:${textMetadataSegments.join(",")}:${toolSegments.join(",")}`
 }
 
 /** Compare two turns by content fingerprint rather than reference equality */
@@ -460,7 +506,7 @@ function areTurnsEqual(a: ChatTurnType, b: ChatTurnType): boolean {
  *   tool-group: { category: "run", tools: [bash] }
  */
 type StreamItem =
-	| { kind: "text"; id: string; text: string }
+	| { kind: "text"; id: string; text: string; metadata?: Record<string, unknown> }
 	| { kind: "reasoning-process"; items: (RenderablePart & { kind: "reasoning" | "tool" })[] }
 	| { kind: "tool-group"; category: ToolCategory; tools: ToolPart[] }
 
@@ -500,7 +546,7 @@ function groupPartsForStream(ordered: RenderablePart[]): StreamItem[] {
 			flushGroup()
 			flushProcessGroup()
 			if (part.kind === "text") {
-				items.push({ kind: "text", id: part.id, text: part.text })
+				items.push({ kind: "text", id: part.id, text: part.text, metadata: part.metadata })
 			}
 		}
 	}
@@ -1072,11 +1118,7 @@ export const ChatTurnComponent = memo(
 									if (item.kind === "text") {
 										return (
 											<div key={item.id} className="py-0.5">
-												<Message from="assistant">
-													<MessageContent>
-														<MessageResponse>{item.text}</MessageResponse>
-													</MessageContent>
-												</Message>
+												<ResearchArtifactBlock item={item} />
 											</div>
 										)
 									}
@@ -1199,11 +1241,7 @@ export const ChatTurnComponent = memo(
 									}
 									return (
 										<div key={item.id} className="py-0.5">
-											<Message from="assistant">
-												<MessageContent>
-													<MessageResponse>{item.text}</MessageResponse>
-												</MessageContent>
-											</Message>
+											<ResearchArtifactBlock item={item} />
 										</div>
 									)
 								})}
@@ -1232,11 +1270,15 @@ export const ChatTurnComponent = memo(
 
 				{/* Completed final response */}
 				{!working && finalResponsePart && responseText && (
-					<Message from="assistant">
-						<MessageContent>
-							<MessageResponse>{responseText}</MessageResponse>
-						</MessageContent>
-					</Message>
+					researchArtifactTitle(finalResponsePart) ? (
+						<ResearchArtifactBlock item={{ ...finalResponsePart, text: responseText }} />
+					) : (
+						<Message from="assistant">
+							<MessageContent>
+								<MessageResponse>{responseText}</MessageResponse>
+							</MessageContent>
+						</Message>
+					)
 				)}
 
 				{/* Streaming response — visible while working, when text isn't already inline */}
