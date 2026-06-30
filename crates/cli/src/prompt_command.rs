@@ -424,9 +424,12 @@ fn jsonl_event_callback(
     }
 
     Some(Arc::new(move |event| {
-        if let Err(error) = write_query_event_jsonl(session_id.as_str(), &event) {
-            eprintln!("devo [prompt] failed to write jsonl event: {error}");
-        }
+        let session_id = session_id.clone();
+        Box::pin(async move {
+            if let Err(error) = write_query_event_jsonl(session_id.as_str(), &event) {
+                eprintln!("devo [prompt] failed to write jsonl event: {error}");
+            }
+        })
     }))
 }
 

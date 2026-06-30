@@ -8,6 +8,7 @@ use devo_safety::ResourceKind;
 use devo_tools::contracts::ToolBudgets;
 use devo_tools::contracts::ToolProgress;
 use futures::StreamExt;
+use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use tokio::sync::RwLock;
 use tokio::sync::mpsc;
@@ -24,11 +25,11 @@ use devo_tools::ClientTerminal;
 use devo_tools::ToolAgentScope;
 use tokio_util::sync::CancellationToken;
 
-type ProgressCallback = dyn Fn(&str, ToolProgress) + Send + Sync;
+type ProgressCallback = dyn Fn(String, ToolProgress) -> BoxFuture<'static, ()> + Send + Sync;
 type ProgressCallbackArc = Arc<ProgressCallback>;
-type CompletionCallback = dyn Fn(&ToolCallResult) + Send + Sync;
+type CompletionCallback = dyn Fn(ToolCallResult) -> BoxFuture<'static, ()> + Send + Sync;
 type CompletionCallbackArc = Arc<CompletionCallback>;
-type ExecutionStartCallback = dyn Fn(&ToolCall) + Send + Sync;
+type ExecutionStartCallback = dyn Fn(ToolCall) -> BoxFuture<'static, ()> + Send + Sync;
 type ExecutionStartCallbackArc = Arc<ExecutionStartCallback>;
 type PermissionFuture = futures::future::BoxFuture<'static, Result<(), String>>;
 type PermissionCheckFn = dyn Fn(ToolPermissionRequest) -> PermissionFuture + Send + Sync;
@@ -137,7 +138,7 @@ impl ToolRuntime {
     pub async fn execute_batch_streaming(
         &self,
         calls: &[ToolCall],
-        on_progress: impl Fn(&str, ToolProgress) + Send + Sync + 'static,
+        on_progress: impl Fn(String, ToolProgress) -> BoxFuture<'static, ()> + Send + Sync + 'static,
     ) -> Vec<ToolCallResult> {
         self.execute_batch_inner(
             calls,
@@ -150,8 +151,8 @@ impl ToolRuntime {
     pub async fn execute_batch_streaming_with_completion(
         &self,
         calls: &[ToolCall],
-        on_progress: impl Fn(&str, ToolProgress) + Send + Sync + 'static,
-        on_completion: impl Fn(&ToolCallResult) + Send + Sync + 'static,
+        on_progress: impl Fn(String, ToolProgress) -> BoxFuture<'static, ()> + Send + Sync + 'static,
+        on_completion: impl Fn(ToolCallResult) -> BoxFuture<'static, ()> + Send + Sync + 'static,
     ) -> Vec<ToolCallResult> {
         self.execute_batch_inner(
             calls,
@@ -190,7 +191,7 @@ impl ToolRuntime {
                 .collect();
             while let Some((index, result)) = futures.next().await {
                 if let Some(callback) = &on_completion {
-                    callback(&result);
+                    callback(result.clone()).await;
                 }
                 indexed_results.push((index, result));
             }
@@ -200,7 +201,7 @@ impl ToolRuntime {
             let _guard = self.gate.write().await;
             let result = self.execute_single(call, &on_progress).await;
             if let Some(callback) = &on_completion {
-                callback(&result);
+                callback(result.clone()).await;
             }
             indexed_results.push((index, result));
         }
@@ -285,7 +286,7 @@ impl ToolRuntime {
         }
 
         if let Some(callback) = &self.execution_options.on_tool_execution_start {
-            callback(call);
+            callback(call.clone()).await;
         }
         info!(tool = %tool_name, id = %call.id, "executing tool");
 
@@ -313,7 +314,7 @@ impl ToolRuntime {
                 let tool_use_id = call.id.clone();
                 let task = tokio::spawn(async move {
                     while let Some(progress) = progress_rx.recv().await {
-                        callback(&tool_use_id, progress);
+                        callback(tool_use_id.clone(), progress).await;
                     }
                 });
                 (Some(progress_tx), Some(task))
@@ -1567,12 +1568,15 @@ mod tests {
         let results = runtime
             .execute_batch_streaming_with_completion(
                 &calls,
-                |_tool_use_id, _content| {},
+                |_tool_use_id, _content| Box::pin(async {}),
                 move |result| {
-                    completions_clone
-                        .lock()
-                        .expect("lock completions")
-                        .push(result.tool_use_id.clone());
+                    let completions_clone = Arc::clone(&completions_clone);
+                    Box::pin(async move {
+                        completions_clone
+                            .lock()
+                            .expect("lock completions")
+                            .push(result.tool_use_id.clone());
+                    })
                 },
             )
             .await;
@@ -1708,13 +1712,16 @@ mod tests {
 
         let results = runtime
             .execute_batch_streaming(&[call], move |tool_use_id, progress| {
-                let ToolProgress::OutputDelta { delta } = progress else {
-                    return;
-                };
-                progress_items_for_callback
-                    .lock()
-                    .expect("progress lock")
-                    .push(format!("{tool_use_id}:{delta}"));
+                let progress_items_for_callback = Arc::clone(&progress_items_for_callback);
+                Box::pin(async move {
+                    let ToolProgress::OutputDelta { delta } = progress else {
+                        return;
+                    };
+                    progress_items_for_callback
+                        .lock()
+                        .expect("progress lock")
+                        .push(format!("{tool_use_id}:{delta}"));
+                })
             })
             .await;
 
@@ -1731,7 +1738,9 @@ mod tests {
     async fn execute_batch_streaming_empty() {
         let registry = make_streaming_registry();
         let runtime = ToolRuntime::new_without_permissions(registry);
-        let results = runtime.execute_batch_streaming(&[], |_, _| {}).await;
+        let results = runtime
+            .execute_batch_streaming(&[], |_, _| Box::pin(async {}))
+            .await;
         assert!(results.is_empty());
     }
 
@@ -1744,7 +1753,9 @@ mod tests {
             name: "nonexistent".into(),
             input: serde_json::json!({}),
         };
-        let results = runtime.execute_batch_streaming(&[call], |_, _| {}).await;
+        let results = runtime
+            .execute_batch_streaming(&[call], |_, _| Box::pin(async {}))
+            .await;
         assert_eq!(results.len(), 1);
         assert!(results[0].is_error);
     }

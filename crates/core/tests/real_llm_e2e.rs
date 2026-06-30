@@ -121,11 +121,14 @@ async fn run_query(
     let provider = RealLlmConfig::from_env()?.provider();
     let seen_events = Arc::new(std::sync::Mutex::new(Vec::new()));
     let callback_events = Arc::clone(&seen_events);
-    let callback = Arc::new(move |event: QueryEvent| {
-        callback_events
-            .lock()
-            .expect("query event callback mutex should not be poisoned")
-            .push(event);
+    let callback: devo_core::EventCallback = Arc::new(move |event: QueryEvent| {
+        let callback_events = Arc::clone(&callback_events);
+        Box::pin(async move {
+            callback_events
+                .lock()
+                .expect("query event callback mutex should not be poisoned")
+                .push(event);
+        })
     });
 
     query(

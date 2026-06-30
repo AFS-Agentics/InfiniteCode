@@ -19,6 +19,7 @@ use devo_protocol::StreamEvent;
 use devo_protocol::ToolDefinition;
 use devo_protocol::TruncationPolicy;
 use futures::StreamExt;
+use futures::future::BoxFuture;
 use tokio::time::sleep;
 use tracing::debug;
 use tracing::info;
@@ -163,8 +164,29 @@ pub enum QueryEvent {
     Usage { usage: devo_protocol::Usage },
 }
 
-/// Callback for streaming query events to the UI layer.
-pub type EventCallback = Arc<dyn Fn(QueryEvent) + Send + Sync>;
+/// Async sink for streaming `QueryEvent`s out of the core query loop.
+///
+/// The type is intentionally erased so `query()` can accept callbacks from tests, the server
+/// runtime, and tool-progress plumbing without knowing their concrete future types:
+///
+/// - `Arc`: shared, cheap-to-clone ownership. The same callback is cloned into model-stream and
+///   tool-progress paths that may outlive the immediate stack frame.
+/// - `dyn Fn(QueryEvent)`: dynamic callback interface. Callers provide any closure that accepts one
+///   event and can be invoked repeatedly.
+/// - `BoxFuture<'static, ()>`: boxed async work returned by the callback. Boxing hides the
+///   closure's concrete future type behind one trait-object shape; `'static` prevents borrowed
+///   stack data from escaping into spawned or delayed event paths.
+/// - `Send + Sync`: the callback can be shared and awaited across Tokio tasks and worker threads.
+///
+/// Awaiting this future is what lets callers use bounded async channels for backpressure instead of
+/// the old synchronous callback bridge.
+pub type EventCallback = Arc<dyn Fn(QueryEvent) -> BoxFuture<'static, ()> + Send + Sync>;
+
+async fn emit_query_event(on_event: &Option<EventCallback>, event: QueryEvent) {
+    if let Some(callback) = on_event {
+        callback(event).await;
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Error classification
@@ -593,21 +615,23 @@ fn hosted_tool_input_or_previous(
     }
 }
 
-fn emit_hosted_tool_start<F>(
-    emit: &F,
+async fn emit_hosted_tool_start(
+    on_event: &Option<EventCallback>,
     emitted_tool_use_starts: &mut HashSet<String>,
     id: &str,
     name: &str,
     input: &serde_json::Value,
-) where
-    F: Fn(QueryEvent),
-{
+) {
     if emitted_tool_use_starts.insert(id.to_string()) {
-        emit(QueryEvent::ToolUseStart {
-            id: id.to_string(),
-            name: name.to_string(),
-            input: input.clone(),
-        });
+        emit_query_event(
+            on_event,
+            QueryEvent::ToolUseStart {
+                id: id.to_string(),
+                name: name.to_string(),
+                input: input.clone(),
+            },
+        )
+        .await;
     }
 }
 
@@ -619,14 +643,12 @@ struct HostedToolResultEvent<'a> {
     status: Option<String>,
 }
 
-fn emit_hosted_tool_result<F>(
-    emit: &F,
+async fn emit_hosted_tool_result(
+    on_event: &Option<EventCallback>,
     emitted_tool_results: &mut HashSet<String>,
     session_cwd: &std::path::Path,
     event: HostedToolResultEvent<'_>,
-) where
-    F: Fn(QueryEvent),
-{
+) {
     let HostedToolResultEvent {
         id,
         name,
@@ -648,15 +670,19 @@ fn emit_hosted_tool_result<F>(
         ToolContent::Text(text.clone())
     };
     let summary = crate::tools::tool_summary::tool_summary(name, input, session_cwd);
-    emit(QueryEvent::ToolResult {
-        tool_use_id: id.to_string(),
-        tool_name: name.to_string(),
-        input: input.clone(),
-        content,
-        display_content: Some(text),
-        is_error: hosted_tool_status_is_error(status.as_deref()),
-        summary,
-    });
+    emit_query_event(
+        on_event,
+        QueryEvent::ToolResult {
+            tool_use_id: id.to_string(),
+            tool_name: name.to_string(),
+            input: input.clone(),
+            content,
+            display_content: Some(text),
+            is_error: hosted_tool_status_is_error(status.as_deref()),
+            summary,
+        },
+    )
+    .await;
 }
 
 fn hosted_tool_result_text(
@@ -752,13 +778,6 @@ pub async fn query(
     runtime: &ToolRuntime,
     on_event: Option<EventCallback>,
 ) -> Result<(), AgentError> {
-    // emit is the event callback function.
-    let emit = |event: QueryEvent| {
-        if let Some(ref cb) = on_event {
-            cb(event);
-        }
-    };
-
     let agents_md_manager = AgentsMdManager::new(session.config.agents_md.clone());
     let current_agents_snapshot = load_workspace_instructions(&session.cwd, &agents_md_manager);
     let agent_scope = runtime.agent_scope();
@@ -1063,15 +1082,15 @@ pub async fn query(
                 Ok(StreamEvent::TextStart { .. }) => {}
                 Ok(StreamEvent::TextDelta { text, .. }) => {
                     assistant_text.push_str(&text);
-                    emit(QueryEvent::TextDelta(text));
+                    emit_query_event(&on_event, QueryEvent::TextDelta(text)).await;
                 }
                 Ok(StreamEvent::ReasoningStart { .. }) => {}
                 Ok(StreamEvent::ReasoningDelta { text, .. }) => {
                     reasoning_text.push_str(&text);
-                    emit(QueryEvent::ReasoningDelta(text));
+                    emit_query_event(&on_event, QueryEvent::ReasoningDelta(text)).await;
                 }
                 Ok(StreamEvent::ReasoningDone { .. }) => {
-                    emit(QueryEvent::ReasoningCompleted);
+                    emit_query_event(&on_event, QueryEvent::ReasoningCompleted).await;
                 }
                 Ok(StreamEvent::ToolCallStart {
                     index,
@@ -1091,12 +1110,13 @@ pub async fn query(
                     let name = normalize_hosted_tool_name(name);
                     hosted_tool_inputs.insert(id.clone(), (index, name.clone(), input.clone()));
                     emit_hosted_tool_start(
-                        &emit,
+                        &on_event,
                         &mut emitted_hosted_tool_starts,
                         &id,
                         &name,
                         &input,
-                    );
+                    )
+                    .await;
                 }
                 Ok(StreamEvent::HostedToolCallDone {
                     index,
@@ -1114,14 +1134,15 @@ pub async fn query(
                     let input = hosted_tool_input_or_previous(input, previous_input);
                     hosted_tool_inputs.insert(id.clone(), (index, name.clone(), input.clone()));
                     emit_hosted_tool_start(
-                        &emit,
+                        &on_event,
                         &mut emitted_hosted_tool_starts,
                         &id,
                         &name,
                         &input,
-                    );
+                    )
+                    .await;
                     emit_hosted_tool_result(
-                        &emit,
+                        &on_event,
                         &mut emitted_hosted_tool_results,
                         &session.cwd,
                         HostedToolResultEvent {
@@ -1131,7 +1152,8 @@ pub async fn query(
                             output,
                             status,
                         },
-                    );
+                    )
+                    .await;
                 }
                 Ok(StreamEvent::ToolCallInputDelta {
                     index,
@@ -1161,12 +1183,16 @@ pub async fn query(
                     session.last_input_tokens = response.usage.input_tokens;
                     session.last_turn_tokens = response.usage.display_total_tokens();
 
-                    emit(QueryEvent::Usage {
-                        usage: response.usage.clone(),
-                    });
+                    emit_query_event(
+                        &on_event,
+                        QueryEvent::Usage {
+                            usage: response.usage.clone(),
+                        },
+                    )
+                    .await;
                 }
                 Ok(StreamEvent::UsageDelta(usage)) => {
-                    emit(QueryEvent::UsageDelta { usage });
+                    emit_query_event(&on_event, QueryEvent::UsageDelta { usage }).await;
                 }
                 Err(e) => {
                     warn!(
@@ -1299,15 +1325,16 @@ pub async fn query(
                         });
                         hosted_tool_inputs.insert(id.clone(), (index, name.clone(), input.clone()));
                         emit_hosted_tool_start(
-                            &emit,
+                            &on_event,
                             &mut emitted_hosted_tool_starts,
                             &id,
                             &name,
                             &input,
-                        );
+                        )
+                        .await;
                         if output.is_some() || status.is_some() {
                             emit_hosted_tool_result(
-                                &emit,
+                                &on_event,
                                 &mut emitted_hosted_tool_results,
                                 &session.cwd,
                                 HostedToolResultEvent {
@@ -1317,7 +1344,8 @@ pub async fn query(
                                     output: output.clone(),
                                     status: status.clone(),
                                 },
-                            );
+                            )
+                            .await;
                         }
                     }
                     ResponseContent::ProviderReasoning { provider, payload } => {
@@ -1344,8 +1372,12 @@ pub async fn query(
                     })
                     .collect::<String>();
                 if !final_reasoning.is_empty() {
-                    emit(QueryEvent::ReasoningDelta(final_reasoning.clone()));
-                    emit(QueryEvent::ReasoningCompleted);
+                    emit_query_event(
+                        &on_event,
+                        QueryEvent::ReasoningDelta(final_reasoning.clone()),
+                    )
+                    .await;
+                    emit_query_event(&on_event, QueryEvent::ReasoningCompleted).await;
                     reasoning_text = final_reasoning;
                 }
             }
@@ -1360,8 +1392,12 @@ pub async fn query(
                     })
                     .collect::<String>();
                 if !final_reasoning.is_empty() {
-                    emit(QueryEvent::ReasoningDelta(final_reasoning.clone()));
-                    emit(QueryEvent::ReasoningCompleted);
+                    emit_query_event(
+                        &on_event,
+                        QueryEvent::ReasoningDelta(final_reasoning.clone()),
+                    )
+                    .await;
+                    emit_query_event(&on_event, QueryEvent::ReasoningCompleted).await;
                     reasoning_text = final_reasoning;
                 }
             }
@@ -1372,9 +1408,16 @@ pub async fn query(
             .map(|(id, (_index, name, input))| (id.clone(), name.clone(), input.clone()))
             .collect::<Vec<_>>();
         for (id, name, input) in pending_hosted_tools {
-            emit_hosted_tool_start(&emit, &mut emitted_hosted_tool_starts, &id, &name, &input);
+            emit_hosted_tool_start(
+                &on_event,
+                &mut emitted_hosted_tool_starts,
+                &id,
+                &name,
+                &input,
+            )
+            .await;
             emit_hosted_tool_result(
-                &emit,
+                &on_event,
                 &mut emitted_hosted_tool_results,
                 &session.cwd,
                 HostedToolResultEvent {
@@ -1384,7 +1427,8 @@ pub async fn query(
                     output: None,
                     status: Some("completed".to_string()),
                 },
-            );
+            )
+            .await;
         }
 
         // Build assistant message
@@ -1432,33 +1476,35 @@ pub async fn query(
             })
             .unwrap_or_default();
 
-        let tool_calls: Vec<ToolCall> = tool_uses
-            .into_iter()
-            .map(|(_index, id, name, initial_input, json_str, saw_delta)| {
-                let input = if saw_delta {
-                    serde_json::from_str(&json_str).unwrap_or_else(|_| {
-                        final_tool_inputs.get(&id).cloned().unwrap_or(initial_input)
-                    })
-                } else {
+        let mut tool_calls = Vec::with_capacity(tool_uses.len());
+        for (_index, id, name, initial_input, json_str, saw_delta) in tool_uses {
+            let input = if saw_delta {
+                serde_json::from_str(&json_str).unwrap_or_else(|_| {
                     final_tool_inputs.get(&id).cloned().unwrap_or(initial_input)
-                };
-                if emitted_tool_use_starts.insert(id.clone()) {
-                    emit(QueryEvent::ToolUseStart {
+                })
+            } else {
+                final_tool_inputs.get(&id).cloned().unwrap_or(initial_input)
+            };
+            if emitted_tool_use_starts.insert(id.clone()) {
+                emit_query_event(
+                    &on_event,
+                    QueryEvent::ToolUseStart {
                         id: id.clone(),
                         name: name.clone(),
                         input: input.clone(),
-                    });
-                }
-                if !final_response_tool_use_ids.contains(&id) {
-                    assistant_content.push(ContentBlock::ToolUse {
-                        id: id.clone(),
-                        name: name.clone(),
-                        input: input.clone(),
-                    });
-                }
-                ToolCall { id, name, input }
-            })
-            .collect();
+                    },
+                )
+                .await;
+            }
+            if !final_response_tool_use_ids.contains(&id) {
+                assistant_content.push(ContentBlock::ToolUse {
+                    id: id.clone(),
+                    name: name.clone(),
+                    input: input.clone(),
+                });
+            }
+            tool_calls.push(ToolCall { id, name, input });
+        }
 
         let assistant_content_contains_dsml_tool_call =
             assistant_content_contains_dsml_tool_call_text(&assistant_content);
@@ -1511,7 +1557,7 @@ pub async fn query(
             }
 
             if let Some(sr) = stop_reason {
-                emit(QueryEvent::TurnComplete { stop_reason: sr });
+                emit_query_event(&on_event, QueryEvent::TurnComplete { stop_reason: sr }).await;
             }
             debug!("no tool calls, ending query loop");
             session.end_turn();
@@ -1546,27 +1592,36 @@ pub async fn query(
                 .execute_batch_streaming_with_completion(
                     &tool_calls,
                     move |tool_use_id, progress| {
-                        progress_events(QueryEvent::ToolProgress {
-                            tool_use_id: tool_use_id.to_string(),
-                            progress,
-                        });
+                        let progress_events = Arc::clone(&progress_events);
+                        Box::pin(async move {
+                            progress_events(QueryEvent::ToolProgress {
+                                tool_use_id,
+                                progress,
+                            })
+                            .await;
+                        })
                     },
                     move |result| {
-                        let (tool_name, input, summary) = metadata
-                            .get(result.tool_use_id.as_str())
-                            .cloned()
-                            .unwrap_or_else(|| {
-                                (String::new(), serde_json::Value::Null, String::new())
-                            });
-                        completion_events(QueryEvent::ToolResult {
-                            tool_use_id: result.tool_use_id.clone(),
-                            tool_name,
-                            input,
-                            content: result.content.clone(),
-                            display_content: result.display_content.clone(),
-                            is_error: result.is_error,
-                            summary,
-                        });
+                        let completion_events = Arc::clone(&completion_events);
+                        let metadata = Arc::clone(&metadata);
+                        Box::pin(async move {
+                            let (tool_name, input, summary) = metadata
+                                .get(result.tool_use_id.as_str())
+                                .cloned()
+                                .unwrap_or_else(|| {
+                                    (String::new(), serde_json::Value::Null, String::new())
+                                });
+                            completion_events(QueryEvent::ToolResult {
+                                tool_use_id: result.tool_use_id,
+                                tool_name,
+                                input,
+                                content: result.content,
+                                display_content: result.display_content,
+                                is_error: result.is_error,
+                                summary,
+                            })
+                            .await;
+                        })
                     },
                 )
                 .await
@@ -1693,6 +1748,7 @@ mod tests {
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
 
+    use crate::EventCallback;
     use crate::tools::ToolAgentScope;
     use crate::tools::ToolContent;
     use crate::tools::ToolPreparationFeedback;
@@ -3005,8 +3061,11 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            seen_clone.lock().unwrap().push(event);
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                seen_clone.lock().unwrap().push(event);
+            })
         });
 
         query(
@@ -3159,8 +3218,11 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            seen_clone.lock().unwrap().push(event);
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                seen_clone.lock().unwrap().push(event);
+            })
         });
 
         query(
@@ -3263,8 +3325,11 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            seen_clone.lock().unwrap().push(event);
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                seen_clone.lock().unwrap().push(event);
+            })
         });
 
         query(
@@ -4115,8 +4180,11 @@ mod tests {
         session.push_message(Message::user("hello"));
         let seen_events = Arc::new(Mutex::new(Vec::new()));
         let callback_events = Arc::clone(&seen_events);
-        let callback = Arc::new(move |event: QueryEvent| {
-            callback_events.lock().expect("lock callback").push(event);
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let callback_events = Arc::clone(&callback_events);
+            Box::pin(async move {
+                callback_events.lock().expect("lock callback").push(event);
+            })
         });
 
         query(
@@ -4216,8 +4284,11 @@ mod tests {
         session.push_message(Message::user("hello"));
         let seen_events = Arc::new(Mutex::new(Vec::new()));
         let callback_events = Arc::clone(&seen_events);
-        let callback = Arc::new(move |event: QueryEvent| {
-            callback_events.lock().expect("lock callback").push(event);
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let callback_events = Arc::clone(&callback_events);
+            Box::pin(async move {
+                callback_events.lock().expect("lock callback").push(event);
+            })
         });
 
         query(
@@ -4377,8 +4448,11 @@ mod tests {
         session.push_message(Message::user("hello"));
         let seen_events = Arc::new(Mutex::new(Vec::new()));
         let callback_events = Arc::clone(&seen_events);
-        let callback = Arc::new(move |event: QueryEvent| {
-            callback_events.lock().expect("lock callback").push(event);
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let callback_events = Arc::clone(&callback_events);
+            Box::pin(async move {
+                callback_events.lock().expect("lock callback").push(event);
+            })
         });
 
         query(
@@ -4725,10 +4799,13 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            if let QueryEvent::ToolResult { summary, .. } = event {
-                seen_clone.lock().unwrap().push(summary);
-            }
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                if let QueryEvent::ToolResult { summary, .. } = event {
+                    seen_clone.lock().unwrap().push(summary);
+                }
+            })
         });
 
         query(
@@ -4779,13 +4856,16 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            if let QueryEvent::ToolResult {
-                tool_name, input, ..
-            } = event
-            {
-                seen_clone.lock().unwrap().push((tool_name, input));
-            }
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                if let QueryEvent::ToolResult {
+                    tool_name, input, ..
+                } = event
+                {
+                    seen_clone.lock().unwrap().push((tool_name, input));
+                }
+            })
         });
 
         query(
@@ -4832,13 +4912,16 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            if let QueryEvent::ToolResult {
-                tool_use_id, input, ..
-            } = event
-            {
-                seen_clone.lock().unwrap().push((tool_use_id, input));
-            }
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                if let QueryEvent::ToolResult {
+                    tool_use_id, input, ..
+                } = event
+                {
+                    seen_clone.lock().unwrap().push((tool_use_id, input));
+                }
+            })
         });
 
         query(
@@ -4897,18 +4980,21 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            if let QueryEvent::ToolResult {
-                content,
-                display_content,
-                ..
-            } = event
-            {
-                seen_clone
-                    .lock()
-                    .expect("lock seen events")
-                    .push((content.into_string(), display_content));
-            }
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                if let QueryEvent::ToolResult {
+                    content,
+                    display_content,
+                    ..
+                } = event
+                {
+                    seen_clone
+                        .lock()
+                        .expect("lock seen events")
+                        .push((content.into_string(), display_content));
+                }
+            })
         });
 
         query(
@@ -4979,10 +5065,13 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            if let QueryEvent::ToolUseStart { id, input, .. } = event {
-                seen_clone.lock().unwrap().push((id, input));
-            }
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                if let QueryEvent::ToolUseStart { id, input, .. } = event {
+                    seen_clone.lock().unwrap().push((id, input));
+                }
+            })
         });
 
         query(
@@ -5033,15 +5122,18 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            if let QueryEvent::ToolResult {
-                content,
-                display_content,
-                ..
-            } = event
-            {
-                seen_clone.lock().unwrap().push((content, display_content));
-            }
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                if let QueryEvent::ToolResult {
+                    content,
+                    display_content,
+                    ..
+                } = event
+                {
+                    seen_clone.lock().unwrap().push((content, display_content));
+                }
+            })
         });
 
         query(
@@ -5092,8 +5184,11 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| {
-            seen_clone.lock().unwrap().push(event);
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                seen_clone.lock().unwrap().push(event);
+            })
         });
 
         query(
@@ -5170,25 +5265,30 @@ mod tests {
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
-        let callback = Arc::new(move |event: QueryEvent| match event {
-            QueryEvent::ToolUseStart { id, .. } => {
-                seen_clone
-                    .lock()
-                    .expect("lock events")
-                    .push(format!("start:{id}"));
-            }
-            QueryEvent::ToolResult {
-                tool_use_id,
-                content,
-                ..
-            } => {
-                let content = content.into_string();
-                seen_clone
-                    .lock()
-                    .expect("lock events")
-                    .push(format!("result:{tool_use_id}:{content}"));
-            }
-            _ => {}
+        let callback: EventCallback = Arc::new(move |event: QueryEvent| {
+            let seen_clone = Arc::clone(&seen_clone);
+            Box::pin(async move {
+                match event {
+                    QueryEvent::ToolUseStart { id, .. } => {
+                        seen_clone
+                            .lock()
+                            .expect("lock events")
+                            .push(format!("start:{id}"));
+                    }
+                    QueryEvent::ToolResult {
+                        tool_use_id,
+                        content,
+                        ..
+                    } => {
+                        let content = content.into_string();
+                        seen_clone
+                            .lock()
+                            .expect("lock events")
+                            .push(format!("result:{tool_use_id}:{content}"));
+                    }
+                    _ => {}
+                }
+            })
         });
 
         query(

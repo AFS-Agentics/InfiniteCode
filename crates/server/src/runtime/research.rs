@@ -14,6 +14,7 @@ use crate::session_context::SessionRuntimeContext;
 
 pub(crate) const RESEARCH_FILE_TOOL_NAMES: &[&str] = &["read", "write", "apply_patch"];
 const RESEARCH_NO_TOOL_NAMES: &[&str] = &[];
+const RESEARCH_QUERY_EVENT_CHANNEL_CAPACITY: usize = 1024;
 const RESEARCH_CLARIFICATION_TOOL_NAMES: &[&str] = &["request_user_input"];
 const RESEARCH_SUPERVISOR_TOOL_NAMES: &[&str] = &[
     "spawn_agent",
@@ -973,9 +974,12 @@ impl ServerRuntime {
         stage: ResearchStageKind,
         mut capture: ResearchStageCapture<'_>,
     ) -> anyhow::Result<()> {
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        let callback = Arc::new(move |event: QueryEvent| {
-            let _ = tx.send(event);
+        let (tx, mut rx) = mpsc::channel::<QueryEvent>(RESEARCH_QUERY_EVENT_CHANNEL_CAPACITY);
+        let callback: devo_core::EventCallback = Arc::new(move |event: QueryEvent| {
+            let tx = tx.clone();
+            Box::pin(async move {
+                let _ = tx.send(event).await;
+            })
         });
         let mut stage_turn_config = runtime.turn_config.clone();
         stage_turn_config.web_search = devo_core::ResolvedWebSearchConfig::Disabled;
@@ -2272,10 +2276,10 @@ impl ServerRuntime {
             },
             ToolExecutionOptions {
                 cancel_token: turn_cancel_token,
-                on_tool_execution_start: Some(Arc::new(move |call: &ToolCall| {
+                on_tool_execution_start: Some(Arc::new(move |call: ToolCall| {
                     let runtime = Arc::clone(&tool_execution_start_runtime);
-                    let tool_call_id = call.id.clone();
-                    tokio::spawn(async move {
+                    let tool_call_id = call.id;
+                    Box::pin(async move {
                         runtime
                             .broadcast_event(ServerEvent::ToolCallStatusUpdated(
                                 devo_protocol::ToolCallStatusUpdatedPayload {
@@ -2287,7 +2291,7 @@ impl ServerRuntime {
                                 },
                             ))
                             .await;
-                    });
+                    })
                 })),
                 ..ToolExecutionOptions::default()
             },
