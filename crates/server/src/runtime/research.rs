@@ -9,6 +9,8 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+use super::research_context::ResearchClarificationContext;
+use super::research_context::ResearchRequestContext;
 use super::research_stages::RESEARCH_FILE_TOOL_NAMES;
 use super::research_stages::RESEARCH_PIPELINE_STAGES;
 pub(crate) use super::research_stages::RESEARCH_WORKER_TOOL_NAMES;
@@ -28,21 +30,6 @@ struct ClarifyDecision {
     verification: String,
 }
 
-#[derive(Debug, Clone)]
-struct ResearchRequestContext {
-    question: String,
-    current_date: String,
-    timezone: String,
-    cwd: String,
-    clarifications: Vec<ResearchClarificationContext>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ResearchClarificationContext {
-    question: String,
-    answer: String,
-}
-
 struct ClarificationGateResult {
     artifact_content: String,
     clarifications: Vec<ResearchClarificationContext>,
@@ -51,48 +38,6 @@ struct ClarificationGateResult {
 struct SupervisorOutput {
     notes: String,
     worker_count: usize,
-}
-
-impl ResearchRequestContext {
-    fn new(question: &str, current_date: String, timezone: String, cwd: String) -> Self {
-        Self {
-            question: question.to_string(),
-            current_date,
-            timezone,
-            cwd,
-            clarifications: Vec::new(),
-        }
-    }
-
-    fn session_messages(&self, additional_context: Vec<String>) -> Vec<devo_core::Message> {
-        self.context_texts(additional_context)
-            .into_iter()
-            .map(devo_core::Message::user)
-            .collect()
-    }
-
-    fn context_texts(&self, additional_context: Vec<String>) -> Vec<String> {
-        let mut messages = vec![
-            devo_core::research::prompts::environment_context(
-                &self.current_date,
-                &self.timezone,
-                &self.cwd,
-            ),
-            self.question.clone(),
-        ];
-        for clarification in &self.clarifications {
-            messages.push(devo_core::research::prompts::clarification_context(
-                &clarification.question,
-                &clarification.answer,
-            ));
-        }
-        messages.extend(
-            additional_context
-                .into_iter()
-                .filter(|context| !context.trim().is_empty()),
-        );
-        messages
-    }
 }
 
 #[derive(Default)]
