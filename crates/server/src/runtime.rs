@@ -173,6 +173,7 @@ mod research_capture;
 mod research_child_agents;
 mod research_context;
 mod research_formatting;
+mod research_parsing;
 mod research_stages;
 mod research_tools;
 mod skills;
