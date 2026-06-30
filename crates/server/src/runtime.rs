@@ -169,6 +169,7 @@ mod proposed_plan;
 mod provider_vendor_api;
 mod reference_search;
 mod research;
+mod research_child_agents;
 mod research_context;
 mod research_stages;
 mod research_tools;
