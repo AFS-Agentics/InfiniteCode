@@ -172,25 +172,24 @@ describe("desktop chrome CSS", () => {
 		expect(windowsContentAreaDeclarations).toEqual({});
 	});
 
-	test("Windows opening route blends the titlebar into the content surface", async () => {
+	test("Windows titlebar stays aligned with the side panel chrome after startup", async () => {
 		const css = await readFile(cssPath, "utf8");
 		const titlebarDeclarations = declarationsForSelector(
 			css,
-			':root[data-platform="win32"][data-opening-route="true"] body::before',
+			':root[data-platform="win32"][data-window-focused="true"] body::before',
 		);
-		const appBarDeclarations = declarationsForSelector(
+		const sidebarInsetDeclarations = declarationsForSelector(
 			css,
-			':root[data-platform="win32"][data-opening-route="true"] [data-slot="app-bar"]',
+			':root[data-platform="win32"][data-window-focused="true"] [data-slot="sidebar-inset"]',
 		);
 
-		expect(titlebarDeclarations).toEqual({
-			"background-color": "var(--devo-transcript-background)",
-		});
-		expect(appBarDeclarations).toEqual({
-			background: "var(--devo-transcript-background)",
-			"background-color": "var(--devo-transcript-background)",
-			"border-bottom-color": "transparent",
-		});
+		expect(titlebarDeclarations["background-color"]).toBe(
+			"var(--devo-windows-chrome-bg)",
+		);
+		expect(sidebarInsetDeclarations["background-color"]).toBe(
+			"var(--devo-windows-chrome-bg) !important",
+		);
+		expect(css).not.toContain("data-opening-route");
 	});
 
 	test("macOS glass sidebar inset extends to the right and bottom window edges", async () => {
