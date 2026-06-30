@@ -175,6 +175,7 @@ mod research_context;
 mod research_formatting;
 mod research_parsing;
 mod research_stages;
+mod research_streaming;
 mod research_tools;
 mod skills;
 mod turn_exec;
