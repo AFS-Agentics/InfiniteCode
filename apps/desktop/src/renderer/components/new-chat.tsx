@@ -15,6 +15,7 @@ import {
 	createFileMention,
 	insertMentionIntoText,
 } from "./chat/prompt-mentions"
+import { SlashCommandPopover, type SlashCommandPopoverHandle } from "./chat/slash-command-popover"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { useAtomValue } from "jotai"
@@ -115,12 +116,13 @@ function WorktreeToggle({
 }
 
 // ============================================================
-// Mention support helpers (mirrors the pattern in ChatInput)
+// Prompt trigger support helpers (mirrors the pattern in ChatInput)
 // ============================================================
 
 /**
  * Exposes the PromptInputProvider's text controller to outside components
- * via a ref — needed to insert mention text without going through React state.
+ * via a ref — needed to insert slash command and mention text without going
+ * through React state.
  */
 function MentionBridge({
 	controllerRef,
@@ -145,12 +147,14 @@ function MentionBridge({
 }
 
 /**
- * Detects `@` trigger patterns in the prompt textarea and notifies the parent
- * so the MentionPopover can open/close and filter results.
+ * User requirement: the new-session composer must support `/` slash popover
+ * behavior in addition to existing `@` mentions.
  */
-function MentionTrigger({
+function TriggerDetector({
+	onSlashChange,
 	onMentionChange,
 }: {
+	onSlashChange: (open: boolean, query: string) => void
 	onMentionChange: (open: boolean, query: string) => void
 }) {
 	const controller = usePromptInputController()
@@ -159,13 +163,21 @@ function MentionTrigger({
 		const textarea = document.querySelector<HTMLTextAreaElement>("textarea[data-prompt-input]")
 		const cursorPos = textarea?.selectionStart ?? inputText.length
 		const textBeforeCursor = inputText.slice(0, cursorPos)
+		const slashMatch = inputText.match(/^\/(\S*)$/)
+		if (slashMatch) {
+			onSlashChange(true, slashMatch[1])
+			onMentionChange(false, "")
+			return
+		}
 		const atMatch = textBeforeCursor.match(/@(\S*)$/)
 		if (atMatch) {
 			onMentionChange(true, atMatch[1])
+			onSlashChange(false, "")
 			return
 		}
+		onSlashChange(false, "")
 		onMentionChange(false, "")
-	}, [inputText, onMentionChange])
+	}, [inputText, onSlashChange, onMentionChange])
 	return null
 }
 
@@ -228,12 +240,15 @@ export function NewChat() {
 	const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
 	const [selectedVariant, setSelectedVariant] = useState<string | undefined>(undefined)
 
-	// Mention popover state
+	// Slash command and mention popover state
+	const [slashOpen, setSlashOpen] = useState(false)
+	const [slashQuery, setSlashQuery] = useState("")
 	const [mentionOpen, setMentionOpen] = useState(false)
 	const [mentionQuery, setMentionQuery] = useState("")
 	const controllerRef = useRef<{ setText: (text: string) => void; getText: () => string } | null>(
 		null,
 	)
+	const slashPopoverRef = useRef<SlashCommandPopoverHandle>(null)
 	const mentionPopoverRef = useRef<MentionPopoverHandle>(null)
 
 	// Project model preferences are a UI fallback for older local state.
@@ -337,34 +352,65 @@ export function NewChat() {
 		[reloadVcs],
 	)
 
-	// Insert a selected mention into the prompt textarea
-	const handleMentionSelect = useCallback((option: MentionOption) => {
-		setMentionOpen(false)
-		const ctrl = controllerRef.current
-		if (!ctrl) return
-		const currentText = ctrl.getText()
-		const textarea = document.querySelector<HTMLTextAreaElement>("textarea[data-prompt-input]")
-		const cursorPos = textarea?.selectionStart ?? currentText.length
-		const mention =
-			option.type === "file" ? createFileMention(option.path) : createAgentMention(option.name)
-		const { text: newText, cursorPosition: newCursor } = insertMentionIntoText(
-			currentText,
-			cursorPos,
-			mention,
-		)
-		ctrl.setText(newText)
-		requestAnimationFrame(() => {
-			const ta = document.querySelector<HTMLTextAreaElement>("textarea[data-prompt-input]")
-			if (ta) {
-				ta.focus()
-				ta.setSelectionRange(newCursor, newCursor)
-			}
-		})
+	const handleSlashClose = useCallback(() => {
+		setSlashOpen(false)
+		setSlashQuery("")
 	}, [])
 
-	// Delegate keyboard events to the mention popover when it's open
+	const handleMentionClose = useCallback(() => {
+		setMentionOpen(false)
+		setMentionQuery("")
+	}, [])
+
+	const handleSlashSelect = useCallback(
+		(command: string) => {
+			handleSlashClose()
+			const ctrl = controllerRef.current
+			if (!ctrl) return
+			ctrl.setText(command)
+			requestAnimationFrame(() => {
+				const ta = document.querySelector<HTMLTextAreaElement>("textarea[data-prompt-input]")
+				if (ta) {
+					ta.focus()
+					ta.setSelectionRange(command.length, command.length)
+				}
+			})
+		},
+		[handleSlashClose],
+	)
+
+	// Insert a selected mention into the prompt textarea
+	const handleMentionSelect = useCallback(
+		(option: MentionOption) => {
+			handleMentionClose()
+			const ctrl = controllerRef.current
+			if (!ctrl) return
+			const currentText = ctrl.getText()
+			const textarea = document.querySelector<HTMLTextAreaElement>("textarea[data-prompt-input]")
+			const cursorPos = textarea?.selectionStart ?? currentText.length
+			const mention =
+				option.type === "file" ? createFileMention(option.path) : createAgentMention(option.name)
+			const { text: newText, cursorPosition: newCursor } = insertMentionIntoText(
+				currentText,
+				cursorPos,
+				mention,
+			)
+			ctrl.setText(newText)
+			requestAnimationFrame(() => {
+				const ta = document.querySelector<HTMLTextAreaElement>("textarea[data-prompt-input]")
+				if (ta) {
+					ta.focus()
+					ta.setSelectionRange(newCursor, newCursor)
+				}
+			})
+		},
+		[handleMentionClose],
+	)
+
+	// Delegate keyboard events to open popovers before the composer handles Enter.
 	const handleTextareaKeyDown = useCallback(
 		(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+			if (slashPopoverRef.current?.handleKeyDown(e)) return
 			if (mentionPopoverRef.current?.handleKeyDown(e)) return
 		},
 		[],
@@ -644,13 +690,25 @@ export function NewChat() {
 					<PromptInputProvider key={draftKey} initialInput={draft}>
 						<DraftSync setDraft={setDraft} />
 						<MentionBridge controllerRef={controllerRef} />
-						<MentionTrigger
+						<TriggerDetector
+							onSlashChange={(open, query) => {
+								setSlashOpen(open)
+								setSlashQuery(query)
+							}}
 							onMentionChange={(open, query) => {
 								setMentionOpen(open)
 								setMentionQuery(query)
 							}}
 						/>
 						<div className="relative">
+							<SlashCommandPopover
+								ref={slashPopoverRef}
+								query={slashQuery}
+								open={slashOpen}
+								enabled={!launching && !!selectedDirectory}
+								onSelect={handleSlashSelect}
+								onClose={handleSlashClose}
+							/>
 							<MentionPopover
 								ref={mentionPopoverRef}
 								query={mentionQuery}
@@ -658,7 +716,7 @@ export function NewChat() {
 								directory={selectedDirectory || null}
 								agents={devoAgents ?? []}
 								onSelect={handleMentionSelect}
-								onClose={() => setMentionOpen(false)}
+								onClose={handleMentionClose}
 							/>
 							<PromptInput
 								className="devo-composer border-border/60 bg-background/95 shadow-none"

@@ -144,7 +144,9 @@ function ComposerTriggerChip({
 					type="button"
 					aria-label={`Remove ${label} trigger`}
 					onClick={onRemove}
-					className="inline-flex size-3.5 shrink-0 items-center justify-center rounded-full bg-muted-foreground/45 text-background transition-colors hover:bg-foreground"
+					// User requirement: reveal the close affordance only while hovering
+					// the trigger chip, with focus reveal preserved for keyboard users.
+					className="pointer-events-none inline-flex size-3.5 shrink-0 items-center justify-center rounded-full bg-muted-foreground/45 text-background opacity-0 transition-[background-color,color,opacity] group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100 hover:bg-foreground"
 				>
 					<XIcon className="size-2.5" />
 				</button>

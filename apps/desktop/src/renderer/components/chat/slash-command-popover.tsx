@@ -16,7 +16,6 @@ import {
 	ListTodoIcon,
 	type LucideIcon,
 	MicroscopeIcon,
-	SearchIcon,
 	SparklesIcon,
 } from "lucide-react"
 import {
@@ -73,11 +72,13 @@ const CLIENT_COMMANDS: SlashCommand[] = [
 		name: "goal",
 		description: "Set a goal from the next message",
 		icon: GoalIcon,
+		insertText: "/goal ",
 	},
 	{
 		name: "plan",
 		description: "Create a plan from the next message",
 		icon: ListTodoIcon,
+		insertText: "/plan ",
 	},
 	{
 		name: "research",
@@ -179,13 +180,7 @@ export const SlashCommandPopover = memo(
 				className="absolute inset-x-0 bottom-full z-50 mb-2 origin-bottom-left overflow-hidden rounded-md border bg-popover shadow-md"
 				onMouseDown={(e) => e.preventDefault()}
 			>
-				{/* Search header */}
-				<div className="flex items-center gap-2 border-b px-3 py-2">
-					<SearchIcon className="size-3.5 shrink-0 text-muted-foreground" />
-					<span className="text-sm text-muted-foreground">Commands</span>
-				</div>
-
-				{/* Results */}
+				{/* User requirement: keep this as a plain command list, without a search/header row. */}
 				<ScrollArea className="max-h-72 overflow-hidden [&>[data-slot=scroll-area-viewport]]:max-h-[inherit]">
 					<div ref={listRef} className="py-1">
 						{flatList.length === 0 && (
