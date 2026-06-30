@@ -28,13 +28,19 @@ describe("MessageResponse markdown surfaces", () => {
 				"transcript Markdown headings should look like bold body text",
 			),
 			headingComponents: messageSource.includes("const transcriptMarkdownComponents"),
+			headingClassWins: messageSource.includes(
+				"className,\n\t\t\t\t\"my-2 border-0 pb-0 text-sm font-semibold leading-6 text-foreground\"",
+			),
 			headingStyle: messageSource.includes(
 				"my-2 border-0 pb-0 text-sm font-semibold leading-6 text-foreground",
 			),
+			decorativeRulesHidden: messageSource.includes("hr: TranscriptMarkdownRule"),
 		}).toEqual({
 			requirementComment: true,
 			headingComponents: true,
+			headingClassWins: true,
 			headingStyle: true,
+			decorativeRulesHidden: true,
 		})
 	})
 })
