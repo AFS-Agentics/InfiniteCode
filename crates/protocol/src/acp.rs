@@ -37,6 +37,7 @@ pub const DEVO_PARENT_MESSAGE_ID_META: &str = "devo/parentMessageId";
 pub const DEVO_ITEM_KIND_META: &str = "devo/itemKind";
 pub const DEVO_RESEARCH_ARTIFACT_TYPE_META: &str = "devo/researchArtifactType";
 pub const DEVO_RESEARCH_ARTIFACT_TITLE_META: &str = "devo/researchArtifactTitle";
+pub const DEVO_TURN_USAGE_META: &str = "devo/turnUsage";
 
 pub type AcpMeta = serde_json::Map<String, serde_json::Value>;
 
@@ -1050,7 +1051,7 @@ mod tests {
     #[test]
     fn usage_update_size_uses_context_window() {
         let session_id = SessionId::new();
-        let event = ServerEvent::TurnUsageUpdated(crate::TurnUsageUpdatedPayload {
+        let payload = crate::TurnUsageUpdatedPayload {
             session_id,
             turn_id: TurnId::new(),
             usage: crate::TurnUsage {
@@ -1067,18 +1068,22 @@ mod tests {
             total_cache_read_tokens: 0,
             last_query_input_tokens: 3,
             context_window: Some(200_000),
-        });
+        };
+        let event = ServerEvent::TurnUsageUpdated(payload.clone());
 
         let (_, value) = acp_notification_from_server_event("turn/usage/updated", &event);
 
         assert_eq!(
-            value["update"],
-            serde_json::json!({
-                "sessionUpdate": "usage_update",
-                "used": 42,
-                "size": 200000
-            })
+            value["update"]["sessionUpdate"],
+            serde_json::json!("usage_update")
         );
+        assert_eq!(value["update"]["used"], serde_json::json!(42));
+        assert_eq!(value["update"]["size"], serde_json::json!(200_000));
+        let actual_payload = serde_json::from_value::<crate::TurnUsageUpdatedPayload>(
+            value["update"]["_meta"][DEVO_TURN_USAGE_META].clone(),
+        )
+        .expect("usage update should preserve Devo turn usage payload");
+        assert_eq!(actual_payload, payload);
     }
 
     #[test]

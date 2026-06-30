@@ -21,6 +21,7 @@ use crate::acp::DEVO_ORIGINAL_EVENT_META;
 use crate::acp::DEVO_ORIGINAL_METHOD_META;
 use crate::acp::DEVO_SESSION_META;
 use crate::acp::DEVO_TURN_ID_META;
+use crate::acp::DEVO_TURN_USAGE_META;
 use crate::acp::devo_extension_method;
 use crate::acp_content::*;
 use crate::acp_session_update::*;
@@ -141,11 +142,16 @@ pub(crate) fn acp_update_from_server_event(event: &ServerEvent) -> Option<AcpSes
         }),
         ServerEvent::TurnUsageUpdated(payload) => {
             let used = (payload.total_input_tokens + payload.total_output_tokens) as u64;
+            let mut meta = AcpMeta::new();
+            meta.insert(
+                DEVO_TURN_USAGE_META.to_string(),
+                serde_json::to_value(payload).expect("serialize turn usage payload"),
+            );
             Some(AcpSessionUpdate::UsageUpdate {
                 used,
                 size: payload.context_window.unwrap_or_else(|| used.max(1)),
                 cost: None,
-                meta: None,
+                meta: Some(meta),
             })
         }
         ServerEvent::ToolCallStatusUpdated(payload) => {
