@@ -82,4 +82,6 @@ nsis:
 
 publish:
   provider: github
+  owner: 7df-lab
+  repo: devo
   releaseType: draft

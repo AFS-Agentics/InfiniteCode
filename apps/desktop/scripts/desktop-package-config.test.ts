@@ -16,4 +16,32 @@ describe("desktop package runtime resources", () => {
 			excludesPublicCliLauncher: true,
 		})
 	})
+
+	test("publishes desktop auto-update metadata to the canonical GitHub repository", () => {
+		const config = readFileSync(join(desktopDir, "electron-builder.yml"), "utf8")
+		const packageJson = JSON.parse(readFileSync(join(desktopDir, "package.json"), "utf8"))
+		const releaseWorkflow = readFileSync(
+			join(desktopDir, "..", "..", ".github", "workflows", "release.yml"),
+			"utf8",
+		)
+		const updaterSource = readFileSync(join(desktopDir, "src", "main", "updater.ts"), "utf8")
+
+		expect({
+			homepage: packageJson.homepage,
+			repositoryUrl: packageJson.repository.url,
+			usesCanonicalOwner: config.includes("owner: 7df-lab"),
+			usesCanonicalRepo: config.includes("repo: devo"),
+			usesCanonicalReleasePage: updaterSource.includes("https://github.com/7df-lab/devo"),
+			publishesBlockmaps: releaseWorkflow.includes("-o -name '*.blockmap'"),
+			publishesChannelMetadata: releaseWorkflow.includes("-o -name '*.yml'"),
+		}).toEqual({
+			homepage: "https://github.com/7df-lab/devo",
+			repositoryUrl: "https://github.com/7df-lab/devo.git",
+			usesCanonicalOwner: true,
+			usesCanonicalRepo: true,
+			usesCanonicalReleasePage: true,
+			publishesBlockmaps: true,
+			publishesChannelMetadata: true,
+		})
+	})
 })
