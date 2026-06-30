@@ -62,6 +62,7 @@ mod session_header;
 
 mod subagent_monitor;
 
+mod subagent_debug;
 mod subagent_live_list;
 
 mod permission_presets;
@@ -482,6 +483,7 @@ impl ChatWidget {
 
         // Keep the bottom pane summary in sync with the assembled widget state.
         widget.sync_bottom_pane_summary();
+        widget.maybe_start_subagent_debug_scenario();
         widget
     }
 }

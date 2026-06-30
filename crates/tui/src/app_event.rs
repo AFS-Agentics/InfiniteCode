@@ -2,10 +2,13 @@
 //!
 use std::path::PathBuf;
 
+use devo_core::ItemId;
 use devo_core::SessionId;
 use devo_protocol::ReferenceSearchSnapshot;
 
 use crate::app_command::AppCommand;
+use crate::events::PlanStep;
+use crate::events::TextItemKind;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ConnectorsSnapshot {
@@ -18,6 +21,49 @@ pub(crate) struct ConnectorInfo {
     pub(crate) name: String,
     pub(crate) description: Option<String>,
     pub(crate) is_enabled: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum SubagentDebugStep {
+    Discover {
+        session_id: SessionId,
+        parent_session_id: SessionId,
+        nickname: String,
+        status: String,
+        last_task_message: Option<String>,
+    },
+    TextDelta {
+        session_id: SessionId,
+        item_id: ItemId,
+        kind: TextItemKind,
+        delta: String,
+    },
+    ToolCall {
+        session_id: SessionId,
+        tool_use_id: String,
+        summary: String,
+    },
+    ToolOutputDelta {
+        session_id: SessionId,
+        tool_use_id: String,
+        delta: String,
+    },
+    ToolResult {
+        session_id: SessionId,
+        tool_use_id: String,
+        title: String,
+        preview: String,
+        is_error: bool,
+    },
+    PlanUpdated {
+        session_id: SessionId,
+        explanation: Option<String>,
+        steps: Vec<PlanStep>,
+    },
+    Finish {
+        session_id: SessionId,
+        status: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -42,6 +88,9 @@ pub(crate) enum AppEvent {
 
     /// Open a read-only transcript overlay for a live direct child agent.
     OpenSubagentOverlay { session_id: SessionId },
+
+    /// Inject one deterministic sub-agent monitor step for TUI debugging.
+    DebugSubagentStep { step: SubagentDebugStep },
 
     #[allow(dead_code)]
     /// Interrupt the current turn or cancel the active UI surface.

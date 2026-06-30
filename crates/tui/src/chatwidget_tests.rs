@@ -5627,7 +5627,21 @@ fn request_user_input_keeps_working_status_indicator_visible() {
         questions: vec![request_user_input_question()],
     });
 
-    let rows = rendered_rows(&widget, 120, 24).join("\n");
+    let rows = rendered_rows(&widget, 120, 24);
+    let live_prefix = " ".repeat(usize::from(LIVE_PREFIX_COLS));
+    assert!(
+        rows.iter()
+            .any(|row| row.starts_with(&format!("{live_prefix}Input requested"))),
+        "request_user_input header should align with live content prefix:\n{}",
+        rows.join("\n")
+    );
+    assert!(
+        rows.iter()
+            .any(|row| row.starts_with(&format!("{live_prefix}Which scope should research use?"))),
+        "request_user_input question should align with live content prefix:\n{}",
+        rows.join("\n")
+    );
+    let rows = rows.join("\n");
     assert!(rows.contains("Working"), "rows:\n{rows}");
     assert!(
         rows.contains("Which scope should research use?"),
@@ -5674,7 +5688,7 @@ fn request_user_input_and_subagent_live_list_are_visible_together() {
 }
 
 #[test]
-fn ctrl_x_focuses_inline_live_list_and_q_exits() {
+fn ctrl_x_focuses_inline_live_list_and_ctrl_x_esc_or_q_exits() {
     let model = Model {
         slug: "test-model".to_string(),
         display_name: "Test Model".to_string(),
@@ -5707,6 +5721,16 @@ fn ctrl_x_focuses_inline_live_list_and_q_exits() {
     widget.handle_key_event(press_key(KeyCode::Down));
     assert_eq!(widget.selected_subagent_for_test(), Some(second));
 
+    widget.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL));
+    assert!(!widget.is_subagent_monitor_open_for_test());
+
+    widget.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL));
+    assert!(widget.is_subagent_monitor_open_for_test());
+    widget.handle_key_event(press_key(KeyCode::Esc));
+    assert!(!widget.is_subagent_monitor_open_for_test());
+
+    widget.handle_key_event(KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL));
+    assert!(widget.is_subagent_monitor_open_for_test());
     widget.handle_key_event(press_key(KeyCode::Char('q')));
     assert!(!widget.is_subagent_monitor_open_for_test());
 }

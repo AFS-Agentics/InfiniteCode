@@ -25,6 +25,7 @@ use crate::app_event_sender::AppEventSender;
 use crate::bottom_pane::CancellationEvent;
 use crate::bottom_pane::bottom_pane_view::BottomPaneView;
 use crate::render::renderable::Renderable;
+use crate::ui_consts::LIVE_PREFIX_COLS;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct QuestionChoice {
@@ -294,17 +295,29 @@ impl BottomPaneView for RequestUserInputOverlay {
 
 impl Renderable for RequestUserInputOverlay {
     fn render(&self, area: Rect, buf: &mut Buffer) {
+        let area = inset_request_user_input_area(area);
         Paragraph::new(self.lines())
             .wrap(Wrap { trim: false })
             .render(area, buf);
     }
 
     fn desired_height(&self, width: u16) -> u16 {
+        let width = width.saturating_sub(LIVE_PREFIX_COLS).max(1);
         Paragraph::new(self.lines())
             .wrap(Wrap { trim: false })
             .line_count(width)
             .try_into()
             .unwrap_or(0)
+    }
+}
+
+fn inset_request_user_input_area(area: Rect) -> Rect {
+    let left = LIVE_PREFIX_COLS.min(area.width);
+    Rect {
+        x: area.x.saturating_add(left),
+        y: area.y,
+        width: area.width.saturating_sub(left),
+        height: area.height,
     }
 }
 

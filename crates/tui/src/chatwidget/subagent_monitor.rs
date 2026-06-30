@@ -175,6 +175,14 @@ impl ChatWidget {
     }
 
     pub(crate) fn on_subagent_discovered(&mut self, agent: SubagentMonitorAgent) {
+        tracing::debug!(
+            target: "devo_tui::subagent",
+            session_id = ?agent.session_id,
+            parent_session_id = ?agent.parent_session_id,
+            nickname = %agent.nickname,
+            status = %agent.status,
+            "subagent discovered by chat widget"
+        );
         self.upsert_subagent(agent);
         self.sync_subagent_hint();
         self.frame_requester.schedule_frame();
@@ -182,6 +190,17 @@ impl ChatWidget {
 
     pub(crate) fn on_subagent_monitor_event(&mut self, event: SubagentMonitorEvent) {
         let session_id = event.session_id();
+        let event_kind = subagent_monitor_event_kind(&event);
+        let old_preview = self
+            .subagent_monitor
+            .sessions
+            .get(&session_id)
+            .map(|view| view.latest_preview.clone());
+        let old_status = self
+            .subagent_monitor
+            .sessions
+            .get(&session_id)
+            .map(|view| view.status.clone());
         let status = {
             let view = self
                 .subagent_monitor
@@ -208,6 +227,25 @@ impl ChatWidget {
         }
 
         self.sync_subagent_hint();
+        let view = self.subagent_monitor.sessions.get(&session_id);
+        let latest_preview = view.map(|view| view.latest_preview.as_str()).unwrap_or("");
+        let has_runtime_update = view.is_some_and(|view| view.has_runtime_update);
+        let transcript_len = view.map(|view| view.transcript.len()).unwrap_or(0);
+        tracing::debug!(
+            target: "devo_tui::subagent",
+            ?session_id,
+            event_kind,
+            old_status = old_status.as_deref().unwrap_or(""),
+            new_status = %status,
+            preview_changed = old_preview.as_deref() != Some(latest_preview),
+            latest_preview,
+            has_runtime_update,
+            transcript_len,
+            live_count = self.live_subagent_ids().len(),
+            selected = ?self.subagent_monitor.selected,
+            focused = self.subagent_monitor.live_list_focused,
+            "subagent monitor event applied"
+        );
         self.frame_requester.schedule_frame();
     }
 
@@ -322,6 +360,15 @@ impl ChatWidget {
             self.ensure_live_subagent_selected();
         }
         self.bottom_pane.set_subagent_hint_visible(has_live);
+        tracing::debug!(
+            target: "devo_tui::subagent",
+            has_live,
+            live_count = self.live_subagent_ids().len(),
+            selected = ?self.subagent_monitor.selected,
+            focused = self.subagent_monitor.live_list_focused,
+            user_selected = self.subagent_monitor.user_selected,
+            "subagent live hint synced"
+        );
     }
 
     fn has_live_subagents(&self) -> bool {
@@ -820,6 +867,23 @@ impl SubagentMonitorEvent {
             | Self::TurnFailed { session_id, .. }
             | Self::SessionStatusChanged { session_id, .. } => *session_id,
         }
+    }
+}
+
+fn subagent_monitor_event_kind(event: &SubagentMonitorEvent) -> &'static str {
+    match event {
+        SubagentMonitorEvent::TurnStarted { .. } => "turn_started",
+        SubagentMonitorEvent::TextItemStarted { .. } => "text_item_started",
+        SubagentMonitorEvent::TextItemDelta { .. } => "text_item_delta",
+        SubagentMonitorEvent::TextItemCompleted { .. } => "text_item_completed",
+        SubagentMonitorEvent::ToolCall { .. } => "tool_call",
+        SubagentMonitorEvent::ToolCallUpdated { .. } => "tool_call_updated",
+        SubagentMonitorEvent::ToolOutputDelta { .. } => "tool_output_delta",
+        SubagentMonitorEvent::ToolResult { .. } => "tool_result",
+        SubagentMonitorEvent::PlanUpdated { .. } => "plan_updated",
+        SubagentMonitorEvent::TurnFinished { .. } => "turn_finished",
+        SubagentMonitorEvent::TurnFailed { .. } => "turn_failed",
+        SubagentMonitorEvent::SessionStatusChanged { .. } => "session_status_changed",
     }
 }
 

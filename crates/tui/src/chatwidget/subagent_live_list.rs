@@ -59,6 +59,21 @@ pub(super) fn render(
 
     let visible_start = visible_window_start(rows, selected);
     let visible_end = rows.len().min(visible_start + MAX_VISIBLE_SUBAGENTS);
+    let visible_rows = rows[visible_start..visible_end]
+        .iter()
+        .map(|row| format!("{}:{}:{}", row.name, row.status, row.preview))
+        .collect::<Vec<_>>()
+        .join(" | ");
+    tracing::debug!(
+        target: "devo_tui::subagent",
+        row_count = rows.len(),
+        visible_start,
+        visible_end,
+        ?selected,
+        focused,
+        visible_rows,
+        "rendering subagent live list"
+    );
     let mut lines = Vec::new();
     for row in &rows[visible_start..visible_end] {
         let is_selected = focused && selected == row.key.session_id();

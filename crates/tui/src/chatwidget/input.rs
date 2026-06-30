@@ -38,6 +38,13 @@ impl ChatWidget {
             return;
         }
         if self.is_subagent_live_list_focused() {
+            if key.code == KeyCode::Char('x') && key.modifiers.contains(KeyModifiers::CONTROL) {
+                self.handle_subagent_live_list_key_event(KeyEvent::new(
+                    KeyCode::Char('q'),
+                    KeyModifiers::NONE,
+                ));
+                return;
+            }
             self.handle_subagent_live_list_key_event(key);
             return;
         }
@@ -227,6 +234,7 @@ impl ChatWidget {
                 self.set_reasoning_effort_selection(value)
             }
             AppEvent::StatusMessageChanged { message } => self.set_status_message(message),
+            AppEvent::DebugSubagentStep { step } => self.apply_subagent_debug_step(step),
             AppEvent::HistoryEntryRequested { .. } => {
                 self.set_status_message("Persistent composer history is not available");
             }

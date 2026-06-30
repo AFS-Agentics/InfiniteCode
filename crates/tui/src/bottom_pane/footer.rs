@@ -85,7 +85,7 @@ pub(crate) struct FooterProps {
     /// instructional hint.
     ///
     /// When both this label and the configured status line are available, they are rendered on the
-    /// same row separated by ` 路 `.
+    /// same row separated by ` · `.
     pub(crate) active_agent_label: Option<String>,
     /// Whether live direct sub-agents can be opened with Ctrl+X.
     pub(crate) subagent_hint_visible: bool,
@@ -631,7 +631,7 @@ pub(crate) fn passive_footer_status_line(props: &FooterProps) -> Option<Line<'st
 
     if let Some(active_agent_label) = props.active_agent_label.as_ref() {
         if let Some(existing) = line.as_mut() {
-            existing.spans.push(" 路 ".into());
+            existing.spans.push(" · ".into());
             existing.spans.push(active_agent_label.clone().into());
         } else {
             line = Some(Line::from(active_agent_label.clone()));
@@ -640,7 +640,7 @@ pub(crate) fn passive_footer_status_line(props: &FooterProps) -> Option<Line<'st
 
     if props.subagent_hint_visible {
         if let Some(existing) = line.as_mut() {
-            existing.spans.push(" 路 ".into());
+            existing.spans.push(" · ".into());
             existing
                 .spans
                 .push(key_hint::ctrl(KeyCode::Char('x')).into());
