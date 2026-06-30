@@ -26,16 +26,16 @@ Question policy:
 
 Using `request_user_input`:
 - Follow the research Language policy for all user-visible tool fields,
-  including question text, option labels, option descriptions, and any
-  free-form prompt.
+  including question text, option labels, and option descriptions.
 - Ask one concise question unless multiple independent answers are truly needed.
 - Offer only meaningful multiple-choice options; do not include filler choices
   that are obviously wrong or irrelevant.
+- Do not provide exactly one multiple-choice option. If there are not at least
+  two meaningful, mutually exclusive options, do not ask a question; continue
+  with a reasonable default and make the assumed scope explicit in the next
+  stage.
 - If one option is the recommended default, put it first and add
   `(Recommended)` at the end of the label.
-- In rare cases where an unavoidable, important clarification cannot be
-  expressed with meaningful multiple-choice options, ask a direct free-form
-  question through the tool.
 - Do not ask whether the user wants research to proceed.
 
 If no clarification is needed, respond with one concise sentence confirming the

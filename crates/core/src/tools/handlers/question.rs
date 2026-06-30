@@ -26,7 +26,7 @@ impl QuestionHandler {
     pub fn new() -> Self {
         let mut spec = ToolSpec::new(
             "request_user_input",
-            "Use this tool when you need to ask the user questions during execution. This allows you to gather user preferences or requirements, clarify ambiguous instructions, get decisions on implementation choices as you work, or offer choices to the user about what direction to take.\n\nUsage notes:\n- Users will always be able to select Other to provide custom text input when the UI supports it.\n- If you recommend a specific option, make that the first option in the list and add \"(Recommended)\" at the end of the label.\n- In Plan Mode, use this tool to clarify requirements or choose between approaches BEFORE finalizing your plan.\n- Do NOT use this tool to ask \"Is my plan ready?\" or \"Should I proceed?\".\n- IMPORTANT: Do not reference \"the plan\" in your questions because the user cannot see the plan in the UI until plan approval is requested through the appropriate Plan Mode flow.",
+            "Use this tool when you need to ask the user questions during execution. This allows you to gather user preferences or requirements, clarify ambiguous instructions, get decisions on implementation choices as you work, or offer choices to the user about what direction to take.\n\nUsage notes:\n- Users will always be able to select Other to provide custom text input when the UI supports it.\n- Only provide `options` when there are at least two meaningful, mutually exclusive choices. Do not provide exactly one option; follow the surrounding task instructions if fewer than two meaningful choices exist.\n- If you recommend a specific option, make that the first option in the list and add \"(Recommended)\" at the end of the label.\n- In Plan Mode, use this tool to clarify requirements or choose between approaches BEFORE finalizing your plan.\n- Do NOT use this tool to ask \"Is my plan ready?\" or \"Should I proceed?\".\n- IMPORTANT: Do not reference \"the plan\" in your questions because the user cannot see the plan in the UI until plan approval is requested through the appropriate Plan Mode flow.",
             JsonSchema::object(
                 std::collections::BTreeMap::from([("questions".to_string(), questions_schema())]),
                 Some(vec!["questions".to_string()]),
@@ -124,7 +124,12 @@ fn questions_schema() -> JsonSchema {
             ),
             (
                 "options".to_string(),
-                JsonSchema::array(option_schema, Some("Mutually exclusive answer options")),
+                JsonSchema::array(
+                    option_schema,
+                    Some(
+                        "Mutually exclusive answer options. Provide this only when there are at least two meaningful choices; do not provide exactly one option.",
+                    ),
+                ),
             ),
         ]),
         Some(vec![
@@ -158,5 +163,35 @@ fn request_user_input_args(
         Err(ToolCallError::InvalidInput(
             "missing 'questions' field".to_string(),
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn question_tool_spec_discourages_single_option_questions() {
+        let handler = QuestionHandler::new();
+        let spec = handler.spec();
+
+        assert!(spec.description.contains("at least two meaningful"));
+        assert!(
+            spec.description
+                .contains("Do not provide exactly one option")
+        );
+        assert!(
+            !spec
+                .description
+                .contains("ask a free-form question instead")
+        );
+
+        let schema = spec.input_schema.to_json_value();
+        let options_description =
+            schema["properties"]["questions"]["items"]["properties"]["options"]["description"]
+                .as_str()
+                .expect("options description");
+        assert!(options_description.contains("at least two meaningful choices"));
+        assert!(options_description.contains("do not provide exactly one option"));
     }
 }
