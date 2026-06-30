@@ -172,6 +172,7 @@ mod research;
 mod research_capture;
 mod research_child_agents;
 mod research_context;
+mod research_events;
 mod research_final_report;
 mod research_formatting;
 mod research_parsing;
