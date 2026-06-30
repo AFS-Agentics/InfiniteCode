@@ -5,6 +5,10 @@ const messageSource = readFileSync(
 	new URL("../../../../packages/ui/src/components/ai-elements/message.tsx", import.meta.url),
 	"utf8",
 )
+const uiStylesSource = readFileSync(
+	new URL("../../../../packages/ui/src/styles/globals.css", import.meta.url),
+	"utf8",
+)
 const rendererCssSource = readFileSync(new URL("../../index.css", import.meta.url), "utf8")
 
 describe("MessageResponse markdown surfaces", () => {
@@ -73,6 +77,30 @@ describe("MessageResponse markdown surfaces", () => {
 			controlsPassedToStreamdown: true,
 			tableCopyNotDisabled: true,
 			tableDownloadNotDisabled: true,
+		})
+	})
+
+	test("includes streamdown sources so code highlighting classes are generated", () => {
+		expect({
+			streamdownSource: uiStylesSource.includes('@source "../../../../node_modules/streamdown/dist/*.js";'),
+			codePluginSource: uiStylesSource.includes(
+				'@source "../../../../node_modules/@streamdown/code/dist/*.js";',
+			),
+			cjkPluginSource: uiStylesSource.includes(
+				'@source "../../../../node_modules/@streamdown/cjk/dist/*.js";',
+			),
+			mathPluginSource: uiStylesSource.includes(
+				'@source "../../../../node_modules/@streamdown/math/dist/*.js";',
+			),
+			mermaidPluginSource: uiStylesSource.includes(
+				'@source "../../../../node_modules/@streamdown/mermaid/dist/*.js";',
+			),
+		}).toEqual({
+			streamdownSource: true,
+			codePluginSource: true,
+			cjkPluginSource: true,
+			mathPluginSource: true,
+			mermaidPluginSource: true,
 		})
 	})
 })
