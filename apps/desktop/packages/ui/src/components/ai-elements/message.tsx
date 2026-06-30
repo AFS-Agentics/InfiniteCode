@@ -292,12 +292,8 @@ function TranscriptMarkdownHeading({
 	)
 }
 
-function TranscriptMarkdownRule() {
-	return null
-}
-
 // Product requirement: transcript Markdown headings should look like bold body text,
-// not oversized section titles, heading divider rules, or decorative rules above headings.
+// not oversized section titles or headings with divider rules.
 const transcriptMarkdownComponents: NonNullable<MessageResponseProps["components"]> = {
 	h1: TranscriptMarkdownHeading,
 	h2: TranscriptMarkdownHeading,
@@ -305,7 +301,6 @@ const transcriptMarkdownComponents: NonNullable<MessageResponseProps["components
 	h4: TranscriptMarkdownHeading,
 	h5: TranscriptMarkdownHeading,
 	h6: TranscriptMarkdownHeading,
-	hr: TranscriptMarkdownRule,
 }
 
 export const MessageResponse = memo(

@@ -34,13 +34,13 @@ describe("MessageResponse markdown surfaces", () => {
 			headingStyle: messageSource.includes(
 				"my-2 border-0 pb-0 text-sm font-semibold leading-6 text-foreground",
 			),
-			decorativeRulesHidden: messageSource.includes("hr: TranscriptMarkdownRule"),
+			markdownRulesStillRender: !messageSource.includes("hr: TranscriptMarkdownRule"),
 		}).toEqual({
 			requirementComment: true,
 			headingComponents: true,
 			headingClassWins: true,
 			headingStyle: true,
-			decorativeRulesHidden: true,
+			markdownRulesStillRender: true,
 		})
 	})
 })
