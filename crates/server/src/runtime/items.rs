@@ -355,7 +355,8 @@ impl ServerRuntime {
         turn_status: Option<TurnStatus>,
         worklog: Option<Worklog>,
     ) {
-        if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
+        let session_arc = self.sessions.lock().await.get(&session_id).cloned();
+        if let Some(session_arc) = session_arc {
             let record = {
                 let mut session = session_arc.lock().await;
                 if let Some(history_item) = history_item_from_turn_item(&turn_item) {
@@ -402,7 +403,8 @@ impl ServerRuntime {
     }
 
     pub(super) async fn allocate_item_sequence(&self, session_id: SessionId) -> u64 {
-        if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
+        let session_arc = self.sessions.lock().await.get(&session_id).cloned();
+        if let Some(session_arc) = session_arc {
             let mut session = session_arc.lock().await;
             let item_seq = session.next_item_seq;
             session.loaded_item_count += 1;

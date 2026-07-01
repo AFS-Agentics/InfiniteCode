@@ -369,13 +369,16 @@ impl ServerRuntime {
     }
 
     async fn apply_parent_usage_snapshot(&self, snapshot: ParentUsageSnapshot) {
-        if let Some(session_arc) = self
+        // Bind the session Arc before locking it so the global `sessions` guard is
+        // released first. Holding `sessions` across the per-session `.await` would
+        // pin the process-wide lock and can deadlock every other request.
+        let session_arc = self
             .sessions
             .lock()
             .await
             .get(&snapshot.session_id)
-            .cloned()
-        {
+            .cloned();
+        if let Some(session_arc) = session_arc {
             let mut session = session_arc.lock().await;
             snapshot.apply_to_session(&mut session);
         }

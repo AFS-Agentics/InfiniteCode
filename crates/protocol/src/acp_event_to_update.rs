@@ -358,12 +358,40 @@ fn acp_plan_entry_from_turn_plan_step(step: &TurnPlanStepPayload) -> AcpPlanEntr
 }
 
 fn tool_title(tool_name: &str, parameters: &serde_json::Value) -> String {
-    parameters
+    if let Some(command) = parameters
         .get("command")
         .or_else(|| parameters.get("cmd"))
         .and_then(serde_json::Value::as_str)
-        .map(str::to_string)
-        .unwrap_or_else(|| tool_name.to_string())
+    {
+        return command.to_string();
+    }
+    if matches!(
+        tool_name,
+        "webfetch" | "web_fetch" | "web-fetch" | "fetch_url" | "fetch-url"
+    ) && let Some(url) = parameters
+        .get("url")
+        .and_then(serde_json::Value::as_str)
+        .filter(|url| !url.is_empty())
+    {
+        return format!("web_fetch: {url}");
+    }
+    if matches!(tool_name, "web_search" | "websearch" | "web-search")
+        && let Some(query) = parameters
+            .get("query")
+            .and_then(serde_json::Value::as_str)
+            .filter(|query| !query.is_empty())
+    {
+        return format!("web_search: {query}");
+    }
+    if tool_name == "spawn_agent"
+        && let Some(message) = parameters
+            .get("message")
+            .and_then(serde_json::Value::as_str)
+            .filter(|message| !message.is_empty())
+    {
+        return format!("spawn_agent: {message}");
+    }
+    tool_name.to_string()
 }
 
 fn tool_kind_from_name(tool_name: &str) -> AcpToolKind {
@@ -371,7 +399,8 @@ fn tool_kind_from_name(tool_name: &str) -> AcpToolKind {
         "read" | "grep" | "glob" | "lsp" => AcpToolKind::Read,
         "apply_patch" | "edit" | "write" => AcpToolKind::Edit,
         "bash" | "shell_command" | "exec_command" => AcpToolKind::Execute,
-        "web_search" | "websearch" | "web_fetch" | "websearch_query" => AcpToolKind::Fetch,
+        "web_search" | "websearch" | "web_fetch" | "webfetch" | "web-fetch" | "fetch_url"
+        | "fetch-url" | "websearch_query" => AcpToolKind::Fetch,
         "agent" => AcpToolKind::Think,
         _ => AcpToolKind::Other,
     }

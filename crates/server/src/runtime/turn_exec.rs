@@ -856,7 +856,8 @@ impl ServerRuntime {
     ) {
         self.capture_turn_workspace_baseline(session_id, turn.turn_id, cwd.clone())
             .await;
-        if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
+        let session_arc = self.sessions.lock().await.get(&session_id).cloned();
+        if let Some(session_arc) = session_arc {
             session_arc.lock().await.turn_approval_cache =
                 crate::execution::ApprovalGrantCache::default();
         }
@@ -1088,7 +1089,8 @@ impl ServerRuntime {
             self.capture_turn_workspace_baseline(session_id, turn.turn_id, cwd)
                 .await;
         }
-        if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
+        let session_arc = self.sessions.lock().await.get(&session_id).cloned();
+        if let Some(session_arc) = session_arc {
             session_arc.lock().await.turn_approval_cache =
                 crate::execution::ApprovalGrantCache::default();
         }
@@ -1149,7 +1151,6 @@ impl ServerRuntime {
             let mut proposed_plan_leading_normal = String::new();
             let mut latest_usage: Option<TurnUsage> = None;
             let mut stop_reason: Option<devo_core::StopReason> = None;
-            let mut usage_base: Option<(usize, usize, usize, usize)> = None;
             while let Some(event) = event_rx.recv().await {
                 let assistant_token_text = query_event_trace_token_preview(&event);
                 if let Some(assistant_token_text) = assistant_token_text.as_deref() {
@@ -1778,52 +1779,7 @@ impl ServerRuntime {
                     QueryEvent::UsageDelta { usage } | QueryEvent::Usage { usage } => {
                         let turn_usage = TurnUsage::from_usage(&usage);
                         latest_usage = Some(turn_usage.clone());
-                        let display_total_tokens = usage.display_total_tokens();
-                        let cache_read_input_tokens = usage.cache_read_input_tokens.unwrap_or(0);
-
-                        let base = if let Some(base) = usage_base {
-                            base
-                        } else {
-                            let base = {
-                                let session = event_session_arc.lock().await;
-                                (
-                                    session.summary.total_input_tokens,
-                                    session.summary.total_output_tokens,
-                                    session.summary.total_tokens,
-                                    session.summary.total_cache_read_tokens,
-                                )
-                            };
-                            usage_base = Some(base);
-                            base
-                        };
-                        let total_input_tokens = base.0 + usage.input_tokens;
-                        let total_output_tokens = base.1 + usage.output_tokens;
-                        let total_tokens = base.2 + display_total_tokens;
-                        let total_cache_read_tokens = base.3 + cache_read_input_tokens;
                         if usage_parent_session_id.is_some() {
-                            {
-                                let mut session = event_session_arc.lock().await;
-                                session.summary.total_input_tokens = total_input_tokens;
-                                session.summary.total_output_tokens = total_output_tokens;
-                                session.summary.total_tokens = total_tokens;
-                                session.summary.total_cache_read_tokens = total_cache_read_tokens;
-                                session.summary.last_query_total_tokens = display_total_tokens;
-                            }
-                            let _ = runtime
-                                .broadcast_event(ServerEvent::TurnUsageUpdated(
-                                    TurnUsageUpdatedPayload {
-                                        session_id,
-                                        turn_id: turn_for_events.turn_id,
-                                        usage: turn_usage.clone(),
-                                        total_input_tokens,
-                                        total_output_tokens,
-                                        total_tokens,
-                                        total_cache_read_tokens,
-                                        last_query_input_tokens: usage.input_tokens,
-                                        context_window: usage_context_window,
-                                    },
-                                ))
-                                .await;
                             let _ = runtime
                                 .publish_subagent_turn_usage(
                                     session_id,
@@ -2096,7 +2052,12 @@ impl ServerRuntime {
             .as_ref()
             .and_then(|summary| summary.latest_usage.clone());
         let terminal_stop_reason = event_summary.and_then(|summary| summary.stop_reason);
-        if usage_parent_session_id.is_none()
+        if usage_parent_session_id.is_some()
+            && let Some(usage) = latest_usage.clone()
+        {
+            self.publish_subagent_turn_usage(session_id, turn.turn_id, usage)
+                .await;
+        } else if usage_parent_session_id.is_none()
             && let Some(snapshot) = self.parent_usage_snapshot(session_id, turn.turn_id).await
         {
             latest_usage = Some(snapshot.turn_usage.to_turn_usage());

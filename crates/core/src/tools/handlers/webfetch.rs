@@ -122,10 +122,44 @@ impl ToolHandler for WebFetchHandler {
             .header(reqwest::header::ACCEPT, accept)
             .header(reqwest::header::ACCEPT_LANGUAGE, "en-US,en;q=0.9");
 
-        let response = timeout(Duration::from_millis(timeout_ms), request.send()).await;
-        let response = match response {
-            Ok(result) => result
-                .map_err(|e| ToolCallError::ExecutionFailed(format!("Request failed: {e}")))?,
+        let fetch_result = timeout(Duration::from_millis(timeout_ms), async {
+            let response = request
+                .send()
+                .await
+                .map_err(|e| ToolCallError::ExecutionFailed(format!("Request failed: {e}")))?;
+            if !response.status().is_success() {
+                let msg = format!("Request failed with status code: {}", response.status());
+                return Err(ToolCallError::ExecutionFailed(msg));
+            }
+            if response
+                .content_length()
+                .is_some_and(|len| len as usize > MAX_RESPONSE_SIZE)
+            {
+                return Err(ToolCallError::ExecutionFailed("response too large".into()));
+            }
+            let content_type = response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|value| value.to_str().ok())
+                .unwrap_or("")
+                .to_string();
+            let bytes = response.bytes().await.map_err(|e| {
+                ToolCallError::ExecutionFailed(format!("Failed to read response: {e}"))
+            })?;
+            Ok((bytes, content_type))
+        })
+        .await;
+
+        let (bytes, content_type) = match fetch_result {
+            Ok(Ok(payload)) => payload,
+            Ok(Err(error)) => {
+                let message = error.to_string();
+                return Ok(ToolResult::error(
+                    ToolResultContent::Text(message.clone()),
+                    "HTTP error",
+                    error,
+                ));
+            }
             Err(_) => {
                 return Ok(ToolResult::error(
                     ToolResultContent::Text("Request timed out".into()),
@@ -135,45 +169,6 @@ impl ToolHandler for WebFetchHandler {
             }
         };
 
-        if !response.status().is_success() {
-            let msg = format!("Request failed with status code: {}", response.status());
-            return Ok(ToolResult::error(
-                ToolResultContent::Text(msg.clone()),
-                "HTTP error",
-                ToolCallError::ExecutionFailed(msg),
-            ));
-        }
-
-        if response
-            .content_length()
-            .is_some_and(|len| len as usize > MAX_RESPONSE_SIZE)
-        {
-            return Ok(ToolResult::error(
-                ToolResultContent::Text("Response too large (exceeds 5MB limit)".into()),
-                "Response too large",
-                ToolCallError::ExecutionFailed("response too large".into()),
-            ));
-        }
-
-        let content_type = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|value| value.to_str().ok())
-            .unwrap_or("")
-            .to_string();
-        let mime = content_type
-            .split(';')
-            .next()
-            .unwrap_or("")
-            .trim()
-            .to_lowercase();
-        let title = format!("{url} ({content_type})");
-
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|e| ToolCallError::ExecutionFailed(format!("Failed to read response: {e}")))?;
-
         if bytes.len() > MAX_RESPONSE_SIZE {
             return Ok(ToolResult::error(
                 ToolResultContent::Text("Response too large (exceeds 5MB limit)".into()),
@@ -181,6 +176,14 @@ impl ToolHandler for WebFetchHandler {
                 ToolCallError::ExecutionFailed("response too large".into()),
             ));
         }
+
+        let mime = content_type
+            .split(';')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_lowercase();
+        let title = format!("{url} ({content_type})");
 
         if is_image_mime(&mime) {
             return Ok(ToolResult::success(

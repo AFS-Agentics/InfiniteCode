@@ -322,20 +322,13 @@ async fn run_stdio(runtime: Arc<ServerRuntime>) -> Result<()> {
             continue;
         }
         let value: serde_json::Value = serde_json::from_str(&line)?;
-        if let Some(response) = runtime
-            .handle_incoming_with_actions(connection_id, value)
-            .await
-            && !send_incoming_response(
-                &runtime,
-                &sender_clone,
-                response,
-                connection_id,
-                "stdio_notifications",
-            )
-            .await
-        {
-            break;
-        }
+        spawn_incoming_message_handler(
+            Arc::clone(&runtime),
+            connection_id,
+            sender_clone.clone(),
+            value,
+            "stdio_notifications",
+        );
     }
 
     runtime.unregister_connection(connection_id).await;
@@ -451,20 +444,13 @@ async fn handle_internal_proxy_connection(
         match frame {
             Message::Text(text) => {
                 let value: serde_json::Value = serde_json::from_str(&text)?;
-                if let Some(response) = runtime
-                    .handle_incoming_with_actions(connection_id, value)
-                    .await
-                    && !send_incoming_response(
-                        &runtime,
-                        &sender_clone,
-                        response,
-                        connection_id,
-                        "internal_proxy_notifications",
-                    )
-                    .await
-                {
-                    break;
-                }
+                spawn_incoming_message_handler(
+                    Arc::clone(&runtime),
+                    connection_id,
+                    sender_clone.clone(),
+                    value,
+                    "internal_proxy_notifications",
+                );
             }
             Message::Close(_) => break,
             _ => {}
@@ -570,20 +556,13 @@ async fn handle_websocket_connection(
         match frame {
             Message::Text(text) => {
                 let value: serde_json::Value = serde_json::from_str(&text)?;
-                if let Some(response) = runtime
-                    .handle_incoming_with_actions(connection_id, value)
-                    .await
-                    && !send_incoming_response(
-                        &runtime,
-                        &sender_clone,
-                        response,
-                        connection_id,
-                        "websocket_notifications",
-                    )
-                    .await
-                {
-                    break;
-                }
+                spawn_incoming_message_handler(
+                    Arc::clone(&runtime),
+                    connection_id,
+                    sender_clone.clone(),
+                    value,
+                    "websocket_notifications",
+                );
             }
             Message::Close(_) => break,
             _ => {}
@@ -594,6 +573,33 @@ async fn handle_websocket_connection(
     tracing::info!(connection_id, "websocket connection closed");
     writer_task.abort();
     Ok(())
+}
+
+/// Dispatch a single decoded client message without blocking the connection's
+/// read loop.
+///
+/// The reader task MUST stay responsive so that it can always deliver
+/// `turn/interrupt` requests and, critically, client responses to
+/// server-initiated requests (approvals, `fs/read_text_file`, user input).
+/// Handling a message inline would let a blocked handler or a backpressured
+/// response send freeze the reader, which deadlocks the whole connection (the
+/// awaited client reply can never be read). Spawning per message keeps the
+/// reader draining while individual handlers make progress concurrently.
+fn spawn_incoming_message_handler(
+    runtime: Arc<ServerRuntime>,
+    connection_id: u64,
+    sender: mpsc::Sender<serde_json::Value>,
+    value: serde_json::Value,
+    queue: &'static str,
+) {
+    tokio::spawn(async move {
+        if let Some(response) = runtime
+            .handle_incoming_with_actions(connection_id, value)
+            .await
+        {
+            send_incoming_response(&runtime, &sender, response, connection_id, queue).await;
+        }
+    });
 }
 
 async fn send_incoming_response(

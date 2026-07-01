@@ -391,14 +391,8 @@ impl ChatWidget {
     }
 
     fn active_text_item_insert_index(&self, kind: TextItemKind) -> usize {
-        match kind {
-            TextItemKind::Reasoning | TextItemKind::ResearchArtifact => self
-                .active_text_items
-                .iter()
-                .position(|item| item.kind == TextItemKind::Assistant)
-                .unwrap_or(self.active_text_items.len()),
-            TextItemKind::Assistant => self.active_text_items.len(),
-        }
+        let _ = kind;
+        self.active_text_items.len()
     }
 
     fn commit_completed_text_items(&mut self) {

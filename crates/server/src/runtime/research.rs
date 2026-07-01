@@ -685,7 +685,8 @@ impl ServerRuntime {
         }))
         .await;
         let response = rx.await?;
-        if let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() {
+        let session_arc = self.sessions.lock().await.get(&session_id).cloned();
+        if let Some(session_arc) = session_arc {
             let mut session = session_arc.lock().await;
             session.summary.status = SessionRuntimeStatus::ActiveTurn;
         }

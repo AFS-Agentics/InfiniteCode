@@ -93,6 +93,8 @@ impl ServerRuntime {
             parent_tool_registry,
             runtime_context,
         ) = parent_snapshot;
+        let parent_usage_turn_id =
+            parent_active_turn_id.or_else(|| parent_latest_turn.as_ref().map(|turn| turn.turn_id));
 
         let nickname = self
             .generate_unique_agent_name(parent_session_id, child_session_id)
@@ -273,7 +275,7 @@ impl ServerRuntime {
             },
         )
         .await;
-        if let Some(parent_turn_id) = parent_active_turn_id {
+        if let Some(parent_turn_id) = parent_usage_turn_id {
             self.record_subagent_status_event(
                 parent_session_id,
                 child_session_id,
@@ -285,7 +287,7 @@ impl ServerRuntime {
         self.register_subagent_usage_owner(
             parent_session_id,
             child_session_id,
-            parent_active_turn_id,
+            parent_usage_turn_id,
         )
         .await;
         if !summary.ephemeral
