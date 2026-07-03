@@ -22,6 +22,7 @@ use devo_protocol::StreamEvent;
 use devo_protocol::Usage;
 use devo_provider::ModelProviderSDK;
 use devo_provider::SingleProviderRouter;
+use devo_server::OutboundFrame;
 use devo_server::AcpSuccessResponse;
 use devo_server::ClientTransportKind;
 use devo_server::ServerRuntime;
@@ -63,7 +64,7 @@ impl ModelProviderSDK for NoopProvider {
 async fn acp_available_commands_are_session_update_after_session_response() -> Result<()> {
     let data_root = TempDir::new()?;
     let runtime = build_runtime(data_root.path())?;
-    let (outgoing_tx, mut outgoing_rx) = mpsc::channel(/*buffer*/ 4096);
+    let (outgoing_tx, mut outgoing_rx) = devo_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, outgoing_tx.clone())
         .await;
@@ -90,7 +91,10 @@ async fn acp_available_commands_are_session_update_after_session_response() -> R
         serde_json::from_value(response_value.clone())?;
     let session_id = response.result.session_id;
     outgoing_tx
-        .send(response_value)
+        .send(OutboundFrame::json_rpc_response(
+            connection_id,
+            response_value,
+        ))
         .await
         .context("enqueue simulated transport response")?;
     runtime

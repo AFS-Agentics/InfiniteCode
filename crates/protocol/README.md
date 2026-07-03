@@ -13,8 +13,14 @@ client-to-server ACP methods are:
 - `session/new`: create a new session for a working directory.
 - `session/list`: list persisted sessions.
 - `session/resume`: load a persisted session.
-- `session/prompt`: submit a prompt to an active session.
+- `session/prompt`: submit a prompt to an active session. The JSON-RPC response
+  returns when the turn completes (`AcpPromptResult.stopReason`). Streaming
+  progress is delivered through `session/update` notifications during the turn.
 - `session/cancel`: cancel the active session turn.
+
+Event-driven clients that need an immediate turn acknowledgement should use the
+Devo extension `_devo/turn/start`, which returns `TurnStartResult::Started`
+promptly and streams turn progress through server notifications.
 
 The current server-to-client ACP notification method is:
 

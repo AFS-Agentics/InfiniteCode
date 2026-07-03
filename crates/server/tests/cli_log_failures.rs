@@ -296,7 +296,7 @@ fn build_runtime(
 async fn initialize_connection(
     runtime: &Arc<devo_server::ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = mpsc::channel(4096);
+    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(devo_server::ClientTransportKind::Stdio, notifications_tx)
         .await;

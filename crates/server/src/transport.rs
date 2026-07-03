@@ -1,6 +1,4 @@
 use std::sync::Arc;
-use std::time::Duration;
-use std::time::Instant;
 
 use anyhow::Context;
 use anyhow::Result;
@@ -16,7 +14,9 @@ use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
 use tokio::net::TcpListener;
+use tokio::sync::Semaphore;
 use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 use tokio::task::JoinSet;
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::tungstenite::Message;
@@ -26,13 +26,96 @@ use crate::AcpErrorCode;
 use crate::ClientTransportKind;
 use crate::ServerRuntime;
 use crate::acp_error_response;
-use crate::runtime::CONNECTION_NOTIFICATION_CHANNEL_CAPACITY;
+use crate::runtime::INBOUND_CONCURRENCY_LIMIT;
 use crate::runtime::IncomingResponse;
+use crate::runtime::OUTBOUND_CHANNEL_CAPACITY;
+use crate::runtime::OutboundFrame;
+use crate::runtime::enqueue_outbound;
+use crate::runtime::log_outbound_frame;
+use crate::runtime::outbound_frame_to_value;
 use crate::singleton::SERVER_CONTROL_SHUTDOWN_METHOD;
 use crate::singleton::SERVER_CONTROL_STATUS_METHOD;
 
-const TRANSPORT_WRITE_CHANNEL_CAPACITY: usize = 4096;
-const TRANSPORT_BACKPRESSURE_LOG_THRESHOLD: Duration = Duration::from_millis(50);
+/// Per-connection transport state shared between the read loop and handler tasks.
+struct ConnectionTransport {
+    outbound_tx: mpsc::Sender<OutboundFrame>,
+    inbound_semaphore: Arc<Semaphore>,
+}
+
+impl ConnectionTransport {
+    fn new() -> (Self, mpsc::Receiver<OutboundFrame>) {
+        let (outbound_tx, outbound_rx) = mpsc::channel(OUTBOUND_CHANNEL_CAPACITY);
+        (
+            Self {
+                outbound_tx,
+                inbound_semaphore: Arc::new(Semaphore::new(INBOUND_CONCURRENCY_LIMIT)),
+            },
+            outbound_rx,
+        )
+    }
+}
+
+enum OutboundSink {
+    Stdio,
+    WebSocket(futures::stream::SplitSink<
+        tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+        Message,
+    >),
+}
+
+async fn write_outbound_frame(
+    sink: &mut OutboundSink,
+    frame: OutboundFrame,
+) -> Result<bool> {
+    let value = outbound_frame_to_value(&frame);
+    log_outbound_frame(&frame, &value);
+    let delivered = frame.delivered;
+    let sent = match sink {
+        OutboundSink::Stdio => {
+            let mut stdout = tokio::io::stdout();
+            let bytes = serde_json::to_vec(&value).expect("serialize stdio outbound frame");
+            stdout.write_all(&bytes).await?;
+            stdout.write_all(b"\n").await?;
+            stdout.flush().await?;
+            true
+        }
+        OutboundSink::WebSocket(writer) => writer
+            .send(Message::Text(
+                serde_json::to_string(&value)
+                    .expect("serialize websocket outbound frame")
+                    .into(),
+            ))
+            .await
+            .is_ok(),
+    };
+    if let Some(delivered) = delivered {
+        let _ = delivered.send(sent);
+    }
+    Ok(sent)
+}
+
+fn spawn_outbound_writer(
+    connection_id: u64,
+    mut rx: mpsc::Receiver<OutboundFrame>,
+    mut sink: OutboundSink,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        while let Some(frame) = rx.recv().await {
+            match write_outbound_frame(&mut sink, frame).await {
+                Ok(true) => {}
+                Ok(false) if matches!(sink, OutboundSink::WebSocket(_)) => {
+                    tracing::debug!(connection_id, "outbound websocket writer closed");
+                    break;
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    tracing::warn!(connection_id, error = %error, "outbound writer failed");
+                    break;
+                }
+            }
+        }
+    })
+}
 
 /// Transport trait per L3-BEH-SERVER-001.
 ///
@@ -279,60 +362,33 @@ async fn run_listener_tasks(
 /// must occupy exactly one line of valid JSON. Pretty-printed or otherwise
 /// multi-line payloads are rejected at the transport layer.
 async fn run_stdio(runtime: Arc<ServerRuntime>) -> Result<()> {
-    // Server → client responses and notifications (TextDelta, TurnStarted, …).
-    let (sender, mut receiver) = mpsc::channel(CONNECTION_NOTIFICATION_CHANNEL_CAPACITY);
-    let sender_clone = sender.clone();
+    let (transport, outbound_rx) = ConnectionTransport::new();
+    let outbound_tx = transport.outbound_tx.clone();
     let connection_id = runtime
-        .register_connection(ClientTransportKind::Stdio, sender)
+        .register_connection(ClientTransportKind::Stdio, transport.outbound_tx)
         .await;
     tracing::info!(connection_id, "stdio connection established");
 
-    // Serialized NDJSON lines awaiting stdout. Bounded capacity applies
-    // backpressure when stdout is slow instead of buffering without limit.
-    let (write_tx, mut write_rx) = mpsc::channel::<Vec<u8>>(TRANSPORT_WRITE_CHANNEL_CAPACITY);
+    let outbound_writer =
+        spawn_outbound_writer(connection_id, outbound_rx, OutboundSink::Stdio);
 
-    // --- Writer task ---
-    // Sole responsibility: read serialized lines from write_rx and write
-    // them to stdout. This is the only task that can block on stdout.
-    let writer_task = tokio::spawn(async move {
-        let mut stdout = tokio::io::stdout();
-        while let Some(line) = write_rx.recv().await {
-            stdout.write_all(&line).await?;
-            stdout.write_all(b"\n").await?;
-            stdout.flush().await?;
-        }
-        Result::<()>::Ok(())
-    });
-
-    // --- Producer task ---
-    // Serializes outbound messages and forwards them to the writer task.
-    let producer_task = tokio::spawn(async move {
-        while let Some(message) = receiver.recv().await {
-            let line = serde_json::to_vec(&message).expect("serialize stdio response");
-            if !send_transport_queue_message(&write_tx, line, connection_id, "stdio_write").await
-            {
-                break;
-            }
-        }
-    });
-
-    // --- Stdin reader (main task) ---
     let stdin = tokio::io::stdin();
     let mut lines = BufReader::new(stdin).lines();
     while let Some(line) = lines.next_line().await? {
         accept_incoming_client_message(
             Arc::clone(&runtime),
             connection_id,
-            sender_clone.clone(),
+            outbound_tx.clone(),
+            Arc::clone(&transport.inbound_semaphore),
             &line,
             "stdio_notifications",
-        );
+        )
+        .await;
     }
 
     runtime.unregister_connection(connection_id).await;
     tracing::info!(connection_id, "stdio connection closed");
-    writer_task.abort();
-    producer_task.abort();
+    outbound_writer.abort();
     Ok(())
 }
 
@@ -399,32 +455,25 @@ async fn handle_internal_proxy_connection(
         }
     };
 
-    let (sender, mut receiver) = mpsc::channel(CONNECTION_NOTIFICATION_CHANNEL_CAPACITY);
-    let sender_clone = sender.clone();
+    let (transport, outbound_rx) = ConnectionTransport::new();
+    let outbound_tx = transport.outbound_tx.clone();
     let connection_id = runtime
-        .register_connection(ClientTransportKind::StdioProxy, sender)
+        .register_connection(ClientTransportKind::StdioProxy, transport.outbound_tx)
         .await;
     tracing::info!(connection_id, "internal stdio proxy connection established");
 
-    let writer_task = tokio::spawn(async move {
-        while let Some(message) = receiver.recv().await {
-            writer
-                .send(Message::Text(
-                    serde_json::to_string(&message)
-                        .expect("serialize internal proxy response")
-                        .into(),
-                ))
-                .await?;
-        }
-        Result::<()>::Ok(())
-    });
+    let outbound_writer = spawn_outbound_writer(
+        connection_id,
+        outbound_rx,
+        OutboundSink::WebSocket(writer),
+    );
 
     if let Some(response) = runtime
         .handle_incoming_with_actions(connection_id, first_value)
         .await
         && !send_incoming_response(
             &runtime,
-            &sender_clone,
+            &outbound_tx,
             response,
             connection_id,
             "internal_proxy_notifications",
@@ -433,7 +482,7 @@ async fn handle_internal_proxy_connection(
     {
         runtime.unregister_connection(connection_id).await;
         tracing::info!(connection_id, "internal stdio proxy connection closed");
-        writer_task.abort();
+        outbound_writer.abort();
         return Ok(());
     }
 
@@ -444,10 +493,12 @@ async fn handle_internal_proxy_connection(
                 accept_incoming_client_message(
                     Arc::clone(&runtime),
                     connection_id,
-                    sender_clone.clone(),
+                    outbound_tx.clone(),
+                    Arc::clone(&transport.inbound_semaphore),
                     text.as_str(),
                     "internal_proxy_notifications",
-                );
+                )
+                .await;
             }
             Message::Close(_) => break,
             _ => {}
@@ -456,7 +507,7 @@ async fn handle_internal_proxy_connection(
 
     runtime.unregister_connection(connection_id).await;
     tracing::info!(connection_id, "internal stdio proxy connection closed");
-    writer_task.abort();
+    outbound_writer.abort();
     Ok(())
 }
 
@@ -527,26 +578,19 @@ async fn handle_websocket_connection(
     stream: tokio::net::TcpStream,
 ) -> Result<()> {
     let websocket = accept_async(stream).await?;
-    let (mut writer, mut reader) = websocket.split();
-    let (sender, mut receiver) = mpsc::channel(CONNECTION_NOTIFICATION_CHANNEL_CAPACITY);
-    let sender_clone = sender.clone();
+    let (writer, mut reader) = websocket.split();
+    let (transport, outbound_rx) = ConnectionTransport::new();
+    let outbound_tx = transport.outbound_tx.clone();
     let connection_id = runtime
-        .register_connection(ClientTransportKind::WebSocket, sender)
+        .register_connection(ClientTransportKind::WebSocket, transport.outbound_tx)
         .await;
     tracing::info!(connection_id, "websocket connection established");
 
-    let writer_task = tokio::spawn(async move {
-        while let Some(message) = receiver.recv().await {
-            writer
-                .send(Message::Text(
-                    serde_json::to_string(&message)
-                        .expect("serialize websocket response")
-                        .into(),
-                ))
-                .await?;
-        }
-        Result::<()>::Ok(())
-    });
+    let outbound_writer = spawn_outbound_writer(
+        connection_id,
+        outbound_rx,
+        OutboundSink::WebSocket(writer),
+    );
 
     while let Some(frame) = reader.next().await {
         let frame = frame?;
@@ -555,10 +599,12 @@ async fn handle_websocket_connection(
                 accept_incoming_client_message(
                     Arc::clone(&runtime),
                     connection_id,
-                    sender_clone.clone(),
+                    outbound_tx.clone(),
+                    Arc::clone(&transport.inbound_semaphore),
                     text.as_str(),
                     "websocket_notifications",
-                );
+                )
+                .await;
             }
             Message::Close(_) => break,
             _ => {}
@@ -567,7 +613,7 @@ async fn handle_websocket_connection(
 
     runtime.unregister_connection(connection_id).await;
     tracing::info!(connection_id, "websocket connection closed");
-    writer_task.abort();
+    outbound_writer.abort();
     Ok(())
 }
 
@@ -694,12 +740,24 @@ fn validate_incoming_client_message(
     ))
 }
 
+/// Returns `true` when the payload is a client response to a server-initiated
+/// JSON-RPC request.
+fn is_client_response_message(value: &serde_json::Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    !object.contains_key("method")
+        && object.contains_key("id")
+        && (object.contains_key("result") || object.contains_key("error"))
+}
+
 /// Parses, validates, and dispatches one inbound client payload without blocking
-/// the transport read loop.
-fn accept_incoming_client_message(
+/// the transport read loop on handler work.
+async fn accept_incoming_client_message(
     runtime: Arc<ServerRuntime>,
     connection_id: u64,
-    sender: mpsc::Sender<serde_json::Value>,
+    outbound_tx: mpsc::Sender<OutboundFrame>,
+    inbound_semaphore: Arc<Semaphore>,
     raw_payload: &str,
     queue: &'static str,
 ) {
@@ -710,110 +768,71 @@ fn accept_incoming_client_message(
         Ok(value) => value,
         Err(error_response) => {
             tracing::warn!(connection_id, "rejected malformed client payload");
+            let outbound_tx = outbound_tx.clone();
             tokio::spawn(async move {
-                send_transport_queue_message(&sender, error_response, connection_id, queue).await;
+                enqueue_outbound(
+                    &outbound_tx,
+                    OutboundFrame::json_rpc_response(connection_id, error_response),
+                    queue,
+                )
+                .await;
             });
             return;
         }
     };
     if let Err(error_response) = validate_incoming_client_message(&value) {
         tracing::warn!(connection_id, "rejected invalid client message");
+        let outbound_tx = outbound_tx.clone();
         tokio::spawn(async move {
-            send_transport_queue_message(&sender, error_response, connection_id, queue).await;
+            enqueue_outbound(
+                &outbound_tx,
+                OutboundFrame::json_rpc_response(connection_id, error_response),
+                queue,
+            )
+            .await;
         });
         return;
     }
-    spawn_incoming_message_handler(runtime, connection_id, sender, value, queue);
-}
-
-/// Dispatch a single decoded client message without blocking the connection's
-/// read loop.
-///
-/// The reader task MUST stay responsive so that it can always deliver
-/// `turn/interrupt` requests and, critically, client responses to
-/// server-initiated requests (approvals, `fs/read_text_file`, user input).
-/// Handling a message inline would let a blocked handler or a backpressured
-/// response send freeze the reader, which deadlocks the whole connection (the
-/// awaited client reply can never be read). Spawning per message keeps the
-/// reader draining while individual handlers make progress concurrently.
-fn spawn_incoming_message_handler(
-    runtime: Arc<ServerRuntime>,
-    connection_id: u64,
-    sender: mpsc::Sender<serde_json::Value>,
-    value: serde_json::Value,
-    queue: &'static str,
-) {
+    if is_client_response_message(&value) {
+        tokio::spawn(async move {
+            runtime.resolve_client_response(connection_id, value).await;
+        });
+        return;
+    }
+    let Ok(permit) = inbound_semaphore.acquire_owned().await else {
+        return;
+    };
     tokio::spawn(async move {
+        let _permit = permit;
         if let Some(response) = runtime
             .handle_incoming_with_actions(connection_id, value)
             .await
         {
-            send_incoming_response(&runtime, &sender, response, connection_id, queue).await;
+            send_incoming_response(&runtime, &outbound_tx, response, connection_id, queue).await;
         }
     });
 }
 
 async fn send_incoming_response(
     runtime: &Arc<ServerRuntime>,
-    sender: &mpsc::Sender<serde_json::Value>,
+    outbound_tx: &mpsc::Sender<OutboundFrame>,
     response: IncomingResponse,
     connection_id: u64,
     queue: &'static str,
 ) -> bool {
     let (response, post_response_actions) = response.into_parts();
-    if !send_transport_queue_message(sender, response, connection_id, queue).await {
+    if !enqueue_outbound(
+        outbound_tx,
+        OutboundFrame::json_rpc_response(connection_id, response),
+        queue,
+    )
+    .await
+    {
         return false;
     }
     runtime
         .run_post_response_actions(post_response_actions)
         .await;
-    true
-}
-
-async fn send_transport_queue_message<T>(
-    sender: &mpsc::Sender<T>,
-    value: T,
-    connection_id: u64,
-    queue: &'static str,
-) -> bool {
-    let reserve_started_at = Instant::now();
-    let permit =
-        match tokio::time::timeout(TRANSPORT_BACKPRESSURE_LOG_THRESHOLD, sender.reserve()).await {
-            Ok(Ok(permit)) => permit,
-            Ok(Err(_)) => {
-                tracing::debug!(connection_id, queue, "transport queue receiver dropped");
-                return false;
-            }
-            Err(_) => {
-                tracing::warn!(
-                    connection_id,
-                    queue,
-                    threshold_ms = TRANSPORT_BACKPRESSURE_LOG_THRESHOLD.as_millis(),
-                    "transport queue applying backpressure"
-                );
-                match sender.reserve().await {
-                    Ok(permit) => permit,
-                    Err(_) => {
-                        tracing::debug!(
-                            connection_id,
-                            queue,
-                            "transport queue receiver dropped during backpressure"
-                        );
-                        return false;
-                    }
-                }
-            }
-        };
-    let waited = reserve_started_at.elapsed();
-    if waited >= TRANSPORT_BACKPRESSURE_LOG_THRESHOLD {
-        tracing::debug!(
-            connection_id,
-            queue,
-            waited_ms = waited.as_millis(),
-            "transport queue accepted message after backpressure"
-        );
-    }
-    permit.send(value);
     true
 }
 
@@ -826,6 +845,7 @@ mod tests {
     use super::ListenTarget;
     use super::internal_proxy_control_response;
     use super::parse_internal_proxy_control_request;
+    use super::is_client_response_message;
     use super::parse_incoming_client_payload;
     use super::parse_listen_target;
     use super::resolve_listen_targets;
@@ -922,6 +942,55 @@ mod tests {
                 },
             })
         );
+    }
+
+    #[test]
+    fn is_client_response_message_detects_server_reply_payloads() {
+        assert!(is_client_response_message(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": { "ok": true },
+        })));
+        assert!(!is_client_response_message(&serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {},
+        })));
+    }
+
+    #[tokio::test]
+    async fn enqueue_outbound_backpressures_full_receiver() {
+        use crate::runtime::OutboundFrame;
+        use crate::runtime::enqueue_outbound;
+        use std::time::Duration;
+
+        let (tx, mut rx) = mpsc::channel(1);
+        assert!(
+            enqueue_outbound(
+                &tx,
+                OutboundFrame::json_rpc_response(1, serde_json::json!({ "first": true })),
+                "test_outbound",
+            )
+            .await
+        );
+        let tx_for_task = tx.clone();
+        let mut blocked_enqueue = tokio::spawn(async move {
+            enqueue_outbound(
+                &tx_for_task,
+                OutboundFrame::json_rpc_response(1, serde_json::json!({ "second": true })),
+                "test_outbound",
+            )
+            .await
+        });
+        assert!(
+            tokio::time::timeout(Duration::from_millis(20), &mut blocked_enqueue)
+                .await
+                .is_err()
+        );
+        rx.recv().await.expect("first frame");
+        assert!(blocked_enqueue.await.expect("blocked enqueue"));
+        rx.recv().await.expect("second frame");
     }
 
     #[test]

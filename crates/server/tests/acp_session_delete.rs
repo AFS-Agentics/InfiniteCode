@@ -141,7 +141,7 @@ async fn acp_session_delete_removes_session_from_history_and_is_idempotent() -> 
             )?)),
         ),
     );
-    let (notifications_tx, _notifications_rx) = mpsc::channel(/*buffer*/ 4096);
+    let (notifications_tx, _notifications_rx) = devo_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -431,7 +431,7 @@ fn build_runtime_with_provider(
 async fn initialize_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = mpsc::channel(/*buffer*/ 4096);
+    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;

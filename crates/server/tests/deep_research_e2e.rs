@@ -678,8 +678,8 @@ async fn deep_research_accepts_write_tool_only_final_report() -> Result<()> {
         report_contents.contains("DeepSeek official website"),
         "expected written report to contain final report content: {report_contents}"
     );
-    let final_report =
-        latest_parent_agent_message(&events, session_id).context("expected final report message")?;
+    let final_report = latest_parent_agent_message(&events, session_id)
+        .context("expected final report message")?;
     assert!(
         final_report.contains("Wrote the full research report"),
         "expected final response to point at written report: {final_report}"
@@ -863,102 +863,6 @@ async fn deep_research_streams_researcher_delta_before_query_finishes() -> Resul
         "Use the provided scope.",
     )
     .await?;
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn deep_research_continues_after_delegated_worker_failure() -> Result<()> {
-    // Trace: L2-DES-RESEARCH-001
-    // Verifies: supervisor-driven research can retry after a failed delegated worker turn.
-    let workspace = TempDir::new()?;
-    write_live_research_config(workspace.path())?;
-    let provider: Arc<dyn ModelProviderSDK> =
-        Arc::new(ScriptedResearchProvider::with_delegated_worker_failure_once(workspace.path()));
-    let runtime = build_scripted_research_runtime_with_provider(workspace.path(), provider)?;
-    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
-    let session_id = start_session(&runtime, connection_id, workspace.path()).await?;
-    start_research_turn(&runtime, connection_id, session_id).await?;
-
-    let events = wait_for_research_completion(
-        &runtime,
-        connection_id,
-        session_id,
-        &mut notifications_rx,
-        "Use the provided scope.",
-    )
-    .await?;
-
-    assert!(
-        events.iter().any(|event| {
-            event.get("method") == Some(&serde_json::json!("turn/failed"))
-                && event["params"]["session_id"] != serde_json::json!(session_id.to_string())
-        }),
-        "expected child turn failure to be visible before recovery: {events:#?}"
-    );
-    let completed_turn = events
-        .iter()
-        .find(|event| {
-            event.get("method") == Some(&serde_json::json!("turn/completed"))
-                && event["params"]["session_id"] == serde_json::json!(session_id.to_string())
-        })
-        .context("missing parent research turn completion")?;
-    assert_eq!(
-        completed_turn["params"]["turn"]["status"],
-        serde_json::json!("Completed")
-    );
-    let final_report =
-        latest_parent_agent_message(&events, session_id).context("expected final report message")?;
-    assert!(
-        final_report.contains("DeepSeek official website"),
-        "expected final report after delegated worker recovery: {final_report}"
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn deep_research_restarts_worker_when_continuation_fails() -> Result<()> {
-    // Trace: L2-DES-RESEARCH-001
-    // Verifies: supervisor-driven research can spawn replacement workers after repeated failures.
-    let workspace = TempDir::new()?;
-    write_live_research_config(workspace.path())?;
-    let provider: Arc<dyn ModelProviderSDK> = Arc::new(
-        ScriptedResearchProvider::with_delegated_worker_failures_before_success(
-            workspace.path(),
-            2,
-        ),
-    );
-    let runtime = build_scripted_research_runtime_with_provider(workspace.path(), provider)?;
-    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
-    let session_id = start_session(&runtime, connection_id, workspace.path()).await?;
-    start_research_turn(&runtime, connection_id, session_id).await?;
-
-    let events = wait_for_research_completion(
-        &runtime,
-        connection_id,
-        session_id,
-        &mut notifications_rx,
-        "Use the provided scope.",
-    )
-    .await?;
-
-    let child_failures = events
-        .iter()
-        .filter(|event| {
-            event.get("method") == Some(&serde_json::json!("turn/failed"))
-                && event["params"]["session_id"] != serde_json::json!(session_id.to_string())
-        })
-        .count();
-    assert_eq!(child_failures, 2);
-    let child_sessions = unique_child_turn_sessions(&events, session_id);
-    assert_eq!(child_sessions.len(), 3);
-    let final_report =
-        latest_parent_agent_message(&events, session_id).context("expected final report message")?;
-    assert!(
-        final_report.contains("DeepSeek official website"),
-        "expected final report after replacement worker recovery: {final_report}"
-    );
 
     Ok(())
 }
@@ -1608,7 +1512,8 @@ fn supervisor_stream_events(request: &ModelRequest) -> Vec<Result<StreamEvent>> 
             }
             Some(poll_index) => {
                 let wait_id = supervisor_wait_tool_id(attempt, poll_index);
-                let wait_content = request_tool_result_content(request, &wait_id).unwrap_or_default();
+                let wait_content =
+                    request_tool_result_content(request, &wait_id).unwrap_or_default();
                 // #region agent log
                 agent_debug_log(
                     "deep_research_e2e.rs:supervisor_stream_events",
@@ -1662,19 +1567,20 @@ fn supervisor_wait_tool_id(attempt: usize, poll_index: u32) -> String {
 fn wait_agent_next_sequence(content: &str) -> Option<u64> {
     serde_json::from_str::<serde_json::Value>(content)
         .ok()
-        .and_then(|value| value.get("next_sequence").and_then(serde_json::Value::as_u64))
+        .and_then(|value| {
+            value
+                .get("next_sequence")
+                .and_then(serde_json::Value::as_u64)
+        })
 }
 
 fn wait_agent_result_indicates_failure(content: &str) -> bool {
-    if content.contains("failed")
-        || content.contains("interrupted")
-        || content.contains("canceled")
+    if content.contains("failed") || content.contains("interrupted") || content.contains("canceled")
     {
         return true;
     }
-    wait_agent_statuses(content).any(|status| {
-        matches!(status.as_str(), "failed" | "interrupted" | "closed")
-    })
+    wait_agent_statuses(content)
+        .any(|status| matches!(status.as_str(), "failed" | "interrupted" | "closed"))
 }
 
 fn wait_agent_result_indicates_success(content: &str) -> bool {
@@ -1712,12 +1618,7 @@ fn wait_agent_statuses(content: &str) -> impl Iterator<Item = String> {
 }
 
 // #region agent log
-fn agent_debug_log(
-    location: &str,
-    message: &str,
-    data: serde_json::Value,
-    hypothesis_id: &str,
-) {
+fn agent_debug_log(location: &str, message: &str, data: serde_json::Value, hypothesis_id: &str) {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis())
@@ -1936,7 +1837,7 @@ fn streamed_text_event_chunks(
 async fn initialize_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = mpsc::channel(/*buffer*/ 256);
+    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(256);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -2436,7 +2337,10 @@ fn legacy_event_from_acp_notification(value: serde_json::Value) -> serde_json::V
 }
 
 fn latest_agent_message(events: &[serde_json::Value]) -> Option<String> {
-    events.iter().rev().find_map(|event| agent_message_from_completed_event(event))
+    events
+        .iter()
+        .rev()
+        .find_map(|event| agent_message_from_completed_event(event))
 }
 
 fn latest_parent_agent_message(

@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::time::Duration;
-use std::time::Instant;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
@@ -25,75 +24,10 @@ use crate::acp_auth_required_response;
 use crate::acp_notification_from_server_event;
 use crate::devo_extension_inner_method;
 
-pub(crate) const CONNECTION_NOTIFICATION_CHANNEL_CAPACITY: usize = 4096;
+use super::outbound::OutboundFrame;
+use super::outbound::enqueue_outbound;
 
-const CONNECTION_NOTIFICATION_BACKPRESSURE_LOG_THRESHOLD: Duration = Duration::from_millis(50);
-
-struct PendingConnectionNotification {
-    connection_id: u64,
-    kind: PendingConnectionMessageKind,
-    method: String,
-    event_seq: u64,
-    sender: mpsc::Sender<serde_json::Value>,
-    value: serde_json::Value,
-}
-
-struct QueuedConnectionNotification {
-    notification: PendingConnectionNotification,
-    delivered: Option<oneshot::Sender<bool>>,
-}
-
-fn spawn_connection_notification_writer(
-    mut queue_rx: mpsc::UnboundedReceiver<QueuedConnectionNotification>,
-) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        while let Some(queued) = queue_rx.recv().await {
-            let sent = send_connection_notification(queued.notification).await;
-            if let Some(delivered) = queued.delivered {
-                let _ = delivered.send(sent);
-            }
-        }
-    })
-}
-
-fn enqueue_connection_notification(
-    queue_tx: &mpsc::UnboundedSender<QueuedConnectionNotification>,
-    notification: PendingConnectionNotification,
-) -> bool {
-    queue_tx
-        .send(QueuedConnectionNotification {
-            notification,
-            delivered: None,
-        })
-        .is_ok()
-}
-
-async fn enqueue_connection_notification_and_wait_for_delivery(
-    queue_tx: &mpsc::UnboundedSender<QueuedConnectionNotification>,
-    notification: PendingConnectionNotification,
-) -> bool {
-    let (delivered_tx, delivered_rx) = oneshot::channel();
-    if queue_tx
-        .send(QueuedConnectionNotification {
-            notification,
-            delivered: Some(delivered_tx),
-        })
-        .is_err()
-    {
-        return false;
-    }
-    match delivered_rx.await {
-        Ok(sent) => sent,
-        Err(_) => false,
-    }
-}
-
-#[derive(Clone, Copy)]
-enum PendingConnectionMessageKind {
-    Notification,
-    JsonRpcResponse,
-    ClientRequest,
-}
+pub(crate) const INBOUND_CONCURRENCY_LIMIT: usize = 64;
 
 #[derive(Debug)]
 pub struct IncomingResponse {
@@ -195,12 +129,9 @@ impl ServerRuntime {
     pub async fn register_connection(
         self: &Arc<Self>,
         transport: ClientTransportKind,
-        sender: mpsc::Sender<serde_json::Value>,
+        outbound_tx: mpsc::Sender<OutboundFrame>,
     ) -> u64 {
         let connection_id = self.next_connection_id.fetch_add(1, Ordering::SeqCst);
-        let (notification_queue_tx, notification_queue_rx) = mpsc::unbounded_channel();
-        let _notification_writer =
-            spawn_connection_notification_writer(notification_queue_rx);
         let mut connections = self.connections.lock().await;
         connections.insert(
             connection_id,
@@ -209,8 +140,7 @@ impl ServerRuntime {
                 state: ConnectionState::Connected,
                 acp_authenticated: false,
                 acp_client_capabilities: crate::AcpClientCapabilities::default(),
-                sender,
-                notification_queue_tx,
+                outbound_tx,
                 opt_out_notification_methods: HashSet::new(),
                 subscriptions: Vec::new(),
                 next_event_seq: 1,
@@ -660,6 +590,15 @@ impl ServerRuntime {
             .is_some_and(|connection| connection.state == ConnectionState::Ready)
     }
 
+    pub async fn resolve_client_response(
+        self: &Arc<Self>,
+        connection_id: u64,
+        message: serde_json::Value,
+    ) {
+        self.resolve_pending_client_response(connection_id, message)
+            .await;
+    }
+
     pub(super) async fn emit_to_connection(
         &self,
         connection_id: u64,
@@ -680,19 +619,12 @@ impl ServerRuntime {
             let event = event.with_seq(event_seq);
             let (method, value) = acp_notification_from_server_event(method, &event);
             Some((
-                connection.notification_queue_tx.clone(),
-                PendingConnectionNotification {
-                    connection_id,
-                    kind: PendingConnectionMessageKind::Notification,
-                    method,
-                    event_seq,
-                    sender: connection.sender.clone(),
-                    value,
-                },
+                connection.outbound_tx.clone(),
+                OutboundFrame::notification(connection_id, method, event_seq, value),
             ))
         };
-        if let Some((queue_tx, notification)) = notification {
-            enqueue_connection_notification(&queue_tx, notification);
+        if let Some((outbound_tx, frame)) = notification {
+            let _ = enqueue_outbound(&outbound_tx, frame, "connection_notifications").await;
         }
     }
 
@@ -726,21 +658,14 @@ impl ServerRuntime {
                     let event = event.clone().with_seq(event_seq);
                     let (method, value) = acp_notification_from_server_event(method, &event);
                     Some((
-                        connection.notification_queue_tx.clone(),
-                        PendingConnectionNotification {
-                            connection_id: *connection_id,
-                            kind: PendingConnectionMessageKind::Notification,
-                            method,
-                            event_seq,
-                            sender: connection.sender.clone(),
-                            value,
-                        },
+                        connection.outbound_tx.clone(),
+                        OutboundFrame::notification(*connection_id, method, event_seq, value),
                     ))
                 })
                 .collect::<Vec<_>>()
         };
-        for (queue_tx, notification) in notifications {
-            enqueue_connection_notification(&queue_tx, notification);
+        for (outbound_tx, frame) in notifications {
+            let _ = enqueue_outbound(&outbound_tx, frame, "connection_notifications").await;
         }
     }
 
@@ -765,24 +690,29 @@ impl ServerRuntime {
         connection_id: u64,
         value: serde_json::Value,
     ) {
-        let (queue_tx, notification) = {
+        let (outbound_tx, frame) = {
             let connections = self.connections.lock().await;
             let Some(connection) = connections.get(&connection_id) else {
                 return;
             };
+            let (delivered_tx, delivered_rx) = oneshot::channel();
             (
-                connection.notification_queue_tx.clone(),
-                PendingConnectionNotification {
-                    connection_id,
-                    kind: PendingConnectionMessageKind::JsonRpcResponse,
-                    method: "<response>".to_string(),
-                    event_seq: 0,
-                    sender: connection.sender.clone(),
-                    value,
-                },
+                connection.outbound_tx.clone(),
+                (
+                    OutboundFrame::json_rpc_response_with_delivery(
+                        connection_id,
+                        value,
+                        delivered_tx,
+                    ),
+                    delivered_rx,
+                ),
             )
         };
-        let _ = enqueue_connection_notification_and_wait_for_delivery(&queue_tx, notification).await;
+        let (frame, delivered_rx) = frame;
+        if !enqueue_outbound(&outbound_tx, frame, "connection_responses").await {
+            return;
+        }
+        let _ = delivered_rx.await;
     }
 
     pub(super) async fn send_request_to_connection_cancellable(
@@ -828,7 +758,7 @@ impl ServerRuntime {
         timeout_duration: Option<Duration>,
         cancel_token: CancellationToken,
     ) -> Result<serde_json::Value, String> {
-        let (request_id, receiver, queue_tx, notification) = {
+        let (request_id, receiver, outbound_tx, frame) = {
             let mut connections = self.connections.lock().await;
             let Some(connection) = connections.get_mut(&connection_id) else {
                 return Err("client connection does not exist".to_string());
@@ -846,15 +776,12 @@ impl ServerRuntime {
             (
                 request_id,
                 rx,
-                connection.notification_queue_tx.clone(),
-                PendingConnectionNotification {
+                connection.outbound_tx.clone(),
+                OutboundFrame::client_request(
                     connection_id,
-                    kind: PendingConnectionMessageKind::ClientRequest,
-                    method: method.to_string(),
-                    event_seq: 0,
-                    sender: connection.sender.clone(),
+                    method.to_string(),
                     value,
-                },
+                ),
             )
         };
         let mut pending_request = PendingClientRequestGuard::new(
@@ -862,7 +789,7 @@ impl ServerRuntime {
             connection_id,
             request_id,
         );
-        if !enqueue_connection_notification(&queue_tx, notification) {
+        if !enqueue_outbound(&outbound_tx, frame, "connection_requests").await {
             pending_request.remove().await;
             return Err("client connection closed before request was sent".to_string());
         }
@@ -1116,8 +1043,7 @@ pub(crate) struct ConnectionRuntime {
     pub(crate) state: ConnectionState,
     pub(crate) acp_authenticated: bool,
     pub(crate) acp_client_capabilities: crate::AcpClientCapabilities,
-    pub(crate) sender: mpsc::Sender<serde_json::Value>,
-    notification_queue_tx: mpsc::UnboundedSender<QueuedConnectionNotification>,
+    pub(crate) outbound_tx: mpsc::Sender<OutboundFrame>,
     pub(crate) opt_out_notification_methods: HashSet<String>,
     pub(crate) subscriptions: Vec<SubscriptionFilter>,
     next_event_seq: u64,
@@ -1175,171 +1101,6 @@ impl SubscriptionFilter {
             && session_id.and_then(|session_id| child_parent_by_session.get(&session_id).copied())
                 == Some(expected)
     }
-}
-
-async fn send_connection_notification(notification: PendingConnectionNotification) -> bool {
-    let PendingConnectionNotification {
-        connection_id,
-        kind,
-        method,
-        event_seq,
-        sender,
-        value,
-    } = notification;
-    let notification = match kind {
-        PendingConnectionMessageKind::Notification => {
-            serde_json::to_value(crate::NotificationEnvelope {
-                method: method.clone(),
-                params: value,
-            })
-            .expect("serialize client notification envelope")
-        }
-        PendingConnectionMessageKind::JsonRpcResponse
-        | PendingConnectionMessageKind::ClientRequest => value,
-    };
-    let item_id = notification_item_id(&notification);
-    let assistant_delta = notification_assistant_delta(&method, &notification);
-    let delta_len = assistant_delta.map(str::len);
-    let assistant_token_text = assistant_delta.and_then(assistant_token_log_preview);
-    if let Some(assistant_token_text) = assistant_token_text.as_deref() {
-        tracing::debug!(
-            stream_elapsed_ms = stream_trace_elapsed_ms(),
-            connection_id,
-            method = %method,
-            event_seq,
-            item_id = ?item_id,
-            delta_len = ?delta_len,
-            assistant_token_text,
-            "sending client notification"
-        );
-    } else {
-        tracing::debug!(
-            stream_elapsed_ms = stream_trace_elapsed_ms(),
-            connection_id,
-            method = %method,
-            event_seq,
-            item_id = ?item_id,
-            delta_len = ?delta_len,
-            "sending client notification"
-        );
-    }
-    let reserve_started_at = Instant::now();
-    let permit = match tokio::time::timeout(
-        CONNECTION_NOTIFICATION_BACKPRESSURE_LOG_THRESHOLD,
-        sender.reserve(),
-    )
-    .await
-    {
-        Ok(Ok(permit)) => permit,
-        Ok(Err(_)) => {
-            tracing::debug!(
-                connection_id,
-                method = %method,
-                event_seq,
-                "client notification receiver dropped"
-            );
-            return false;
-        }
-        Err(_) => {
-            tracing::warn!(
-                connection_id,
-                method = %method,
-                event_seq,
-                threshold_ms = CONNECTION_NOTIFICATION_BACKPRESSURE_LOG_THRESHOLD.as_millis(),
-                "client notification queue applying backpressure"
-            );
-            match sender.reserve().await {
-                Ok(permit) => permit,
-                Err(_) => {
-                    tracing::debug!(
-                        connection_id,
-                        method = %method,
-                        event_seq,
-                        "client notification receiver dropped during backpressure"
-                    );
-                    return false;
-                }
-            }
-        }
-    };
-    let waited = reserve_started_at.elapsed();
-    if waited >= CONNECTION_NOTIFICATION_BACKPRESSURE_LOG_THRESHOLD {
-        tracing::debug!(
-            connection_id,
-            method = %method,
-            event_seq,
-            waited_ms = waited.as_millis(),
-            "client notification queue accepted message after backpressure"
-        );
-    }
-    permit.send(notification);
-    true
-}
-
-fn stream_trace_elapsed_ms() -> u128 {
-    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
-    STREAM_TRACE_START
-        .get_or_init(Instant::now)
-        .elapsed()
-        .as_millis()
-}
-
-fn notification_item_id(value: &serde_json::Value) -> Option<String> {
-    value
-        .get("params")
-        .and_then(|params| params.get("context"))
-        .and_then(|context| context.get("item_id"))
-        .and_then(serde_json::Value::as_str)
-        .map(ToOwned::to_owned)
-}
-
-fn notification_assistant_delta<'a>(method: &str, value: &'a serde_json::Value) -> Option<&'a str> {
-    (method == "item/agentMessage/delta")
-        .then(|| value.get("params")?.get("delta")?.as_str())
-        .flatten()
-}
-
-fn assistant_token_log_preview(text: &str) -> Option<String> {
-    assistant_token_logging_enabled()
-        .then(|| format_assistant_token_log_preview(text, assistant_token_log_max_chars()))
-}
-
-fn assistant_token_logging_enabled() -> bool {
-    static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
-    *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
-        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
-            .ok()
-            .is_some_and(|value| {
-                matches!(
-                    value.as_str(),
-                    "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
-                )
-            })
-    })
-}
-
-fn assistant_token_log_max_chars() -> usize {
-    static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
-    *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
-        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
-            .ok()
-            .and_then(|value| value.parse::<usize>().ok())
-            .filter(|value| *value > 0)
-            .unwrap_or(512)
-    })
-}
-
-fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
-    let max_chars = max_chars.max(1);
-    let mut preview = String::new();
-    let mut chars = text.chars();
-    for ch in chars.by_ref().take(max_chars) {
-        preview.extend(ch.escape_default());
-    }
-    if chars.next().is_some() {
-        preview.push_str("...");
-    }
-    preview
 }
 
 #[cfg(test)]
@@ -1475,10 +1236,10 @@ mod tests {
     async fn post_response_actions_run_after_backpressured_response_enqueue() -> Result<()> {
         let data_root = TempDir::new()?;
         let runtime = build_runtime(data_root.path());
-        let (sender, mut receiver) = mpsc::channel(1);
-        let transport_sender = sender.clone();
+        let (outbound_tx, mut receiver) = super::outbound::test_outbound_channel(1);
+        let transport_outbound = outbound_tx.clone();
         let connection_id = runtime
-            .register_connection(ClientTransportKind::Stdio, sender)
+            .register_connection(ClientTransportKind::Stdio, outbound_tx)
             .await;
         let session_id = SessionId::new();
         let response = serde_json::json!({
@@ -1488,10 +1249,17 @@ mod tests {
         });
         let expected_response = response.clone();
 
-        transport_sender
-            .send(serde_json::json!({ "queued": "backpressure" }))
+        assert!(
+            enqueue_outbound(
+                &transport_outbound,
+                OutboundFrame::json_rpc_response(
+                    connection_id,
+                    serde_json::json!({ "queued": "backpressure" }),
+                ),
+                "test_prefill",
+            )
             .await
-            .expect("prefill transport queue");
+        );
         let runtime_for_task = Arc::clone(&runtime);
         let mut transport_task = tokio::spawn(async move {
             let incoming = IncomingResponse::new(response).with_post_response_action(
@@ -1501,10 +1269,14 @@ mod tests {
                 },
             );
             let (response, post_response_actions) = incoming.into_parts();
-            transport_sender
-                .send(response)
+            assert!(
+                enqueue_outbound(
+                    &transport_outbound,
+                    OutboundFrame::json_rpc_response(connection_id, response),
+                    "test_response",
+                )
                 .await
-                .expect("enqueue response");
+            );
             runtime_for_task
                 .run_post_response_actions(post_response_actions)
                 .await;
@@ -1550,9 +1322,9 @@ mod tests {
     async fn timed_out_client_request_removes_pending_request() -> Result<()> {
         let data_root = TempDir::new()?;
         let runtime = build_runtime(data_root.path());
-        let (sender, mut receiver) = mpsc::channel(1);
+        let (outbound_tx, mut receiver) = super::outbound::test_outbound_channel(1);
         let connection_id = runtime
-            .register_connection(ClientTransportKind::Stdio, sender)
+            .register_connection(ClientTransportKind::Stdio, outbound_tx)
             .await;
 
         let result = runtime
@@ -1591,9 +1363,9 @@ mod tests {
     async fn cancelled_client_request_removes_pending_request() -> Result<()> {
         let data_root = TempDir::new()?;
         let runtime = build_runtime(data_root.path());
-        let (sender, mut receiver) = mpsc::channel(1);
+        let (outbound_tx, mut receiver) = super::outbound::test_outbound_channel(1);
         let connection_id = runtime
-            .register_connection(ClientTransportKind::Stdio, sender)
+            .register_connection(ClientTransportKind::Stdio, outbound_tx)
             .await;
         let cancel_token = CancellationToken::new();
         cancel_token.cancel();
@@ -1633,9 +1405,9 @@ mod tests {
     async fn dropped_client_request_removes_pending_request() -> Result<()> {
         let data_root = TempDir::new()?;
         let runtime = build_runtime(data_root.path());
-        let (sender, mut receiver) = mpsc::channel(1);
+        let (outbound_tx, mut receiver) = super::outbound::test_outbound_channel(1);
         let connection_id = runtime
-            .register_connection(ClientTransportKind::Stdio, sender)
+            .register_connection(ClientTransportKind::Stdio, outbound_tx)
             .await;
         let runtime_for_request = Arc::clone(&runtime);
 
@@ -1689,13 +1461,13 @@ mod tests {
         let session_id = SessionId::new();
         let turn_id = TurnId::new();
         let item_id = ItemId::new();
-        let (owner_sender, mut owner_receiver) = mpsc::channel(4);
+        let (owner_outbound, mut owner_receiver) = super::outbound::test_outbound_channel(4);
         let owner_connection_id = runtime
-            .register_connection(ClientTransportKind::Stdio, owner_sender)
+            .register_connection(ClientTransportKind::Stdio, owner_outbound)
             .await;
-        let (observer_sender, mut observer_receiver) = mpsc::channel(4);
+        let (observer_outbound, mut observer_receiver) = super::outbound::test_outbound_channel(4);
         let observer_connection_id = runtime
-            .register_connection(ClientTransportKind::StdioProxy, observer_sender)
+            .register_connection(ClientTransportKind::StdioProxy, observer_outbound)
             .await;
 
         runtime
@@ -1748,13 +1520,13 @@ mod tests {
         let session_id = SessionId::new();
         let turn_id = TurnId::new();
         let item_id = ItemId::new();
-        let (owner_sender, mut owner_receiver) = mpsc::channel(4);
+        let (owner_outbound, mut owner_receiver) = super::outbound::test_outbound_channel(4);
         let owner_connection_id = runtime
-            .register_connection(ClientTransportKind::StdioProxy, owner_sender)
+            .register_connection(ClientTransportKind::StdioProxy, owner_outbound)
             .await;
-        let (watcher_sender, mut watcher_receiver) = mpsc::channel(4);
+        let (watcher_outbound, mut watcher_receiver) = super::outbound::test_outbound_channel(4);
         let watcher_connection_id = runtime
-            .register_connection(ClientTransportKind::Stdio, watcher_sender)
+            .register_connection(ClientTransportKind::Stdio, watcher_outbound)
             .await;
 
         runtime

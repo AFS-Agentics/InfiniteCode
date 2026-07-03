@@ -883,7 +883,7 @@ logout = true
 async fn legacy_initialize_params_are_rejected() -> Result<()> {
     let data_root = TempDir::new()?;
     let runtime = build_runtime(data_root.path())?;
-    let (notifications_tx, _notifications_rx) = mpsc::channel(/*buffer*/ 4096);
+    let (notifications_tx, _notifications_rx) = devo_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -961,7 +961,7 @@ async fn initialize_acp_connection_with_transport(
     runtime: &Arc<ServerRuntime>,
     transport: ClientTransportKind,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>, AcpInitializeResult)> {
-    let (notifications_tx, notifications_rx) = mpsc::channel(/*buffer*/ 4096);
+    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(transport, notifications_tx)
         .await;
