@@ -750,7 +750,7 @@ fn validate_incoming_client_message(
 }
 
 /// Returns `true` when the payload is a client response to a server-initiated
-/// JSON-RPC request.
+/// JSON-RPC request (see the call site in [`accept_incoming_client_message`]).
 fn is_client_response_message(value: &serde_json::Value) -> bool {
     let Some(object) = value.as_object() else {
         return false;
@@ -802,12 +802,31 @@ async fn accept_incoming_client_message(
         });
         return;
     }
+    // The server may initiate JSON-RPC requests to the client (ACP client-side
+    // tools such as fs/read, fs/write, permission prompts). Those replies arrive
+    // as client responses (id + result/error, no method) and must be matched to
+    // the pending server request instead of entering the normal inbound handler.
     if is_client_response_message(&value) {
         tokio::spawn(async move {
             runtime.resolve_client_response(connection_id, value).await;
         });
         return;
     }
+    // Bound how many client requests/notifications may run concurrently on this
+    // connection (see INBOUND_CONCURRENCY_LIMIT). The transport read loop awaits a
+    // permit before spawning the next handler, so inbound work applies backpressure
+    // instead of unbounded task growth. Client responses above skip this permit
+    // because a handler may hold one while blocked on a server-initiated client call
+    // (e.g. ACP fs/read); requiring a permit for the reply would deadlock.
+    //
+    // Concurrency risks to keep in mind:
+    // - Handlers for the same connection run in parallel; ordering is not preserved
+    //   beyond what the runtime/session actors enforce.
+    // - If every permit is held by handlers waiting on the client, the read loop
+    //   blocks here until one finishes. Responses already bypass the permit, but a
+    //   pipelined client request queued ahead of those responses in the socket
+    //   buffer can delay reading them (head-of-line blocking).
+    // - Semaphore close drops the message silently (no JSON-RPC error).
     let Ok(permit) = inbound_semaphore.acquire_owned().await else {
         return;
     };

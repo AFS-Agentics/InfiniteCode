@@ -26,7 +26,7 @@ use tokio::sync::Notify;
 use tokio::sync::mpsc;
 use tokio::time::Duration;
 
-use crate::stdio::ServerNotificationMessage;
+use crate::client_core::ServerNotificationMessage;
 
 static ACP_TERMINAL_NEXT_ID: AtomicU64 = AtomicU64::new(1);
 pub const ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD: &str = "_devo/acp_terminal/output";

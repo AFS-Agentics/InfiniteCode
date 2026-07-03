@@ -1,10 +1,24 @@
+//! Transport-agnostic Devo server client: JSON-RPC request/response routing,
+//! server-initiated ACP client handlers, and notification demultiplexing.
+//!
+//! Both [`crate::stdio::StdioServerClient`] and [`crate::websocket::WebSocketServerClient`]
+//! delegate protocol logic here. Incoming messages are classified as:
+//!
+//! - **Server → client requests** (`id` + `method`): handled asynchronously; the
+//!   response echoes the same JSON-RPC `id` (see `fs/read`, permissions, terminal).
+//! - **Server responses** (`id` + `result`/`error`, no `method`): matched against
+//!   [`PendingResponses`] via numeric `id` to complete a client-initiated `request`.
+//! - **Notifications** (no `id`): forwarded on the notification channel.
+
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::OnceLock;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+use std::time::Instant;
 
 use anyhow::Context;
 use anyhow::Result;
@@ -25,13 +39,21 @@ use crate::acp_permissions::handle_acp_request_permission;
 use crate::acp_permissions::resolve_acp_permission_response;
 use crate::acp_terminal::AcpTerminalManager;
 use crate::acp_terminal::handle_acp_terminal_request;
-use crate::stdio::ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD;
-use crate::stdio::ACP_PROMPT_STARTED_NOTIFICATION_METHOD;
-use crate::stdio::ServerNotificationMessage;
+
+pub const ACP_PROMPT_STARTED_NOTIFICATION_METHOD: &str = "_devo/acp_prompt/started";
+pub const ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD: &str = "_devo/acp_prompt/completed";
 
 const SERVER_RESPONSE_TIMEOUT: Duration = Duration::from_secs(10);
 
-type PendingResponses = Arc<Mutex<HashMap<u64, oneshot::Sender<serde_json::Value>>>>;
+/// Synthetic notifications emitted when falling back to detached `session/prompt`.
+#[derive(Debug, Clone)]
+pub struct ServerNotificationMessage {
+    pub method: String,
+    pub params: serde_json::Value,
+}
+
+/// Client-initiated requests awaiting a server response, keyed by JSON-RPC `id`.
+pub(crate) type PendingResponses = Arc<Mutex<HashMap<u64, oneshot::Sender<serde_json::Value>>>>;
 
 pub(crate) enum ClientWriteMessage {
     Json(serde_json::Value),
@@ -110,6 +132,23 @@ impl ServerClientCore {
             acp_terminals: self.acp_terminals.clone(),
             notifications_tx: self.notifications_tx.clone(),
         }
+    }
+
+    pub(crate) fn set_client_capabilities(&mut self, client_capabilities: AcpClientCapabilities) {
+        self.client_capabilities = client_capabilities;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pending_responses(&self) -> PendingResponses {
+        Arc::clone(&self.pending)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_agent_capabilities_for_test(
+        &mut self,
+        capabilities: AcpAgentCapabilities,
+    ) {
+        self.acp_agent_capabilities = Some(capabilities);
     }
 
     pub(crate) async fn initialize(&mut self) -> Result<InitializeResult> {
@@ -302,6 +341,8 @@ impl ServerClientCore {
     {
         let request_id = self.next_request_id.fetch_add(1, Ordering::SeqCst);
         let (response_tx, response_rx) = oneshot::channel();
+        // The transport reader resolves responses by this id (see
+        // `deliver_pending_client_response`).
         self.pending.lock().await.insert(request_id, response_tx);
         let request = AcpClientRequest::new(serde_json::json!(request_id), method, params);
         if let Err(error) = self.writer.send_serializable(&request) {
@@ -389,6 +430,212 @@ impl ServerClientCore {
         self.acp_terminals.release_all().await;
     }
 
+    pub(crate) async fn agent_list(&mut self, params: AgentListParams) -> Result<AgentListResult> {
+        self.request_devo("agent/list", params).await
+    }
+
+    pub(crate) async fn agent_spawn(&mut self, params: SpawnAgentParams) -> Result<SpawnAgentResult> {
+        self.request_devo("agent/spawn", params).await
+    }
+
+    pub(crate) async fn agent_close(&mut self, params: CloseAgentParams) -> Result<CloseAgentResult> {
+        self.request_devo("agent/close", params).await
+    }
+
+    pub(crate) async fn session_title_update(
+        &mut self,
+        params: SessionTitleUpdateParams,
+    ) -> Result<SessionTitleUpdateResult> {
+        self.request_devo("session/title/update", params).await
+    }
+
+    pub(crate) async fn session_metadata_update(
+        &mut self,
+        params: SessionMetadataUpdateParams,
+    ) -> Result<SessionMetadataUpdateResult> {
+        self.request_devo("session/metadata/update", params).await
+    }
+
+    pub(crate) async fn session_permissions_update(
+        &mut self,
+        params: SessionPermissionsUpdateParams,
+    ) -> Result<SessionPermissionsUpdateResult> {
+        self.request_devo("session/permissions/update", params).await
+    }
+
+    pub(crate) async fn session_compact(
+        &mut self,
+        params: SessionCompactParams,
+    ) -> Result<SessionCompactResult> {
+        self.request_devo("session/compact", params).await
+    }
+
+    pub(crate) async fn goal_create(&mut self, params: GoalCreateParams) -> Result<GoalCreateResult> {
+        self.request_devo("goal/create", params).await
+    }
+
+    pub(crate) async fn goal_set(&mut self, params: GoalSetParams) -> Result<GoalSetResult> {
+        self.request_devo("goal/set", params).await
+    }
+
+    pub(crate) async fn goal_status(&mut self, params: GoalStatusParams) -> Result<GoalStatusResult> {
+        self.request_devo("goal/status", params).await
+    }
+
+    pub(crate) async fn goal_pause(&mut self, params: GoalSetStatusParams) -> Result<GoalSetStatusResult> {
+        self.request_devo("goal/pause", params).await
+    }
+
+    pub(crate) async fn goal_resume(
+        &mut self,
+        params: GoalSetStatusParams,
+    ) -> Result<GoalSetStatusResult> {
+        self.request_devo("goal/resume", params).await
+    }
+
+    pub(crate) async fn goal_complete(
+        &mut self,
+        params: GoalSetStatusParams,
+    ) -> Result<GoalSetStatusResult> {
+        self.request_devo("goal/complete", params).await
+    }
+
+    pub(crate) async fn goal_clear(&mut self, params: GoalClearParams) -> Result<GoalClearResult> {
+        self.request_devo("goal/clear", params).await
+    }
+
+    pub(crate) async fn session_fork(&mut self, params: SessionForkParams) -> Result<SessionForkResult> {
+        self.request_devo("session/fork", params).await
+    }
+
+    pub(crate) async fn session_rollback(
+        &mut self,
+        params: SessionRollbackParams,
+    ) -> Result<SessionRollbackResult> {
+        self.request_devo("session/rollback", params).await
+    }
+
+    pub(crate) async fn skills_list(&mut self, params: SkillListParams) -> Result<SkillListResult> {
+        self.request_devo("skills/list", params).await
+    }
+
+    pub(crate) async fn skills_changed(
+        &mut self,
+        params: SkillChangedParams,
+    ) -> Result<SkillChangedResult> {
+        self.request_devo("skills/changed", params).await
+    }
+
+    pub(crate) async fn skills_set_enabled(
+        &mut self,
+        params: SkillSetEnabledParams,
+    ) -> Result<SkillSetEnabledResult> {
+        self.request_devo("skills/set_enabled", params).await
+    }
+
+    pub(crate) async fn model_catalog(
+        &mut self,
+        params: ModelCatalogParams,
+    ) -> Result<ModelCatalogResult> {
+        self.request_devo("model/catalog", params).await
+    }
+
+    pub(crate) async fn model_saved(&mut self, params: ModelSavedParams) -> Result<ModelSavedResult> {
+        self.request_devo("model/saved", params).await
+    }
+
+    pub(crate) async fn provider_vendor_list(
+        &mut self,
+        params: ProviderVendorListParams,
+    ) -> Result<ProviderVendorListResult> {
+        self.request_devo("provider/list", params).await
+    }
+
+    pub(crate) async fn provider_vendor_upsert(
+        &mut self,
+        params: ProviderVendorUpsertParams,
+    ) -> Result<ProviderVendorUpsertResult> {
+        self.request_devo("provider/upsert", params).await
+    }
+
+    pub(crate) async fn provider_validate(
+        &mut self,
+        params: ProviderValidateParams,
+    ) -> Result<ProviderValidateResult> {
+        self.request_devo("provider/validate", params).await
+    }
+
+    pub(crate) async fn command_exec(&mut self, params: CommandExecParams) -> Result<CommandExecResult> {
+        self.request_devo("command/exec", params).await
+    }
+
+    pub(crate) async fn command_exec_write(
+        &mut self,
+        params: CommandExecWriteParams,
+    ) -> Result<CommandExecWriteResult> {
+        self.request_devo("command/exec/write", params).await
+    }
+
+    pub(crate) async fn command_exec_resize(
+        &mut self,
+        params: CommandExecResizeParams,
+    ) -> Result<CommandExecResizeResult> {
+        self.request_devo("command/exec/resize", params).await
+    }
+
+    pub(crate) async fn command_exec_terminate(
+        &mut self,
+        params: CommandExecTerminateParams,
+    ) -> Result<CommandExecTerminateResult> {
+        self.request_devo("command/exec/terminate", params).await
+    }
+
+    pub(crate) async fn turn_shell_command(
+        &mut self,
+        params: ShellCommandParams,
+    ) -> Result<ShellCommandResult> {
+        self.request_devo("turn/shell_command", params).await
+    }
+
+    pub(crate) async fn turn_interrupt(
+        &mut self,
+        params: TurnInterruptParams,
+    ) -> Result<TurnInterruptResult> {
+        self.request_devo("turn/interrupt", params).await
+    }
+
+    pub(crate) async fn turn_steer(&mut self, params: TurnSteerParams) -> Result<TurnSteerResult> {
+        self.request_devo("turn/steer", params).await
+    }
+
+    pub(crate) async fn reference_search_start(
+        &mut self,
+        params: ReferenceSearchStartParams,
+    ) -> Result<ReferenceSearchStartResult> {
+        self.request_devo("search/start", params).await
+    }
+
+    pub(crate) async fn reference_search_update(
+        &mut self,
+        params: ReferenceSearchUpdateParams,
+    ) -> Result<ReferenceSearchUpdateResult> {
+        self.request_devo("search/update", params).await
+    }
+
+    pub(crate) async fn reference_search_cancel(
+        &mut self,
+        params: ReferenceSearchCancelParams,
+    ) -> Result<ReferenceSearchCancelResult> {
+        self.request_devo("search/cancel", params).await
+    }
+
+    /// Fallback when the server does not implement `_devo/turn/start`.
+    ///
+    /// Sends blocking ACP `session/prompt` but returns immediately after the
+    /// request is written. Completion is delivered later via synthetic
+    /// `_devo/acp_prompt/completed` notifications. Multiple detached prompts
+    /// may be in flight at once; each uses a distinct JSON-RPC `id` in
+    /// [`PendingResponses`], so responses do not collide as long as ids stay unique.
     async fn turn_start_acp_prompt_detached(&mut self, params: TurnStartParams) -> Result<()> {
         let session_id = params.session_id;
         let prompt = params
@@ -451,6 +698,8 @@ impl ServerClientCore {
 }
 
 impl ServerClientReaderState {
+    /// Classifies one inbound server payload and dispatches without blocking the
+    /// transport read loop on handler work.
     pub(crate) async fn handle_message(&self, message: serde_json::Value) {
         if let (Some(id), Some(method)) = (
             message.get("id").cloned(),
@@ -462,15 +711,15 @@ impl ServerClientReaderState {
                 .unwrap_or_else(|| serde_json::json!({}));
             let state = self.clone();
             let method = method.to_string();
+            // Server-initiated ACP client tools may run concurrently; each reply
+            // must echo the request `id` assigned by the server.
             tokio::spawn(async move {
                 state.handle_client_request(id, &method, params).await;
             });
             return;
         }
         if let Some(id) = message.get("id").and_then(serde_json::Value::as_u64) {
-            if let Some(tx) = self.pending.lock().await.remove(&id) {
-                let _ = tx.send(message);
-            }
+            deliver_pending_client_response(&self.pending, id, message).await;
             return;
         }
         if let Ok(notification) =
@@ -515,6 +764,7 @@ impl ServerClientReaderState {
             });
             return;
         }
+        log_notification_received(&notification);
         let _ = self.notifications_tx.send(ServerNotificationMessage {
             method: notification.method,
             params: notification.params,
@@ -573,6 +823,21 @@ impl ServerClientReaderState {
         if let Err(error) = self.writer.send_value(response) {
             tracing::warn!(%error, method, "failed to write ACP client response");
         }
+    }
+}
+
+async fn deliver_pending_client_response(
+    pending: &PendingResponses,
+    request_id: u64,
+    message: serde_json::Value,
+) {
+    if let Some(tx) = pending.lock().await.remove(&request_id) {
+        let _ = tx.send(message);
+    } else {
+        tracing::warn!(
+            request_id,
+            "dropping server response for unknown client request id"
+        );
     }
 }
 
@@ -776,4 +1041,95 @@ fn acp_title_state(title: &Option<String>) -> SessionTitleState {
     } else {
         SessionTitleState::Unset
     }
+}
+
+fn log_notification_received(notification: &NotificationEnvelope<serde_json::Value>) {
+    let event_seq = notification
+        .params
+        .get("context")
+        .and_then(|context| context.get("seq"))
+        .and_then(serde_json::Value::as_u64);
+    let item_id = notification
+        .params
+        .get("context")
+        .and_then(|context| context.get("item_id"))
+        .and_then(serde_json::Value::as_str);
+    let assistant_delta = (notification.method == "item/agentMessage/delta")
+        .then(|| notification.params.get("delta")?.as_str())
+        .flatten();
+    let delta_len = assistant_delta.map(str::len);
+    let assistant_token_text = assistant_delta.and_then(assistant_token_log_preview);
+    if let Some(assistant_token_text) = assistant_token_text.as_deref() {
+        tracing::debug!(
+            stream_elapsed_ms = stream_trace_elapsed_ms(),
+            method = %notification.method,
+            event_seq,
+            item_id = ?item_id,
+            delta_len = ?delta_len,
+            assistant_token_text,
+            "client received server notification"
+        );
+    } else {
+        tracing::debug!(
+            stream_elapsed_ms = stream_trace_elapsed_ms(),
+            method = %notification.method,
+            event_seq,
+            item_id = ?item_id,
+            delta_len = ?delta_len,
+            "client received server notification"
+        );
+    }
+}
+
+fn stream_trace_elapsed_ms() -> u128 {
+    static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
+    STREAM_TRACE_START
+        .get_or_init(Instant::now)
+        .elapsed()
+        .as_millis()
+}
+
+fn assistant_token_log_preview(text: &str) -> Option<String> {
+    assistant_token_logging_enabled().then(|| {
+        let max_chars = assistant_token_log_max_chars();
+        format_assistant_token_log_preview(text, max_chars)
+    })
+}
+
+fn assistant_token_logging_enabled() -> bool {
+    static ENABLED: OnceLock<bool> = OnceLock::new();
+    *ENABLED.get_or_init(|| {
+        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+            .ok()
+            .is_some_and(|value| {
+                matches!(
+                    value.as_str(),
+                    "1" | "true" | "TRUE" | "yes" | "YES" | "on" | "ON"
+                )
+            })
+    })
+}
+
+fn assistant_token_log_max_chars() -> usize {
+    static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
+    *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
+        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+            .ok()
+            .and_then(|value| value.parse::<usize>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(512)
+    })
+}
+
+fn format_assistant_token_log_preview(text: &str, max_chars: usize) -> String {
+    let max_chars = max_chars.max(1);
+    let mut preview = String::with_capacity(text.len().min(max_chars));
+    let mut chars = text.chars();
+    for ch in chars.by_ref().take(max_chars) {
+        preview.extend(ch.escape_default());
+    }
+    if chars.next().is_some() {
+        preview.push_str("...");
+    }
+    preview
 }

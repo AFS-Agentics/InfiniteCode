@@ -1,13 +1,27 @@
+//! ACP `session/prompt` and `session/cancel` handlers.
+//!
+//! Portable ACP clients submit turns through blocking `session/prompt`: the JSON-RPC
+//! response is deferred until the turn reaches a terminal state, while progress is
+//! streamed on `session/update`. Devo's TUI uses `_devo/turn/start` instead; this
+//! module serves external ACP integrations.
+
 use super::super::acp_slash_commands::AcpSlashCommandPromptResult;
 use super::*;
 
 impl ServerRuntime {
+    /// Handles ACP `session/prompt` for non-Devo clients.
+    ///
+    /// Returns `None` when the prompt turn was accepted and the JSON-RPC response
+    /// will be sent asynchronously after the turn finishes (ACP blocking semantics).
+    /// Streaming progress is delivered through `session/update` on the subscribed
+    /// connection while the background task waits for turn completion.
     pub(crate) async fn handle_acp_session_prompt(
         self: &Arc<Self>,
         connection_id: u64,
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> Option<serde_json::Value> {
+        // --- Validate request ---------------------------------------------------
         let params: AcpPromptParams = match serde_json::from_value(params) {
             Ok(params) => params,
             Err(error) => {
@@ -18,6 +32,7 @@ impl ServerRuntime {
                 ));
             }
         };
+        // ACP prompt turns are exclusive per session; queueing is not supported here.
         if self.session_has_active_turn(params.session_id).await {
             return Some(acp_error_response(
                 request_id,
@@ -25,8 +40,10 @@ impl ServerRuntime {
                 "session already has an active prompt turn",
             ));
         }
+        // Ensure this connection receives `session/update` for the prompt turn.
         self.subscribe_connection_to_session(connection_id, params.session_id, None)
             .await;
+        // --- Slash commands embedded in the prompt ----------------------------
         match self
             .handle_acp_slash_command_prompt(
                 connection_id,
@@ -42,6 +59,7 @@ impl ServerRuntime {
             }
             AcpSlashCommandPromptResult::Pending => return None,
         }
+        // --- Start a regular turn from ACP prompt content ---------------------
         let session_id = params.session_id;
         let input = match input_items_from_acp_prompt(params.prompt) {
             Ok(input) => input,
@@ -53,6 +71,8 @@ impl ServerRuntime {
                 ));
             }
         };
+        // Reuse the Devo turn engine with ACP-default params (no model/sandbox
+        // extensions on the prompt RPC). Reject if another turn is already active.
         let legacy_response = self
             .handle_turn_start_with_queue_policy(
                 Some(connection_id),
@@ -84,6 +104,9 @@ impl ServerRuntime {
                 "session/prompt cannot queue behind an active turn",
             ));
         };
+        // --- Defer JSON-RPC response until the turn completes -----------------
+        // The client keeps reading `session/update` notifications while this
+        // task blocks on terminal turn status, then receives `AcpPromptResult`.
         let runtime = Arc::clone(self);
         tokio::spawn(async move {
             let stop_reason = runtime
@@ -105,6 +128,7 @@ impl ServerRuntime {
         None
     }
 
+    /// Handles ACP `session/cancel` by interrupting the active turn on the session.
     pub(crate) async fn handle_acp_session_cancel(self: &Arc<Self>, params: serde_json::Value) {
         let params: AcpCancelParams = match serde_json::from_value(params) {
             Ok(params) => params,
@@ -149,6 +173,7 @@ impl ServerRuntime {
         self.runtime_active_turn_id(session_id).await.is_some()
     }
 
+    /// Waits for a prompt turn to reach a terminal state and maps it to ACP `stopReason`.
     pub(crate) async fn wait_for_acp_prompt_stop_reason(
         &self,
         session_id: SessionId,
@@ -167,6 +192,8 @@ impl ServerRuntime {
         acp_stop_reason_from_terminal_turn(status)
     }
 }
+
+/// Maps internal turn completion metadata to the ACP `stopReason` enum.
 fn acp_stop_reason_from_terminal_turn(snapshot: TerminalTurnSnapshot) -> AcpStopReason {
     match snapshot.status {
         TurnStatus::Completed => match snapshot.stop_reason {

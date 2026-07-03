@@ -1,3 +1,7 @@
+//! ACP client-side filesystem handlers for server-initiated `fs/read` and
+//! `fs/write` requests. Each handler echoes the JSON-RPC `id` from the inbound
+//! request in its success or error response.
+
 use std::path::Path;
 
 use devo_protocol::ACP_FS_READ_TEXT_FILE_METHOD;

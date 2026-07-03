@@ -1,3 +1,7 @@
+//! ACP permission prompt bridge: server `session/request_permission` is
+//! surfaced to the UI via notifications; the JSON-RPC response is sent later
+//! when the user approves or denies, using the original request `id`.
+
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
@@ -21,7 +25,7 @@ use devo_protocol::acp_success_response;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 
-use crate::stdio::ServerNotificationMessage;
+use crate::client_core::ServerNotificationMessage;
 
 static ACP_PERMISSION_NEXT_ID: AtomicU64 = AtomicU64::new(1);
 

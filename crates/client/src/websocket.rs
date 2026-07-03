@@ -19,7 +19,7 @@ use tokio_tungstenite::tungstenite::Message;
 use crate::client_core::ClientWriteMessage;
 use crate::client_core::ClientWriter;
 use crate::client_core::ServerClientCore;
-use crate::stdio::ServerNotificationMessage;
+use crate::client_core::ServerNotificationMessage;
 
 const WEBSOCKET_SHUTDOWN_TIMEOUT: Duration = Duration::from_millis(500);
 
@@ -128,7 +128,7 @@ impl WebSocketServerClient {
     }
 
     pub async fn agent_list(&mut self, params: AgentListParams) -> Result<AgentListResult> {
-        self.core.request_devo("agent/list", params).await
+        self.core.agent_list(params).await
     }
 
     pub async fn agent_spawn(&mut self, params: SpawnAgentParams) -> Result<SpawnAgentResult> {

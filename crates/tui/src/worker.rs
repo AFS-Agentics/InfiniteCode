@@ -21,7 +21,6 @@ use devo_core::SessionId;
 use devo_core::TurnId;
 use devo_core::TurnStatus;
 use devo_protocol::ACP_SESSION_UPDATE_METHOD;
-use devo_protocol::AcpStopReason;
 use devo_protocol::AgentListParams;
 use devo_protocol::AgentToolPolicy;
 use devo_protocol::CloseAgentParams;
@@ -45,8 +44,6 @@ use devo_protocol::SessionHistoryMetadata;
 use devo_protocol::SessionPlanStepStatus;
 use devo_protocol::SpawnAgentParams;
 use devo_protocol::ThreadGoalStatus;
-use devo_server::ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD;
-use devo_server::ACP_PROMPT_STARTED_NOTIFICATION_METHOD;
 use devo_server::ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD;
 use devo_server::ApprovalDecisionPayload;
 use devo_server::ApprovalRequestPayload;
@@ -832,7 +829,6 @@ async fn run_worker_inner(
     let mut reasoning_effort_selection = config.reasoning_effort_selection;
     let mut permission_preset = config.permission_preset;
     let mut active_turn_id: Option<TurnId> = None;
-    let mut synthetic_acp_turn_id: Option<TurnId> = None;
     let mut turn_count = 0usize;
     let mut total_input_tokens = 0usize;
     let mut total_output_tokens = 0usize;
@@ -941,6 +937,10 @@ async fn run_worker_inner(
                             event_tx,
                         )
                         .await?;
+
+                        // Start the turn via `_devo/turn/start`. The bundled server implements
+                        // this extension; streaming and completion arrive as server
+                        // notifications (`turn/started`, item deltas, `turn/completed`, etc.).
                         let start_result = client.turn_start(TurnStartParams {
                             session_id: active_session_id,
                             input,
@@ -2274,43 +2274,6 @@ async fn run_worker_inner(
                     Some(notification) => {
                         let method = notification.method;
                         let params = notification.params;
-                        if method == ACP_PROMPT_STARTED_NOTIFICATION_METHOD {
-                            if active_turn_id.is_none()
-                                && let Some((turn_id, event)) = acp_prompt_started_event(
-                                    &params,
-                                    session_id,
-                                    &model,
-                                    &model_binding_id,
-                                    &reasoning_effort_selection,
-                                )
-                            {
-                                active_turn_id = Some(turn_id);
-                                synthetic_acp_turn_id = Some(turn_id);
-                                saw_usage_update_for_turn = false;
-                                let _ = event_tx.send(event);
-                            }
-                            continue;
-                        }
-                        if method == ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD {
-                            if synthetic_acp_turn_id.is_some()
-                                && let Some(event) = acp_prompt_completed_event(
-                                    &params,
-                                    session_id,
-                                    &mut active_turn_id,
-                                    &mut turn_count,
-                                    total_input_tokens,
-                                    total_output_tokens,
-                                    total_tokens,
-                                    total_cache_read_tokens,
-                                    last_query_total_tokens,
-                                    last_query_input_tokens,
-                                )
-                            {
-                                synthetic_acp_turn_id = None;
-                                let _ = event_tx.send(event);
-                            }
-                            continue;
-                        }
                         if method == ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD {
                             if let Some(terminal_id) =
                                 params.get("terminalId").and_then(serde_json::Value::as_str)
@@ -4216,102 +4179,6 @@ fn proposed_plan_text(payload: &serde_json::Value) -> String {
         .to_string()
 }
 
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct AcpPromptLifecycleNotification {
-    session_id: SessionId,
-    #[serde(default)]
-    stop_reason: Option<AcpStopReason>,
-    #[serde(default)]
-    error: Option<String>,
-}
-
-fn acp_prompt_started_event(
-    params: &serde_json::Value,
-    active_session_id: Option<SessionId>,
-    model: &str,
-    model_binding_id: &Option<String>,
-    reasoning_effort_selection: &Option<String>,
-) -> Option<(TurnId, WorkerEvent)> {
-    acp_prompt_lifecycle_notification(params, active_session_id)?;
-    let turn_id = TurnId::new();
-    Some((
-        turn_id,
-        WorkerEvent::TurnStarted {
-            model: model.to_string(),
-            model_binding_id: model_binding_id.clone(),
-            reasoning_effort_selection: reasoning_effort_selection.clone(),
-            reasoning_effort: None,
-            turn_id,
-        },
-    ))
-}
-
-#[expect(clippy::too_many_arguments)]
-fn acp_prompt_completed_event(
-    params: &serde_json::Value,
-    active_session_id: Option<SessionId>,
-    active_turn_id: &mut Option<TurnId>,
-    turn_count: &mut usize,
-    total_input_tokens: usize,
-    total_output_tokens: usize,
-    total_tokens: usize,
-    total_cache_read_tokens: usize,
-    last_query_total_tokens: usize,
-    last_query_input_tokens: usize,
-) -> Option<WorkerEvent> {
-    let notification = acp_prompt_lifecycle_notification(params, active_session_id)?;
-    *active_turn_id = None;
-    if let Some(error) = notification.error {
-        return Some(WorkerEvent::TurnFailed {
-            message: error,
-            turn_count: *turn_count,
-            total_input_tokens,
-            total_output_tokens,
-            total_tokens,
-            total_cache_read_tokens,
-            prompt_token_estimate: total_input_tokens,
-            last_query_input_tokens,
-        });
-    }
-    *turn_count += 1;
-    Some(WorkerEvent::TurnFinished {
-        stop_reason: acp_stop_reason_text(
-            notification.stop_reason.unwrap_or(AcpStopReason::EndTurn),
-        ),
-        turn_count: *turn_count,
-        total_input_tokens,
-        total_output_tokens,
-        total_tokens,
-        total_cache_read_tokens,
-        last_query_total_tokens,
-        last_query_input_tokens,
-        prompt_token_estimate: total_input_tokens,
-    })
-}
-
-fn acp_prompt_lifecycle_notification(
-    params: &serde_json::Value,
-    active_session_id: Option<SessionId>,
-) -> Option<AcpPromptLifecycleNotification> {
-    let Ok(notification) = serde_json::from_value::<AcpPromptLifecycleNotification>(params.clone())
-    else {
-        return None;
-    };
-    (Some(notification.session_id) == active_session_id).then_some(notification)
-}
-
-fn acp_stop_reason_text(stop_reason: AcpStopReason) -> String {
-    match stop_reason {
-        AcpStopReason::EndTurn => "Completed",
-        AcpStopReason::MaxTokens => "MaxTokens",
-        AcpStopReason::MaxTurnRequests => "MaxTurnRequests",
-        AcpStopReason::Refusal => "Refusal",
-        AcpStopReason::Cancelled => "Interrupted",
-    }
-    .to_string()
-}
-
 fn plan_event_from_tool_result(payload: &ToolResultPayload) -> Option<WorkerEvent> {
     let tool_name = payload.tool_name.as_deref()?;
     match tool_name {
@@ -4513,8 +4380,6 @@ mod tests {
 
     use super::QueryWorkerHandle;
     use super::ShellCommandExecStart;
-    use super::acp_prompt_completed_event;
-    use super::acp_prompt_started_event;
     use super::acp_terminal_output_event;
     use super::acp_terminal_snapshot_delta;
     use super::handle_completed_item;
@@ -5145,111 +5010,6 @@ mod tests {
                         status: PlanStepStatus::InProgress,
                     },
                 ],
-            }
-        );
-    }
-
-    #[test]
-    fn acp_prompt_started_emits_turn_started() {
-        let session_id = SessionId::new();
-        let (turn_id, event) = acp_prompt_started_event(
-            &serde_json::json!({ "sessionId": session_id }),
-            Some(session_id),
-            "test-model",
-            &Some("binding".to_string()),
-            &Some("high".to_string()),
-        )
-        .expect("ACP prompt started event");
-
-        assert_eq!(
-            event,
-            WorkerEvent::TurnStarted {
-                model: "test-model".to_string(),
-                model_binding_id: Some("binding".to_string()),
-                reasoning_effort_selection: Some("high".to_string()),
-                reasoning_effort: None,
-                turn_id,
-            }
-        );
-    }
-
-    #[test]
-    fn acp_prompt_completed_emits_turn_finished() {
-        let session_id = SessionId::new();
-        let mut active_turn_id = Some(TurnId::new());
-        let mut turn_count = 2;
-
-        let event = acp_prompt_completed_event(
-            &serde_json::json!({
-                "sessionId": session_id,
-                "stopReason": "end_turn"
-            }),
-            Some(session_id),
-            &mut active_turn_id,
-            &mut turn_count,
-            11,
-            13,
-            24,
-            17,
-            19,
-            23,
-        )
-        .expect("ACP prompt completed event");
-
-        assert_eq!(active_turn_id, None);
-        assert_eq!(turn_count, 3);
-        assert_eq!(
-            event,
-            WorkerEvent::TurnFinished {
-                stop_reason: "Completed".to_string(),
-                turn_count: 3,
-                total_input_tokens: 11,
-                total_output_tokens: 13,
-                total_tokens: 24,
-                total_cache_read_tokens: 17,
-                last_query_total_tokens: 19,
-                last_query_input_tokens: 23,
-                prompt_token_estimate: 11,
-            }
-        );
-    }
-
-    #[test]
-    fn acp_prompt_error_emits_turn_failed() {
-        let session_id = SessionId::new();
-        let mut active_turn_id = Some(TurnId::new());
-        let mut turn_count = 2;
-
-        let event = acp_prompt_completed_event(
-            &serde_json::json!({
-                "sessionId": session_id,
-                "error": "server -32000: failed"
-            }),
-            Some(session_id),
-            &mut active_turn_id,
-            &mut turn_count,
-            11,
-            13,
-            24,
-            17,
-            19,
-            23,
-        )
-        .expect("ACP prompt failed event");
-
-        assert_eq!(active_turn_id, None);
-        assert_eq!(turn_count, 2);
-        assert_eq!(
-            event,
-            WorkerEvent::TurnFailed {
-                message: "server -32000: failed".to_string(),
-                turn_count: 2,
-                total_input_tokens: 11,
-                total_output_tokens: 13,
-                total_tokens: 24,
-                total_cache_read_tokens: 17,
-                prompt_token_estimate: 11,
-                last_query_input_tokens: 23,
             }
         );
     }

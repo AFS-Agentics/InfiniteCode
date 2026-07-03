@@ -2273,21 +2273,6 @@ fn child_turn_session_id(
     (session_id != parent_session_id.to_string()).then(|| session_id.to_string())
 }
 
-fn unique_child_turn_sessions(
-    events: &[serde_json::Value],
-    parent_session_id: devo_core::SessionId,
-) -> Vec<String> {
-    let mut sessions = Vec::new();
-    for event in events {
-        let Some(session_id) = child_turn_session_id(event, parent_session_id) else {
-            continue;
-        };
-        if !sessions.contains(&session_id) {
-            sessions.push(session_id);
-        }
-    }
-    sessions
-}
 fn legacy_event_from_acp_notification(value: serde_json::Value) -> serde_json::Value {
     if value.get("method") != Some(&serde_json::json!("session/update")) {
         return value;
