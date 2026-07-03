@@ -345,7 +345,6 @@ pub(super) fn command_execution_item_id_for_progress(
 ) -> Option<ItemId> {
     pending_tool_calls
         .get(tool_use_id)
-        .filter(|pending| pending.display_kind.is_command_execution())
         .and_then(|pending| pending.item_id)
 }
 

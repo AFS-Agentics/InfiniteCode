@@ -198,6 +198,24 @@ impl CodeSearchService {
         Ok(index)
     }
 
+    /// Returns `true` when the next `search` or `find_related` call for this
+    /// root/content pair will trigger a full index build (no warm memory cache
+    /// and no valid disk cache). Callers use this to surface a "building index"
+    /// notice before the potentially slow first-run.
+    pub fn needs_index_build(&self, root: &Path, content: ContentFilter) -> bool {
+        let Ok(root) = canonical_root(root) else {
+            return true;
+        };
+        let key = memory_key(&root, content, self.provider.model_id());
+        if self.clean_warm_index(&key).ok().flatten().is_some() {
+            return false;
+        }
+        let cache_path = cache_file_path(&self.cache_dir, &root, content, self.provider.model_id());
+        let has_valid_cache = load_payload(&cache_path)
+            .is_some_and(|c| c.payload.is_valid_for(&root, content, self.provider.model_id()));
+        !has_valid_cache
+    }
+
     /// Reuses an in-memory index without touching the filesystem when watcher
     /// state says it is both available and clean.
     fn clean_warm_index(&self, key: &str) -> Result<Option<Arc<SearchIndex>>, CodeSearchError> {
@@ -787,6 +805,34 @@ mod tests {
 
         assert_eq!(output.index_stats.indexed_files, 1);
         assert_eq!(load_payload(&cache_path).is_some(), true);
+    }
+
+    #[test]
+    fn needs_index_build_true_without_cache_false_after_build() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let cache = tempfile::tempdir().expect("cache");
+        fs::write(temp.path().join("lib.rs"), "pub fn alpha() {}\n").expect("write");
+        let service = test_service(cache.path().to_path_buf());
+
+        assert!(
+            service.needs_index_build(temp.path(), ContentFilter::Code),
+            "should need build before first search"
+        );
+
+        service
+            .search(SearchRequest {
+                root: temp.path().to_path_buf(),
+                query: "alpha".to_string(),
+                content: ContentFilter::Code,
+                top_k: 1,
+                filters: SearchFilters::empty(),
+            })
+            .expect("search");
+
+        assert!(
+            !service.needs_index_build(temp.path(), ContentFilter::Code),
+            "should not need build after first search"
+        );
     }
 
     fn empty_index() -> Arc<SearchIndex> {

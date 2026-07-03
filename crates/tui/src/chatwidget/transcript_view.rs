@@ -224,40 +224,57 @@ impl ChatWidget {
             }
         }
         for pending in &self.pending_tool_calls {
-            let pending_lines = if let Some(start_time) = pending.start_time {
-                let mut pending_lines = vec![Line::from(vec![
-                    crate::exec_cell::spinner(Some(start_time), true),
-                    " ".into(),
-                    Span::styled(pending.title.clone(), Self::tool_text_style()),
-                ])];
-                pending_lines.extend(pending.lines.clone());
-                pending_lines
+            if let (Some(tool_name), Some(input)) = (&pending.tool_name, &pending.input) {
+                let tool_lines = ToolIoCell::from_text_output(
+                    ToolIoCellOptions {
+                        title_line: Some(Self::running_tool_line(&pending.title)),
+                        dot_prefix: Self::pending_dot_prefix(),
+                        subsequent_prefix: "  ".into(),
+                        output_style: Self::tool_text_style(),
+                        show_empty_ellipsis: false,
+                    },
+                    tool_name.clone(),
+                    input.clone(),
+                    pending.output.clone(),
+                )
+                .transcript_lines(width);
+                Self::extend_lines_with_separator(&mut lines, tool_lines);
             } else {
-                pending.lines.clone()
-            };
-            Self::extend_lines_with_separator(
-                &mut lines,
-                match mode {
-                    LiveViewportLineMode::Display => {
-                        history_cell::AgentMessageCell::new_with_prefix(
-                            pending_lines,
-                            Self::pending_dot_prefix(),
-                            "  ",
-                            false,
-                        )
-                        .display_lines(width)
-                    }
-                    LiveViewportLineMode::Transcript => {
-                        history_cell::AgentMessageCell::new_with_prefix(
-                            pending_lines,
-                            Self::pending_dot_prefix(),
-                            "  ",
-                            false,
-                        )
-                        .transcript_lines(width)
-                    }
-                },
-            );
+                let pending_lines = if let Some(start_time) = pending.start_time {
+                    let mut pending_lines = vec![Line::from(vec![
+                        crate::exec_cell::spinner(Some(start_time), true),
+                        " ".into(),
+                        Span::styled(pending.title.clone(), Self::tool_text_style()),
+                    ])];
+                    pending_lines.extend(pending.lines.clone());
+                    pending_lines
+                } else {
+                    pending.lines.clone()
+                };
+                Self::extend_lines_with_separator(
+                    &mut lines,
+                    match mode {
+                        LiveViewportLineMode::Display => {
+                            history_cell::AgentMessageCell::new_with_prefix(
+                                pending_lines,
+                                Self::pending_dot_prefix(),
+                                "  ",
+                                false,
+                            )
+                            .display_lines(width)
+                        }
+                        LiveViewportLineMode::Transcript => {
+                            history_cell::AgentMessageCell::new_with_prefix(
+                                pending_lines,
+                                Self::pending_dot_prefix(),
+                                "  ",
+                                false,
+                            )
+                            .transcript_lines(width)
+                        }
+                    },
+                );
+            }
         }
         Self::trim_trailing_blank_lines(&mut lines);
         lines
@@ -280,7 +297,7 @@ impl ChatWidget {
                 input.clone(),
                 tool_call.output.clone(),
             )
-            .display_lines(width),
+            .transcript_lines(width),
             _ => history_cell::AgentMessageCell::new_with_prefix(
                 tool_call.lines.clone(),
                 Self::pending_dot_prefix(),

@@ -13,6 +13,7 @@ use crate::render::line_utils::prefix_lines;
 use crate::render::line_utils::push_owned_lines;
 use crate::tool_io_cell::ToolIoCell;
 use crate::tool_io_cell::ToolIoCellOptions;
+use crate::tool_io_cell::tool_input_lines;
 use crate::wrapping::RtOptions;
 use crate::wrapping::adaptive_wrap_line;
 use crate::wrapping::adaptive_wrap_lines;
@@ -480,6 +481,15 @@ impl ExecCell {
                         .subsequent_indent(subsequent_indent),
                 );
                 push_owned_lines(&wrapped, &mut out_indented);
+            }
+
+            if call.output.is_none() {
+                if let (Some(tool_name), Some(input)) = (&call.tool_name, &call.tool_input) {
+                    let input_lines = tool_input_lines(tool_name, input);
+                    for line in input_lines {
+                        out_indented.push(line.patch_style(Style::default().dim()));
+                    }
+                }
             }
         }
 

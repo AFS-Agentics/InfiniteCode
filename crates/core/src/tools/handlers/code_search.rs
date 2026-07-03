@@ -9,7 +9,7 @@ use devo_code_search::{
 use serde::Deserialize;
 
 use crate::contracts::{
-    ToolCallError, ToolContext, ToolProgressSender, ToolResult, ToolResultContent,
+    ToolCallError, ToolContext, ToolProgress, ToolProgressSender, ToolResult, ToolResultContent,
 };
 use crate::registry_plan::code_search_tool_spec;
 use crate::tool_handler::ToolHandler;
@@ -67,7 +67,7 @@ impl ToolHandler for CodeSearchHandler {
         &self,
         ctx: ToolContext,
         input: serde_json::Value,
-        _progress: Option<ToolProgressSender>,
+        progress: Option<ToolProgressSender>,
     ) -> Result<ToolResult, ToolCallError> {
         if ctx.cancel_token.is_cancelled() {
             return Err(ToolCallError::Cancelled);
@@ -75,6 +75,25 @@ impl ToolHandler for CodeSearchHandler {
         let input: CodeSearchInput = serde_json::from_value(input)
             .map_err(|error| ToolCallError::InvalidInput(error.to_string()))?;
         let request = build_request(&ctx.workspace_root, input)?;
+
+        if let Some(ref sender) = progress {
+            let root = match &request {
+                CodeSearchRequest::Search(r) => &r.root,
+                CodeSearchRequest::FindRelated(r) => &r.root,
+            };
+            let content = match &request {
+                CodeSearchRequest::Search(r) => r.content,
+                CodeSearchRequest::FindRelated(r) => r.content,
+            };
+            if self.service.needs_index_build(root, content) {
+                let _ = sender.send(ToolProgress::StatusUpdate {
+                    message: "First code search: building index (may take a moment, usually quick)"
+                        .to_string(),
+                    percent: None,
+                });
+            }
+        }
+
         let service = Arc::clone(&self.service);
         let output = tokio::task::spawn_blocking(move || match request {
             CodeSearchRequest::Search(request) => service.search(request),
