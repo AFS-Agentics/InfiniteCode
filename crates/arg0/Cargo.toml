@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }
+console-subscriber = { version = "0.5", optional = true }
 devo-core = { workspace = true }
 devo-server = { workspace = true }
 devo-util-paths = { workspace = true }
@@ -20,6 +21,10 @@ tempfile = { workspace = true }
 tokio = { workspace = true, features = ["rt-multi-thread"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[features]
+default = []
+tokio-console = ["console-subscriber"]
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }

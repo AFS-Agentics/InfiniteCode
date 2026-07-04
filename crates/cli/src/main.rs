@@ -223,6 +223,10 @@ async fn run_cli() -> Result<()> {
             status: _,
             shutdown: _,
         }) => {
+            // Start tokio-console before file logging so the console subscriber
+            // can capture task instrumentation. File logging will fall back
+            // gracefully if a subscriber is already installed.
+            devo_arg0::maybe_init_tokio_console();
             let args = server_process_args_from_cli(&cli).expect("server command args");
             let _logging = install_server_logging(&cli)?;
             run_server_process(args, ServerProcessRunOptions::default()).await

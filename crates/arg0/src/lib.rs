@@ -61,6 +61,18 @@ pub enum EarlyDispatch {
 
 // ── Public API ────────────────────────────────────────────────────────────
 
+/// Initialize the tokio-console tracing subscriber if `TOKIO_CONSOLE` is set
+/// and the `tokio-console` feature is active. Must be called before any other
+/// tracing subscriber is installed.
+pub fn maybe_init_tokio_console() {
+    #[cfg(feature = "tokio-console")]
+    if std::env::var("TOKIO_CONSOLE").is_ok() {
+        console_subscriber::init();
+    }
+    #[cfg(not(feature = "tokio-console"))]
+    let _ = std::env::var("TOKIO_CONSOLE");
+}
+
 /// Entry‑point wrapper that performs `argv[0]` dispatch first.
 ///
 /// If the current executable was invoked as `devo-server` (via symlink or batch
@@ -197,6 +209,7 @@ fn build_runtime() -> Result<tokio::runtime::Runtime> {
 }
 
 fn run_server_alias_dispatch() -> Result<()> {
+    maybe_init_tokio_console();
     let runtime = build_runtime()?;
     runtime.block_on(run_server_dispatch());
     Ok(())
