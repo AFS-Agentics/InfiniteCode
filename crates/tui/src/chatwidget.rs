@@ -298,6 +298,8 @@ pub(crate) struct ChatWidget {
     queued_input_modes: VecDeque<InputMode>,
     promoted_input_modes: VecDeque<InputMode>,
     active_turn_id: Option<TurnId>,
+    /// True while a `/research` turn is active; suppresses automatic git-diff overlays.
+    active_turn_is_research: bool,
     current_turn_mode: InputMode,
     committed_server_assistant_in_turn: bool,
     boundary_committed_assistant_items: HashSet<ItemId>,
@@ -330,6 +332,14 @@ impl ChatWidget {
 
     pub(crate) fn should_auto_show_git_diff(tool_title: &str, is_error: bool) -> bool {
         diff_rules::should_auto_show_git_diff(tool_title, is_error)
+    }
+
+    pub(crate) fn should_auto_show_git_diff_for_turn(
+        &self,
+        tool_title: &str,
+        is_error: bool,
+    ) -> bool {
+        !self.active_turn_is_research && diff_rules::should_auto_show_git_diff(tool_title, is_error)
     }
     pub(crate) fn new_with_app_event(common: ChatWidgetInit) -> Self {
         // Pull the constructor inputs apart up front so the setup below reads in stages.
@@ -460,6 +470,7 @@ impl ChatWidget {
             queued_input_modes: VecDeque::new(),
             promoted_input_modes: VecDeque::new(),
             active_turn_id: None,
+            active_turn_is_research: false,
             current_turn_mode: InputMode::Build,
             committed_server_assistant_in_turn: false,
             boundary_committed_assistant_items: HashSet::new(),

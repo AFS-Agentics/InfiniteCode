@@ -402,6 +402,12 @@ impl ServerRuntime {
             Some(turn_config.model.context_window as u64),
         )
         .await;
+        // Research runs outside the session actor (unlike execute_turn_in_actor).
+        // Register the same TurnInlineState / active_stream path so item persist,
+        // usage, and hooks never flood the actor mailbox (capacity 64). Without
+        // this, every token/tool item does blocking send().await and can stall
+        // client inbound handlers that also need the mailbox.
+        self.begin_research_turn_stream(session_id, &turn).await;
         let result = self
             .run_research_pipeline(
                 session_id,
@@ -423,6 +429,30 @@ impl ServerRuntime {
         } else {
             self.clear_research_child_agents(session_id).await;
         }
+        if let Err(error) = &result {
+            let failure_message = format!("Research failed: {error}");
+            self.emit_turn_item(
+                session_id,
+                turn.turn_id,
+                ItemKind::ResearchArtifact,
+                TurnItem::ResearchArtifact(ResearchArtifactItem {
+                    artifact_type: ResearchArtifactType::Failure,
+                    title: "Research Failure".to_string(),
+                    content: failure_message.clone(),
+                }),
+                serde_json::json!({
+                    "artifact_type": "failure",
+                    "title": "Research Failure",
+                    "content": failure_message
+                }),
+            )
+            .await;
+        }
+        // Merge inline mutations and free the mailbox path before any actor
+        // export/replace or finish work.
+        self.end_research_turn_stream(session_id, turn.turn_id)
+            .await;
+        self.refresh_core_session_prompt_context(session_id).await;
         let final_usage = usage_ledger.lock().await.aggregate();
         self.clear_active_turn_runtime_handles(session_id).await;
 
@@ -431,28 +461,37 @@ impl ServerRuntime {
                 self.finish_research_turn(session_id, turn, TurnStatus::Completed, final_usage)
                     .await;
             }
-            Err(error) => {
-                let failure_message = format!("Research failed: {error}");
-                self.emit_turn_item(
-                    session_id,
-                    turn.turn_id,
-                    ItemKind::ResearchArtifact,
-                    TurnItem::ResearchArtifact(ResearchArtifactItem {
-                        artifact_type: ResearchArtifactType::Failure,
-                        title: "Research Failure".to_string(),
-                        content: failure_message.clone(),
-                    }),
-                    serde_json::json!({
-                        "artifact_type": "failure",
-                        "title": "Research Failure",
-                        "content": failure_message
-                    }),
-                )
-                .await;
-                self.refresh_core_session_prompt_context(session_id).await;
+            Err(_) => {
                 self.finish_research_turn(session_id, turn, TurnStatus::Failed, final_usage)
                     .await;
             }
+        }
+    }
+
+    async fn begin_research_turn_stream(&self, session_id: SessionId, turn: &TurnMetadata) {
+        let Some(session_handle) = self.session(session_id).await else {
+            return;
+        };
+        let Some(stream) = session_handle.begin_inline_turn(turn.clone()).await else {
+            tracing::warn!(
+                session_id = %session_id,
+                turn_id = %turn.turn_id,
+                "failed to begin research inline turn state"
+            );
+            return;
+        };
+        if let Some(spawn_snapshot) = session_handle.spawn_snapshot().await {
+            self.register_turn_spawn_snapshot(session_id, turn.turn_id, Arc::new(spawn_snapshot))
+                .await;
+        }
+        self.register_active_stream(session_id, stream).await;
+    }
+
+    async fn end_research_turn_stream(&self, session_id: SessionId, turn_id: TurnId) {
+        self.clear_turn_spawn_snapshot(session_id, turn_id).await;
+        self.unregister_active_stream(session_id).await;
+        if let Some(session_handle) = self.session(session_id).await {
+            session_handle.end_inline_turn().await;
         }
     }
 
@@ -587,7 +626,6 @@ impl ServerRuntime {
             context_reference,
         )
         .await;
-        self.refresh_core_session_prompt_context(session_id).await;
         Ok(())
     }
 
@@ -1090,13 +1128,18 @@ impl ServerRuntime {
         turn.status = status.clone();
         turn.completed_at = Some(Utc::now());
         let own_usage = final_usage.to_turn_usage();
+        let latest_query = self
+            .parent_usage_snapshot(session_id, turn.turn_id)
+            .await
+            .map(|snapshot| snapshot.latest_query_usage.to_turn_usage())
+            .unwrap_or_else(|| own_usage.clone());
         let usage = self
-            .publish_parent_turn_usage(
+            .publish_parent_turn_totals_and_latest(
                 session_id,
                 turn.turn_id,
                 own_usage.clone(),
+                latest_query,
                 /*context_window*/ None,
-                super::subagent_usage::UsageUpdateKind::InFlight,
             )
             .await
             .map(|snapshot| snapshot.turn_usage.to_turn_usage())
@@ -1166,19 +1209,20 @@ impl ServerRuntime {
         usage: ResearchUsageTotals,
         context_window: Option<u64>,
     ) {
+        let latest_query = usage.to_turn_usage();
         let aggregate = {
             let mut ledger = usage_ledger.lock().await;
             ledger.by_invocation.insert(usage_key, usage);
             ledger.aggregate()
         };
-        // Research ledger already aggregates all invocations; publish as
-        // in-flight replacement so repeated updates do not double-count.
-        self.publish_parent_turn_usage(
+        // Research ledger aggregates all invocations for session/turn totals,
+        // but context-window display must use only the latest invocation.
+        self.publish_parent_turn_totals_and_latest(
             session_id,
             turn_id,
             aggregate.to_turn_usage(),
+            latest_query,
             context_window,
-            super::subagent_usage::UsageUpdateKind::InFlight,
         )
         .await;
     }

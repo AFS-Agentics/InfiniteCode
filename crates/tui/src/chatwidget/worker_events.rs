@@ -587,7 +587,7 @@ impl ChatWidget {
                 } else {
                     "Tool completed"
                 });
-                if Self::should_auto_show_git_diff(&resolved_title, is_error) {
+                if self.should_auto_show_git_diff_for_turn(&resolved_title, is_error) {
                     let tx = self.app_event_tx.clone();
                     tokio::spawn(async move {
                         let text = Self::format_git_diff_result(get_git_diff().await);
@@ -703,7 +703,7 @@ impl ChatWidget {
                 } else {
                     "Tool completed"
                 });
-                if Self::should_auto_show_git_diff(&resolved_title, is_error) {
+                if self.should_auto_show_git_diff_for_turn(&resolved_title, is_error) {
                     let tx = self.app_event_tx.clone();
                     tokio::spawn(async move {
                         let text = Self::format_git_diff_result(get_git_diff().await);
@@ -851,6 +851,7 @@ impl ChatWidget {
                 prompt_token_estimate,
             } => {
                 let was_interrupted = stop_reason.contains("Interrupted");
+                self.active_turn_is_research = false;
                 self.commit_active_streams(DotStatus::Completed);
                 if was_interrupted
                     && let Some(cell) = self
@@ -926,6 +927,7 @@ impl ChatWidget {
                 last_query_input_tokens,
             } => {
                 self.resume_browser_loading = false;
+                self.active_turn_is_research = false;
                 self.commit_active_streams(DotStatus::Failed);
                 self.active_tool_calls.clear();
                 self.pending_tool_calls.clear();

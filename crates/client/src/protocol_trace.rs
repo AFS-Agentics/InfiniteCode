@@ -120,14 +120,14 @@ impl ProtocolTrace {
 }
 
 fn resolve_trace_path() -> PathBuf {
-    if let Ok(explicit) = std::env::var("DEVO_PROTOCOL_TRACE_FILE") {
-        if !explicit.is_empty() {
-            let path = PathBuf::from(&explicit);
-            if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            return path;
+    if let Ok(explicit) = std::env::var("DEVO_PROTOCOL_TRACE_FILE")
+        && !explicit.is_empty()
+    {
+        let path = PathBuf::from(&explicit);
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
         }
+        return path;
     }
 
     let base = devo_util_paths::find_devo_home()

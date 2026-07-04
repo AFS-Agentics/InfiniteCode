@@ -49,7 +49,7 @@ impl ChatWidget {
         self.set_status_message(format!("Cannot change {noun} while generating"));
     }
 
-    pub(super) fn handle_slash_command(&mut self, command: SlashCommand, argument: String) {
+    pub(crate) fn handle_slash_command(&mut self, command: SlashCommand, argument: String) {
         if !self.can_change_configuration() && !command.available_during_task() {
             self.add_busy_configuration_message(command);
             return;
@@ -188,6 +188,7 @@ impl ChatWidget {
                     self.active_accent_color(),
                     self.current_turn_mode,
                 ));
+                self.active_turn_is_research = true;
                 self.app_event_tx
                     .send(AppEvent::Command(AppCommand::RunResearch {
                         question: trimmed.to_string(),

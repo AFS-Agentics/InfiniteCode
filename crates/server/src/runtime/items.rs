@@ -393,10 +393,10 @@ impl ServerRuntime {
                 })
             };
             if let Some(rollout) = inline_rollout {
-                if let Some((record, item)) = rollout {
-                    if let Err(error) = self.rollout_store.append_item(&record, item) {
-                        tracing::warn!(session_id = %session_id, error = %error, "failed to persist item line");
-                    }
+                if let Some((record, item)) = rollout
+                    && let Err(error) = self.rollout_store.append_item(&record, item)
+                {
+                    tracing::warn!(session_id = %session_id, error = %error, "failed to persist item line");
                 }
                 return;
             }

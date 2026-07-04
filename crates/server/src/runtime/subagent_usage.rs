@@ -85,7 +85,10 @@ impl UsageTotals {
 pub(crate) struct ParentUsageSnapshot {
     pub(super) session_id: SessionId,
     pub(super) turn_id: TurnId,
+    /// Accumulated usage for the parent turn (all legs + children).
     pub(super) turn_usage: UsageTotals,
+    /// Latest single model-call sample for context-window display.
+    pub(super) latest_query_usage: UsageTotals,
     pub(super) session_totals: UsageTotals,
     pub(super) context_window: Option<u64>,
 }
@@ -113,6 +116,9 @@ struct ParentTurnUsage {
     parent_turn_usage: UsageTotals,
     /// Latest partial usage for the model call still in progress.
     inflight_usage: UsageTotals,
+    /// Most recent single model-call sample (not accumulated).
+    /// Used for context-window display (`last_query_*`).
+    latest_query_usage: UsageTotals,
     context_window: Option<u64>,
 }
 
@@ -177,6 +183,7 @@ impl SubagentUsageState {
                 base_child_totals,
                 parent_turn_usage: UsageTotals::default(),
                 inflight_usage: UsageTotals::default(),
+                latest_query_usage: UsageTotals::default(),
                 context_window,
             });
     }
@@ -215,6 +222,33 @@ impl SubagentUsageState {
             usage,
             kind,
         );
+        state.latest_query_usage = usage;
+        if context_window.is_some() {
+            state.context_window = context_window;
+        }
+        self.snapshot_for_parent_turn(session_id, turn_id)
+    }
+
+    /// Replace parent-turn totals with an explicit snapshot (research ledger)
+    /// while tracking the latest single invocation for context-window display.
+    pub(super) fn record_parent_turn_totals_and_latest(
+        &mut self,
+        session_id: SessionId,
+        turn_id: TurnId,
+        turn_totals: UsageTotals,
+        latest_query: UsageTotals,
+        context_window: Option<u64>,
+    ) -> Option<ParentUsageSnapshot> {
+        let key = ParentTurnKey {
+            session_id,
+            turn_id,
+        };
+        let state = self.parent_turns.get_mut(&key)?;
+        // Research owns the full turn total as a single in-flight snapshot so
+        // repeated ledger publishes do not double-count completed legs.
+        state.parent_turn_usage = UsageTotals::default();
+        state.inflight_usage = turn_totals;
+        state.latest_query_usage = latest_query;
         if context_window.is_some() {
             state.context_window = context_window;
         }
@@ -254,9 +288,14 @@ impl SubagentUsageState {
             );
             owner
         };
-        owner
-            .parent_turn_id
-            .and_then(|turn_id| self.snapshot_for_parent_turn(owner.parent_session_id, turn_id))
+        let parent_turn_id = owner.parent_turn_id?;
+        if let Some(parent) = self.parent_turns.get_mut(&ParentTurnKey {
+            session_id: owner.parent_session_id,
+            turn_id: parent_turn_id,
+        }) {
+            parent.latest_query_usage = usage;
+        }
+        self.snapshot_for_parent_turn(owner.parent_session_id, parent_turn_id)
     }
 
     /// Fold any remaining in-flight child usage into committed totals (e.g. on
@@ -301,6 +340,7 @@ impl SubagentUsageState {
             session_id,
             turn_id,
             turn_usage,
+            latest_query_usage: state.latest_query_usage,
             session_totals,
             context_window: state.context_window,
         })
@@ -420,6 +460,32 @@ impl ServerRuntime {
         Some(snapshot)
     }
 
+    /// Publish research-ledger turn totals while keeping context display on the
+    /// latest single invocation (not the sum of all research stages).
+    pub(super) async fn publish_parent_turn_totals_and_latest(
+        &self,
+        session_id: SessionId,
+        turn_id: TurnId,
+        turn_totals: TurnUsage,
+        latest_query: TurnUsage,
+        context_window: Option<u64>,
+    ) -> Option<ParentUsageSnapshot> {
+        self.begin_parent_usage_turn(session_id, turn_id, context_window)
+            .await;
+        let snapshot = {
+            let mut usage_state = self.subagent_usage.lock().await;
+            usage_state.record_parent_turn_totals_and_latest(
+                session_id,
+                turn_id,
+                UsageTotals::from_turn_usage(&turn_totals),
+                UsageTotals::from_turn_usage(&latest_query),
+                context_window,
+            )
+        }?;
+        self.apply_parent_usage_snapshot(snapshot).await;
+        Some(snapshot)
+    }
+
     pub(super) async fn publish_subagent_turn_usage(
         &self,
         child_session_id: SessionId,
@@ -526,12 +592,13 @@ impl ParentUsageSnapshot {
         TurnUsageUpdatedPayload {
             session_id: self.session_id,
             turn_id: self.turn_id,
-            usage: self.turn_usage.to_turn_usage(),
+            // Context bar / last_query_* use the latest model call only.
+            usage: self.latest_query_usage.to_turn_usage(),
             total_input_tokens: self.session_totals.input_tokens,
             total_output_tokens: self.session_totals.output_tokens,
             total_tokens: self.session_totals.total_tokens,
             total_cache_read_tokens: self.session_totals.cache_read_input_tokens,
-            last_query_input_tokens: self.turn_usage.input_tokens,
+            last_query_input_tokens: self.latest_query_usage.input_tokens,
             context_window: self.context_window,
         }
     }
@@ -559,7 +626,7 @@ impl ParentUsageSnapshot {
         summary.total_tokens = self.session_totals.total_tokens;
         summary.total_cache_creation_tokens = self.session_totals.cache_creation_input_tokens;
         summary.total_cache_read_tokens = self.session_totals.cache_read_input_tokens;
-        summary.last_query_total_tokens = self.turn_usage.total_tokens;
+        summary.last_query_total_tokens = self.latest_query_usage.total_tokens;
     }
 }
 
@@ -625,6 +692,7 @@ mod tests {
             )
             .expect("child snapshot");
         assert_eq!(child_snapshot.turn_usage, totals(28, 7));
+        assert_eq!(child_snapshot.latest_query_usage, totals(20, 5));
         assert_eq!(child_snapshot.session_totals, totals(128, 17));
 
         let updated_child_snapshot = state
@@ -636,6 +704,7 @@ mod tests {
             )
             .expect("updated child snapshot");
         assert_eq!(updated_child_snapshot.turn_usage, totals(33, 8));
+        assert_eq!(updated_child_snapshot.latest_query_usage, totals(25, 6));
         assert_eq!(updated_child_snapshot.session_totals, totals(133, 18));
     }
 
@@ -658,6 +727,7 @@ mod tests {
             )
             .expect("first leg");
         assert_eq!(after_first_leg.turn_usage, totals(600, 50));
+        assert_eq!(after_first_leg.latest_query_usage, totals(600, 50));
         assert_eq!(after_first_leg.session_totals, totals(700, 60));
 
         // Second model call starts (typical UsageDelta with output_tokens = 0).
@@ -671,6 +741,7 @@ mod tests {
             )
             .expect("second leg start");
         assert_eq!(after_second_start.turn_usage, totals(1300, 50));
+        assert_eq!(after_second_start.latest_query_usage, totals(700, 0));
         assert_eq!(after_second_start.session_totals, totals(1400, 60));
 
         // Second model call completes.
@@ -684,7 +755,54 @@ mod tests {
             )
             .expect("second leg complete");
         assert_eq!(after_second_leg.turn_usage, totals(1300, 80));
+        assert_eq!(after_second_leg.latest_query_usage, totals(700, 30));
         assert_eq!(after_second_leg.session_totals, totals(1400, 90));
+    }
+
+    #[test]
+    fn research_totals_accumulate_but_context_uses_latest_invocation() {
+        let mut state = SubagentUsageState::default();
+        let parent_session_id = SessionId::new();
+        let parent_turn_id = TurnId::new();
+
+        state.begin_parent_turn(
+            parent_session_id,
+            parent_turn_id,
+            totals(0, 0),
+            Some(200_000),
+        );
+
+        let after_first = state
+            .record_parent_turn_totals_and_latest(
+                parent_session_id,
+                parent_turn_id,
+                totals(8_000, 1_000),
+                totals(8_000, 1_000),
+                Some(200_000),
+            )
+            .expect("first research invocation");
+        assert_eq!(after_first.turn_usage, totals(8_000, 1_000));
+        assert_eq!(after_first.latest_query_usage, totals(8_000, 1_000));
+
+        let after_second = state
+            .record_parent_turn_totals_and_latest(
+                parent_session_id,
+                parent_turn_id,
+                totals(20_000, 3_000),
+                totals(12_000, 2_000),
+                Some(200_000),
+            )
+            .expect("second research invocation");
+        assert_eq!(after_second.turn_usage, totals(20_000, 3_000));
+        assert_eq!(after_second.latest_query_usage, totals(12_000, 2_000));
+        assert_eq!(after_second.session_totals, totals(20_000, 3_000));
+
+        let payload = after_second.to_turn_usage_updated_payload();
+        assert_eq!(payload.usage.input_tokens, 12_000);
+        assert_eq!(payload.usage.output_tokens, 2_000);
+        assert_eq!(payload.last_query_input_tokens, 12_000);
+        assert_eq!(payload.total_input_tokens, 20_000);
+        assert_eq!(payload.total_output_tokens, 3_000);
     }
 
     #[test]

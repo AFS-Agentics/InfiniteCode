@@ -446,10 +446,10 @@ async fn write_ndjson_to_stdin(
     trace: Option<&ProtocolTrace>,
 ) -> Result<()> {
     let mut line = serde_json::to_vec(value).context("serialize client payload")?;
-    if let Some(t) = trace {
-        if let Ok(s) = std::str::from_utf8(&line) {
-            t.record(TraceDirection::Out, s);
-        }
+    if let Some(t) = trace
+        && let Ok(s) = std::str::from_utf8(&line)
+    {
+        t.record(TraceDirection::Out, s);
     }
     line.push(b'\n');
     let mut stdin = stdin.lock().await;

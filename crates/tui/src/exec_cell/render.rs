@@ -483,12 +483,12 @@ impl ExecCell {
                 push_owned_lines(&wrapped, &mut out_indented);
             }
 
-            if call.output.is_none() {
-                if let (Some(tool_name), Some(input)) = (&call.tool_name, &call.tool_input) {
-                    let input_lines = tool_input_lines(tool_name, input);
-                    for line in input_lines {
-                        out_indented.push(line.patch_style(Style::default().dim()));
-                    }
+            if call.output.is_none()
+                && let (Some(tool_name), Some(input)) = (&call.tool_name, &call.tool_input)
+            {
+                let input_lines = tool_input_lines(tool_name, input);
+                for line in input_lines {
+                    out_indented.push(line.patch_style(Style::default().dim()));
                 }
             }
         }

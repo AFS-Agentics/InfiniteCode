@@ -8267,6 +8267,49 @@ async fn successful_write_tool_result_triggers_diff_event() {
     );
 }
 
+#[tokio::test]
+async fn research_turn_does_not_auto_show_git_diff() {
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, mut app_event_rx) = widget_with_model(model, PathBuf::from("."));
+
+    widget.handle_slash_command(
+        crate::slash_command::SlashCommand::Research,
+        "DeepSeek official website".to_string(),
+    );
+    assert!(!widget.should_auto_show_git_diff_for_turn("write report.md", false));
+
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
+        tool_use_id: "tool-1".to_string(),
+        summary: "write report.md".to_string(),
+        preparing: false,
+        parsed_commands: None,
+    });
+    widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
+        tool_use_id: "tool-1".to_string(),
+        title: "write report.md".to_string(),
+        preview: "updated".to_string(),
+        is_error: false,
+        truncated: false,
+    });
+
+    let auto_diff = tokio::time::timeout(std::time::Duration::from_millis(200), async {
+        loop {
+            if let Some(AppEvent::DiffResult(_)) = app_event_rx.recv().await {
+                break true;
+            }
+        }
+    })
+    .await;
+    assert!(
+        auto_diff.is_err(),
+        "research turns must not emit automatic DiffResult events"
+    );
+}
+
 #[test]
 fn patch_applied_event_renders_edited_block() {
     let model = Model {

@@ -450,6 +450,24 @@ pub(super) async fn run_session_actor(
                 state = *new_state;
                 let _ = reply.send(());
             }
+            SessionCommand::BeginInlineTurn { turn, reply } => {
+                {
+                    let mut stream = state.stream.lock().await;
+                    stream.turn_inline =
+                        Some(super::turn_inline::TurnInlineState::new(&state, &turn));
+                }
+                let _ = reply.send(Arc::clone(&state.stream));
+            }
+            SessionCommand::EndInlineTurn { reply } => {
+                let inline = {
+                    let mut stream = state.stream.lock().await;
+                    stream.turn_inline.take()
+                };
+                if let Some(inline) = inline {
+                    inline.merge_into(&mut state);
+                }
+                let _ = reply.send(());
+            }
             SessionCommand::Shutdown { reply } => {
                 let _ = reply.send(());
                 break;

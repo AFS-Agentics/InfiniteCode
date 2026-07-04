@@ -1450,6 +1450,7 @@ fn hosted_web_search_researcher_response() -> ModelResponse {
 
 fn supervisor_stream_events(request: &ModelRequest) -> Vec<Result<StreamEvent>> {
     assert_supervisor_request_uses_agent_tools(request);
+    #[allow(clippy::never_loop)]
     for attempt in 1..=3 {
         let spawn_id = format!("spawn-supervisor-worker-{attempt}");
         if !request_has_tool_result(request, &spawn_id) {
@@ -2307,7 +2308,7 @@ fn latest_agent_message(events: &[serde_json::Value]) -> Option<String> {
     events
         .iter()
         .rev()
-        .find_map(|event| agent_message_from_completed_event(event))
+        .find_map(agent_message_from_completed_event)
 }
 
 fn latest_parent_agent_message(
