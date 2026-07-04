@@ -12,6 +12,7 @@ path = "src/lib.rs"
 anyhow = { workspace = true }
 chrono = { workspace = true }
 devo-protocol = { workspace = true }
+devo-util-paths = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 futures = { workspace = true }
@@ -21,3 +22,4 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
+tempfile = { workspace = true }

@@ -25,10 +25,10 @@ use tokio::time::timeout;
 use crate::client_core::ClientWriteMessage;
 use crate::client_core::ClientWriter;
 use crate::client_core::ServerClientCore;
+use crate::protocol_trace::ProtocolTrace;
+use crate::protocol_trace::TraceDirection;
 
 pub use crate::acp_terminal::ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD;
-pub use crate::client_core::ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD;
-pub use crate::client_core::ACP_PROMPT_STARTED_NOTIFICATION_METHOD;
 pub use crate::client_core::ServerNotificationMessage;
 
 const SERVER_CHILD_STDIN_SHUTDOWN_TIMEOUT: Duration = Duration::from_millis(100);
@@ -85,14 +85,21 @@ impl StdioServerClient {
         );
         let reader_state = core.reader_state();
         let stdin = Arc::new(Mutex::new(stdin));
+        let trace = ProtocolTrace::from_env();
 
+        let writer_trace = trace.clone();
         let writer_task = tokio::spawn(run_stdin_writer(
             Arc::clone(&stdin),
             write_rx,
+            writer_trace,
         ));
+        let reader_trace = trace;
         let reader_task = tokio::spawn(async move {
             let mut lines = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = lines.next_line().await {
+                if let Some(ref t) = reader_trace {
+                    t.record(TraceDirection::In, &line);
+                }
                 match serde_json::from_str::<serde_json::Value>(&line) {
                     Ok(message) => reader_state.handle_message(message).await,
                     Err(_) => {
@@ -414,11 +421,12 @@ impl StdioServerClient {
 async fn run_stdin_writer(
     stdin: Arc<Mutex<ChildStdin>>,
     mut write_rx: tokio::sync::mpsc::UnboundedReceiver<ClientWriteMessage>,
+    trace: Option<ProtocolTrace>,
 ) -> Result<()> {
     while let Some(message) = write_rx.recv().await {
         match message {
             ClientWriteMessage::Json(value) => {
-                write_ndjson_to_stdin(&stdin, &value)
+                write_ndjson_to_stdin(&stdin, &value, trace.as_ref())
                     .await
                     .context("write client payload")?;
             }
@@ -438,8 +446,14 @@ async fn run_stdin_writer(
 async fn write_ndjson_to_stdin(
     stdin: &Arc<Mutex<ChildStdin>>,
     value: &serde_json::Value,
+    trace: Option<&ProtocolTrace>,
 ) -> Result<()> {
     let mut line = serde_json::to_vec(value).context("serialize client payload")?;
+    if let Some(t) = trace {
+        if let Ok(s) = std::str::from_utf8(&line) {
+            t.record(TraceDirection::Out, s);
+        }
+    }
     line.push(b'\n');
     let mut stdin = stdin.lock().await;
     stdin.write_all(&line).await.context("write client payload")?;
@@ -508,7 +522,7 @@ mod tests {
             while let Some(message) = write_rx.recv().await {
                 match message {
                     ClientWriteMessage::Json(value) => {
-                        if write_ndjson_to_stdin(&stdin, &value).await.is_err() {
+                        if write_ndjson_to_stdin(&stdin, &value, None).await.is_err() {
                             break;
                         }
                     }
