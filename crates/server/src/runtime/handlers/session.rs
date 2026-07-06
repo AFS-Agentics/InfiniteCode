@@ -106,6 +106,7 @@ impl ServerRuntime {
         let config = core_session.config.clone();
         let pending_turn_queue = Arc::clone(&core_session.pending_turn_queue);
         let btw_input_queue = Arc::clone(&core_session.btw_input_queue);
+        let rollout_path_for_db = record.as_ref().map(|entry| entry.rollout_path.clone());
         let actor_state = SessionActorState {
             runtime_context,
             record,
@@ -134,10 +135,16 @@ impl ServerRuntime {
         self.insert_session_actor(actor_state).await;
         self.subscribe_connection_to_session(connection_id, session_id, None)
             .await;
+        self.runtime_arc()
+            .after_root_session_insert(session_id)
+            .await;
 
         // Persist session metadata to SQLite (skip for ephemeral sessions)
         if !summary.ephemeral
-            && let Err(err) = self.deps.db.upsert_session(&summary)
+            && let Err(err) = self
+                .deps
+                .db
+                .upsert_session(&summary, rollout_path_for_db.as_deref())
         {
             tracing::warn!(
                 session_id = %session_id,
@@ -177,7 +184,35 @@ impl ServerRuntime {
     }
 
     pub(crate) async fn list_session_summaries(&self) -> Vec<SessionMetadata> {
-        self.list_session_summaries_from_actors().await
+        let mut sessions_by_id = match self.deps.db.list_root_sessions() {
+            Ok(sessions) => sessions
+                .into_iter()
+                .map(|session| (session.session_id, session))
+                .collect::<std::collections::HashMap<_, _>>(),
+            Err(error) => {
+                tracing::warn!(error = %error, "failed to list root sessions from database");
+                std::collections::HashMap::new()
+            }
+        };
+
+        for handle in self.list_session_handles().await {
+            let Some(runtime_summary) = handle.summary().await else {
+                continue;
+            };
+            if runtime_summary.ephemeral || runtime_summary.agent_path.is_some() {
+                continue;
+            }
+            sessions_by_id.insert(runtime_summary.session_id, runtime_summary);
+        }
+
+        let mut sessions = sessions_by_id.into_values().collect::<Vec<_>>();
+        sessions.sort_by(|left, right| {
+            right
+                .last_activity_at
+                .cmp(&left.last_activity_at)
+                .then_with(|| right.updated_at.cmp(&left.updated_at))
+        });
+        sessions
     }
 
     pub(crate) async fn handle_session_metadata_update(
@@ -229,7 +264,7 @@ impl ServerRuntime {
 
         // Persist updated session metadata to SQLite
         if !updated_session.ephemeral
-            && let Err(err) = self.deps.db.upsert_session(&updated_session)
+            && let Err(err) = self.deps.db.upsert_session(&updated_session, None)
         {
             tracing::warn!(
                 session_id = %params.session_id,
@@ -366,7 +401,7 @@ impl ServerRuntime {
 
         // Persist updated session metadata to SQLite
         if !summary.ephemeral
-            && let Err(err) = self.deps.db.upsert_session(&summary)
+            && let Err(err) = self.deps.db.upsert_session(&summary, None)
         {
             tracing::warn!(
                 session_id = %params.session_id,
@@ -419,12 +454,44 @@ impl ServerRuntime {
         params: SessionResumeParams,
         tool_registry_update: RuntimeSessionToolRegistryUpdate,
     ) -> serde_json::Value {
-        let Some(session_handle) = self.session(params.session_id).await else {
-            return self.error_response(
-                request_id,
-                ProtocolErrorCode::SessionNotFound,
-                "session does not exist",
-            );
+        let session_handle = match self
+            .runtime_arc()
+            .get_or_load_parent_session(params.session_id)
+            .await
+        {
+            Ok(handle) => handle,
+            Err(crate::runtime::session_cache::LoadSessionError::SessionNotFound) => {
+                return self.error_response(
+                    request_id,
+                    ProtocolErrorCode::SessionNotFound,
+                    "session does not exist",
+                );
+            }
+            Err(crate::runtime::session_cache::LoadSessionError::SubagentNotResumable {
+                parent_session_id,
+            }) => {
+                return self.error_response(
+                    request_id,
+                    ProtocolErrorCode::InvalidParams,
+                    format!(
+                        "subagent sessions cannot be resumed directly; resume the parent session {parent_session_id} instead"
+                    ),
+                );
+            }
+            Err(crate::runtime::session_cache::LoadSessionError::RolloutMissing) => {
+                return self.error_response(
+                    request_id,
+                    ProtocolErrorCode::InternalError,
+                    "session metadata exists but rollout file is missing; session cannot be restored",
+                );
+            }
+            Err(crate::runtime::session_cache::LoadSessionError::RestoreFailed(message)) => {
+                return self.error_response(
+                    request_id,
+                    ProtocolErrorCode::InternalError,
+                    format!("failed to restore session: {message}"),
+                );
+            }
         };
         match tool_registry_update {
             RuntimeSessionToolRegistryUpdate::KeepCurrent => {}
@@ -563,10 +630,29 @@ impl ServerRuntime {
             forked_runtime.record = Some(record);
         }
         let summary = forked_runtime.summary.clone();
+        let rollout_path_for_db = forked_runtime
+            .record
+            .as_ref()
+            .map(|entry| entry.rollout_path.clone());
         self.insert_session_actor(SessionActorState::from_runtime_session(forked_runtime))
             .await;
         self.subscribe_connection_to_session(connection_id, forked_id, None)
             .await;
+        self.runtime_arc()
+            .after_root_session_insert(forked_id)
+            .await;
+        if !summary.ephemeral
+            && let Err(err) = self
+                .deps
+                .db
+                .upsert_session(&summary, rollout_path_for_db.as_deref())
+        {
+            tracing::warn!(
+                session_id = %forked_id,
+                error = %err,
+                "failed to persist forked session metadata to database"
+            );
+        }
         tracing::info!(
             connection_id,
             source_session_id = %params.session_id,

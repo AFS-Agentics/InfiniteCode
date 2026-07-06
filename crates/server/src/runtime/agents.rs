@@ -128,6 +128,7 @@ impl ServerRuntime {
             Some(record)
         };
 
+        let rollout_path_for_db = record.as_ref().map(|entry| entry.rollout_path.clone());
         let mut core_session = runtime_context.new_session_state(
             child_session_id,
             parent_summary.cwd.clone(),
@@ -281,7 +282,10 @@ impl ServerRuntime {
         )
         .await;
         if !summary.ephemeral
-            && let Err(error) = self.deps.db.upsert_session(&summary)
+            && let Err(error) = self.deps.db.upsert_session(
+                &summary,
+                rollout_path_for_db.as_deref().map(std::path::Path::new),
+            )
         {
             tracing::warn!(
                 session_id = %child_session_id,

@@ -1706,3 +1706,405 @@ async fn interrupt_mid_stream_does_not_duplicate_last_item_on_resume() -> Result
 
     Ok(())
 }
+
+#[tokio::test]
+async fn lazy_resume_loads_parent_session_from_rollout_on_map_miss() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
+
+    let start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 1,
+                "method": "session/start",
+                "params": {
+                    "cwd": data_root.path(),
+                    "ephemeral": false,
+                    "title": "Lazy resume session",
+                    "model": "test-model"
+                }
+            }),
+        )
+        .await
+        .context("session/start response")?;
+    let session_id = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+    >(start_response)?
+    .result
+    .session
+    .session_id;
+
+    let turn_start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 2,
+                "method": "_devo/turn/start",
+                "params": {
+                    "session_id": session_id,
+                    "input": [{ "type": "text", "text": "persist for lazy resume" }],
+                    "model": null,
+                    "sandbox": null,
+                    "approval_policy": null,
+                    "cwd": null
+                }
+            }),
+        )
+        .await
+        .context("turn/start response")?;
+    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+        serde_json::from_value(turn_start_response)?;
+    wait_for_turn_completed(&mut notifications_rx).await?;
+
+    let rebuilt_runtime = build_runtime(data_root.path())?;
+    rebuilt_runtime.refresh_session_index()?;
+
+    let (rebuilt_connection_id, _rebuilt_notifications_rx) =
+        initialize_connection(&rebuilt_runtime).await?;
+    let resume_response = rebuilt_runtime
+        .handle_incoming(
+            rebuilt_connection_id,
+            serde_json::json!({
+                "id": 3,
+                "method": "_devo/session/resume",
+                "params": { "session_id": session_id }
+            }),
+        )
+        .await
+        .context("session/resume response")?;
+    let resume_result = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+    >(resume_response)?
+    .result;
+    assert_eq!(resume_result.session.session_id, session_id);
+    Ok(())
+}
+
+#[tokio::test]
+async fn lazy_resume_after_compat_backfill_without_refresh_session_index() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
+
+    let start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 1,
+                "method": "session/start",
+                "params": {
+                    "cwd": data_root.path(),
+                    "ephemeral": false,
+                    "title": "Lazy resume backfill",
+                    "model": "test-model"
+                }
+            }),
+        )
+        .await
+        .context("session/start response")?;
+    let session_id = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+    >(start_response)?
+    .result
+    .session
+    .session_id;
+
+    let turn_start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 2,
+                "method": "_devo/turn/start",
+                "params": {
+                    "session_id": session_id,
+                    "input": [{ "type": "text", "text": "persist for compat backfill" }],
+                    "model": null,
+                    "sandbox": null,
+                    "approval_policy": null,
+                    "cwd": null
+                }
+            }),
+        )
+        .await
+        .context("turn/start response")?;
+    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+        serde_json::from_value(turn_start_response)?;
+    wait_for_turn_completed(&mut notifications_rx).await?;
+
+    let db_path = data_root.path().join("test_persistence.db");
+    {
+        let conn = rusqlite::Connection::open(&db_path)?;
+        conn.execute(
+            "UPDATE sessions SET rollout_path = NULL WHERE id = ?1",
+            rusqlite::params![session_id.to_string()],
+        )?;
+    }
+
+    let rebuilt_runtime = build_runtime(data_root.path())?;
+    assert!(rebuilt_runtime.backfill_session_index_if_required()?);
+
+    let (rebuilt_connection_id, _) = initialize_connection(&rebuilt_runtime).await?;
+    let resume_response = rebuilt_runtime
+        .handle_incoming(
+            rebuilt_connection_id,
+            serde_json::json!({
+                "id": 3,
+                "method": "_devo/session/resume",
+                "params": { "session_id": session_id }
+            }),
+        )
+        .await
+        .context("session/resume response")?;
+    let resume_result = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+    >(resume_response)?
+    .result;
+    assert_eq!(resume_result.session.session_id, session_id);
+    Ok(())
+}
+
+#[tokio::test]
+async fn concurrent_lazy_resume_single_actor() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
+
+    let start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 1,
+                "method": "session/start",
+                "params": {
+                    "cwd": data_root.path(),
+                    "ephemeral": false,
+                    "title": "Concurrent lazy resume",
+                    "model": "test-model"
+                }
+            }),
+        )
+        .await
+        .context("session/start response")?;
+    let session_id = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+    >(start_response)?
+    .result
+    .session
+    .session_id;
+
+    let turn_start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 2,
+                "method": "_devo/turn/start",
+                "params": {
+                    "session_id": session_id,
+                    "input": [{ "type": "text", "text": "persist for concurrent resume" }],
+                    "model": null,
+                    "sandbox": null,
+                    "approval_policy": null,
+                    "cwd": null
+                }
+            }),
+        )
+        .await
+        .context("turn/start response")?;
+    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+        serde_json::from_value(turn_start_response)?;
+    wait_for_turn_completed(&mut notifications_rx).await?;
+
+    let rebuilt_runtime = build_runtime(data_root.path())?;
+    rebuilt_runtime.refresh_session_index()?;
+    let (connection_a, _) = initialize_connection(&rebuilt_runtime).await?;
+    let (connection_b, _) = initialize_connection(&rebuilt_runtime).await?;
+
+    let request_a = rebuilt_runtime.handle_incoming(
+        connection_a,
+        serde_json::json!({
+            "id": 3,
+            "method": "_devo/session/resume",
+            "params": { "session_id": session_id }
+        }),
+    );
+    let request_b = rebuilt_runtime.handle_incoming(
+        connection_b,
+        serde_json::json!({
+            "id": 4,
+            "method": "_devo/session/resume",
+            "params": { "session_id": session_id }
+        }),
+    );
+    let (response_a, response_b) = tokio::join!(request_a, request_b);
+    let response_a = response_a.context("first session/resume response")?;
+    let response_b = response_b.context("second session/resume response")?;
+    let result_a = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+    >(response_a)?
+    .result;
+    let result_b = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+    >(response_b)?
+    .result;
+    assert_eq!(result_a.session.session_id, session_id);
+    assert_eq!(result_b.session.session_id, session_id);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn lazy_resume_rejects_subagent_session_ids() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let parent_id = SessionId::new();
+    let child_id = SessionId::new();
+    let now = chrono::Utc::now();
+    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    let mut parent = sample_indexed_session(parent_id, data_root.path(), now, None);
+    parent.title = Some("Parent".into());
+    db.upsert_session(&parent, Some("/tmp/parent.jsonl".as_ref()))?;
+    let mut child = sample_indexed_session(child_id, data_root.path(), now, Some(parent_id));
+    child.title = Some("Child".into());
+    child.agent_path = Some("root/subagent".into());
+    db.upsert_session(&child, Some("/tmp/child.jsonl".as_ref()))?;
+    let runtime = build_runtime(data_root.path())?;
+
+    let (connection_id, _) = initialize_connection(&runtime).await?;
+    let resume_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 1,
+                "method": "_devo/session/resume",
+                "params": { "session_id": child_id }
+            }),
+        )
+        .await
+        .context("session/resume response")?;
+    let error = serde_json::from_value::<devo_server::ErrorResponse>(resume_response)?;
+    assert_eq!(
+        error.error.code,
+        devo_server::ProtocolErrorCode::InvalidParams
+    );
+    assert!(
+        error
+            .error
+            .message
+            .contains("subagent sessions cannot be resumed directly")
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn lazy_resume_fails_when_rollout_file_is_missing() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
+
+    let start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 1,
+                "method": "session/start",
+                "params": {
+                    "cwd": data_root.path(),
+                    "ephemeral": false,
+                    "title": "Missing rollout",
+                    "model": "test-model"
+                }
+            }),
+        )
+        .await
+        .context("session/start response")?;
+    let session_id = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+    >(start_response)?
+    .result
+    .session
+    .session_id;
+
+    let turn_start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 2,
+                "method": "_devo/turn/start",
+                "params": {
+                    "session_id": session_id,
+                    "input": [{ "type": "text", "text": "create rollout then delete it" }],
+                    "model": null,
+                    "sandbox": null,
+                    "approval_policy": null,
+                    "cwd": null
+                }
+            }),
+        )
+        .await
+        .context("turn/start response")?;
+    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+        serde_json::from_value(turn_start_response)?;
+    wait_for_turn_completed(&mut notifications_rx).await?;
+
+    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    let index = db.get_session_index(&session_id)?.expect("indexed session");
+    let rollout_path = index.rollout_path.expect("rollout path");
+    std::fs::remove_file(&rollout_path)?;
+
+    let rebuilt_runtime = build_runtime(data_root.path())?;
+    let (rebuilt_connection_id, _) = initialize_connection(&rebuilt_runtime).await?;
+    let resume_response = rebuilt_runtime
+        .handle_incoming(
+            rebuilt_connection_id,
+            serde_json::json!({
+                "id": 3,
+                "method": "_devo/session/resume",
+                "params": { "session_id": session_id }
+            }),
+        )
+        .await
+        .context("session/resume response")?;
+    let error = serde_json::from_value::<devo_server::ErrorResponse>(resume_response)?;
+    assert_eq!(
+        error.error.code,
+        devo_server::ProtocolErrorCode::InternalError
+    );
+    assert!(error.error.message.contains("rollout file is missing"));
+    Ok(())
+}
+
+fn sample_indexed_session(
+    session_id: SessionId,
+    cwd: &std::path::Path,
+    now: chrono::DateTime<chrono::Utc>,
+    parent_session_id: Option<SessionId>,
+) -> devo_server::SessionMetadata {
+    devo_server::SessionMetadata {
+        session_id,
+        cwd: cwd.to_path_buf(),
+        additional_directories: Vec::new(),
+        created_at: now,
+        updated_at: now,
+        last_activity_at: now,
+        title: None,
+        title_state: devo_core::SessionTitleState::Unset,
+        parent_session_id,
+        agent_path: None,
+        agent_nickname: None,
+        agent_role: None,
+        ephemeral: false,
+        model: Some("test-model".into()),
+        model_binding_id: None,
+        reasoning_effort_selection: None,
+        reasoning_effort: None,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_tokens: 0,
+        total_cache_creation_tokens: 0,
+        total_cache_read_tokens: 0,
+        prompt_token_estimate: 0,
+        last_query_total_tokens: 0,
+        status: devo_protocol::SessionRuntimeStatus::Idle,
+    }
+}

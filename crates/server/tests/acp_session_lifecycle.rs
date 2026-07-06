@@ -1072,7 +1072,11 @@ async fn create_acp_session(
         )
         .await
         .context("session/new response")?;
-    let response: AcpSuccessResponse<AcpNewSessionResult> = serde_json::from_value(response)?;
+    if response.get("result").is_none() {
+        anyhow::bail!("session/new error response: {response}");
+    }
+    let response: AcpSuccessResponse<AcpNewSessionResult> =
+        serde_json::from_value(response).context("decode session/new success response")?;
     Ok(response.result.session_id)
 }
 
@@ -1097,7 +1101,15 @@ async fn list_acp_sessions(
         )
         .await
         .context("session/list response")?;
-    Ok(serde_json::from_value::<AcpSuccessResponse<AcpListSessionsResult>>(response)?.result)
+    if response.get("result").is_none() {
+        panic!("session/list error response: {response}");
+    }
+    let response_for_error = response.clone();
+    serde_json::from_value::<AcpSuccessResponse<AcpListSessionsResult>>(response)
+        .map(|success| success.result)
+        .map_err(|error| {
+            anyhow::anyhow!("session/list decode failed: {error}; response={response_for_error}")
+        })
 }
 
 async fn wait_for_response<T>(
@@ -1281,6 +1293,92 @@ async fn assert_auth_required(
         error.error.data,
         serde_json::json!({ "reason": "auth_required" })
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn acp_session_list_includes_live_actor_missing_from_database() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, _notifications_rx) = initialize_acp_connection(&runtime).await?;
+    let cwd = data_root.path().join("repo");
+    std::fs::create_dir_all(&cwd)?;
+    let session_id = create_acp_session(&runtime, connection_id, &cwd, 10).await?;
+
+    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    db.delete_session(&session_id)?;
+
+    let result = list_acp_sessions(&runtime, connection_id, 11, None, None).await?;
+    let listed = result
+        .sessions
+        .iter()
+        .filter_map(|session| session.meta.as_ref())
+        .filter_map(|meta| meta.get(devo_server::DEVO_SESSION_META))
+        .map(|value| serde_json::from_value::<devo_server::SessionMetadata>(value.clone()))
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        listed
+            .iter()
+            .filter(|session| session.session_id == session_id)
+            .count(),
+        1
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn acp_session_resume_lazy_loads_without_memory_actor() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, mut notifications_rx) = initialize_acp_connection(&runtime).await?;
+    let cwd = data_root.path().join("repo");
+    std::fs::create_dir_all(&cwd)?;
+    let session_id = create_acp_session(&runtime, connection_id, &cwd, 10).await?;
+
+    let prompt_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 11,
+                "method": "session/prompt",
+                "params": {
+                    "sessionId": session_id,
+                    "prompt": [
+                        {
+                            "type": "text",
+                            "text": "persist for lazy ACP resume"
+                        }
+                    ]
+                }
+            }),
+        )
+        .await;
+    assert_eq!(prompt_response, None);
+    let _: AcpSuccessResponse<AcpPromptResult> =
+        wait_for_response(&mut notifications_rx, 11).await?;
+
+    let restored_runtime = build_runtime(data_root.path())?;
+    restored_runtime.refresh_session_index()?;
+    let (restored_connection_id, mut restored_notifications_rx) =
+        initialize_acp_connection(&restored_runtime).await?;
+    let resume_response = restored_runtime
+        .handle_incoming(
+            restored_connection_id,
+            serde_json::json!({
+                "id": 12,
+                "method": "session/resume",
+                "params": {
+                    "sessionId": session_id,
+                    "cwd": path_value(&cwd),
+                    "mcpServers": []
+                }
+            }),
+        )
+        .await
+        .context("session/resume response")?;
+    assert!(resume_response["result"].is_object());
+    let _: AcpSuccessResponse<AcpResumeSessionResult> = serde_json::from_value(resume_response)?;
+    assert_no_replayed_history(&mut restored_notifications_rx).await?;
     Ok(())
 }
 

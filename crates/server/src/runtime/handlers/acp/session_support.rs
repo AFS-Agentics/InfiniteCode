@@ -9,22 +9,15 @@ impl ServerRuntime {
         session_id: SessionId,
         cwd: &Path,
     ) -> Result<(), (AcpErrorCode, String)> {
-        let Some(session_arc) = self.sessions.lock().await.get(&session_id).cloned() else {
+        let stored_cwd = self
+            .resolve_indexed_session_cwd(session_id)
+            .map_err(|error| (AcpErrorCode::ServerError, error.to_string()))?;
+        let Some(stored_cwd) = stored_cwd else {
             return Err((
                 AcpErrorCode::ServerError,
                 "session does not exist".to_string(),
             ));
         };
-        let stored_cwd = session_arc
-            .summary()
-            .await
-            .ok_or_else(|| {
-                (
-                    AcpErrorCode::ServerError,
-                    "session actor unavailable".to_string(),
-                )
-            })?
-            .cwd;
         if stored_cwd != cwd {
             return Err((
                 AcpErrorCode::InvalidParams,
@@ -32,6 +25,14 @@ impl ServerRuntime {
             ));
         }
         Ok(())
+    }
+
+    fn resolve_indexed_session_cwd(
+        &self,
+        session_id: SessionId,
+    ) -> anyhow::Result<Option<PathBuf>> {
+        self.rollout_store
+            .resolve_indexed_session_cwd(&self.deps.db, &session_id)
     }
 
     pub(super) async fn acp_session_tool_registry(
@@ -111,7 +112,7 @@ impl ServerRuntime {
         }
 
         if !updated_summary.ephemeral
-            && let Err(error) = self.deps.db.upsert_session(&updated_summary)
+            && let Err(error) = self.deps.db.upsert_session(&updated_summary, None)
         {
             tracing::warn!(
                 session_id = %session_id,

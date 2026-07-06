@@ -179,6 +179,7 @@ mod research_streaming;
 mod research_tool_runtime;
 mod research_tools;
 mod session_actor;
+mod session_cache;
 mod session_interactive;
 mod skills;
 mod subagent_usage;
@@ -248,6 +249,10 @@ pub struct ServerRuntime {
     active_workspace_baselines: Mutex<HashMap<TurnId, ActiveWorkspaceBaseline>>,
     /// Weak back-reference used when session actors need the owning runtime `Arc`.
     self_weak: std::sync::Weak<ServerRuntime>,
+    /// LRU order for loaded root session actors.
+    session_lru: Mutex<session_cache::ParentSessionLru>,
+    /// Per-session gate that serializes lazy parent session hydration.
+    parent_session_load_gate: Arc<session_cache::SessionLoadGate>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -352,6 +357,10 @@ impl ServerRuntime {
             command_exec_manager: command_exec::CommandExecManager::new(),
             active_workspace_baselines: Mutex::new(HashMap::new()),
             self_weak: self_weak.clone(),
+            session_lru: Mutex::new(session_cache::ParentSessionLru::new(
+                session_cache::PARENT_SESSION_LRU_CAPACITY,
+            )),
+            parent_session_load_gate: Arc::new(session_cache::SessionLoadGate::default()),
         })
     }
 }

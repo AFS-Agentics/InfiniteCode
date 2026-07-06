@@ -23,11 +23,18 @@ impl ServerRuntime {
     ) -> super::SessionHandle {
         let runtime = self.runtime_arc();
         let session_id = state.session_id();
+        if let Some(existing) = self.sessions.lock().await.get(&session_id).cloned() {
+            return existing;
+        }
+
         let handle = super::SessionHandle::spawn(session_id, state, runtime);
-        self.sessions
-            .lock()
-            .await
-            .insert(session_id, handle.clone());
+        let mut sessions = self.sessions.lock().await;
+        if let Some(existing) = sessions.get(&session_id).cloned() {
+            drop(sessions);
+            handle.shutdown().await;
+            return existing;
+        }
+        sessions.insert(session_id, handle.clone());
         handle
     }
 
@@ -45,6 +52,7 @@ impl ServerRuntime {
         self.sessions.lock().await.values().cloned().collect()
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn list_session_summaries_from_actors(
         &self,
     ) -> Vec<crate::session::SessionMetadata> {

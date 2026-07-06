@@ -250,7 +250,7 @@ impl ServerRuntime {
 
         if let Some(updated_session) = updated_session
             && !updated_session.ephemeral
-            && let Err(error) = self.deps.db.upsert_session(&updated_session)
+            && let Err(error) = self.deps.db.upsert_session(&updated_session, None)
         {
             tracing::warn!(
                 session_id = %params.session_id,

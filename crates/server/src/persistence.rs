@@ -360,6 +360,93 @@ impl RolloutStore {
         Ok(sessions)
     }
 
+    /// Indexes rollout SessionMeta headers into SQLite without replaying turns.
+    pub(crate) fn index_rollout_metadata(&self, db: &crate::db::Database) -> Result<()> {
+        let mut canonical =
+            HashMap::<SessionId, (chrono::DateTime<Utc>, PathBuf, SessionRecord)>::new();
+        for rollout_path in self.rollout_paths()? {
+            match read_rollout_index_fields(&rollout_path) {
+                Ok((record, last_activity_at)) => match canonical.get(&record.id) {
+                    Some((existing_activity, existing_path, _)) => {
+                        if last_activity_at > *existing_activity {
+                            tracing::warn!(
+                                session_id = %record.id,
+                                kept_rollout_path = %rollout_path.display(),
+                                replaced_rollout_path = %existing_path.display(),
+                                "duplicate rollout for session id; keeping newest last_activity_at"
+                            );
+                            canonical.insert(record.id, (last_activity_at, rollout_path, record));
+                        } else {
+                            tracing::warn!(
+                                session_id = %record.id,
+                                kept_rollout_path = %existing_path.display(),
+                                ignored_rollout_path = %rollout_path.display(),
+                                "duplicate rollout for session id; keeping newest last_activity_at"
+                            );
+                        }
+                    }
+                    None => {
+                        canonical.insert(record.id, (last_activity_at, rollout_path, record));
+                    }
+                },
+                Err(error) => {
+                    tracing::warn!(
+                        rollout_path = %rollout_path.display(),
+                        error = %error,
+                        "failed to index rollout metadata; skipping file"
+                    );
+                }
+            }
+        }
+
+        for (session_id, (last_activity_at, rollout_path, record)) in canonical {
+            let metadata = session_metadata_from_record(&record, last_activity_at);
+            if let Err(error) =
+                db.upsert_rollout_index_session(&metadata, Some(rollout_path.as_path()))
+            {
+                tracing::warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "failed to upsert indexed session metadata"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Finds a rollout file by session id suffix when the SQLite index is stale.
+    pub(crate) fn find_rollout_by_session_id(
+        &self,
+        session_id: &SessionId,
+    ) -> Result<Option<PathBuf>> {
+        let suffix = format!("-{session_id}.jsonl");
+        for rollout_path in self.rollout_paths()? {
+            let Some(file_name) = rollout_path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            if file_name.ends_with(&suffix) {
+                return Ok(Some(rollout_path));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Resolves a session cwd from the SQLite index, falling back to rollout SessionMeta.
+    pub(crate) fn resolve_indexed_session_cwd(
+        &self,
+        db: &crate::db::Database,
+        session_id: &SessionId,
+    ) -> Result<Option<PathBuf>> {
+        if let Some(index) = db.get_session_index(session_id)? {
+            return Ok(Some(index.metadata.cwd));
+        }
+        if let Some(rollout_path) = self.find_rollout_by_session_id(session_id)? {
+            let (record, _) = read_rollout_index_fields(&rollout_path)?;
+            return Ok(Some(record.cwd));
+        }
+        Ok(None)
+    }
+
     /// Deletes canonical rollout files for a session.
     pub(crate) fn delete_session_rollouts(&self, session_id: &SessionId) -> Result<bool> {
         let suffix = format!("-{session_id}.jsonl");
@@ -394,7 +481,7 @@ impl RolloutStore {
         Ok(deleted)
     }
 
-    async fn load_session_from_rollout(
+    pub(crate) async fn load_session_from_rollout(
         &self,
         rollout_path: &Path,
         deps: &ServerRuntimeDependencies,
@@ -433,7 +520,7 @@ impl RolloutStore {
             .with_context(|| format!("replay rollout {}", rollout_path.display()))
     }
 
-    fn rollout_paths(&self) -> Result<Vec<PathBuf>> {
+    pub(crate) fn rollout_paths(&self) -> Result<Vec<PathBuf>> {
         let mut files = Vec::new();
         let root = self.data_root.join("sessions");
         if !root.exists() {
@@ -1493,6 +1580,83 @@ fn apply_prompt_turn_item(
     }
 }
 
+fn read_rollout_index_fields(path: &Path) -> Result<(SessionRecord, chrono::DateTime<Utc>)> {
+    let file = File::open(path).with_context(|| format!("open rollout file {}", path.display()))?;
+    let reader = BufReader::new(file);
+    let mut session: Option<SessionRecord> = None;
+    let mut last_activity_at: Option<chrono::DateTime<Utc>> = None;
+
+    for line in reader.lines() {
+        let line = line.with_context(|| format!("read line from {}", path.display()))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let parsed = match serde_json::from_str::<RolloutLine>(&line) {
+            Ok(parsed) => parsed,
+            Err(_) => continue,
+        };
+        match parsed {
+            RolloutLine::SessionMeta(meta_line) => {
+                let mut record = meta_line.session;
+                if record.last_activity_at.is_none() {
+                    record.last_activity_at = Some(record.created_at);
+                }
+                last_activity_at = record.last_activity_at;
+                session = Some(record);
+            }
+            RolloutLine::SessionTitleUpdated(line) => {
+                if let Some(record) = session.as_mut() {
+                    record.title = Some(line.title);
+                    record.title_state = line.title_state;
+                    record.updated_at = line.timestamp;
+                    last_activity_at = Some(line.timestamp);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let session = session
+        .with_context(|| format!("missing SessionMeta line in rollout {}", path.display()))?;
+    let last_activity_at = last_activity_at
+        .or(session.last_activity_at)
+        .unwrap_or(session.created_at);
+    Ok((session, last_activity_at))
+}
+
+fn session_metadata_from_record(
+    record: &SessionRecord,
+    last_activity_at: chrono::DateTime<Utc>,
+) -> SessionMetadata {
+    SessionMetadata {
+        session_id: record.id,
+        cwd: record.cwd.clone(),
+        additional_directories: record.additional_directories.clone(),
+        created_at: record.created_at,
+        updated_at: record.updated_at,
+        last_activity_at,
+        title: record.title.clone(),
+        title_state: record.title_state.clone(),
+        parent_session_id: record.parent_session_id,
+        agent_path: record.agent_path.clone(),
+        agent_nickname: record.agent_nickname.clone(),
+        agent_role: record.agent_role.clone(),
+        ephemeral: false,
+        model: record.model.clone(),
+        model_binding_id: record.model_binding_id.clone(),
+        reasoning_effort_selection: record.reasoning_effort_selection.clone(),
+        reasoning_effort: None,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_tokens: 0,
+        total_cache_creation_tokens: 0,
+        total_cache_read_tokens: 0,
+        prompt_token_estimate: 0,
+        last_query_total_tokens: 0,
+        status: SessionRuntimeStatus::Idle,
+    }
+}
+
 fn collect_rollout_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     for entry in std::fs::read_dir(root).with_context(|| format!("read dir {}", root.display()))? {
         let entry = entry.with_context(|| format!("read entry in {}", root.display()))?;
@@ -1887,6 +2051,197 @@ mod tests {
                 .as_ref()
                 .map(|turn| turn.turn_id),
             Some(replacement_turn_id)
+        );
+    }
+
+    #[test]
+    fn index_rollout_metadata_reads_session_meta_only() {
+        use chrono::Utc;
+        use pretty_assertions::assert_eq;
+        use std::io::Write;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().expect("temp dir");
+        let data_root = dir.path().to_path_buf();
+        let session_id = SessionId::new();
+        let now = Utc::now();
+        let rollout_store = super::RolloutStore::new(data_root.clone());
+        let record = rollout_store.create_session_record(
+            session_id,
+            now,
+            data_root.clone(),
+            Vec::new(),
+            Some("Indexed session".into()),
+            Some("test-model".into()),
+            None,
+            None,
+            "test-provider".into(),
+            None,
+        );
+        rollout_store
+            .append_session_meta(&record)
+            .expect("append session meta");
+        std::fs::OpenOptions::new()
+            .append(true)
+            .open(&record.rollout_path)
+            .expect("open rollout")
+            .write_all(b"{\"type\":\"turn\",\"payload\":{}}\n")
+            .expect("append non-meta line");
+
+        let db = crate::db::Database::open(data_root.join("index.db")).expect("open db");
+        rollout_store
+            .index_rollout_metadata(&db)
+            .expect("index rollout metadata");
+
+        let index = db
+            .get_session_index(&session_id)
+            .expect("get index")
+            .expect("indexed session");
+        assert_eq!(index.metadata.title.as_deref(), Some("Indexed session"));
+        assert_eq!(index.rollout_path, Some(record.rollout_path));
+        assert_eq!(index.metadata.parent_session_id, None);
+
+        let roots = db.list_root_sessions().expect("list roots");
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].session_id, session_id);
+    }
+
+    #[test]
+    fn index_rollout_metadata_overwrites_stale_sqlite_title_when_rollout_has_title() {
+        use chrono::Utc;
+        use devo_protocol::SessionMetadata;
+        use devo_protocol::SessionRuntimeStatus;
+        use devo_protocol::SessionTitleState;
+        use pretty_assertions::assert_eq;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().expect("temp dir");
+        let data_root = dir.path().to_path_buf();
+        let session_id = SessionId::new();
+        let now = Utc::now();
+        let rollout_store = super::RolloutStore::new(data_root.clone());
+        let record = rollout_store.create_session_record(
+            session_id,
+            now,
+            data_root.clone(),
+            Vec::new(),
+            None,
+            Some("test-model".into()),
+            None,
+            None,
+            "test-provider".into(),
+            None,
+        );
+        rollout_store
+            .append_session_meta(&record)
+            .expect("append session meta");
+        rollout_store
+            .append_title_update(
+                &record,
+                "Canonical rollout title".into(),
+                SessionTitleState::Final(devo_core::SessionTitleFinalSource::ModelGenerated),
+                None,
+            )
+            .expect("append title update");
+
+        let db = crate::db::Database::open(data_root.join("index.db")).expect("open db");
+        db.upsert_session(
+            &SessionMetadata {
+                session_id,
+                cwd: data_root.clone(),
+                additional_directories: Vec::new(),
+                created_at: now,
+                updated_at: now,
+                last_activity_at: now,
+                title: Some("Existing title".into()),
+                title_state: SessionTitleState::Final(
+                    devo_core::SessionTitleFinalSource::ModelGenerated,
+                ),
+                parent_session_id: None,
+                agent_path: None,
+                agent_nickname: None,
+                agent_role: None,
+                ephemeral: false,
+                model: Some("test-model".into()),
+                model_binding_id: None,
+                reasoning_effort_selection: None,
+                reasoning_effort: None,
+                total_input_tokens: 0,
+                total_output_tokens: 0,
+                total_tokens: 0,
+                total_cache_creation_tokens: 0,
+                total_cache_read_tokens: 0,
+                prompt_token_estimate: 0,
+                last_query_total_tokens: 0,
+                status: SessionRuntimeStatus::Idle,
+            },
+            None,
+        )
+        .expect("seed sqlite title");
+
+        rollout_store
+            .index_rollout_metadata(&db)
+            .expect("index rollout metadata");
+
+        let index = db
+            .get_session_index(&session_id)
+            .expect("get index")
+            .expect("indexed session");
+        assert_eq!(
+            index.metadata.title.as_deref(),
+            Some("Canonical rollout title")
+        );
+    }
+
+    #[test]
+    fn index_rollout_metadata_reads_session_title_updates() {
+        use chrono::Utc;
+        use devo_core::SessionTitleFinalSource;
+        use devo_core::SessionTitleState;
+        use pretty_assertions::assert_eq;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().expect("temp dir");
+        let data_root = dir.path().to_path_buf();
+        let session_id = SessionId::new();
+        let now = Utc::now();
+        let rollout_store = super::RolloutStore::new(data_root.clone());
+        let record = rollout_store.create_session_record(
+            session_id,
+            now,
+            data_root.clone(),
+            Vec::new(),
+            None,
+            Some("test-model".into()),
+            None,
+            None,
+            "test-provider".into(),
+            None,
+        );
+        rollout_store
+            .append_session_meta(&record)
+            .expect("append session meta");
+        rollout_store
+            .append_title_update(
+                &record,
+                "Updated from rollout".into(),
+                SessionTitleState::Final(SessionTitleFinalSource::ModelGenerated),
+                None,
+            )
+            .expect("append title update");
+
+        let db = crate::db::Database::open(data_root.join("index.db")).expect("open db");
+        rollout_store
+            .index_rollout_metadata(&db)
+            .expect("index rollout metadata");
+
+        let index = db
+            .get_session_index(&session_id)
+            .expect("get index")
+            .expect("indexed session");
+        assert_eq!(
+            index.metadata.title.as_deref(),
+            Some("Updated from rollout")
         );
     }
 

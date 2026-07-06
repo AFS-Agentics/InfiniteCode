@@ -1,175 +1,231 @@
 use super::*;
+use std::path::Path;
+
+use crate::execution::RuntimeSession;
+use crate::runtime::session_actor::SessionActorState;
 
 impl ServerRuntime {
-    /// Loads durable sessions from rollout files and installs them into the runtime map.
-    /// Also restores token stats and pending queues from SQLite.
-    pub async fn load_persisted_sessions(self: &Arc<Self>) -> anyhow::Result<()> {
-        let mut sessions = self.rollout_store.load_sessions(&self.deps).await?;
-        tracing::info!(session_count = sessions.len(), "loaded persisted sessions");
-        let mut restored_goal_stores = std::collections::HashMap::new();
+    /// Replays one rollout file and applies SQLite side effects for a single session.
+    pub(crate) async fn hydrate_runtime_session(
+        self: &Arc<Self>,
+        session_id: SessionId,
+        rollout_path: &Path,
+    ) -> anyhow::Result<RuntimeSession> {
+        let mut runtime_session = self
+            .rollout_store
+            .load_session_from_rollout(rollout_path, &self.deps)
+            .await?;
+        if runtime_session.summary.session_id != session_id {
+            anyhow::bail!(
+                "rollout session id mismatch: expected {session_id}, got {}",
+                runtime_session.summary.session_id
+            );
+        }
+        self.apply_persisted_session_side_effects(session_id, &mut runtime_session)
+            .await?;
+        Ok(runtime_session)
+    }
 
-        for (session_id, runtime_session) in sessions.iter_mut() {
-            if !runtime_session.summary.ephemeral
-                && let Err(err) = self.deps.db.upsert_session(&runtime_session.summary)
-            {
+    async fn apply_persisted_session_side_effects(
+        self: &Arc<Self>,
+        session_id: SessionId,
+        runtime_session: &mut RuntimeSession,
+    ) -> anyhow::Result<()> {
+        if !runtime_session.summary.ephemeral
+            && let Err(err) = self.deps.db.upsert_session(
+                &runtime_session.summary,
+                runtime_session
+                    .record
+                    .as_ref()
+                    .map(|record| record.rollout_path.as_path()),
+            )
+        {
+            tracing::warn!(
+                session_id = %session_id,
+                error = %err,
+                "failed to seed restored session metadata to database"
+            );
+        }
+
+        match self.deps.db.get_stats(&session_id) {
+            Ok(Some(stats)) => {
+                runtime_session.summary.total_input_tokens = stats.total_input_tokens;
+                runtime_session.summary.total_output_tokens = stats.total_output_tokens;
+                runtime_session.summary.total_tokens = stats.total_tokens;
+                runtime_session.summary.total_cache_creation_tokens =
+                    stats.total_cache_creation_tokens;
+                runtime_session.summary.total_cache_read_tokens = stats.total_cache_read_tokens;
+                runtime_session.summary.prompt_token_estimate = stats.prompt_token_estimate;
+                if let Ok(mut core) = runtime_session.core_session.try_lock() {
+                    core.total_input_tokens = stats.total_input_tokens;
+                    core.total_output_tokens = stats.total_output_tokens;
+                    core.total_tokens = stats.total_tokens;
+                    core.total_cache_creation_tokens = stats.total_cache_creation_tokens;
+                    core.total_cache_read_tokens = stats.total_cache_read_tokens;
+                    core.last_input_tokens = stats.last_input_tokens;
+                    core.last_turn_tokens = core.last_turn_tokens.max(stats.last_input_tokens);
+                    core.prompt_token_estimate = stats.prompt_token_estimate;
+                }
+                tracing::debug!(
+                    session_id = %session_id,
+                    "restored token stats from database"
+                );
+            }
+            Ok(None) => {
+                let stats = crate::db::SessionStats {
+                    total_input_tokens: runtime_session.summary.total_input_tokens,
+                    total_output_tokens: runtime_session.summary.total_output_tokens,
+                    total_tokens: runtime_session.summary.total_tokens,
+                    total_cache_creation_tokens: runtime_session
+                        .summary
+                        .total_cache_creation_tokens,
+                    total_cache_read_tokens: runtime_session.summary.total_cache_read_tokens,
+                    last_input_tokens: 0,
+                    turn_count: 0,
+                    prompt_token_estimate: runtime_session.summary.prompt_token_estimate,
+                };
+                if let Err(err) = self.deps.db.update_stats(&session_id, &stats) {
+                    tracing::warn!(
+                        session_id = %session_id,
+                        error = %err,
+                        "failed to persist initial token stats to database"
+                    );
+                }
+            }
+            Err(err) => {
                 tracing::warn!(
                     session_id = %session_id,
                     error = %err,
-                    "failed to seed restored session metadata to database"
+                    "failed to load token stats from database"
                 );
-                continue;
             }
+        }
 
-            match self.deps.db.get_stats(session_id) {
-                Ok(Some(stats)) => {
-                    runtime_session.summary.total_input_tokens = stats.total_input_tokens;
-                    runtime_session.summary.total_output_tokens = stats.total_output_tokens;
-                    runtime_session.summary.total_tokens = stats.total_tokens;
-                    runtime_session.summary.total_cache_creation_tokens =
-                        stats.total_cache_creation_tokens;
-                    runtime_session.summary.total_cache_read_tokens = stats.total_cache_read_tokens;
-                    runtime_session.summary.prompt_token_estimate = stats.prompt_token_estimate;
-                    if let Ok(mut core) = runtime_session.core_session.try_lock() {
-                        core.total_input_tokens = stats.total_input_tokens;
-                        core.total_output_tokens = stats.total_output_tokens;
-                        core.total_tokens = stats.total_tokens;
-                        core.total_cache_creation_tokens = stats.total_cache_creation_tokens;
-                        core.total_cache_read_tokens = stats.total_cache_read_tokens;
-                        core.last_input_tokens = stats.last_input_tokens;
-                        core.last_turn_tokens = core.last_turn_tokens.max(stats.last_input_tokens);
-                        core.prompt_token_estimate = stats.prompt_token_estimate;
-                    }
+        match self
+            .deps
+            .db
+            .drain_pending(&session_id, crate::db::QueueType::Turn)
+        {
+            Ok(items) => {
+                if !items.is_empty() {
+                    let core_session = runtime_session.core_session.lock().await;
+                    let mut queue = core_session
+                        .pending_turn_queue
+                        .lock()
+                        .expect("pending turn queue mutex should not be poisoned");
+                    queue.extend(items);
                     tracing::debug!(
                         session_id = %session_id,
-                        "restored token stats from database"
-                    );
-                }
-                Ok(None) => {
-                    let stats = crate::db::SessionStats {
-                        total_input_tokens: runtime_session.summary.total_input_tokens,
-                        total_output_tokens: runtime_session.summary.total_output_tokens,
-                        total_tokens: runtime_session.summary.total_tokens,
-                        total_cache_creation_tokens: runtime_session
-                            .summary
-                            .total_cache_creation_tokens,
-                        total_cache_read_tokens: runtime_session.summary.total_cache_read_tokens,
-                        last_input_tokens: 0,
-                        turn_count: 0,
-                        prompt_token_estimate: runtime_session.summary.prompt_token_estimate,
-                    };
-                    if let Err(err) = self.deps.db.update_stats(session_id, &stats) {
-                        tracing::warn!(
-                            session_id = %session_id,
-                            error = %err,
-                            "failed to persist initial token stats to database"
-                        );
-                    }
-                }
-                Err(err) => {
-                    tracing::warn!(
-                        session_id = %session_id,
-                        error = %err,
-                        "failed to load token stats from database"
+                        pending_count = queue.len(),
+                        "restored pending turn queue from database"
                     );
                 }
             }
-
-            match self
-                .deps
-                .db
-                .drain_pending(session_id, crate::db::QueueType::Turn)
-            {
-                Ok(items) => {
-                    if !items.is_empty() {
-                        let core_session = runtime_session.core_session.lock().await;
-                        let mut queue = core_session
-                            .pending_turn_queue
-                            .lock()
-                            .expect("pending turn queue mutex should not be poisoned");
-                        queue.extend(items);
-                        tracing::debug!(
-                            session_id = %session_id,
-                            pending_count = queue.len(),
-                            "restored pending turn queue from database"
-                        );
-                    }
-                }
-                Err(err) => {
-                    tracing::warn!(
-                        session_id = %session_id,
-                        error = %err,
-                        "failed to load pending turn queue from database"
-                    );
-                }
-            }
-
-            if let Err(err) = self
-                .deps
-                .db
-                .clear_pending(session_id, crate::db::QueueType::Btw)
-            {
+            Err(err) => {
                 tracing::warn!(
                     session_id = %session_id,
                     error = %err,
-                    "failed to clear stale btw inputs from database"
+                    "failed to load pending turn queue from database"
                 );
             }
+        }
 
-            match self.goal_durable_store.replay_goal_store(*session_id).await {
-                Ok(Some(mut goal_store)) => {
-                    if let Some(goal) = goal_store.get()
-                        && goal.status == crate::goal::GoalStatus::Active
-                    {
-                        let previous_status = goal.status;
-                        match goal_store.set_status(devo_protocol::ThreadGoalStatus::Paused) {
-                            Ok(paused_goal) => {
-                                if let Err(error) = self
-                                    .goal_durable_store
-                                    .append_status_changed(
-                                        &paused_goal,
-                                        previous_status,
-                                        Some(
-                                            "Goal paused because the session was restored without explicit resume."
-                                                .to_string(),
-                                        ),
-                                    )
-                                    .await
-                                {
-                                    tracing::warn!(
-                                        session_id = %session_id,
-                                        error = %error,
-                                        "failed to persist restored goal pause record"
-                                    );
-                                }
-                            }
-                            Err(error) => {
+        if let Err(err) = self
+            .deps
+            .db
+            .clear_pending(&session_id, crate::db::QueueType::Btw)
+        {
+            tracing::warn!(
+                session_id = %session_id,
+                error = %err,
+                "failed to clear stale btw inputs from database"
+            );
+        }
+
+        match self.goal_durable_store.replay_goal_store(session_id).await {
+            Ok(Some(mut goal_store)) => {
+                if let Some(goal) = goal_store.get()
+                    && goal.status == crate::goal::GoalStatus::Active
+                {
+                    let previous_status = goal.status;
+                    match goal_store.set_status(devo_protocol::ThreadGoalStatus::Paused) {
+                        Ok(paused_goal) => {
+                            if let Err(error) = self
+                                .goal_durable_store
+                                .append_status_changed(
+                                    &paused_goal,
+                                    previous_status,
+                                    Some(
+                                        "Goal paused because the session was restored without explicit resume."
+                                            .to_string(),
+                                    ),
+                                )
+                                .await
+                            {
                                 tracing::warn!(
                                     session_id = %session_id,
                                     error = %error,
-                                    "failed to pause restored active goal"
+                                    "failed to persist restored goal pause record"
                                 );
                             }
                         }
+                        Err(error) => {
+                            tracing::warn!(
+                                session_id = %session_id,
+                                error = %error,
+                                "failed to pause restored active goal"
+                            );
+                        }
                     }
-                    restored_goal_stores.insert(*session_id, goal_store);
                 }
-                Ok(None) => {}
-                Err(error) => {
-                    tracing::warn!(
-                        session_id = %session_id,
-                        error = %error,
-                        "failed to replay durable goal records"
-                    );
-                }
+                self.goal_stores.lock().await.insert(session_id, goal_store);
+            }
+            Ok(None) => {}
+            Err(error) => {
+                tracing::warn!(
+                    session_id = %session_id,
+                    error = %error,
+                    "failed to replay durable goal records"
+                );
             }
         }
 
-        for (_, runtime_session) in sessions {
-            self.insert_session_actor(SessionActorState::from_runtime_session(runtime_session))
-                .await;
-        }
-        self.goal_stores.lock().await.extend(restored_goal_stores);
         Ok(())
+    }
+
+    /// Loads durable sessions from rollout files and installs them into the runtime map.
+    /// Used by integration tests and bulk-restore tooling; production startup indexes only.
+    pub async fn load_persisted_sessions(self: &Arc<Self>) -> anyhow::Result<()> {
+        let sessions = self.rollout_store.load_sessions(&self.deps).await?;
+        tracing::info!(session_count = sessions.len(), "loaded persisted sessions");
+
+        for (session_id, mut runtime_session) in sessions {
+            self.apply_persisted_session_side_effects(session_id, &mut runtime_session)
+                .await?;
+            if runtime_session.summary.parent_session_id.is_none() {
+                self.insert_root_session_actor(runtime_session)
+                    .await
+                    .map_err(|error| anyhow::anyhow!("{error}"))?;
+            } else {
+                self.insert_session_actor(SessionActorState::from_runtime_session(runtime_session))
+                    .await;
+            }
+        }
+        Ok(())
+    }
+
+    /// Rebuilds the SQLite session index from rollout SessionMeta headers.
+    pub fn refresh_session_index(&self) -> anyhow::Result<()> {
+        self.rollout_store.index_rollout_metadata(&self.deps.db)
+    }
+
+    /// Backfills rollout metadata into SQLite only when legacy rows lack index fields.
+    pub fn backfill_session_index_if_required(&self) -> anyhow::Result<bool> {
+        if !self.deps.db.session_index_backfill_required()? {
+            return Ok(false);
+        }
+        self.rollout_store.index_rollout_metadata(&self.deps.db)?;
+        Ok(true)
     }
 
     /// Completes deferred (in-progress) items for all active turns and

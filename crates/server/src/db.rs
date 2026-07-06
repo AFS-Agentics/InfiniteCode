@@ -31,6 +31,22 @@ impl QueueType {
     }
 }
 
+/// SQLite index row used for lazy session list and resume.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionIndexRecord {
+    pub metadata: SessionMetadata,
+    pub rollout_path: Option<PathBuf>,
+}
+
+/// Source of a session metadata upsert.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionUpsertSource {
+    /// Live runtime writes should preserve existing non-null fields when the update omits them.
+    RuntimeLive,
+    /// Rollout index writes rebuild SQLite from canonical rollout metadata.
+    RolloutIndex,
+}
+
 /// Session-level token statistics.
 #[derive(Debug, Clone)]
 pub struct SessionStats {
@@ -211,13 +227,47 @@ impl Database {
             )
             .context("failed to backfill total_tokens column")?;
         }
+        if !sessions_has_column(&conn, "rollout_path")? {
+            conn.execute("ALTER TABLE sessions ADD COLUMN rollout_path TEXT", [])
+                .context("failed to add rollout_path column")?;
+        }
+        if !sessions_has_column(&conn, "parent_session_id")? {
+            conn.execute("ALTER TABLE sessions ADD COLUMN parent_session_id TEXT", [])
+                .context("failed to add parent_session_id column")?;
+        }
+        if !sessions_has_column(&conn, "agent_path")? {
+            conn.execute("ALTER TABLE sessions ADD COLUMN agent_path TEXT", [])
+                .context("failed to add agent_path column")?;
+        }
         Ok(())
     }
 
     // === Session CRUD ===
 
-    /// Inserts or updates a session's metadata.
-    pub fn upsert_session(&self, meta: &SessionMetadata) -> Result<()> {
+    /// Inserts or updates a session's metadata and optional rollout index fields.
+    pub fn upsert_session(
+        &self,
+        meta: &SessionMetadata,
+        rollout_path: Option<&std::path::Path>,
+    ) -> Result<()> {
+        self.upsert_session_with_source(meta, rollout_path, SessionUpsertSource::RuntimeLive)
+    }
+
+    /// Inserts or updates session metadata using rollout-index semantics.
+    pub fn upsert_rollout_index_session(
+        &self,
+        meta: &SessionMetadata,
+        rollout_path: Option<&std::path::Path>,
+    ) -> Result<()> {
+        self.upsert_session_with_source(meta, rollout_path, SessionUpsertSource::RolloutIndex)
+    }
+
+    fn upsert_session_with_source(
+        &self,
+        meta: &SessionMetadata,
+        rollout_path: Option<&std::path::Path>,
+        source: SessionUpsertSource,
+    ) -> Result<()> {
         let conn = self.conn.lock().expect("database mutex poisoned");
         let additional_directories = serde_json::to_string(&meta.additional_directories)
             .context("failed to serialize session additional directories")?;
@@ -226,18 +276,51 @@ impl Database {
             SessionTitleState::Provisional => "provisional",
             SessionTitleState::Final(_) => "final",
         };
-        conn.execute(
-            "INSERT INTO sessions (id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at, last_activity_at, schema_version)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 2)
-             ON CONFLICT(id) DO UPDATE SET
-                title = excluded.title,
-                title_state = excluded.title_state,
-                model = excluded.model,
-                thinking = excluded.thinking,
+        let rollout_path_str = rollout_path.map(|path| path.to_string_lossy().into_owned());
+        let parent_session_id = meta.parent_session_id.map(|id| id.to_string());
+        let agent_path = meta.agent_path.clone();
+        let update_clause = match source {
+            SessionUpsertSource::RuntimeLive => {
+                "title = COALESCE(excluded.title, sessions.title),
+                title_state = CASE
+                    WHEN excluded.title IS NOT NULL THEN excluded.title_state
+                    ELSE sessions.title_state
+                END,
+                model = COALESCE(excluded.model, sessions.model),
+                thinking = COALESCE(excluded.thinking, sessions.thinking),
                 cwd = excluded.cwd,
                 additional_directories = excluded.additional_directories,
                 updated_at = excluded.updated_at,
-                last_activity_at = excluded.last_activity_at",
+                last_activity_at = excluded.last_activity_at,
+                parent_session_id = COALESCE(excluded.parent_session_id, sessions.parent_session_id),
+                agent_path = COALESCE(excluded.agent_path, sessions.agent_path),
+                rollout_path = COALESCE(excluded.rollout_path, sessions.rollout_path)"
+            }
+            SessionUpsertSource::RolloutIndex => {
+                "title = COALESCE(excluded.title, sessions.title),
+                title_state = CASE
+                    WHEN excluded.title IS NOT NULL THEN excluded.title_state
+                    ELSE sessions.title_state
+                END,
+                model = COALESCE(excluded.model, sessions.model),
+                thinking = COALESCE(excluded.thinking, sessions.thinking),
+                cwd = excluded.cwd,
+                additional_directories = excluded.additional_directories,
+                created_at = excluded.created_at,
+                updated_at = excluded.updated_at,
+                last_activity_at = excluded.last_activity_at,
+                parent_session_id = COALESCE(excluded.parent_session_id, sessions.parent_session_id),
+                agent_path = COALESCE(excluded.agent_path, sessions.agent_path),
+                rollout_path = COALESCE(excluded.rollout_path, sessions.rollout_path)"
+            }
+        };
+        let sql = format!(
+            "INSERT INTO sessions (id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at, last_activity_at, rollout_path, parent_session_id, agent_path, schema_version)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, 3)
+             ON CONFLICT(id) DO UPDATE SET {update_clause}"
+        );
+        conn.execute(
+            &sql,
             params![
                 meta.session_id.to_string(),
                 meta.title,
@@ -250,10 +333,27 @@ impl Database {
                 meta.created_at.timestamp(),
                 meta.updated_at.timestamp(),
                 meta.last_activity_at.timestamp(),
+                rollout_path_str,
+                parent_session_id,
+                agent_path,
             ],
         )
         .context("failed to upsert session")?;
         Ok(())
+    }
+
+    /// Returns true when durable sessions need rollout metadata backfilled into SQLite.
+    pub fn session_index_backfill_required(&self) -> Result<bool> {
+        let conn = self.conn.lock().expect("database mutex poisoned");
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sessions
+                 WHERE ephemeral = 0 AND (rollout_path IS NULL OR rollout_path = '')",
+                [],
+                |row| row.get(0),
+            )
+            .context("failed to check session index backfill requirement")?;
+        Ok(count > 0)
     }
 
     /// Retrieves a session's metadata by ID.
@@ -261,70 +361,12 @@ impl Database {
         let conn = self.conn.lock().expect("database mutex poisoned");
         let mut stmt = conn
             .prepare(
-                "SELECT id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at, last_activity_at
+                "SELECT id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at, last_activity_at, parent_session_id, agent_path
                  FROM sessions WHERE id = ?1",
             )
             .context("failed to prepare get_session statement")?;
         let result = stmt.query_row(params![id.to_string()], |row| {
-            let id_str: String = row.get(0)?;
-            let title: Option<String> = row.get(1)?;
-            let title_state_str: String = row.get(2)?;
-            let model: Option<String> = row.get(3)?;
-            let thinking: Option<String> = row.get(4)?;
-            let cwd_str: String = row.get(5)?;
-            let additional_directories_str: String = row.get(6)?;
-            let ephemeral: i32 = row.get(7)?;
-            let created_at: i64 = row.get(8)?;
-            let updated_at: i64 = row.get(9)?;
-            let last_activity_at: i64 = row.get(10)?;
-
-            let title_state = match title_state_str.as_str() {
-                "provisional" => SessionTitleState::Provisional,
-                "final" => {
-                    SessionTitleState::Final(devo_protocol::SessionTitleFinalSource::ModelGenerated)
-                }
-                _ => SessionTitleState::Unset,
-            };
-
-            Ok(SessionMetadata {
-                session_id: parse_session_id_column(id_str, 0)?,
-                cwd: PathBuf::from(&cwd_str),
-                additional_directories: parse_additional_directories_column(
-                    additional_directories_str,
-                    6,
-                )?,
-                created_at: Utc
-                    .timestamp_opt(created_at, 0)
-                    .single()
-                    .unwrap_or_else(Utc::now),
-                updated_at: Utc
-                    .timestamp_opt(updated_at, 0)
-                    .single()
-                    .unwrap_or_else(Utc::now),
-                last_activity_at: Utc
-                    .timestamp_opt(last_activity_at, 0)
-                    .single()
-                    .unwrap_or_else(Utc::now),
-                title,
-                title_state,
-                parent_session_id: None,
-                agent_path: None,
-                agent_nickname: None,
-                agent_role: None,
-                ephemeral: ephemeral != 0,
-                model,
-                model_binding_id: None,
-                reasoning_effort_selection: thinking,
-                reasoning_effort: None,
-                total_input_tokens: 0,
-                total_output_tokens: 0,
-                total_tokens: 0,
-                total_cache_creation_tokens: 0,
-                total_cache_read_tokens: 0,
-                prompt_token_estimate: 0,
-                last_query_total_tokens: 0,
-                status: SessionRuntimeStatus::Idle,
-            })
+            parse_session_metadata_row(row, false)
         });
 
         match result {
@@ -334,77 +376,67 @@ impl Database {
         }
     }
 
+    /// Returns resume/list index fields for a session id.
+    pub fn get_session_index(&self, id: &SessionId) -> Result<Option<SessionIndexRecord>> {
+        let conn = self.conn.lock().expect("database mutex poisoned");
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at, last_activity_at, parent_session_id, agent_path, rollout_path
+                 FROM sessions WHERE id = ?1",
+            )
+            .context("failed to prepare get_session_index statement")?;
+        let result = stmt.query_row(params![id.to_string()], |row| {
+            let metadata = parse_session_metadata_row(row, true)?;
+            let rollout_path = row
+                .get::<_, Option<String>>(13)?
+                .map(PathBuf::from)
+                .filter(|path| !path.as_os_str().is_empty());
+            Ok(SessionIndexRecord {
+                metadata,
+                rollout_path,
+            })
+        });
+
+        match result {
+            Ok(index) => Ok(Some(index)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Lists durable user-visible sessions (roots and forks, excluding subagents).
+    pub fn list_root_sessions(&self) -> Result<Vec<SessionMetadata>> {
+        let conn = self.conn.lock().expect("database mutex poisoned");
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at, last_activity_at, parent_session_id, agent_path
+                 FROM sessions
+                 WHERE ephemeral = 0 AND agent_path IS NULL
+                 ORDER BY last_activity_at DESC, updated_at DESC",
+            )
+            .context("failed to prepare list_root_sessions statement")?;
+        let rows = stmt
+            .query_map([], |row| parse_session_metadata_row(row, false))
+            .context("failed to query root sessions")?;
+
+        let mut sessions = Vec::new();
+        for row in rows {
+            sessions.push(row?);
+        }
+        Ok(sessions)
+    }
+
     /// Lists all sessions ordered by most recently updated.
     pub fn list_sessions(&self) -> Result<Vec<SessionMetadata>> {
         let conn = self.conn.lock().expect("database mutex poisoned");
         let mut stmt = conn
             .prepare(
-                "SELECT id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at, last_activity_at
+                "SELECT id, title, title_state, model, thinking, cwd, additional_directories, ephemeral, created_at, updated_at, last_activity_at, parent_session_id, agent_path
                  FROM sessions ORDER BY last_activity_at DESC, updated_at DESC",
             )
             .context("failed to prepare list_sessions statement")?;
         let rows = stmt
-            .query_map([], |row| {
-                let id_str: String = row.get(0)?;
-                let title: Option<String> = row.get(1)?;
-                let title_state_str: String = row.get(2)?;
-                let model: Option<String> = row.get(3)?;
-                let thinking: Option<String> = row.get(4)?;
-                let cwd_str: String = row.get(5)?;
-                let additional_directories_str: String = row.get(6)?;
-                let ephemeral: i32 = row.get(7)?;
-                let created_at: i64 = row.get(8)?;
-                let updated_at: i64 = row.get(9)?;
-                let last_activity_at: i64 = row.get(10)?;
-
-                let title_state = match title_state_str.as_str() {
-                    "provisional" => SessionTitleState::Provisional,
-                    "final" => SessionTitleState::Final(
-                        devo_protocol::SessionTitleFinalSource::ModelGenerated,
-                    ),
-                    _ => SessionTitleState::Unset,
-                };
-
-                Ok(SessionMetadata {
-                    session_id: parse_session_id_column(id_str, 0)?,
-                    cwd: PathBuf::from(&cwd_str),
-                    additional_directories: parse_additional_directories_column(
-                        additional_directories_str,
-                        6,
-                    )?,
-                    created_at: Utc
-                        .timestamp_opt(created_at, 0)
-                        .single()
-                        .unwrap_or_else(Utc::now),
-                    updated_at: Utc
-                        .timestamp_opt(updated_at, 0)
-                        .single()
-                        .unwrap_or_else(Utc::now),
-                    last_activity_at: Utc
-                        .timestamp_opt(last_activity_at, 0)
-                        .single()
-                        .unwrap_or_else(Utc::now),
-                    title,
-                    title_state,
-                    parent_session_id: None,
-                    agent_path: None,
-                    agent_nickname: None,
-                    agent_role: None,
-                    ephemeral: ephemeral != 0,
-                    model,
-                    model_binding_id: None,
-                    reasoning_effort_selection: thinking,
-                    reasoning_effort: None,
-                    total_input_tokens: 0,
-                    total_output_tokens: 0,
-                    total_tokens: 0,
-                    total_cache_creation_tokens: 0,
-                    total_cache_read_tokens: 0,
-                    prompt_token_estimate: 0,
-                    last_query_total_tokens: 0,
-                    status: SessionRuntimeStatus::Idle,
-                })
-            })
+            .query_map([], |row| parse_session_metadata_row(row, false))
             .context("failed to query sessions")?;
 
         let mut sessions = Vec::new();
@@ -696,6 +728,88 @@ impl Database {
     }
 }
 
+fn sessions_has_column(conn: &Connection, column: &str) -> Result<bool> {
+    let mut stmt = conn
+        .prepare("PRAGMA table_info(sessions)")
+        .context("failed to inspect sessions schema")?;
+    let columns = stmt
+        .query_map([], |row| row.get::<_, String>(1))
+        .context("failed to read sessions schema")?;
+    for column_name in columns {
+        if column_name? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn parse_session_metadata_row(
+    row: &rusqlite::Row<'_>,
+    _include_parent: bool,
+) -> rusqlite::Result<SessionMetadata> {
+    let id_str: String = row.get(0)?;
+    let title: Option<String> = row.get(1)?;
+    let title_state_str: String = row.get(2)?;
+    let model: Option<String> = row.get(3)?;
+    let thinking: Option<String> = row.get(4)?;
+    let cwd_str: String = row.get(5)?;
+    let additional_directories_str: String = row.get(6)?;
+    let ephemeral: i32 = row.get(7)?;
+    let created_at: i64 = row.get(8)?;
+    let updated_at: i64 = row.get(9)?;
+    let last_activity_at: i64 = row.get(10)?;
+    let parent_session_id = row
+        .get::<_, Option<String>>(11)?
+        .map(|value| parse_session_id_column(value, 11))
+        .transpose()?;
+    let agent_path = row
+        .get::<_, Option<String>>(12)?
+        .filter(|path| !path.is_empty());
+
+    let title_state = match title_state_str.as_str() {
+        "provisional" => SessionTitleState::Provisional,
+        "final" => SessionTitleState::Final(devo_protocol::SessionTitleFinalSource::ModelGenerated),
+        _ => SessionTitleState::Unset,
+    };
+
+    Ok(SessionMetadata {
+        session_id: parse_session_id_column(id_str, 0)?,
+        cwd: PathBuf::from(&cwd_str),
+        additional_directories: parse_additional_directories_column(additional_directories_str, 6)?,
+        created_at: Utc
+            .timestamp_opt(created_at, 0)
+            .single()
+            .unwrap_or_else(Utc::now),
+        updated_at: Utc
+            .timestamp_opt(updated_at, 0)
+            .single()
+            .unwrap_or_else(Utc::now),
+        last_activity_at: Utc
+            .timestamp_opt(last_activity_at, 0)
+            .single()
+            .unwrap_or_else(Utc::now),
+        title,
+        title_state,
+        parent_session_id,
+        agent_path,
+        agent_nickname: None,
+        agent_role: None,
+        ephemeral: ephemeral != 0,
+        model,
+        model_binding_id: None,
+        reasoning_effort_selection: thinking,
+        reasoning_effort: None,
+        total_input_tokens: 0,
+        total_output_tokens: 0,
+        total_tokens: 0,
+        total_cache_creation_tokens: 0,
+        total_cache_read_tokens: 0,
+        prompt_token_estimate: 0,
+        last_query_total_tokens: 0,
+        status: SessionRuntimeStatus::Idle,
+    })
+}
+
 fn parse_session_id_column(id: String, column: usize) -> rusqlite::Result<SessionId> {
     SessionId::from_str(&id).map_err(|error| {
         rusqlite::Error::FromSqlConversionFailure(
@@ -802,7 +916,7 @@ mod tests {
         let (db, _dir) = test_db();
         let mut meta = sample_session("session-1");
         meta.additional_directories = vec![PathBuf::from("/tmp/shared")];
-        db.upsert_session(&meta).expect("upsert");
+        db.upsert_session(&meta, None).expect("upsert");
 
         let retrieved = db.get_session(&meta.session_id).expect("get");
         assert!(retrieved.is_some());
@@ -825,8 +939,8 @@ mod tests {
         meta1.last_activity_at = baseline;
         meta2.updated_at = baseline + chrono::Duration::seconds(10);
         meta2.last_activity_at = baseline - chrono::Duration::seconds(10);
-        db.upsert_session(&meta1).expect("upsert");
-        db.upsert_session(&meta2).expect("upsert");
+        db.upsert_session(&meta1, None).expect("upsert");
+        db.upsert_session(&meta2, None).expect("upsert");
 
         let sessions = db.list_sessions().expect("list");
         assert_eq!(sessions.len(), 2);
@@ -869,7 +983,7 @@ mod tests {
     fn delete_session_cascades() {
         let (db, _dir) = test_db();
         let meta = sample_session("session-1");
-        db.upsert_session(&meta).expect("upsert");
+        db.upsert_session(&meta, None).expect("upsert");
 
         db.delete_session(&meta.session_id).expect("delete");
         let retrieved = db.get_session(&meta.session_id).expect("get");
@@ -880,7 +994,7 @@ mod tests {
     fn update_and_get_stats() {
         let (db, _dir) = test_db();
         let meta = sample_session("session-1");
-        db.upsert_session(&meta).expect("upsert");
+        db.upsert_session(&meta, None).expect("upsert");
 
         let stats = SessionStats {
             total_input_tokens: 1000,
@@ -906,7 +1020,7 @@ mod tests {
     fn push_and_drain_pending() {
         let (db, _dir) = test_db();
         let meta = sample_session("session-1");
-        db.upsert_session(&meta).expect("upsert");
+        db.upsert_session(&meta, None).expect("upsert");
 
         let item1 = PendingInputItem::new(
             PendingInputKind::UserText {
@@ -952,7 +1066,7 @@ mod tests {
     fn queue_types_are_isolated() {
         let (db, _dir) = test_db();
         let meta = sample_session("session-1");
-        db.upsert_session(&meta).expect("upsert");
+        db.upsert_session(&meta, None).expect("upsert");
 
         let turn_item = PendingInputItem::new(
             PendingInputKind::UserText {
@@ -1000,7 +1114,7 @@ mod tests {
     fn remove_pending_by_id_only_removes_matching_item() {
         let (db, _dir) = test_db();
         let meta = sample_session("session-1");
-        db.upsert_session(&meta).expect("upsert");
+        db.upsert_session(&meta, None).expect("upsert");
 
         let first = PendingInputItem::new(
             PendingInputKind::UserText {
@@ -1042,11 +1156,79 @@ mod tests {
     fn drain_pending_empty_returns_empty() {
         let (db, _dir) = test_db();
         let meta = sample_session("session-1");
-        db.upsert_session(&meta).expect("upsert");
+        db.upsert_session(&meta, None).expect("upsert");
 
         let drained = db
             .drain_pending(&meta.session_id, QueueType::Turn)
             .expect("drain");
         assert!(drained.is_empty());
+    }
+
+    #[test]
+    fn session_index_backfill_required_detects_missing_rollout_path() {
+        let (db, _dir) = test_db();
+        let meta = sample_session("session-1");
+
+        assert!(
+            !db.session_index_backfill_required()
+                .expect("check empty db")
+        );
+        db.upsert_session(&meta, None)
+            .expect("upsert without rollout path");
+
+        assert!(
+            db.session_index_backfill_required()
+                .expect("check missing rollout path")
+        );
+        db.upsert_rollout_index_session(&meta, Some("/tmp/session.jsonl".as_ref()))
+            .expect("upsert rollout path");
+        assert!(
+            !db.session_index_backfill_required()
+                .expect("check populated rollout path")
+        );
+    }
+
+    #[test]
+    fn list_root_sessions_excludes_subagents_and_ephemeral() {
+        let (db, _dir) = test_db();
+        let root_id = SessionId::new();
+        let subagent_id = SessionId::new();
+        let ephemeral_id = SessionId::new();
+        let rollout_path = PathBuf::from("/tmp/root.jsonl");
+
+        let mut root = sample_session(&root_id.to_string());
+        root.session_id = root_id;
+        db.upsert_session(&root, Some(rollout_path.as_path()))
+            .expect("upsert root");
+
+        let mut subagent = sample_session(&subagent_id.to_string());
+        subagent.session_id = subagent_id;
+        subagent.parent_session_id = Some(root_id);
+        subagent.agent_path = Some("root/review".into());
+        db.upsert_session(&subagent, Some("/tmp/subagent.jsonl".as_ref()))
+            .expect("upsert subagent");
+
+        let mut ephemeral = sample_session(&ephemeral_id.to_string());
+        ephemeral.session_id = ephemeral_id;
+        ephemeral.ephemeral = true;
+        db.upsert_session(&ephemeral, None)
+            .expect("upsert ephemeral");
+
+        let roots = db.list_root_sessions().expect("list root sessions");
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].session_id, root_id);
+
+        let index = db
+            .get_session_index(&root_id)
+            .expect("get index")
+            .expect("root index");
+        assert_eq!(index.rollout_path, Some(rollout_path));
+        assert_eq!(index.metadata.parent_session_id, None);
+
+        let subagent_index = db
+            .get_session_index(&subagent_id)
+            .expect("get subagent index")
+            .expect("subagent index");
+        assert_eq!(subagent_index.metadata.parent_session_id, Some(root_id));
     }
 }

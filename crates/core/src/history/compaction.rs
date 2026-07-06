@@ -434,7 +434,7 @@ mod tests {
 
     #[test]
     fn compact_builds_merged_messages() {
-        let items = vec![
+        let items = [
             ResponseItem::Message(Message::user("hello")),
             // Split assistant turn — text + two tool calls
             ResponseItem::Message(Message::assistant_text("ok")),
