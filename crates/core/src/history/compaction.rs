@@ -1,18 +1,24 @@
 //! Compaction — summarise conversation history via a separate LLM call
 //! when the token budget is exceeded.
 //!
-//! Two compaction modes:
+//! Two compaction modes (`CompactionKind`) choose different preserve strategies:
 //!
-//! * **Auto** — triggered automatically when the context window is reached.
-//!   The operation is skipped if the history is already within budget.
-//! * **Proactive** — explicitly requested by the user (e.g. via a `/compact`
-//!   command). The compaction always runs, regardless of the current budget.
+//! * **Auto** — token-budget threshold in the query loop (`query.rs`).
+//!   Preserves a tail window of roughly [`COMPACT_USER_MESSAGE_MAX_TOKENS`]
+//!   estimated tokens via [`split_by_user_message_budget`], regardless of user
+//!   message boundaries. Example: `[user1, asst1, user2, asst2, user3]` may
+//!   become `[summary, asst2, user3]` when `asst2` and `user3` fit the tail
+//!   budget but `user2` does not.
+//! * **Proactive** — `/compact` or provider `context_too_long` retry.
+//!   Preserves from the latest user message onward via
+//!   [`preserve_suffix_from_latest_user_message`]. Example: the same history
+//!   becomes `[summary, user3]` only.
 //!
 //! The compaction flow:
 //!
 //! 1. Filter out `Reason` items (reasoning text is not useful for summaries).
-//! 2. Separate items into a "to‑compact" (old) and "to‑preserve" (recent) set
-//!    based on a user‑message token budget.
+//! 2. Separate items into a "to‑compact" prefix and "to‑preserve" suffix.
+//!    Auto uses a tail token budget; Proactive uses the latest-user suffix.
 //! 3. Call the summarizer LLM with the `prompt.md` template appended as the
 //!    last developer message after the to-compact history.
 //! 4. Wrap the returned summary with the `summary_prefix.md` template.
@@ -40,6 +46,8 @@ use super::TokenInfo;
 use super::normalize;
 
 const SUMMARIZATION_PROMPT: &str = include_str!("../../prompts/compact/prompt.md");
+/// Tail preserve budget for [`CompactionKind::Auto`]: walk backward from the
+/// end of history and keep items until this estimated-token budget is full.
 const COMPACT_USER_MESSAGE_MAX_TOKENS: usize = 20_000;
 
 // ---------------------------------------------------------------------------
@@ -110,14 +118,24 @@ impl Default for CompactionConfig {
 // CompactionKind — how compaction was triggered
 // ---------------------------------------------------------------------------
 
-/// Whether compaction was triggered automatically or proactively by the user.
+/// Whether compaction was triggered automatically or proactively.
+///
+/// Call-site mapping:
+/// - [`CompactionKind::Auto`]: `query.rs` token-budget threshold before a turn.
+/// - [`CompactionKind::Proactive`]: `/compact` (`server/.../compaction.rs`) and
+///   provider `context_too_long` retry in `query.rs`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompactionKind {
-    /// Automatic compaction triggered when the context window is reached.
-    /// Skips if the history is already within budget.
+    /// Automatic compaction when context pressure is high.
+    ///
+    /// Skips when [`should_compact`] says the session is already within budget.
+    /// Preserve strategy: [`split_by_user_message_budget`] over the tail
+    /// [`COMPACT_USER_MESSAGE_MAX_TOKENS`] window (items, not user turns).
     Auto,
-    /// Proactive compaction explicitly requested by the user.
-    /// Always runs regardless of the current token budget.
+    /// Forced compaction that always runs.
+    ///
+    /// Preserve strategy: [`preserve_suffix_from_latest_user_message`] — from
+    /// the last `Role::User` item through the end of history.
     Proactive,
 }
 
@@ -167,7 +185,9 @@ pub async fn compact_history(
     let mut filtered = normalize::filter_reason(items);
     normalize::pair_tool_call_items(&mut filtered);
 
-    // 2. Determine what to summarize vs what to preserve in the final history.
+    // 2. Pick preserve strategy from compaction kind.
+    //    Auto: tail token window (may include assistant/tool items before the
+    //    latest user). Proactive: suffix from the latest user message only.
     let (mut to_compact, mut preserved) = if config.kind == CompactionKind::Proactive {
         (
             filtered.clone(),
@@ -243,11 +263,19 @@ pub async fn compact_history(
 
 /// Splits items into a "to compact" prefix and a "to preserve" suffix.
 ///
-/// Walks backward from the end, accumulating item token estimates until the
-/// budget is exhausted. Everything before the split point is marked for
-/// compaction; everything from the split point onward is preserved.
-/// At least one item is always preserved (the last item) when items exist,
-/// regardless of the budget.
+/// Used by [`CompactionKind::Auto`]. Walks backward from the end, accumulating
+/// per-item token estimates until `budget_tokens` would be exceeded.
+///
+/// # Example
+///
+/// History `[user1, asst1, user2, asst2(large), user3]` with a small budget
+/// that fits only `asst2` and `user3`:
+/// - `to_compact` = `[user1, asst1, user2]`
+/// - `preserve` = `[asst2, user3]`
+/// - result after compaction = `[summary, asst2, user3]`
+///
+/// Items are [`ResponseItem`] records (messages, tool calls, tool outputs), not
+/// whole turns. At least the last item is preserved when history is non-empty.
 fn split_by_user_message_budget(
     items: &[ResponseItem],
     budget_tokens: usize,
@@ -285,10 +313,7 @@ fn split_by_user_message_budget(
 }
 
 fn summarizer_request_messages(to_compact: &[ResponseItem]) -> Vec<RequestMessage> {
-    let mut messages: Vec<RequestMessage> = to_compact
-        .iter()
-        .map(RequestMessage::from)
-        .collect();
+    let mut messages: Vec<RequestMessage> = to_compact.iter().map(RequestMessage::from).collect();
     merge_consecutive_assistant_messages(&mut messages);
     messages.push(RequestMessage {
         role: RequestRole::Developer.as_str().to_string(),
@@ -299,6 +324,19 @@ fn summarizer_request_messages(to_compact: &[ResponseItem]) -> Vec<RequestMessag
     messages
 }
 
+/// Preserves history from the latest user message through the end.
+///
+/// Used by [`CompactionKind::Proactive`] (`/compact` and `context_too_long`
+/// retry). Assistant and tool items after that user are kept; everything
+/// before the user is summarized.
+///
+/// # Example
+///
+/// History `[user1, asst1, user2, asst2, user3]` always yields:
+/// - `preserve` = `[user3]`
+/// - result after compaction = `[summary, user3]`
+///
+/// Returns an empty vector when no user message exists.
 fn preserve_suffix_from_latest_user_message(items: &[ResponseItem]) -> Vec<ResponseItem> {
     let Some(latest_user_index) = items.iter().rposition(
         |item| matches!(item, ResponseItem::Message(msg) if msg.role == devo_protocol::Role::User),
@@ -422,10 +460,7 @@ mod tests {
             },
         ];
 
-        let mut messages: Vec<RequestMessage> = items
-            .iter()
-            .map(RequestMessage::from)
-            .collect();
+        let mut messages: Vec<RequestMessage> = items.iter().map(RequestMessage::from).collect();
         merge_consecutive_assistant_messages(&mut messages);
 
         // user, assistant(merged), user, user
@@ -476,7 +511,9 @@ mod tests {
         ];
 
         let messages = summarizer_request_messages(&items);
-        let last = messages.last().expect("summarizer messages should not be empty");
+        let last = messages
+            .last()
+            .expect("summarizer messages should not be empty");
 
         assert_eq!(last.role, RequestRole::Developer.as_str());
         assert!(
@@ -521,6 +558,86 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn auto_compaction_preserves_tail_by_token_budget_not_latest_user_only() {
+        struct StubSummarizer;
+
+        #[async_trait]
+        impl HistorySummarizer for StubSummarizer {
+            async fn summarize(
+                &self,
+                _messages: Vec<RequestMessage>,
+            ) -> Result<String, CompactionError> {
+                Ok("summary".to_string())
+            }
+        }
+
+        let large_tail = "x".repeat(40_000);
+        let items = vec![
+            ResponseItem::Message(Message::user("old user")),
+            ResponseItem::Message(Message::assistant_text("old assistant")),
+            ResponseItem::Message(Message::user(large_tail.clone())),
+            ResponseItem::Message(Message::assistant_text(large_tail)),
+            ResponseItem::Message(Message::user("latest user")),
+        ];
+        let token_info = TokenInfo {
+            input_tokens: 200,
+            cached_input_tokens: 0,
+            output_tokens: 0,
+        };
+        let config = CompactionConfig {
+            budget: TokenBudget {
+                auto_compact_token_limit: Some(100),
+                ..TokenBudget::new(200_000, 8192)
+            },
+            kind: CompactionKind::Auto,
+        };
+
+        let action = compact_history(&items, &token_info, &StubSummarizer, &config)
+            .await
+            .expect("auto compaction should succeed");
+
+        let proactive_config = CompactionConfig {
+            budget: config.budget.clone(),
+            kind: CompactionKind::Proactive,
+        };
+        let proactive_action =
+            compact_history(&items, &token_info, &StubSummarizer, &proactive_config)
+                .await
+                .expect("proactive compaction should succeed");
+
+        match (action, proactive_action) {
+            (
+                CompactAction::Replaced(auto_compacted),
+                CompactAction::Replaced(proactive_compacted),
+            ) => {
+                assert_eq!(
+                    proactive_compacted[1..],
+                    [ResponseItem::Message(Message::user("latest user"))]
+                );
+                assert!(
+                    auto_compacted.len() > proactive_compacted.len(),
+                    "auto compaction should preserve more tail items than proactive latest-user suffix"
+                );
+                assert_eq!(
+                    auto_compacted.last(),
+                    Some(&ResponseItem::Message(Message::user("latest user")))
+                );
+                assert!(
+                    auto_compacted.iter().any(|item| {
+                        matches!(
+                            item,
+                            ResponseItem::Message(msg)
+                                if msg.role == devo_protocol::Role::Assistant
+                        )
+                    }),
+                    "auto compaction should preserve assistant tail items beyond the latest user message"
+                );
+            }
+            _ => panic!("expected both compaction modes to replace history"),
+        }
+    }
+
+    #[tokio::test]
     async fn proactive_compaction_summarizes_all_history_and_preserves_latest_user_suffix() {
         struct StubSummarizer;
 
@@ -531,7 +648,9 @@ mod tests {
                 messages: Vec<RequestMessage>,
             ) -> Result<String, CompactionError> {
                 assert_eq!(messages.len(), 4);
-                let last = messages.last().expect("summarizer messages should not be empty");
+                let last = messages
+                    .last()
+                    .expect("summarizer messages should not be empty");
                 assert_eq!(last.role, RequestRole::Developer.as_str());
                 assert!(
                     matches!(&last.content[0], RequestContent::Text { text } if text.contains("CONTEXT CHECKPOINT COMPACTION"))
