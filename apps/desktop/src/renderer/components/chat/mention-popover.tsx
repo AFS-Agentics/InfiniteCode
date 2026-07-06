@@ -92,7 +92,7 @@ export const MentionPopover = memo(
 		)
 
 		// --- Data: file search (enabled whenever popover is open, even with empty query) ---
-		const { files } = useFileSearch(directory, query, open)
+		const { files, isLoading, error } = useFileSearch(directory, query, open)
 		const fileOptions = useMemo<MentionOption[]>(
 			() => files.slice(0, 20).map((f) => ({ type: "file" as const, path: f, display: f })),
 			[files],
@@ -174,6 +174,8 @@ export const MentionPopover = memo(
 		const agentItems = allOptions.filter((o) => o.type === "agent")
 		const fileItems = allOptions.filter((o) => o.type === "file")
 		const hasResults = allOptions.length > 0
+		const showLoading = isLoading && !hasResults
+		const showError = !!error && !hasResults && !isLoading
 
 		let globalIndex = 0
 
@@ -196,7 +198,15 @@ export const MentionPopover = memo(
 					<div ref={listRef} className="py-1">
 						{!hasResults && (
 							<div className="py-4 text-center text-sm text-muted-foreground">
-								{query ? "No results found" : "No files or agents available"}
+								{showLoading
+									? query
+										? `Searching for "${query}"…`
+										: "Searching files and agents…"
+									: showError
+										? error
+										: query
+											? "No results found"
+											: "No files or agents available"}
 							</div>
 						)}
 

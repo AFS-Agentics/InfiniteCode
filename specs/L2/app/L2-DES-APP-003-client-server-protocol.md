@@ -386,6 +386,7 @@ Rules:
 
 - `search/start` must return promptly with a server-owned `search_id` or a structured rejection.
 - `search/updated`, `search/completed`, and `search/failed` are sent only to the requesting client connection unless a later requirement defines shared picker state.
+- Connection-local search notifications must be delivered to the requesting connection even when the only active notification subscriptions are session-scoped (`session_id=Some(...)`). Search snapshots carry no `session_id` and must not depend on `events/subscribe` session matching.
 - `search/update` should supersede prior query work for the same `search_id`.
 - Search query text is the literal keyword after the client prefix. It must not require or encode provider selectors such as file, skill, or MCP.
 - If `providers` is omitted, the server should use the default provider set for prefixed input.

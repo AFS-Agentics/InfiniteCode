@@ -78,3 +78,14 @@ Find where provider-hosted web search is configured.
 按 `Esc` 后，Devo 会对当前 token dismiss popup，直到 token 改变才重新打开。这样 popup 不会在你继续输入时干扰你。
 
 如果 popup 没有选中结果时按 `Enter`，Devo 会关闭 popup，而不是提交 prompt。这样可以避免 reference search 活跃时误提交。
+
+## 搜索如何保持同步
+
+`@` 引用搜索由 **服务端驱动**，且是 **连接级（connection-local）** 的：
+
+- 客户端通过 `search/start` 打开搜索会话，并在 `@` 后继续输入时用 `search/update` 更新查询。
+- 服务端会立即返回初始快照，随后通过 `search/updated` 流式推送文件匹配，并以 `search/completed` 结束。
+- 当最新快照的 `file_search_complete` 为 `true` 时，popup 会结束 loading 状态。
+- 这些通知只发给发起搜索的客户端连接，不属于会话 transcript，也不依赖 `events/subscribe` 的 session 过滤。
+
+若文件搜索失败，客户端应退出 loading 并显示简短降级提示，而不是一直等待。

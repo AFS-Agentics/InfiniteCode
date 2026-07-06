@@ -1,7 +1,9 @@
-//! Server-owned reference search sessions for TUI composer `@` lookups.
+//! Server-owned reference search sessions for composer `@` lookups.
 //!
 //! The runtime aggregates skill metadata, configured MCP servers, and live file
 //! search snapshots into protocol rows so UI clients only render and select.
+//! Incremental file results are pushed to the requesting client through
+//! connection-local `search/updated` and `search/completed` notifications.
 
 use std::num::NonZero;
 use std::path::PathBuf;
@@ -207,7 +209,7 @@ impl ServerRuntime {
             file_matches: Vec::new(),
             total_file_match_count: 0,
             scanned_file_count: 0,
-            file_search_complete: true,
+            file_search_complete: false,
             file_session,
         };
         let snapshot = state.snapshot(&search_id);
@@ -219,9 +221,7 @@ impl ServerRuntime {
 
         self.spawn_reference_search_update_task(connection_id, update_rx);
 
-        if !snapshot.query.trim().is_empty()
-            && let Some(state) = self.reference_searches.lock().await.get_mut(&search_id)
-        {
+        if let Some(state) = self.reference_searches.lock().await.get_mut(&search_id) {
             state.file_search_complete = false;
             state.file_session.update_query(&snapshot.query);
             return Ok(state.snapshot(&search_id));
@@ -247,12 +247,8 @@ impl ServerRuntime {
         state.file_matches.clear();
         state.total_file_match_count = 0;
         state.scanned_file_count = 0;
-        if state.query.trim().is_empty() {
-            state.file_search_complete = true;
-        } else {
-            state.file_search_complete = false;
-            state.file_session.update_query(&state.query);
-        }
+        state.file_search_complete = false;
+        state.file_session.update_query(&state.query);
 
         Ok(state.snapshot(&params.search_id))
     }
@@ -309,7 +305,8 @@ impl ServerRuntime {
                 ServerEvent::ReferenceSearchUpdated(snapshot),
             )
         };
-        self.emit_to_connection(connection_id, method, event).await;
+        self.emit_connection_local_to_connection(connection_id, method, event)
+            .await;
     }
 
     fn mcp_sources(runtime_context: &SessionRuntimeContext) -> Vec<McpReferenceSource> {

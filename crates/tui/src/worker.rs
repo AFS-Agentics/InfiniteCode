@@ -38,6 +38,7 @@ use devo_protocol::ProviderVendorListParams;
 use devo_protocol::ProviderVendorUpsertParams;
 use devo_protocol::ReferenceSearchCancelParams;
 use devo_protocol::ReferenceSearchId;
+use devo_protocol::ReferenceSearchSnapshot;
 use devo_protocol::ReferenceSearchStartParams;
 use devo_protocol::ReferenceSearchUpdateParams;
 use devo_protocol::SessionHistoryMetadata;
@@ -2793,6 +2794,19 @@ async fn run_worker_inner(
                                         message = %payload.message,
                                         "reference search failed"
                                     );
+                                    // End the composer loading state instead of waiting forever
+                                    // for a completion notification that will never arrive.
+                                    let snapshot = ReferenceSearchSnapshot {
+                                        search_id: payload.search_id,
+                                        query: payload.query,
+                                        results: Vec::new(),
+                                        total_file_match_count: 0,
+                                        scanned_file_count: 0,
+                                        file_search_complete: true,
+                                    };
+                                    let _ = event_tx.send(WorkerEvent::ReferenceSearchUpdated {
+                                        snapshot,
+                                    });
                                 }
                             }
                             "session/title/updated" => {

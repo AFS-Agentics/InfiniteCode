@@ -63,6 +63,12 @@ import {
 	ProtocolValidationError,
 	assertValidProtocolPayload,
 } from "./protocol-validation"
+import {
+	ReferenceSearchSession,
+	type ReferenceSearchSnapshot,
+} from "./reference-search-session"
+
+export type { ReferenceSearchSnapshot } from "./reference-search-session"
 
 export type JsonRpcId = number | string
 
@@ -581,6 +587,7 @@ class AcpClient {
 	private pendingQuestions = new Map<string, PendingQuestion>()
 	private sessionDiscovery = new Map<string, Promise<Session | undefined>>()
 	private lastEventTime = 0
+	private referenceSearchSession: ReferenceSearchSession | null = null
 
 	constructor(private readonly options: CreateDevoClientOptions) {}
 	project = {
@@ -887,7 +894,25 @@ class AcpClient {
 	}
 
 	find = {
-		files: async (_params: { query: string }) => ({ data: [] }),
+		// @ mention file search uses connection-local search/* RPC + notifications.
+		files: async (params: { query: string }) => {
+			const session = this.ensureReferenceSearchSession()
+			await session.startOrUpdate(params.query)
+			return { data: session.filePaths() }
+		},
+	}
+
+	referenceSearch = {
+		startOrUpdate: async (params: { query: string }) => ({
+			data: await this.ensureReferenceSearchSession().startOrUpdate(params.query),
+		}),
+		cancel: async () => {
+			await this.ensureReferenceSearchSession().cancel()
+			return { data: null }
+		},
+		subscribe: (listener: (snapshot: ReferenceSearchSnapshot) => void) =>
+			this.ensureReferenceSearchSession().subscribe(listener),
+		getState: () => this.ensureReferenceSearchSession().getState(),
 	}
 
 	worktree = {
@@ -1160,6 +1185,25 @@ class AcpClient {
 		})
 	}
 
+	/** Devo extension RPCs that are not yet present in the generated ACP schema bundle. */
+	private async requestExtension(method: string, params: unknown): Promise<unknown> {
+		await this.open()
+		if (!this.transport) throw new Error("Devo ACP transport is not connected")
+		const extensionMethod = method.startsWith("_devo/") ? method : `_devo/${method}`
+		return this.transport.request(extensionMethod, params, this.options.directory)
+	}
+
+	private ensureReferenceSearchSession(): ReferenceSearchSession {
+		if (!this.referenceSearchSession) {
+			const cwd = this.options.directory ?? defaultCwd()
+			this.referenceSearchSession = new ReferenceSearchSession(
+				(method, params) => this.requestExtension(method, params),
+				cwd,
+			)
+		}
+		return this.referenceSearchSession
+	}
+
 	private handleTransportEvent(event: DevoAcpTransportEvent): void {
 		if (event.type === "closed") {
 			if (this.transport) {
@@ -1177,6 +1221,14 @@ class AcpClient {
 			)
 			if (!notification) return
 			this.handleSessionUpdate(notification)
+			return
+		}
+		if (
+			event.type === "notification" &&
+			event.method &&
+			event.params &&
+			this.referenceSearchSession?.handleNotification(event.method, event.params)
+		) {
 			return
 		}
 		if (

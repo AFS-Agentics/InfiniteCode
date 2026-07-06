@@ -415,14 +415,17 @@ fn provider_retry_decision(
 
 /// Compact session messages using LLM-backed summarization.
 ///
-/// Converts session messages to ResponseItems, runs compact_history()
-/// with the history module's LLM summarizer, and converts the compacted
-/// items back to Messages.
+/// `kind` selects the preserve strategy inside [`compact_history`]:
+/// - [`CompactionKind::Auto`]: preventive compaction when the session token
+///   budget is high; keeps a tail token window.
+/// - [`CompactionKind::Proactive`]: forced compaction after provider
+///   `context_too_long`; keeps from the latest user message onward.
 async fn summarize_and_compact(
     session: &mut SessionState,
     provider: &Arc<dyn ModelProviderSDK>,
     request_model: &str,
     max_tokens: usize,
+    kind: CompactionKind,
 ) {
     let items: Vec<ResponseItem> = session
         .prompt_source_messages()
@@ -439,7 +442,7 @@ async fn summarize_and_compact(
 
     let config = CompactionConfig {
         budget: session.config.token_budget.clone(),
-        kind: CompactionKind::Proactive,
+        kind,
     };
 
     let summarizer =
@@ -904,11 +907,14 @@ pub async fn query(
                 budget_steer_injected = true;
             }
             info!("token budget threshold exceeded, running LLM compaction");
+            // Auto: preserve tail items up to COMPACT_USER_MESSAGE_MAX_TOKENS.
+            // Example: [user1, asst1, user2, asst2, user3] -> [summary, asst2, user3].
             summarize_and_compact(
                 session,
                 &provider,
                 &turn_config.request_model,
                 turn_config.model.max_tokens.unwrap_or(4096) as usize,
+                CompactionKind::Auto,
             )
             .await;
         }
@@ -1036,11 +1042,14 @@ pub async fn query(
                 match provider_retry_decision(&e, &mut retry_count, &mut context_compacted) {
                     ProviderRetryDecision::CompactAndRetry => {
                         warn!("context_too_long - compacting and retrying");
+                        // Proactive: must compact even if token estimates disagree
+                        // with the provider; preserve from latest user only.
                         summarize_and_compact(
                             session,
                             &provider,
                             &turn_config.request_model,
                             turn_config.model.max_tokens.unwrap_or(4096) as usize,
+                            CompactionKind::Proactive,
                         )
                         .await;
                         session.turn_count -= 1;
@@ -1214,11 +1223,14 @@ pub async fn query(
                     match provider_retry_decision(&e, &mut retry_count, &mut context_compacted) {
                         ProviderRetryDecision::CompactAndRetry => {
                             warn!("context_too_long - compacting and retrying");
+                            // Proactive: must compact even if token estimates disagree
+                            // with the provider; preserve from latest user only.
                             summarize_and_compact(
                                 session,
                                 &provider,
                                 &turn_config.request_model,
                                 turn_config.model.max_tokens.unwrap_or(4096) as usize,
+                                CompactionKind::Proactive,
                             )
                             .await;
                             session.turn_count -= 1;

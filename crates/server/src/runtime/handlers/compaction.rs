@@ -147,6 +147,8 @@ impl ServerRuntime {
 
             let config = CompactionConfig {
                 budget: core_session.config.token_budget.clone(),
+                // Proactive: user-requested /compact; preserve latest user suffix.
+                // Example: [user1, asst1, user2, asst2, user3] -> [summary, user3].
                 kind: CompactionKind::Proactive,
             };
 

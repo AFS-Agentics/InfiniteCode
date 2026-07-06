@@ -640,12 +640,52 @@ impl ServerRuntime {
         self.record_subagent_output_event(event).await;
     }
 
+    /// Deliver a connection-local notification to one client connection.
+    ///
+    /// Connection-local search notifications (`search/updated`, `search/completed`,
+    /// `search/failed`) are not session transcript events. They carry no
+    /// `session_id` and must reach the requesting connection even when the only
+    /// active subscriptions are session-scoped (`session_id=Some(...)`).
+    pub(super) async fn emit_connection_local_to_connection(
+        &self,
+        connection_id: u64,
+        method: &str,
+        event: ServerEvent,
+    ) {
+        debug_assert!(is_connection_local_notification(method));
+        let notification = {
+            let mut connections = self.connections.lock().await;
+            let Some(connection) = connections.get_mut(&connection_id) else {
+                return;
+            };
+            if !connection.should_deliver_connection_local(method) {
+                return;
+            }
+            let event_seq = connection.next_seq();
+            let event = event.with_seq(event_seq);
+            let (method, value) = acp_notification_from_server_event(method, &event);
+            Some((
+                connection.outbound_tx.clone(),
+                OutboundFrame::notification(connection_id, method, event_seq, value),
+            ))
+        };
+        if let Some((outbound_tx, frame)) = notification {
+            let _ = enqueue_outbound_notification(&outbound_tx, frame, "connection_notifications")
+                .await;
+        }
+    }
+
     pub(super) async fn emit_to_connection(
         &self,
         connection_id: u64,
         method: &str,
         event: ServerEvent,
     ) {
+        if is_connection_local_notification(method) {
+            self.emit_connection_local_to_connection(connection_id, method, event)
+                .await;
+            return;
+        }
         let session_id = event.session_id();
         let child_parent_by_session = self.child_parent_by_session().await;
         let notification = {
@@ -1096,7 +1136,23 @@ pub(crate) struct ConnectionRuntime {
     pending_client_requests: HashMap<u64, oneshot::Sender<Result<serde_json::Value, String>>>,
 }
 
+/// Returns whether `method` is a connection-local composer notification.
+///
+/// These events are scoped to the requesting client connection, not to a
+/// durable session subscription.
+pub(super) fn is_connection_local_notification(method: &str) -> bool {
+    matches!(
+        method,
+        "search/updated" | "search/completed" | "search/failed"
+    )
+}
+
 impl ConnectionRuntime {
+    /// Connection-local notifications bypass session subscription filters.
+    pub(super) fn should_deliver_connection_local(&self, method: &str) -> bool {
+        !self.opt_out_notification_methods.contains(method)
+    }
+
     pub(super) fn should_deliver(
         &self,
         method: &str,
@@ -1611,5 +1667,74 @@ mod tests {
         assert_agent_message_chunk_update(&watcher_message["params"]["update"], turn_id, item_id);
 
         Ok(())
+    }
+
+    /// Trace: L2-DES-CLIENT-002
+    /// Verifies: connection-local search notifications deliver despite session-only subscriptions.
+    #[tokio::test]
+    async fn connection_local_search_notifications_ignore_session_subscriptions() -> Result<()> {
+        use devo_protocol::ReferenceSearchId;
+        use devo_protocol::ReferenceSearchSnapshot;
+
+        let data_root = TempDir::new()?;
+        let runtime = build_runtime(data_root.path());
+        let session_id = SessionId::new();
+        let (owner_outbound, mut owner_receiver) = super::outbound::test_outbound_channel(4);
+        let owner_connection_id = runtime
+            .register_connection(ClientTransportKind::Stdio, owner_outbound)
+            .await;
+        let (other_outbound, mut other_receiver) = super::outbound::test_outbound_channel(4);
+        let _other_connection_id = runtime
+            .register_connection(ClientTransportKind::Stdio, other_outbound)
+            .await;
+
+        runtime
+            .subscribe_connection_to_session(owner_connection_id, session_id, None)
+            .await;
+
+        let snapshot = ReferenceSearchSnapshot {
+            search_id: ReferenceSearchId::new(),
+            query: "src".to_string(),
+            results: Vec::new(),
+            total_file_match_count: 0,
+            scanned_file_count: 0,
+            file_search_complete: true,
+        };
+        runtime
+            .emit_connection_local_to_connection(
+                owner_connection_id,
+                "search/completed",
+                ServerEvent::ReferenceSearchCompleted(snapshot),
+            )
+            .await;
+
+        let owner_message = tokio::time::timeout(Duration::from_secs(1), owner_receiver.recv())
+            .await?
+            .expect("owner receives connection-local search notification");
+        assert_eq!(owner_message["method"], "_devo/search/completed");
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), other_receiver.recv())
+                .await
+                .is_err(),
+            "unrelated connection must not receive connection-local search notification"
+        );
+
+        Ok(())
+    }
+
+    /// Trace: L2-DES-CLIENT-002
+    /// Verifies: session-scoped notifications still require matching subscriptions.
+    #[test]
+    fn session_scoped_notifications_require_matching_subscription() {
+        let subscribed_session = SessionId::new();
+        let subscription = SubscriptionFilter {
+            session_id: Some(subscribed_session),
+            event_types: HashSet::new(),
+            include_child_agents: false,
+        };
+        let child_parent_by_session = HashMap::new();
+
+        assert!(!subscription.session_matches(None, &child_parent_by_session));
+        assert!(subscription.session_matches(Some(subscribed_session), &child_parent_by_session));
     }
 }
