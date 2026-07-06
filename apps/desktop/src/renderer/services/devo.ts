@@ -1,5 +1,6 @@
 import type {
 	DevoClient,
+	ReferenceSearchSnapshot,
 	WorkspaceChangeScope,
 	WorkspaceChangesReadResult,
 	WorkspaceDiffDetail,
@@ -374,12 +375,19 @@ export async function listCommands(
 }
 
 /**
- * Search for files in the project.
- * Returns file paths as strings (from the Devo /find/file endpoint).
+ * Search for files in the project via server-backed reference search.
+ * Returns file paths from the active `search/*` session snapshot.
  */
 export async function findFiles(client: DevoClient, query: string): Promise<string[]> {
-	const result = await client.find.files({ query })
-	return (result.data ?? []) as string[]
+	const result = await client.referenceSearch.startOrUpdate({ query })
+	return filePathsFromReferenceSnapshot(result.data)
+}
+
+function filePathsFromReferenceSnapshot(snapshot: ReferenceSearchSnapshot): string[] {
+	return snapshot.results
+		.filter((result) => result.kind === "file")
+		.map((result) => result.display_name)
+		.filter((path) => path.trim().length > 0)
 }
 
 /**

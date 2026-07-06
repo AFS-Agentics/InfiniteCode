@@ -90,3 +90,20 @@ you continue typing.
 If you press `Enter` while the popup has no selected result, Devo closes the
 popup instead of submitting the prompt. This prevents accidental submissions
 while reference search is still active.
+
+## How Search Stays In Sync
+
+Reference search is **server-backed** and **connection-local**:
+
+- The client opens a search session with `search/start` and updates it with
+  `search/update` as you type after `@`.
+- The server returns an initial snapshot immediately, then streams file matches
+  through `search/updated` and finishes with `search/completed`.
+- The popup stops showing a loading state when the latest snapshot sets
+  `file_search_complete` to true.
+- These notifications belong to the requesting client connection. They are not
+  session transcript events and do not require a separate `events/subscribe`
+  filter to match a session id.
+
+If file search fails, clients should leave loading state and show a short
+degraded message rather than waiting indefinitely.
