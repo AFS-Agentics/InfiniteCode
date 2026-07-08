@@ -32,6 +32,13 @@ impl ContextChangesFragment {
         }
     }
 
+    /// Returns true when this fragment communicates a real change (mode transition
+    /// and/or metadata diffs). First-turn fragments with only the current mode are
+    /// treated as changes because there is no prior turn context yet.
+    pub fn has_changes(&self) -> bool {
+        self.collaboration_mode.previous.is_some() || !self.metadata.is_empty()
+    }
+
     pub fn to_message(&self) -> Message {
         Message::user(self.render())
     }
