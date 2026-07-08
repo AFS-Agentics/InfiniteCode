@@ -618,6 +618,7 @@ struct ReplayState {
     session: Option<SessionRecord>,
     latest_turn: Option<TurnRecord>,
     latest_turn_metadata: Option<TurnMetadata>,
+    latest_query_usage: Option<devo_protocol::TurnUsage>,
     turn_records_by_id: HashMap<TurnId, TurnRecord>,
     loaded_item_count: u64,
     next_item_seq: u64,
@@ -714,6 +715,7 @@ impl ReplayState {
                         usage.cache_read_input_tokens.unwrap_or(0) as usize;
                     self.last_input_tokens = usage.input_tokens as usize;
                     self.last_turn_tokens = usage.display_total_tokens();
+                    self.latest_query_usage = Some(usage.clone());
                 }
                 self.latest_turn_metadata = Some(turn_metadata_from_record(&turn));
                 self.turn_kinds_by_id.insert(turn.id, turn.kind.clone());
@@ -1028,10 +1030,10 @@ impl ReplayState {
             total_cache_creation_tokens: self.total_cache_creation_tokens,
             total_cache_read_tokens: self.total_cache_read_tokens,
             prompt_token_estimate: core_session.prompt_token_estimate,
+            last_query_usage: self.latest_query_usage.clone(),
             last_query_total_tokens: self
-                .latest_turn_metadata
+                .latest_query_usage
                 .as_ref()
-                .and_then(|turn| turn.usage.as_ref())
                 .map(devo_protocol::TurnUsage::display_total_tokens)
                 .unwrap_or(0),
             status: SessionRuntimeStatus::Idle,
@@ -1244,6 +1246,7 @@ impl ReplayState {
         self.total_cache_read_tokens = 0;
         self.last_input_tokens = 0;
         self.last_turn_tokens = 0;
+        self.latest_query_usage = None;
 
         for turn_id in &self.turn_order {
             let Some(turn) = self.turn_records_by_id.get(turn_id) else {
@@ -1259,6 +1262,7 @@ impl ReplayState {
                 self.total_cache_read_tokens += usage.cache_read_input_tokens.unwrap_or(0) as usize;
                 self.last_input_tokens = usage.input_tokens as usize;
                 self.last_turn_tokens = usage.display_total_tokens();
+                self.latest_query_usage = Some(usage.clone());
             }
         }
     }
@@ -1725,6 +1729,7 @@ fn session_metadata_from_record(
         total_cache_creation_tokens: 0,
         total_cache_read_tokens: 0,
         prompt_token_estimate: 0,
+        last_query_usage: None,
         last_query_total_tokens: 0,
         status: SessionRuntimeStatus::Idle,
     }
@@ -1958,6 +1963,80 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(titles, vec!["assistant 1", "date"]);
+    }
+
+    #[test]
+    fn replay_preserves_latest_query_usage_when_latest_turn_has_no_usage() {
+        use devo_protocol::TurnUsage;
+
+        let now = Utc.with_ymd_and_hms(2026, 7, 8, 10, 0, 0).unwrap();
+        let session_id = SessionId::new();
+        let mut replay = ReplayState::default();
+        let usage = TurnUsage {
+            input_tokens: 30,
+            output_tokens: 12,
+            cache_creation_input_tokens: None,
+            cache_read_input_tokens: None,
+            reasoning_output_tokens: None,
+            total_tokens: Some(42),
+        };
+
+        replay
+            .apply_line(RolloutLine::Turn(Box::new(TurnLine {
+                timestamp: now,
+                turn: TurnRecord {
+                    id: TurnId::new(),
+                    session_id,
+                    sequence: 1,
+                    started_at: now,
+                    completed_at: Some(now),
+                    status: TurnStatus::Completed,
+                    kind: TurnKind::Regular,
+                    model: "model-a".into(),
+                    model_binding_id: None,
+                    reasoning_effort_selection: None,
+                    request_model: "model-a".into(),
+                    request_thinking: None,
+                    input_token_estimate: None,
+                    usage: Some(usage.clone()),
+                    stop_reason: None,
+                    failure_reason: None,
+                    session_context: None,
+                    turn_context: None,
+                    schema_version: 2,
+                },
+            })))
+            .expect("apply usage turn");
+        replay
+            .apply_line(RolloutLine::Turn(Box::new(TurnLine {
+                timestamp: now,
+                turn: TurnRecord {
+                    id: TurnId::new(),
+                    session_id,
+                    sequence: 2,
+                    started_at: now,
+                    completed_at: Some(now),
+                    status: TurnStatus::Failed,
+                    kind: TurnKind::Regular,
+                    model: "model-a".into(),
+                    model_binding_id: None,
+                    reasoning_effort_selection: None,
+                    request_model: "model-a".into(),
+                    request_thinking: None,
+                    input_token_estimate: None,
+                    usage: None,
+                    stop_reason: None,
+                    failure_reason: Some(devo_protocol::TurnFailureReason::MaxTurnRequests),
+                    session_context: None,
+                    turn_context: None,
+                    schema_version: 2,
+                },
+            })))
+            .expect("apply terminal turn without usage");
+
+        assert_eq!(replay.latest_query_usage, Some(usage));
+        assert_eq!(replay.last_turn_tokens, 42);
+        assert_eq!(replay.last_input_tokens, 30);
     }
 
     #[test]
@@ -2246,6 +2325,7 @@ mod tests {
                 total_cache_creation_tokens: 0,
                 total_cache_read_tokens: 0,
                 prompt_token_estimate: 0,
+                last_query_usage: None,
                 last_query_total_tokens: 0,
                 status: SessionRuntimeStatus::Idle,
             },
