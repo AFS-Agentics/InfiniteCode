@@ -12,6 +12,7 @@ import {
 	removePermissionAtom,
 	removeQuestionAtom,
 	removeSessionAtom,
+	setProviderRetryStatusAtom,
 	setSessionErrorAtom,
 	setSessionStatusAtom,
 	upsertSessionAtom,
@@ -101,6 +102,31 @@ export function processEvent(event: Event): void {
 		case "session.deleted":
 			set(removeSessionAtom, event.properties.info.id)
 			break
+
+		case "turn.provider_retry_status": {
+			const properties = event.properties
+			const sessionId = properties.sessionID ?? properties.session_id
+			const turnId = properties.turnID ?? properties.turn_id
+			if (sessionId && turnId) {
+				const phase = String(properties.phase ?? "")
+				set(setProviderRetryStatusAtom, {
+					sessionId,
+					status:
+						phase === "resumed"
+							? undefined
+							: {
+								turnId,
+								attempt: Number(properties.attempt ?? 0),
+								backoffMs: Number(properties.backoffMs ?? properties.backoff_ms ?? 0),
+								provider: String(properties.provider ?? ""),
+								model: String(properties.model ?? ""),
+								phase,
+								message: String(properties.message ?? ""),
+							},
+				})
+			}
+			break
+		}
 
 		case "session.status":
 			set(setSessionStatusAtom, {

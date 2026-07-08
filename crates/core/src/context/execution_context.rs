@@ -243,18 +243,26 @@ impl TurnContext {
         }
     }
 
-    pub fn context_changes_since(&self, previous: Option<&TurnContext>) -> ContextChangesFragment {
+    /// Returns a context-changes fragment when there is something to communicate.
+    ///
+    /// The first turn (no previous context) always emits a fragment with the current
+    /// collaboration mode. Later turns emit a fragment only when collaboration mode
+    /// or other turn metadata actually changed.
+    pub fn context_changes_since(
+        &self,
+        previous: Option<&TurnContext>,
+    ) -> Option<ContextChangesFragment> {
         let mut metadata = Vec::new();
         let mut previous_collaboration_mode = None;
         let mut collaboration_mode_note = None;
 
         let Some(previous) = previous else {
-            return ContextChangesFragment::new(
+            return Some(ContextChangesFragment::new(
                 self.collaboration_mode,
                 previous_collaboration_mode,
                 collaboration_mode_note,
                 metadata,
-            );
+            ));
         };
 
         if self.environment.cwd != previous.environment.cwd {
@@ -320,12 +328,13 @@ impl TurnContext {
                     .to_string(),
             );
         }
-        ContextChangesFragment::new(
+        let fragment = ContextChangesFragment::new(
             self.collaboration_mode,
             previous_collaboration_mode,
             collaboration_mode_note,
             metadata,
-        )
+        );
+        fragment.has_changes().then_some(fragment)
     }
 }
 
@@ -607,7 +616,9 @@ mod tests {
             collaboration_mode: devo_protocol::CollaborationMode::Build,
         };
 
-        let diff = current.context_changes_since(Some(&previous));
+        let diff = current
+            .context_changes_since(Some(&previous))
+            .expect("metadata changes should produce a fragment");
         let rendered = diff.render();
         assert!(rendered.contains("<metadata>"));
         assert!(rendered.contains("<name>model</name>"));
@@ -635,7 +646,9 @@ mod tests {
             observed_agents_snapshot: None,
             collaboration_mode: devo_protocol::CollaborationMode::Build,
         };
-        let fragment = context.context_changes_since(None);
+        let fragment = context
+            .context_changes_since(None)
+            .expect("first turn should emit context changes");
 
         let message = fragment.to_message();
         assert_eq!(message.role, devo_protocol::Role::User);
@@ -668,7 +681,9 @@ mod tests {
             ..previous.clone()
         };
 
-        let diff = current.context_changes_since(Some(&previous));
+        let diff = current
+            .context_changes_since(Some(&previous))
+            .expect("mode change should produce a fragment");
         let rendered = diff.render();
 
         assert!(rendered.contains("<collaboration_mode>"));
@@ -680,6 +695,30 @@ mod tests {
         ));
         assert!(!rendered.contains("<collaboration_mode_build>"));
         assert!(!rendered.contains("<collaboration_mode_plan>"));
+    }
+
+    #[test]
+    fn turn_context_diff_skips_unchanged_subsequent_turns() {
+        let previous = TurnContext {
+            environment: EnvironmentContext {
+                cwd: PathBuf::from("/tmp/a"),
+                shell: "bash".into(),
+                current_date: "2026-04-27".into(),
+                timezone: "UTC".into(),
+            },
+            persona: super::Persona::Default,
+            model: Model {
+                slug: "model-a".into(),
+                ..Model::default()
+            },
+            reasoning_effort_selection: None,
+            reasoning_effort: None,
+            observed_agents_snapshot: None,
+            collaboration_mode: devo_protocol::CollaborationMode::Build,
+        };
+        let current = previous.clone();
+
+        assert_eq!(current.context_changes_since(Some(&previous)), None);
     }
 
     #[test]

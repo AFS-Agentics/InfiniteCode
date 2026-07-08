@@ -186,6 +186,7 @@ impl ServerRuntime {
             total_cache_creation_tokens: 0,
             total_cache_read_tokens: 0,
             prompt_token_estimate: core_session.prompt_token_estimate,
+            last_query_usage: None,
             last_query_total_tokens: 0,
             status: SessionRuntimeStatus::Idle,
         };
@@ -231,6 +232,7 @@ impl ServerRuntime {
             tool_registry: parent_tool_registry,
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
+            session_context_recorded: false,
         };
         let child_state = SessionActorState::from_runtime_session(child_session);
         self.insert_session_actor(child_state).await;
@@ -570,7 +572,7 @@ impl ServerRuntime {
     }
 
     async fn append_turn_start(
-        &self,
+        self: &Arc<Self>,
         session_id: SessionId,
         turn: &TurnMetadata,
     ) -> Result<(), ToolCallError> {
@@ -585,17 +587,12 @@ impl ServerRuntime {
                     "failed to snapshot turn persistence: {session_id}"
                 ))
             })?;
-        let (record, session_context, turn_context) = (
-            persistence_snapshot.record.clone(),
-            persistence_snapshot.session_context.clone(),
-            persistence_snapshot.latest_turn_context.clone(),
-        );
-        if let Some(record) = record {
-            self.rollout_store
-                .append_turn(
-                    &record,
-                    build_turn_record(turn, session_context, turn_context),
-                )
+        // Child agents can be the first durable write for their rollout; route through
+        // actor-owned dedupe so SessionContextUpdated is recorded even if the process
+        // crashes before terminal turn finalization.
+        if persistence_snapshot.record.is_some() {
+            self.persist_turn_line_deduped(session_id, turn)
+                .await
                 .map_err(|error| ToolCallError::InternalError(error.to_string()))?;
         }
         Ok(())

@@ -312,6 +312,10 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
         initial_theme_name,
     });
 
+    if initial_session.session_id.is_some() && !config.show_model_onboarding {
+        chat_widget.begin_session_resume();
+    }
+
     for warning in &config.startup_warnings {
         chat_widget.add_to_history(history_cell::new_warning_event(warning.clone()));
     }
@@ -905,6 +909,8 @@ fn handle_worker_event(
             total_input_tokens: next_total_input_tokens,
             total_output_tokens: next_total_output_tokens,
             total_tokens: next_total_tokens,
+            last_query_total_tokens: _,
+            last_query_input_tokens: _,
             prompt_token_estimate: _,
         } => {
             loop_state.busy = false;
@@ -969,6 +975,7 @@ fn handle_worker_event(
         | WorkerEvent::RequestUserInput { .. }
         | WorkerEvent::ApprovalDecision { .. }
         | WorkerEvent::SteerAccepted { .. }
+        | WorkerEvent::ProviderRetryStatus { .. }
         | WorkerEvent::GoalStatusLoaded { .. }
         | WorkerEvent::GoalUpdated { .. }
         | WorkerEvent::GoalReplaceConfirmationRequested { .. }

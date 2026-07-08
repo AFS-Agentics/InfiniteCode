@@ -88,6 +88,7 @@ pub(crate) struct SessionActorState {
     pub(crate) tool_registry: Option<Arc<ToolRegistry>>,
     pub(crate) session_approval_cache: crate::execution::ApprovalGrantCache,
     pub(crate) turn_approval_cache: crate::execution::ApprovalGrantCache,
+    pub(crate) session_context_recorded: bool,
 }
 
 impl SessionActorState {
@@ -167,6 +168,7 @@ impl SessionActorState {
             tool_registry: session.tool_registry,
             session_approval_cache: session.session_approval_cache,
             turn_approval_cache: session.turn_approval_cache,
+            session_context_recorded: session.session_context_recorded,
         }
     }
 
@@ -197,6 +199,7 @@ impl SessionActorState {
             tool_registry: self.tool_registry.clone(),
             session_approval_cache: self.session_approval_cache.clone(),
             turn_approval_cache: self.turn_approval_cache.clone(),
+            session_context_recorded: self.session_context_recorded,
         }
     }
 }

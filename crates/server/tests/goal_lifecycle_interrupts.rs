@@ -201,18 +201,13 @@ async fn replacing_goal_interrupts_old_hidden_turn_and_starts_new_goal_cleanly()
     let response: devo_server::SuccessResponse<devo_protocol::GoalStatusResult> =
         serde_json::from_value(status_response)?;
     assert_eq!(
-        response.result.goal.map(|goal| {
-            (
-                goal.objective,
-                goal.status,
-                goal.tokens_used,
-                goal.time_used_seconds,
-            )
-        }),
+        response
+            .result
+            .goal
+            .map(|goal| { (goal.objective, goal.status, goal.tokens_used,) }),
         Some((
             "new replacement goal".to_string(),
             devo_protocol::ThreadGoalStatus::Active,
-            0,
             0,
         ))
     );

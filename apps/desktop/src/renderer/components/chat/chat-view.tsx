@@ -46,7 +46,7 @@ import {
 import { compactionStatusFamily } from "../../atoms/compaction"
 import { messagesFamily } from "../../atoms/messages"
 import { projectModelsAtom, setProjectModelAtom } from "../../atoms/preferences"
-import type { SessionSetupPhase } from "../../atoms/sessions"
+import type { ProviderRetryStatus, SessionSetupPhase } from "../../atoms/sessions"
 import { removePermissionAtom, sessionFamily } from "../../atoms/sessions"
 import {
 	effectivePermissionFamily,
@@ -362,7 +362,7 @@ function LoadEarlierOnScroll({
 }: {
 	hasEarlierMessages: boolean
 	loadingEarlier: boolean
-	onLoadEarlier?: () => Promise<void>
+	onLoadEarlier?: () => void | Promise<void>
 	scrollRef: RefObject<ScrollHandle | null>
 }) {
 	const { scrollRef: containerRef, stopScroll } = useStickToBottomContext()
@@ -730,7 +730,7 @@ interface ChatViewProps {
 	/** Whether there are earlier messages that can be loaded */
 	hasEarlierMessages: boolean
 	/** Callback to load earlier messages */
-	onLoadEarlier?: () => void
+	onLoadEarlier?: () => void | Promise<void>
 	agent: Agent
 	isConnected: boolean
 	onSendMessage?: (
@@ -976,17 +976,34 @@ export function ChatView({
 		? "mx-auto w-full min-w-0"
 		: "mx-auto w-full min-w-0 max-w-3xl"
 
+	const retryStatus = sessionEntry?.retryStatus
+
 	const renderTurn = useCallback(
-		(turn: ChatTurn, index: number) => (
+		(turn: ChatTurn, index: number) => {
+			const isLastTurn = index === turns.length - 1
+			// Prefer protocol turn id when present. Fall back to the active last turn
+			// because the server already scopes retry status to the session's active turn.
+			const activeRetryStatus: ProviderRetryStatus | undefined =
+				!retryStatus || !isLastTurn
+					? undefined
+					: turn.turnId
+						? retryStatus.turnId === turn.turnId
+							? retryStatus
+							: undefined
+						: isWorking
+							? retryStatus
+							: undefined
+			return (
 			<ChatTurnComponent
 				key={turn.id}
 				turn={turn}
-				isLast={index === turns.length - 1}
+				isLast={isLastTurn}
 				isWorking={isWorking}
 				agent={agent}
 				pendingPermission={index === turns.length - 1 ? effectivePermission : undefined}
 				isConnected={isConnected}
 				compactionStatus={compactionStatus}
+				retryStatus={activeRetryStatus}
 				onApprovePermission={handleApprovePermission}
 				onDenyPermission={handleDenyPermission}
 				onRevertToMessage={onRevertToMessage}
@@ -1000,7 +1017,8 @@ export function ChatView({
 				}
 				onDeletePart={onDeletePart}
 			/>
-		),
+			)
+		},
 		[
 			agent,
 			effectivePermission,
@@ -1012,6 +1030,7 @@ export function ChatView({
 			onDeletePart,
 			onForkFromTurn,
 			onRevertToMessage,
+			retryStatus,
 			turns,
 		],
 	)

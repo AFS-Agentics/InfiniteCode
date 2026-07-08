@@ -354,6 +354,16 @@ enum PromptJsonlEvent<'a> {
         is_error: bool,
         summary: &'a str,
     },
+    #[serde(rename = "turn.provider_retry_status")]
+    ProviderRetryStatus {
+        session_id: &'a str,
+        attempt: usize,
+        backoff_ms: u64,
+        provider: &'a str,
+        model: &'a str,
+        phase: &'static str,
+        message: &'a str,
+    },
     #[serde(rename = "turn.usage_delta")]
     UsageDelta {
         session_id: &'a str,
@@ -449,6 +459,20 @@ fn write_query_event_jsonl(session_id: &str, event: &QueryEvent) -> Result<()> {
             session_id,
             item_type: "reasoning",
         }),
+        QueryEvent::ProviderRetryStatus(status) => {
+            write_jsonl(&PromptJsonlEvent::ProviderRetryStatus {
+                session_id,
+                attempt: status.attempt,
+                backoff_ms: status.backoff_ms,
+                provider: status.provider.as_str(),
+                model: status.model.as_str(),
+                phase: match status.phase {
+                    devo_core::QueryProviderRetryPhase::Scheduled => "scheduled",
+                    devo_core::QueryProviderRetryPhase::Resumed => "resumed",
+                },
+                message: status.message.as_str(),
+            })
+        }
         QueryEvent::UsageDelta { usage } => write_jsonl(&PromptJsonlEvent::UsageDelta {
             session_id,
             usage: PromptUsageDelta::new(usage),

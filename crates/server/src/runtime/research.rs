@@ -292,15 +292,10 @@ impl ServerRuntime {
         )
         .await;
         if let Some(persistence) = session_handle.turn_persistence_snapshot().await
-            && let Some(record) = persistence.record
-            && let Err(error) = self.rollout_store.append_turn(
-                &record,
-                build_turn_record(
-                    &turn,
-                    persistence.session_context,
-                    persistence.latest_turn_context,
-                ),
-            )
+            && persistence.record.is_some()
+            && let Err(error) = self
+                .persist_turn_line_deduped(params.session_id, &turn)
+                .await
         {
             self.clear_active_turn_runtime_handles(params.session_id)
                 .await;
@@ -816,7 +811,7 @@ impl ServerRuntime {
             .await?;
         let artifact = stage.artifact();
         let query_result = {
-            let query_future = query(
+            let query_future = devo_core::query_with_options(
                 scratch,
                 &stage_turn_config,
                 runtime
@@ -825,6 +820,9 @@ impl ServerRuntime {
                 Arc::clone(&registry),
                 &tool_runtime,
                 Some(callback),
+                devo_core::QueryOptions {
+                    cancel_token: Some(tool_runtime.cancel_token().clone()),
+                },
             );
             tokio::pin!(query_future);
             let mut event_channel_closed = false;
@@ -1136,20 +1134,9 @@ impl ServerRuntime {
         turn.usage = Some(usage.clone());
         if let Some(session_handle) = self.session(session_id).await {
             session_handle.set_session_idle(Some(turn.clone())).await;
-        }
-        if let Some(session_handle) = self.session(session_id).await
-            && let Some(persistence) = session_handle.turn_persistence_snapshot().await
-            && let Some(record) = persistence.record
-            && let Err(error) = self.rollout_store.append_turn(
-                &record,
-                build_turn_record(
-                    &turn,
-                    persistence.session_context,
-                    persistence.latest_turn_context,
-                ),
-            )
-        {
-            tracing::warn!(session_id = %session_id, error = %error, "failed to persist research turn finish");
+            if let Err(error) = self.persist_turn_line_deduped(session_id, &turn).await {
+                tracing::warn!(session_id = %session_id, error = %error, "failed to persist research turn finish");
+            }
         }
         self.finalize_turn_workspace_changes(session_id, &turn)
             .await;

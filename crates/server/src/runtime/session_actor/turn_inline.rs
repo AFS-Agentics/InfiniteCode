@@ -82,6 +82,7 @@ impl TurnInlineState {
         state.summary.total_tokens = self.summary.total_tokens;
         state.summary.total_cache_creation_tokens = self.summary.total_cache_creation_tokens;
         state.summary.total_cache_read_tokens = self.summary.total_cache_read_tokens;
+        state.summary.last_query_usage = self.summary.last_query_usage.clone();
         state.summary.last_query_total_tokens = self.summary.last_query_total_tokens;
         state.core.total_input_tokens = self.summary.total_input_tokens;
         state.core.total_output_tokens = self.summary.total_output_tokens;

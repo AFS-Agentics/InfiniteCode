@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use anyhow::Context;
 use devo_protocol::ApprovalScopeValue;
 use devo_protocol::CollaborationMode;
 use devo_protocol::PendingInputItem;
@@ -192,6 +193,25 @@ impl SessionHandle {
             return None;
         }
         reply_rx.await.ok()
+    }
+
+    pub(crate) async fn persist_turn_line(
+        &self,
+        runtime: Arc<crate::runtime::ServerRuntime>,
+        turn: crate::TurnMetadata,
+    ) -> anyhow::Result<()> {
+        let (reply_tx, reply_rx) = oneshot::channel();
+        if !self
+            .send(SessionCommand::PersistTurnLine {
+                runtime,
+                turn,
+                reply: reply_tx,
+            })
+            .await
+        {
+            anyhow::bail!("session actor shut down");
+        }
+        reply_rx.await.context("persist turn reply dropped")?
     }
 
     pub(crate) async fn shell_exec_context(

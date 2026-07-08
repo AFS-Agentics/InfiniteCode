@@ -101,6 +101,29 @@ pub(crate) fn spawn_turn_event_stream(
         while let Some(event) = event_rx.recv().await {
             log_dequeued_query_event(&event);
             match event {
+                devo_core::QueryEvent::ProviderRetryStatus(status) => {
+                    runtime
+                        .broadcast_event(ServerEvent::TurnProviderRetryStatus(
+                            devo_protocol::TurnProviderRetryStatusPayload {
+                                session_id,
+                                turn_id: turn_for_events.turn_id,
+                                attempt: status.attempt,
+                                backoff_ms: status.backoff_ms,
+                                provider: status.provider,
+                                model: status.model,
+                                phase: match status.phase {
+                                    devo_core::QueryProviderRetryPhase::Scheduled => {
+                                        devo_protocol::ProviderRetryPhase::Scheduled
+                                    }
+                                    devo_core::QueryProviderRetryPhase::Resumed => {
+                                        devo_protocol::ProviderRetryPhase::Resumed
+                                    }
+                                },
+                                message: status.message,
+                            },
+                        ))
+                        .await;
+                }
                 devo_core::QueryEvent::TextDelta(text) => {
                     if let Some(parser) = proposed_plan_parser.as_mut() {
                         let segments = parser.push_str(&text);
@@ -321,6 +344,15 @@ pub(crate) fn spawn_turn_event_stream(
             &event_stream,
             session_id,
             turn_for_events.turn_id,
+        )
+        .await;
+        complete_pending_tool_calls_as_interrupted(
+            &runtime,
+            session_id,
+            turn_for_events.turn_id,
+            &turn_for_plan_updates,
+            &tool_names_by_id,
+            &mut pending_tool_calls,
         )
         .await;
         tracing::debug!(
@@ -591,6 +623,67 @@ async fn handle_tool_result(
         summary,
     )
     .await;
+}
+
+async fn complete_pending_tool_calls_as_interrupted(
+    runtime: &Arc<ServerRuntime>,
+    session_id: SessionId,
+    turn_id: TurnId,
+    turn_for_plan_updates: &crate::TurnMetadata,
+    tool_names_by_id: &std::collections::HashMap<String, String>,
+    pending_tool_calls: &mut std::collections::HashMap<String, PendingToolCall>,
+) {
+    if pending_tool_calls.is_empty() {
+        return;
+    }
+    let pending = std::mem::take(pending_tool_calls);
+    for (tool_use_id, pending) in pending {
+        let tool_name = tool_names_by_id
+            .get(&tool_use_id)
+            .cloned()
+            .unwrap_or_default();
+        let content = devo_core::tools::ToolContent::Text(
+            devo_core::tools::INTERRUPTED_TOOL_RESULT_MESSAGE.to_string(),
+        );
+        let summary = if tool_name.is_empty() {
+            "interrupted".to_string()
+        } else {
+            format!("{tool_name}: interrupted")
+        };
+        let suppress_separate_result = if pending.item_id.is_some() && pending.item_seq.is_some() {
+            complete_pending_tool_call(
+                runtime,
+                session_id,
+                turn_id,
+                turn_for_plan_updates,
+                &tool_use_id,
+                (!tool_name.is_empty()).then(|| tool_name.clone()),
+                &pending,
+                &content,
+                None,
+                /*is_error*/ true,
+                &summary,
+            )
+            .await
+        } else {
+            false
+        };
+        if !suppress_separate_result {
+            tool_results::emit_tool_result_item(
+                runtime,
+                session_id,
+                turn_id,
+                tool_use_id,
+                (!tool_name.is_empty()).then_some(tool_name),
+                Some(pending.input),
+                content,
+                None,
+                /*is_error*/ true,
+                summary,
+            )
+            .await;
+        }
+    }
 }
 
 async fn handle_tool_progress(

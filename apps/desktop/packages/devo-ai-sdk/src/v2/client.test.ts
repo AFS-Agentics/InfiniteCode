@@ -1731,6 +1731,73 @@ describe("ACP desktop SDK session mapping", () => {
 		expect(await client.session.status()).toEqual({ data: { s1: { type: "idle" } } })
 	})
 
+	test("emits compaction lifecycle events from wrapped original events with nested session metadata", async () => {
+		const transport = new FakeTransport((method) => {
+			if (method === "initialize") return initializeResult
+			if (method === "session/list") return { sessions: [sessionInfo] }
+			throw new Error(`unexpected request ${method}`)
+		})
+		const client = createDevoClient({ directory: "/repo", transport })
+		const stream = (await client.global.event()).stream[Symbol.asyncIterator]()
+
+		await client.session.list()
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: { sessionUpdate: "session_info_update" },
+			_meta: {
+				"devo/originalMethod": "session/compaction/started",
+				"devo/originalEvent": {
+					kind: "session_compaction_started",
+					session: {
+						session_id: "s1",
+						title: "Existing session",
+					},
+				},
+			},
+		} satisfies AcpSessionNotification)
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: { sessionUpdate: "session_info_update" },
+			_meta: {
+				"devo/originalMethod": "session/compaction/completed",
+				"devo/originalEvent": {
+					SessionCompactionCompleted: {
+						session: {
+							sessionId: "s1",
+							title: "Existing session",
+						},
+					},
+				},
+			},
+		} satisfies AcpSessionNotification)
+		transport.emitSessionUpdate({
+			sessionId: "s1",
+			update: { sessionUpdate: "session_info_update" },
+			_meta: {
+				"devo/originalMethod": "session/compaction/failed",
+				"devo/originalEvent": {
+					SessionCompactionFailed: {
+						session_id: "s1",
+						message: "provider unavailable",
+					},
+				},
+			},
+		} satisfies AcpSessionNotification)
+
+		expect(await nextPayloadOfType(stream, "session.compaction.started", "started")).toEqual({
+			type: "session.compaction.started",
+			properties: { sessionID: "s1" },
+		})
+		expect(await nextPayloadOfType(stream, "session.compaction.completed", "completed")).toEqual({
+			type: "session.compaction.completed",
+			properties: { sessionID: "s1" },
+		})
+		expect(await nextPayloadOfType(stream, "session.compaction.failed", "failed")).toEqual({
+			type: "session.compaction.failed",
+			properties: { sessionID: "s1", message: "provider unavailable" },
+		})
+	})
+
 	test("refreshes session status from session info update metadata", async () => {
 		const transport = new FakeTransport((method) => {
 			if (method === "initialize") return initializeResult

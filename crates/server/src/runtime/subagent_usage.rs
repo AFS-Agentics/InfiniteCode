@@ -667,6 +667,8 @@ impl ParentUsageSnapshot {
         summary.total_tokens = self.session_totals.total_tokens;
         summary.total_cache_creation_tokens = self.session_totals.cache_creation_input_tokens;
         summary.total_cache_read_tokens = self.session_totals.cache_read_input_tokens;
+        // Context length is latest query usage, not cumulative session totals.
+        summary.last_query_usage = Some(self.latest_query_usage.to_turn_usage());
         summary.last_query_total_tokens = self.latest_query_usage.total_tokens;
     }
 }

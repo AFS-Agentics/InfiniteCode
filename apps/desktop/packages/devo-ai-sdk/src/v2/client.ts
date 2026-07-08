@@ -233,6 +233,29 @@ function sessionMeta(value: unknown): Record<string, unknown> | undefined {
 	return objectRecord(meta?.["devo/session"])
 }
 
+function providerRetryStatusFromOriginalEvent(
+	original: Record<string, unknown>,
+	originalMethod?: string,
+): Record<string, unknown> | null {
+	if (originalMethod !== "turn/provider_retry_status" && !("TurnProviderRetryStatus" in original) && original.kind !== "turn_provider_retry_status") {
+		return null
+	}
+	const payload = objectRecord(original.TurnProviderRetryStatus) ?? original
+	const sessionID = String(payload.session_id ?? payload.sessionId ?? "")
+	const turnID = String(payload.turn_id ?? payload.turnId ?? "")
+	if (!sessionID || !turnID) return null
+	return {
+		sessionID,
+		turnID,
+		attempt: numberFromProtocol(payload.attempt),
+		backoffMs: numberFromProtocol(payload.backoff_ms ?? payload.backoffMs),
+		provider: String(payload.provider ?? ""),
+		model: String(payload.model ?? ""),
+		phase: String(payload.phase ?? ""),
+		message: String(payload.message ?? ""),
+	}
+}
+
 function sessionStatusFromMetadata(value: unknown): string | undefined {
 	const meta = objectRecord(value)
 	const nestedStatus = objectRecord(meta?.["devo/session"])?.status
@@ -320,6 +343,14 @@ function sessionStatusChangedFromOriginalEvent(
 	return typeof sessionId === "string" && typeof status === "string" ? { sessionId, status } : null
 }
 
+function sessionIdFromCompactionPayload(payload: Record<string, unknown>): string | null {
+	const direct = payload.session_id ?? payload.sessionId
+	if (typeof direct === "string" && direct) return direct
+	const session = objectRecord(payload.session)
+	const nested = session?.session_id ?? session?.sessionId
+	return typeof nested === "string" && nested ? nested : null
+}
+
 function sessionCompactionFromOriginalEvent(
 	original: unknown,
 	originalMethod?: string,
@@ -369,8 +400,8 @@ function sessionCompactionFromOriginalEvent(
 	}
 
 	if (!status || !payload) return null
-	const sessionId = payload.session_id ?? payload.sessionId
-	if (typeof sessionId !== "string" || !sessionId) return null
+	const sessionId = sessionIdFromCompactionPayload(payload)
+	if (!sessionId) return null
 	const message = payload.message
 	return {
 		sessionId,
@@ -1525,6 +1556,14 @@ class AcpClient {
 			this.handleDeletedSessionIds(deletedSessionIds, directory)
 			return
 		}
+		const retryStatus = providerRetryStatusFromOriginalEvent(original as Record<string, unknown>, originalMethod)
+		if (retryStatus) {
+			this.emit(directory, {
+				type: "turn.provider_retry_status",
+				properties: retryStatus,
+			})
+			return
+		}
 		const changedStatus = sessionStatusChangedFromOriginalEvent(original, originalMethod)
 		if (changedStatus) {
 			this.rememberSessionStatus(changedStatus.sessionId, directory, changedStatus.status)
@@ -1796,12 +1835,14 @@ class AcpClient {
 			existingMessage,
 			now,
 		)
+		const turnId = this.turnIdForUpdate(update)
 		const message = {
 			...(existingMessage ?? {}),
 			id: messageId,
 			sessionID: sessionId,
 			role,
 			...(parentID ? { parentID } : {}),
+			...(turnId ? { turnID: turnId } : {}),
 			time: { ...(existingMessage?.time ?? {}), created },
 		} as Message
 		this.appendMessage(sessionId, message)
@@ -1865,12 +1906,14 @@ class AcpClient {
 			existingMessage,
 			now,
 		)
+		const turnId = this.turnIdForUpdate(update)
 		const message = {
 			...(existingMessage ?? {}),
 			id: messageId,
 			sessionID: sessionId,
 			role: "assistant",
 			...(parentID ? { parentID } : {}),
+			...(turnId ? { turnID: turnId } : {}),
 			time: { ...(existingMessage?.time ?? {}), created },
 		} as Message
 		const partEventTime = updateHistoryCreatedAt(update) ?? now

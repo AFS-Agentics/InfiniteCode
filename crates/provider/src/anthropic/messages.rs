@@ -42,6 +42,7 @@ use crate::ProviderAdapter;
 use crate::ProviderCapabilities;
 use crate::ProviderHttpOptions;
 use crate::dsml::DsmlToolCallHealer;
+use crate::error::ProviderError;
 use crate::hosted_tools::append_anthropic_hosted_tools;
 use crate::http::invalid_status_error;
 use crate::merge_extra_body;
@@ -409,10 +410,12 @@ impl ModelProviderSDK for AnthropicProvider {
                         )
                         .await)?
                     }
-                    Err(error) => Err(anyhow::anyhow!(
-                        "anthropic stream error for model {}: {}",
-                        request.model,
-                        format_eventsource_error(&error)
+                    Err(error) => Err(stream_error(
+                        format!(
+                            "anthropic stream error for model {}: {}",
+                            request.model,
+                            format_eventsource_error(&error)
+                        )
                     ))?,
                 };
 
@@ -1360,6 +1363,13 @@ fn parse_stop_reason(value: &str) -> StopReason {
         "max_tokens" => StopReason::MaxTokens,
         "stop_sequence" => StopReason::StopSequence,
         _ => StopReason::EndTurn,
+    }
+}
+
+fn stream_error(message: String) -> ProviderError {
+    ProviderError::StreamError {
+        message,
+        bytes_received: None,
     }
 }
 

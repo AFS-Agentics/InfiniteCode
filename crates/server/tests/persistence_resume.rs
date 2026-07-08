@@ -1877,6 +1877,16 @@ async fn first_usage_update_after_resume_preserves_historical_session_totals() -
     .result
     .session;
     assert_eq!(resumed.total_input_tokens, 100);
+    // Context length comes from the latest query snapshot, not cumulative totals.
+    let last_query_usage = resumed
+        .last_query_usage
+        .expect("resumed session should include last_query_usage");
+    assert_eq!(last_query_usage.input_tokens, 100);
+    assert_eq!(last_query_usage.output_tokens, 25);
+    assert_eq!(last_query_usage.total_tokens, Some(125));
+    assert_eq!(resumed.last_query_total_tokens, 125);
+    // Cumulative session totals remain distinct from latest-query context length.
+    assert_ne!(resumed.total_input_tokens, resumed.last_query_total_tokens);
 
     let second_turn_response = rebuilt_runtime
         .handle_incoming(
@@ -1902,6 +1912,185 @@ async fn first_usage_update_after_resume_preserves_historical_session_totals() -
     assert_eq!(post_resume_usage.total_input_tokens, 200);
     assert_eq!(post_resume_usage.total_output_tokens, 50);
     assert_eq!(post_resume_usage.total_cache_read_tokens, 100);
+    Ok(())
+}
+
+#[tokio::test]
+async fn rollout_writes_base_instructions_once_across_multiple_turns() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
+
+    let start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 1,
+                "method": "session/start",
+                "params": {
+                    "cwd": data_root.path(),
+                    "ephemeral": false,
+                    "title": "Rollout dedupe",
+                    "model": "test-model"
+                }
+            }),
+        )
+        .await
+        .context("session/start response")?;
+    let session_id = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+    >(start_response)?
+    .result
+    .session
+    .session_id;
+
+    for (request_id, prompt) in [(2, "first turn"), (3, "second turn")] {
+        let turn_response = runtime
+            .handle_incoming(
+                connection_id,
+                serde_json::json!({
+                    "id": request_id,
+                    "method": "_devo/turn/start",
+                    "params": {
+                        "session_id": session_id,
+                        "input": [{ "type": "text", "text": prompt }],
+                        "model": null,
+                        "sandbox": null,
+                        "approval_policy": null,
+                        "cwd": null
+                    }
+                }),
+            )
+            .await
+            .context("turn/start response")?;
+        let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+            serde_json::from_value(turn_response)?;
+        wait_for_turn_completed(&mut notifications_rx).await?;
+    }
+
+    runtime.refresh_session_index()?;
+    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    let index = db.get_session_index(&session_id)?.expect("indexed session");
+    let rollout_path = index.rollout_path.expect("rollout path");
+    let rollout = std::fs::read_to_string(&rollout_path)?;
+    let mut session_context_lines = 0usize;
+    let mut turn_lines_with_session_context = 0usize;
+    for line in rollout.lines().filter(|line| !line.trim().is_empty()) {
+        let rollout_line: RolloutLine = serde_json::from_str(line)?;
+        match rollout_line {
+            RolloutLine::SessionContextUpdated(_) => session_context_lines += 1,
+            RolloutLine::Turn(turn_line) if turn_line.turn.session_context.is_some() => {
+                turn_lines_with_session_context += 1;
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(session_context_lines, 1);
+    assert_eq!(turn_lines_with_session_context, 0);
+
+    let rebuilt_runtime = build_runtime(data_root.path())?;
+    let (rebuilt_connection_id, _) = initialize_connection(&rebuilt_runtime).await?;
+    let resume_response = rebuilt_runtime
+        .handle_incoming(
+            rebuilt_connection_id,
+            serde_json::json!({
+                "id": 4,
+                "method": "_devo/session/resume",
+                "params": { "session_id": session_id }
+            }),
+        )
+        .await
+        .context("session/resume response")?;
+    let _: devo_server::SuccessResponse<devo_server::SessionResumeResult> =
+        serde_json::from_value(resume_response)?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn turn_start_persists_session_context_before_turn_completes() -> Result<()> {
+    let data_root = TempDir::new()?;
+    let runtime = build_runtime(data_root.path())?;
+    let (connection_id, mut notifications_rx) = initialize_connection(&runtime).await?;
+
+    let start_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 1,
+                "method": "session/start",
+                "params": {
+                    "cwd": data_root.path(),
+                    "ephemeral": false,
+                    "title": "Turn start crash window",
+                    "model": "test-model"
+                }
+            }),
+        )
+        .await
+        .context("session/start response")?;
+    let session_id = serde_json::from_value::<
+        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+    >(start_response)?
+    .result
+    .session
+    .session_id;
+
+    let turn_response = runtime
+        .handle_incoming(
+            connection_id,
+            serde_json::json!({
+                "id": 2,
+                "method": "_devo/turn/start",
+                "params": {
+                    "session_id": session_id,
+                    "input": [{ "type": "text", "text": "crash before complete" }],
+                    "model": null,
+                    "sandbox": null,
+                    "approval_policy": null,
+                    "cwd": null
+                }
+            }),
+        )
+        .await
+        .context("turn/start response")?;
+    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+        serde_json::from_value(turn_response)?;
+
+    // Inspect the rollout before waiting for turn completion to simulate a crash
+    // after durable turn-start persistence.
+    runtime.refresh_session_index()?;
+    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    let index = db.get_session_index(&session_id)?.expect("indexed session");
+    let rollout_path = index.rollout_path.expect("rollout path");
+
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    let (session_context_lines, turn_lines) = loop {
+        let rollout = std::fs::read_to_string(&rollout_path)?;
+        let mut session_context_lines = 0usize;
+        let mut turn_lines = 0usize;
+        for line in rollout.lines().filter(|line| !line.trim().is_empty()) {
+            let rollout_line: RolloutLine = serde_json::from_str(line)?;
+            match rollout_line {
+                RolloutLine::SessionContextUpdated(_) => session_context_lines += 1,
+                RolloutLine::Turn(_) => turn_lines += 1,
+                _ => {}
+            }
+        }
+        if session_context_lines >= 1 && turn_lines >= 1 {
+            break (session_context_lines, turn_lines);
+        }
+        if tokio::time::Instant::now() >= deadline {
+            anyhow::bail!(
+                "timed out waiting for turn-start SessionContextUpdated; context_lines={session_context_lines} turn_lines={turn_lines}"
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    };
+    assert_eq!(session_context_lines, 1);
+    assert!(turn_lines >= 1);
+
+    wait_for_turn_completed(&mut notifications_rx).await?;
     Ok(())
 }
 
@@ -2302,6 +2491,7 @@ fn sample_indexed_session(
         total_cache_creation_tokens: 0,
         total_cache_read_tokens: 0,
         prompt_token_estimate: 0,
+        last_query_usage: None,
         last_query_total_tokens: 0,
         status: devo_protocol::SessionRuntimeStatus::Idle,
     }

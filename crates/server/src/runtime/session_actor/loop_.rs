@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::Context;
 use chrono::Utc;
 use devo_core::SessionTitleFinalSource;
 use devo_core::SessionTitleState;
@@ -17,6 +18,7 @@ use super::state::SessionActorState;
 use super::turn::execute_turn_in_actor;
 use crate::SessionRuntimeStatus;
 use crate::execution::PendingApproval;
+use crate::persistence::build_turn_record;
 use crate::runtime::session_model_selection;
 
 pub(super) async fn run_session_actor(
@@ -110,8 +112,6 @@ pub(super) async fn run_session_actor(
             SessionCommand::GetTurnPersistenceSnapshot { reply } => {
                 let _ = reply.send(TurnPersistenceSnapshot {
                     record: state.record.clone(),
-                    session_context: state.core.session_context.clone(),
-                    latest_turn_context: state.core.latest_turn_context.clone(),
                 });
             }
             SessionCommand::GetShellExecContext { cwd, reply } => {
@@ -280,6 +280,7 @@ pub(super) async fn run_session_actor(
             SessionCommand::BeginActiveTurn { turn, turn_config } => {
                 let now = Utc::now();
                 apply_turn_config_to_session_summary(&mut state.summary, &turn_config);
+                ensure_session_context_locked(&mut state, &turn_config);
                 state.summary.status = SessionRuntimeStatus::ActiveTurn;
                 state.summary.updated_at = now;
                 state.summary.last_activity_at = now;
@@ -315,6 +316,7 @@ pub(super) async fn run_session_actor(
             SessionCommand::ActivateQueuedTurn { turn, turn_config } => {
                 let now = Utc::now();
                 apply_turn_config_to_session_summary(&mut state.summary, &turn_config);
+                ensure_session_context_locked(&mut state, &turn_config);
                 state.summary.status = SessionRuntimeStatus::ActiveTurn;
                 state.summary.updated_at = now;
                 state.summary.last_activity_at = now;
@@ -367,6 +369,9 @@ pub(super) async fn run_session_actor(
                     state.latest_turn = Some(turn.clone());
                     turn
                 });
+                if interrupted.is_some() {
+                    state.core.mark_last_turn_interrupted();
+                }
                 let _ = reply.send(interrupted);
             }
             SessionCommand::ExportRuntimeSession { reply } => {
@@ -468,6 +473,7 @@ pub(super) async fn run_session_actor(
                 }
                 let now = Utc::now();
                 apply_turn_config_to_session_summary(&mut state.summary, &turn_config);
+                ensure_session_context_locked(&mut state, &turn_config);
                 state.summary.status = SessionRuntimeStatus::ActiveTurn;
                 state.summary.updated_at = now;
                 state.summary.last_activity_at = now;
@@ -499,6 +505,25 @@ pub(super) async fn run_session_actor(
                 }
                 let _ = reply.send(());
             }
+            SessionCommand::PersistTurnLine {
+                runtime,
+                turn,
+                reply,
+            } => {
+                let result = (|| {
+                    let record = state
+                        .record
+                        .as_ref()
+                        .context("missing session record for turn persistence")?;
+                    runtime.rollout_store.append_turn_deduped(
+                        record,
+                        &mut state.session_context_recorded,
+                        build_turn_record(&turn, None, state.core.latest_turn_context.clone()),
+                        state.core.session_context.clone(),
+                    )
+                })();
+                let _ = reply.send(result);
+            }
             SessionCommand::Shutdown { reply } => {
                 let _ = reply.send(());
                 break;
@@ -514,6 +539,27 @@ fn apply_turn_config_to_session_summary(
     summary.model = Some(turn_config.model.slug.clone());
     summary.model_binding_id = turn_config.model_binding_id.clone();
     summary.reasoning_effort_selection = turn_config.reasoning_effort_selection.clone();
+}
+
+/// Capture locked session context before the first durable turn start is written.
+///
+/// This must happen before `PersistTurnLine` so a process crash between turn start
+/// persistence and query finalization still leaves `SessionContextUpdated` in the
+/// rollout journal.
+fn ensure_session_context_locked(state: &mut SessionActorState, turn_config: &TurnConfig) {
+    if state.core.session_context.is_some() {
+        return;
+    }
+    let agents_md_manager = devo_core::AgentsMdManager::new(state.core.config.agents_md.clone());
+    let locked_agents_snapshot =
+        devo_core::load_workspace_instructions(&state.core.cwd, &agents_md_manager);
+    state.core.session_context = Some(devo_core::SessionContext::capture(
+        &turn_config.model,
+        turn_config.reasoning_effort_selection.as_deref(),
+        &state.core.cwd,
+        locked_agents_snapshot,
+        state.core.config.available_skills_instructions.clone(),
+    ));
 }
 
 fn pop_queued_turn_input_data(

@@ -112,6 +112,11 @@ impl ServerRuntime {
                 session_prompt_token_estimate,
             )
             .await;
+        if matches!(final_turn.status, TurnStatus::Interrupted) {
+            state.core.mark_last_turn_interrupted();
+        } else {
+            state.core.last_turn_interrupted = false;
+        }
         self.clear_btw_input_queue(state, session_id).await;
         self.append_terminal_turn_record(state, session_id, &final_turn)
             .await;
@@ -168,6 +173,9 @@ impl ServerRuntime {
         state.summary.total_cache_read_tokens = session_total_cache_read_tokens;
         state.summary.prompt_token_estimate = session_prompt_token_estimate;
         if let Some(usage) = &final_turn.usage {
+            // Context length uses latest-query display total, not session
+            // cumulative total_input/output/tokens.
+            state.summary.last_query_usage = Some(usage.clone());
             state.summary.last_query_total_tokens = usage.display_total_tokens();
         }
         state.core.total_input_tokens = session_total_input_tokens;
@@ -223,17 +231,19 @@ impl ServerRuntime {
 
     async fn append_terminal_turn_record(
         self: &Arc<Self>,
-        state: &SessionActorState,
+        state: &mut SessionActorState,
         session_id: SessionId,
         final_turn: &crate::TurnMetadata,
     ) {
         let record = state.record.clone();
-        let session_context = state.core.session_context.clone();
         let turn_context = state.core.latest_turn_context.clone();
+        let session_context = state.core.session_context.clone();
         if let Some(record) = record
-            && let Err(error) = self.rollout_store.append_turn(
+            && let Err(error) = self.rollout_store.append_turn_deduped(
                 &record,
-                build_turn_record(final_turn, session_context, turn_context),
+                &mut state.session_context_recorded,
+                build_turn_record(final_turn, None, turn_context),
+                session_context,
             )
         {
             tracing::warn!(session_id = %session_id, error = %error, "failed to persist terminal turn line");

@@ -35,6 +35,11 @@ impl ServerRuntime {
         artifact: Option<&StreamedResearchArtifact>,
         event: QueryEvent,
     ) -> anyhow::Result<()> {
+        if let QueryEvent::ProviderRetryStatus(status) = event {
+            self.broadcast_provider_retry_status(context.session_id, context.turn_id, status)
+                .await;
+            return Ok(());
+        }
         match capture {
             ResearchStageCapture::Clarification(capture) => {
                 let artifact = artifact
@@ -72,6 +77,34 @@ impl ServerRuntime {
             }
         }
         Ok(())
+    }
+
+    async fn broadcast_provider_retry_status(
+        &self,
+        session_id: SessionId,
+        turn_id: TurnId,
+        status: devo_core::ProviderRetryStatus,
+    ) {
+        self.broadcast_event(ServerEvent::TurnProviderRetryStatus(
+            devo_protocol::TurnProviderRetryStatusPayload {
+                session_id,
+                turn_id,
+                attempt: status.attempt,
+                backoff_ms: status.backoff_ms,
+                provider: status.provider,
+                model: status.model,
+                phase: match status.phase {
+                    devo_core::QueryProviderRetryPhase::Scheduled => {
+                        devo_protocol::ProviderRetryPhase::Scheduled
+                    }
+                    devo_core::QueryProviderRetryPhase::Resumed => {
+                        devo_protocol::ProviderRetryPhase::Resumed
+                    }
+                },
+                message: status.message,
+            },
+        ))
+        .await;
     }
 
     async fn handle_research_artifact_query_event(
@@ -144,7 +177,8 @@ impl ServerRuntime {
             QueryEvent::ToolUseStart { .. }
             | QueryEvent::ToolExecutionStart { .. }
             | QueryEvent::ToolProgress { .. }
-            | QueryEvent::ToolResult { .. } => {}
+            | QueryEvent::ToolResult { .. }
+            | QueryEvent::ProviderRetryStatus(_) => {}
         }
     }
 
@@ -303,7 +337,9 @@ impl ServerRuntime {
                 self.complete_reasoning_item(session_id, turn_id, &mut capture.reasoning)
                     .await;
             }
-            QueryEvent::TurnComplete { .. } | QueryEvent::ToolProgress { .. } => {}
+            QueryEvent::TurnComplete { .. }
+            | QueryEvent::ToolProgress { .. }
+            | QueryEvent::ProviderRetryStatus(_) => {}
         }
     }
 
@@ -454,7 +490,7 @@ impl ServerRuntime {
             QueryEvent::TurnComplete { .. } => {
                 capture.turn_completed = true;
             }
-            QueryEvent::ToolProgress { .. } => {}
+            QueryEvent::ToolProgress { .. } | QueryEvent::ProviderRetryStatus(_) => {}
         }
     }
 
@@ -554,7 +590,8 @@ impl ServerRuntime {
             }
             QueryEvent::TurnComplete { .. }
             | QueryEvent::ToolExecutionStart { .. }
-            | QueryEvent::ToolProgress { .. } => {}
+            | QueryEvent::ToolProgress { .. }
+            | QueryEvent::ProviderRetryStatus(_) => {}
         }
     }
 }

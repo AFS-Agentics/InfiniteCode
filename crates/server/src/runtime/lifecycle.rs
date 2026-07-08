@@ -251,7 +251,9 @@ impl ServerRuntime {
                 continue;
             };
 
-            if let Some((item_id, item_seq, text)) = snapshot.deferred_assistant {
+            if let Some((item_id, item_seq, text)) = snapshot.deferred_assistant
+                && !text.trim().is_empty()
+            {
                 self.complete_item(
                     session_id,
                     turn_id,
@@ -284,16 +286,10 @@ impl ServerRuntime {
                 continue;
             }
 
-            if let Some(record) = snapshot.record
-                && let Some(persistence) = session_handle.turn_persistence_snapshot().await
-                && let Err(error) = self.rollout_store.append_turn(
-                    &record,
-                    build_turn_record(
-                        &interrupted_turn,
-                        persistence.session_context,
-                        persistence.latest_turn_context,
-                    ),
-                )
+            if snapshot.record.is_some()
+                && let Err(error) = self
+                    .persist_turn_line_deduped(session_id, &interrupted_turn)
+                    .await
             {
                 tracing::warn!(
                     session_id = %session_id,

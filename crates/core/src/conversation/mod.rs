@@ -4,9 +4,9 @@ pub use devo_protocol::{ItemId, SessionId, SessionTitleState, TurnId, TurnStatus
 pub use records::{
     ApprovalDecisionItem, ApprovalRequestItem, CommandExecutionItem, CompactionSnapshotLine,
     ItemLine, ItemRecord, MessageEditRecordedLine, ResearchArtifactItem, ResearchArtifactType,
-    RolloutLine, SessionMetaLine, SessionRecord, SessionRollbackLine, SessionTitleUpdatedLine,
-    TextItem, ToolCallItem, ToolProgressItem, ToolResultItem, TurnError, TurnItem, TurnLine,
-    TurnRecord, TurnSupersededLine, TurnWorkspaceChangeRecordedLine,
+    RolloutLine, SessionContextUpdatedLine, SessionMetaLine, SessionRecord, SessionRollbackLine,
+    SessionTitleUpdatedLine, TextItem, ToolCallItem, ToolProgressItem, ToolResultItem, TurnError,
+    TurnItem, TurnLine, TurnRecord, TurnSupersededLine, TurnWorkspaceChangeRecordedLine,
     TurnWorkspaceCheckpointRecordedLine, TurnWorkspaceRestoreCompletedLine,
     TurnWorkspaceRestoreStartedLine, Worklog,
 };

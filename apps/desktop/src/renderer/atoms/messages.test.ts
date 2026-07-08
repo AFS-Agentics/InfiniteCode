@@ -31,6 +31,41 @@ describe("message ordering", () => {
 		expect(groupIntoTurns(entries, [])).toEqual([
 			{
 				id: user.id,
+				turnId: undefined,
+				userMessage: { info: user, parts: [] },
+				assistantMessages: [{ info: assistant, parts: [] }],
+			},
+		])
+	})
+
+	test("propagates protocol turn ids onto chat turns", () => {
+		const user = {
+			id: "u1",
+			sessionID: "s1",
+			role: "user",
+			turnID: "protocol-turn-1",
+			time: { created: 1 },
+		}
+		const assistant = {
+			id: "a1",
+			sessionID: "s1",
+			role: "assistant",
+			parentID: "u1",
+			turnID: "protocol-turn-1",
+			time: { created: 2 },
+		}
+		const turns = groupIntoTurns(
+			[
+				{ info: user, parts: [] },
+				{ info: assistant, parts: [] },
+			],
+			[],
+		)
+
+		expect(turns).toEqual([
+			{
+				id: "u1",
+				turnId: "protocol-turn-1",
 				userMessage: { info: user, parts: [] },
 				assistantMessages: [{ info: assistant, parts: [] }],
 			},
@@ -148,11 +183,13 @@ describe("message ordering", () => {
 		expect(groupIntoTurns(entries, [])).toEqual([
 			{
 				id: "u1",
+				turnId: undefined,
 				userMessage: { info: firstUser, parts: [] },
 				assistantMessages: [{ info: firstAssistant, parts: [] }],
 			},
 			{
 				id: "u2",
+				turnId: undefined,
 				userMessage: { info: secondUser, parts: [] },
 				assistantMessages: [{ info: secondAssistant, parts: [] }],
 			},
@@ -230,6 +267,7 @@ describe("message ordering", () => {
 		expect(groupIntoTurns(entries, [])).toEqual([
 			{
 				id: "u1",
+				turnId: undefined,
 				userMessage: { info: firstUser, parts: [] },
 				assistantMessages: [
 					{ info: firstTool, parts: [firstToolPart] },
@@ -238,6 +276,7 @@ describe("message ordering", () => {
 			},
 			{
 				id: "u2",
+				turnId: undefined,
 				userMessage: { info: secondUser, parts: [] },
 				assistantMessages: [
 					{ info: secondTool, parts: [secondToolPart] },

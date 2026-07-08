@@ -21,6 +21,7 @@ use super::{
 };
 use crate::dsml::DsmlTextStreamFilter;
 use crate::dsml::DsmlToolCallHealer;
+use crate::error::ProviderError;
 use crate::http::invalid_status_error;
 use crate::text_normalization::{TaggedTextFragment, TaggedTextParser};
 use crate::timeout;
@@ -110,10 +111,10 @@ pub(super) async fn completion_stream(
                     )
                     .await)?
                 }
-                Err(error) => Err(anyhow::anyhow!(
+                Err(error) => Err(stream_error(format!(
                     "openai stream error for model {}: {error}",
                     request.model
-                ))?,
+                )))?,
             };
 
             match event {
@@ -174,6 +175,13 @@ pub(super) async fn completion_stream(
     };
 
     Ok(Box::pin(stream))
+}
+
+fn stream_error(message: String) -> ProviderError {
+    ProviderError::StreamError {
+        message,
+        bytes_received: None,
+    }
 }
 
 fn stream_trace_elapsed_ms() -> u128 {

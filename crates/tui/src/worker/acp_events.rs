@@ -594,18 +594,18 @@ fn worker_events_from_acp_usage_update(
     cost: Option<devo_protocol::AcpCost>,
     meta: Option<devo_protocol::AcpMeta>,
 ) -> Vec<WorkerEvent> {
-    let mut events = vec![WorkerEvent::AcpUsageUpdated { used, size, cost }];
     if let Some(payload) = turn_usage_payload_from_acp_meta(meta.as_ref()) {
-        events.push(WorkerEvent::UsageUpdated {
+        return vec![WorkerEvent::UsageUpdated {
             total_input_tokens: payload.total_input_tokens,
             total_output_tokens: payload.total_output_tokens,
             total_tokens: payload.total_tokens,
             total_cache_read_tokens: payload.total_cache_read_tokens,
             last_query_total_tokens: payload.usage.display_total_tokens(),
             last_query_input_tokens: payload.last_query_input_tokens,
-        });
+        }];
     }
-    events
+
+    vec![WorkerEvent::AcpUsageUpdated { used, size, cost }]
 }
 
 fn turn_usage_payload_from_acp_meta(

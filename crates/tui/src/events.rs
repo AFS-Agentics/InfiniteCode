@@ -10,6 +10,7 @@ use devo_protocol::AcpAvailableCommand;
 use devo_protocol::AcpCost;
 use devo_protocol::AcpSessionConfigOption;
 use devo_protocol::ProviderModelBinding;
+use devo_protocol::ProviderRetryPhase;
 use devo_protocol::ProviderVendor;
 use devo_protocol::ProviderWireApi;
 use devo_protocol::ReasoningEffort;
@@ -181,6 +182,16 @@ pub(crate) enum WorkerEvent {
     },
     /// A steer (/btw) was accepted by the server.
     SteerAccepted { turn_id: TurnId },
+    /// Provider retry status for the active turn.
+    ProviderRetryStatus {
+        turn_id: TurnId,
+        attempt: usize,
+        backoff_ms: u64,
+        provider: String,
+        model: String,
+        phase: ProviderRetryPhase,
+        message: String,
+    },
     /// A streamed assistant, reasoning, or research artifact text item started.
     TextItemStarted {
         item_id: ItemId,
@@ -338,9 +349,9 @@ pub(crate) enum WorkerEvent {
         total_tokens: usize,
         /// Total cached input tokens accumulated in the session.
         total_cache_read_tokens: usize,
-        /// Last completed query token usage, measured as input plus output tokens.
+        /// Latest completed query display total (not session cumulative totals).
         last_query_total_tokens: usize,
-        /// Input tokens consumed by the current or last completed query.
+        /// Input tokens from the latest completed query.
         last_query_input_tokens: usize,
     },
     /// The current turn completed successfully.
@@ -357,9 +368,9 @@ pub(crate) enum WorkerEvent {
         total_tokens: usize,
         /// Total cached input tokens accumulated in the session.
         total_cache_read_tokens: usize,
-        /// Last completed turn token usage, measured as input plus output tokens.
+        /// Latest completed query display total (not session cumulative totals).
         last_query_total_tokens: usize,
-        /// Input tokens consumed by the last completed query.
+        /// Input tokens from the latest completed query.
         last_query_input_tokens: usize,
         /// Estimated prompt tokens for the just-completed request.
         prompt_token_estimate: usize,
@@ -520,9 +531,9 @@ pub(crate) enum WorkerEvent {
         reasoning_effort: Option<ReasoningEffort>,
         /// Contextual footer label for the active child agent, when viewing one.
         active_agent_label: Option<String>,
-        /// Last completed turn token usage for the fresh session.
+        /// Latest completed query display total for the fresh session.
         last_query_total_tokens: usize,
-        /// Last completed query input tokens for the fresh session.
+        /// Latest completed query input tokens for the fresh session.
         last_query_input_tokens: usize,
         /// Total cached input tokens accumulated in the fresh session.
         total_cache_read_tokens: usize,
@@ -553,9 +564,9 @@ pub(crate) enum WorkerEvent {
         total_tokens: usize,
         /// Total cached input tokens accumulated for the resumed session.
         total_cache_read_tokens: usize,
-        /// Last completed turn token usage, measured as input plus output tokens.
+        /// Latest completed query display total (not session cumulative totals).
         last_query_total_tokens: usize,
-        /// Input tokens consumed by the last completed query.
+        /// Input tokens from the latest completed query.
         last_query_input_tokens: usize,
         /// Estimated prompt tokens currently visible to the model.
         prompt_token_estimate: usize,
@@ -585,6 +596,10 @@ pub(crate) enum WorkerEvent {
         total_output_tokens: usize,
         /// Display total tokens accumulated in the compacted session.
         total_tokens: usize,
+        /// Latest/context display total after compaction.
+        last_query_total_tokens: usize,
+        /// Input tokens currently visible to the model after compaction.
+        last_query_input_tokens: usize,
         /// Estimated prompt tokens currently visible to the model.
         prompt_token_estimate: usize,
     },

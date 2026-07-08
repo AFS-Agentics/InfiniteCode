@@ -23,6 +23,7 @@ import {
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { useDisplayMode } from "../../hooks/use-agents"
 import type { SessionCompactionStatus } from "../../atoms/compaction"
+import type { ProviderRetryStatus } from "../../atoms/sessions"
 import type { ChatMessageEntry, ChatTurn as ChatTurnType } from "../../hooks/use-session-chat"
 import {
 	computeTurnCost,
@@ -465,6 +466,7 @@ interface ChatTurnProps {
 	pendingPermission?: PendingPermission
 	isConnected?: boolean
 	compactionStatus?: SessionCompactionStatus | null
+	retryStatus?: ProviderRetryStatus
 	onApprovePermission?: (
 		agent: Agent,
 		permissionSessionId: string,
@@ -495,7 +497,19 @@ function pendingPermissionFingerprint(permission: PendingPermission | undefined)
 	return `${permission.sessionId}:${requestId}`
 }
 
-function WorkingTurnStatusStrip({ turn }: { turn: ChatTurnType }) {
+function retryStatusText(status: ProviderRetryStatus): string {
+	if (status.message.trim()) return status.message
+	const seconds = Math.max(status.backoffMs / 1000, 0.1)
+	return `Retrying provider request in ${seconds.toFixed(1)}s (attempt ${status.attempt})`
+}
+
+function WorkingTurnStatusStrip({
+	turn,
+	retryStatus,
+}: {
+	turn: ChatTurnType
+	retryStatus?: ProviderRetryStatus
+}) {
 	const [display, setDisplay] = useState(() =>
 		formatWorkDuration(computeTurnWorkTime(turn, { active: true })),
 	)
@@ -512,8 +526,7 @@ function WorkingTurnStatusStrip({ turn }: { turn: ChatTurnType }) {
 	return (
 		<div className="space-y-2 pt-1">
 			<div className="text-sm tabular-nums text-muted-foreground/70">
-				{"Working for "}
-				{display}
+				{retryStatus ? retryStatusText(retryStatus) : <>Working for {display}</>}
 			</div>
 			<div className="h-px bg-border/70" />
 		</div>
@@ -588,6 +601,7 @@ export const ChatTurnComponent = memo(
 		pendingPermission,
 		isConnected = false,
 		compactionStatus,
+		retryStatus,
 		onApprovePermission,
 		onDenyPermission,
 		onRevertToMessage,
@@ -642,12 +656,13 @@ export const ChatTurnComponent = memo(
 		// Compute status by walking the last message's parts in reverse — no
 		// need to flatMap all messages into a temporary array.
 		const statusText = useMemo(() => {
+			if (retryStatus) return retryStatusText(retryStatus)
 			for (let m = turn.assistantMessages.length - 1; m >= 0; m--) {
 				const status = computeStatus(turn.assistantMessages[m].parts)
 				if (status !== "Working...") return status
 			}
 			return "Working..."
-		}, [turn.assistantMessages])
+		}, [retryStatus, turn.assistantMessages])
 
 		const working = isLast && isWorking
 
@@ -780,7 +795,7 @@ export const ChatTurnComponent = memo(
 					</Message>
 				)}
 
-				{working && <WorkingTurnStatusStrip turn={turn} />}
+				{working && <WorkingTurnStatusStrip turn={turn} retryStatus={retryStatus} />}
 
 				{!working && showWorkedForSummary && (
 					<CompletedTurnProcessDisclosure
@@ -911,6 +926,7 @@ export const ChatTurnComponent = memo(
 		if (!areTurnsEqual(prev.turn, next.turn)) return false
 		if (prev.isLast !== next.isLast) return false
 		if (prev.isWorking !== next.isWorking) return false
+		if (prev.retryStatus !== next.retryStatus) return false
 		if (prev.agent?.sessionId !== next.agent?.sessionId) return false
 		if (prev.agent?.directory !== next.agent?.directory) return false
 		if (prev.agent?.projectDirectory !== next.agent?.projectDirectory) return false

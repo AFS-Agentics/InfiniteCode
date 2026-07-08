@@ -13,6 +13,7 @@ use reqwest_eventsource::{Event, EventSource};
 use serde_json::{Value, json};
 use tracing::debug;
 
+use crate::error::ProviderError;
 use crate::hosted_tools::append_openai_responses_hosted_tools;
 use crate::http::invalid_status_error;
 use crate::text_normalization::{TaggedTextFragment, TaggedTextParser, split_tagged_text};
@@ -436,6 +437,13 @@ fn hosted_web_fetch_output(item: &Value) -> Option<Value> {
         .cloned()
 }
 
+fn stream_error(message: String) -> ProviderError {
+    ProviderError::StreamError {
+        message,
+        bytes_received: None,
+    }
+}
+
 fn parse_usage(value: &Value) -> Option<Usage> {
     Some(Usage {
         input_tokens: value
@@ -567,10 +575,10 @@ impl ModelProviderSDK for OpenAIResponsesProvider {
                         )
                         .await)?
                     }
-                    Err(error) => Err(anyhow::anyhow!(
+                    Err(error) => Err(stream_error(format!(
                         "openai responses stream error for model {}: {error}",
                         request.model
-                    ))?,
+                    )))?,
                 };
 
                 match event {

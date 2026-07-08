@@ -13,6 +13,7 @@ pub(super) fn stream_trace_elapsed_ms() -> u128 {
 
 pub(super) fn query_event_trace_kind(event: &QueryEvent) -> &'static str {
     match event {
+        QueryEvent::ProviderRetryStatus(_) => "provider_retry_status",
         QueryEvent::TextDelta(_) => "text_delta",
         QueryEvent::ReasoningDelta(_) => "reasoning_delta",
         QueryEvent::ReasoningCompleted => "reasoning_completed",
@@ -40,6 +41,7 @@ pub(super) fn query_event_trace_delta_len(event: &QueryEvent) -> usize {
             progress: devo_core::tools::ToolProgress::Terminal { .. },
             ..
         }
+        | QueryEvent::ProviderRetryStatus(_)
         | QueryEvent::ReasoningCompleted
         | QueryEvent::ToolUseStart { .. }
         | QueryEvent::ToolExecutionStart { .. }

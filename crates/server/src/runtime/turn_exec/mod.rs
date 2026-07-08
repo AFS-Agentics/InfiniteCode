@@ -16,6 +16,8 @@ pub(crate) use types::ExecuteTurnRequest;
 
 use std::sync::Arc;
 
+use anyhow::Context;
+
 use super::*;
 
 impl ServerRuntime {
@@ -25,6 +27,20 @@ impl ServerRuntime {
             return;
         };
         handle.execute_turn(Arc::clone(&self), request).await;
+    }
+
+    pub(crate) async fn persist_turn_line_deduped(
+        self: &Arc<Self>,
+        session_id: devo_core::SessionId,
+        turn: &crate::TurnMetadata,
+    ) -> anyhow::Result<()> {
+        let handle = self
+            .session(session_id)
+            .await
+            .context("session not found")?;
+        handle
+            .persist_turn_line(Arc::clone(self), turn.clone())
+            .await
     }
 
     pub(super) async fn prepare_turn_execution_for_actor(

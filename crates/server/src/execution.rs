@@ -233,6 +233,8 @@ pub(crate) struct RuntimeSession {
     pub(crate) session_approval_cache: ApprovalGrantCache,
     /// Turn-scoped approvals granted through ACP permission responses.
     pub(crate) turn_approval_cache: ApprovalGrantCache,
+    /// Whether the locked session context has been written to rollout storage.
+    pub(crate) session_context_recorded: bool,
 }
 
 #[cfg(test)]

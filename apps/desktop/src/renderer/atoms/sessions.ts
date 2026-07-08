@@ -22,6 +22,16 @@ export type SessionError = {
 	data: Record<string, unknown>
 }
 
+export type ProviderRetryStatus = {
+	turnId: string
+	attempt: number
+	backoffMs: number
+	provider: string
+	model: string
+	phase: "scheduled" | "resumed" | string
+	message: string
+}
+
 /** Phases of worktree setup shown in the chat view's empty state */
 export type SessionSetupPhase = "creating-worktree" | "starting-session" | null
 
@@ -58,6 +68,8 @@ export interface SessionEntry {
 	setupPhase?: SessionSetupPhase
 	/** Renderer-local marker for a completed background turn waiting to be read. */
 	hasUnreadCompletion?: boolean
+	/** Active provider retry status for the current turn. */
+	retryStatus?: ProviderRetryStatus
 }
 
 // ============================================================
@@ -101,6 +113,7 @@ export const upsertSessionAtom = atom(
 			error: existing?.error,
 			setupPhase: existing?.setupPhase,
 			hasUnreadCompletion: existing?.hasUnreadCompletion,
+			retryStatus: existing?.retryStatus,
 		})
 
 		// Add to index
@@ -156,7 +169,29 @@ export const setSessionStatusAtom = atom(
 			: completedTurn
 				? get(viewedSessionIdAtom) !== args.sessionId
 				: entry.hasUnreadCompletion
-		set(sessionFamily(args.sessionId), { ...entry, status: args.status, hasUnreadCompletion })
+		set(sessionFamily(args.sessionId), {
+			...entry,
+			status: args.status,
+			hasUnreadCompletion,
+			retryStatus: args.status.type === "idle" || args.status.type === "error" ? undefined : entry.retryStatus,
+		})
+	},
+)
+
+
+export const setProviderRetryStatusAtom = atom(
+	null,
+	(
+		get,
+		set,
+		args: {
+			sessionId: string
+			status: ProviderRetryStatus | undefined
+		},
+	) => {
+		const entry = get(sessionFamily(args.sessionId))
+		if (!entry) return
+		set(sessionFamily(args.sessionId), { ...entry, retryStatus: args.status })
 	},
 )
 
@@ -359,6 +394,7 @@ export const setSessionsAtom = atom(
 				error: existing?.error,
 				setupPhase: existing?.setupPhase,
 				hasUnreadCompletion: existing?.hasUnreadCompletion,
+			retryStatus: existing?.retryStatus,
 			})
 			nextIds.add(session.id)
 		}

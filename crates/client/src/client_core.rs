@@ -1016,6 +1016,7 @@ fn acp_session_metadata_from_start_params(
         total_cache_creation_tokens: 0,
         total_cache_read_tokens: 0,
         prompt_token_estimate: 0,
+        last_query_usage: None,
         last_query_total_tokens: 0,
         status: SessionRuntimeStatus::Idle,
     }
@@ -1052,6 +1053,7 @@ fn acp_session_metadata_from_session_info(session_info: &AcpSessionInfo) -> Sess
         total_cache_creation_tokens: 0,
         total_cache_read_tokens: 0,
         prompt_token_estimate: 0,
+        last_query_usage: None,
         last_query_total_tokens: 0,
         status: SessionRuntimeStatus::Idle,
     }

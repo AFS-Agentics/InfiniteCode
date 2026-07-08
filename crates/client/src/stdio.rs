@@ -661,6 +661,7 @@ mod tests {
             total_cache_creation_tokens: 0,
             total_cache_read_tokens: 0,
             prompt_token_estimate: 0,
+            last_query_usage: None,
             last_query_total_tokens: 0,
             status: SessionRuntimeStatus::Idle,
         };
@@ -751,6 +752,7 @@ mod tests {
                 total_cache_creation_tokens: 0,
                 total_cache_read_tokens: 0,
                 prompt_token_estimate: 0,
+                last_query_usage: None,
                 last_query_total_tokens: 0,
                 status: SessionRuntimeStatus::Idle,
             }]
@@ -799,6 +801,7 @@ mod tests {
             total_cache_creation_tokens: 0,
             total_cache_read_tokens: 0,
             prompt_token_estimate: 0,
+            last_query_usage: None,
             last_query_total_tokens: 0,
             status: SessionRuntimeStatus::Idle,
         };

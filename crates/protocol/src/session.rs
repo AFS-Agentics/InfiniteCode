@@ -13,6 +13,7 @@ use crate::ReasoningEffort;
 use crate::SessionId;
 use crate::SessionTitleState;
 use crate::TurnId;
+use crate::TurnUsage;
 use crate::parse_command::ParsedCommand;
 use crate::protocol::FileChange;
 use crate::turn::TurnMetadata;
@@ -60,10 +61,23 @@ pub struct SessionMetadata {
     pub total_cache_creation_tokens: usize,
     pub total_cache_read_tokens: usize,
     pub prompt_token_estimate: usize,
-    /// Last completed query display total.
+    /// Structured usage for the latest completed model query.
     ///
-    /// Provider-reported `total_tokens` is used when available; otherwise this
-    /// falls back to `input_tokens + output_tokens`.
+    /// Context length in the UI is based on this latest-query snapshot (display
+    /// total: provider `total_tokens` when available, otherwise
+    /// `input_tokens + output_tokens`). It is **not** the session cumulative
+    /// `total_input_tokens` / `total_output_tokens` / `total_tokens`.
+    ///
+    /// Refreshed on every completed model invoke so resume and clients can show
+    /// the latest completed-query usage rather than rolling session totals.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_query_usage: Option<TurnUsage>,
+    /// Legacy/derived projection of [`Self::last_query_usage`] display total.
+    ///
+    /// Prefer `last_query_usage` when available. When both are set, this should
+    /// equal `last_query_usage.display_total_tokens()`. Provider-reported
+    /// `total_tokens` is used when available; otherwise this falls back to
+    /// `input_tokens + output_tokens`.
     ///
     /// This value is refreshed on every completed model invoke so the UI can
     /// show the latest completed-query usage after each request, and it remains
@@ -397,6 +411,14 @@ mod tests {
             total_cache_creation_tokens: 5,
             total_cache_read_tokens: 7,
             prompt_token_estimate: 21,
+            last_query_usage: Some(TurnUsage {
+                input_tokens: 10,
+                output_tokens: 11,
+                cache_creation_input_tokens: None,
+                cache_read_input_tokens: None,
+                reasoning_output_tokens: None,
+                total_tokens: Some(21),
+            }),
             last_query_total_tokens: 21,
             status: SessionRuntimeStatus::Idle,
         };
@@ -404,6 +426,38 @@ mod tests {
         let json = serde_json::to_string(&metadata).expect("serialize");
         let restored: SessionMetadata = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(restored, metadata);
+    }
+
+    #[test]
+    fn session_metadata_deserializes_without_last_query_usage() {
+        let session_id = SessionId::new();
+        let created_at = Utc::now();
+        let payload = serde_json::json!({
+            "session_id": session_id,
+            "cwd": "/tmp",
+            "created_at": created_at,
+            "updated_at": created_at,
+            "last_activity_at": created_at,
+            "title": null,
+            "title_state": "Unset",
+            "ephemeral": false,
+            "model": null,
+            "reasoning_effort": null,
+            "total_input_tokens": 100,
+            "total_output_tokens": 20,
+            "total_tokens": 120,
+            "total_cache_creation_tokens": 0,
+            "total_cache_read_tokens": 0,
+            "prompt_token_estimate": 50,
+            "last_query_total_tokens": 30,
+            "status": "idle"
+        });
+
+        let restored: SessionMetadata =
+            serde_json::from_value(payload).expect("deserialize legacy session metadata");
+        assert_eq!(restored.last_query_usage, None);
+        assert_eq!(restored.last_query_total_tokens, 30);
+        assert_eq!(restored.total_input_tokens, 100);
     }
 
     #[test]

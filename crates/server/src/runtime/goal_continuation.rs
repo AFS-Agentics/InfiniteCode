@@ -320,7 +320,7 @@ impl ServerRuntime {
     }
 
     async fn append_goal_continuation_turn_start(
-        &self,
+        self: &Arc<Self>,
         session_id: SessionId,
         turn: &TurnMetadata,
     ) -> anyhow::Result<()> {
@@ -330,16 +330,8 @@ impl ServerRuntime {
         let Some(persistence) = session_handle.turn_persistence_snapshot().await else {
             return Ok(());
         };
-        let (record, session_context, turn_context) = (
-            persistence.record,
-            persistence.session_context,
-            persistence.latest_turn_context,
-        );
-        if let Some(record) = record {
-            self.rollout_store.append_turn(
-                &record,
-                build_turn_record(turn, session_context, turn_context),
-            )?;
+        if persistence.record.is_some() {
+            self.persist_turn_line_deduped(session_id, turn).await?;
         }
         let goal = {
             let stores = self.goal_stores.lock().await;

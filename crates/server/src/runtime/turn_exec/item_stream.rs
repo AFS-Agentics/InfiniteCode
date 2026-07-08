@@ -36,6 +36,9 @@ pub(super) async fn complete_assistant_item(
     item_seq: u64,
     text: String,
 ) {
+    if text.trim().is_empty() {
+        return;
+    }
     runtime
         .complete_item(
             session_id,

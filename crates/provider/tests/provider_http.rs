@@ -245,6 +245,32 @@ async fn deepseek_anthropic_messages_hosted_web_search_stream_live_when_api_key_
 }
 
 #[tokio::test]
+async fn anthropic_messages_stream_reports_invalid_content_type_before_content() {
+    let (base_url, _capture) = spawn_sse_server(ANTHROPIC_HTML_STREAM_RESPONSE).await;
+    let provider = AnthropicProvider::new(base_url);
+    let mut request = minimal_request();
+    request.model = "deepseek-v4-flash".to_string();
+
+    let mut stream = provider
+        .completion_stream(request)
+        .await
+        .expect("anthropic stream");
+    let event = stream
+        .next()
+        .await
+        .expect("stream should yield the content-type error");
+    let error = event.expect_err("invalid content type should be a stream error");
+    let message = error.to_string();
+
+    assert!(message.contains("deepseek-v4-flash"), "{message}");
+    assert!(
+        message.contains("InvalidContentType") || message.contains("invalid header value"),
+        "{message}"
+    );
+    assert!(stream.next().await.is_none());
+}
+
+#[tokio::test]
 async fn anthropic_messages_stream_uses_proxy_friendly_sse_headers() {
     let (base_url, capture) = spawn_sse_server(ANTHROPIC_TEXT_SSE_RESPONSE).await;
     let provider = AnthropicProvider::new(base_url);
@@ -482,6 +508,14 @@ async fn spawn_json_server(
 
     (format!("http://{addr}"), handle)
 }
+
+const ANTHROPIC_HTML_STREAM_RESPONSE: &str = concat!(
+    "HTTP/1.1 200 OK\r\n",
+    "content-type: text/html; charset=utf-8\r\n",
+    "connection: close\r\n",
+    "\r\n",
+    "<html><body>transient upstream response</body></html>",
+);
 
 const ANTHROPIC_TEXT_SSE_RESPONSE: &str = concat!(
     "HTTP/1.1 200 OK\r\n",

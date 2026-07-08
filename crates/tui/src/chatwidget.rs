@@ -280,6 +280,7 @@ pub(crate) struct ChatWidget {
     exit_after_onboarding: bool,
     resume_browser: Option<ResumeBrowserState>,
     resume_browser_loading: bool,
+    resuming_session: bool,
     subagent_monitor: SubagentMonitorState,
     picker_mode: Option<PickerMode>,
     pending_model_selection: Option<PendingModelSelection>,
@@ -322,6 +323,57 @@ impl ChatWidget {
         let seq = self.next_seq;
         self.next_seq += 1;
         seq
+    }
+
+    pub(super) fn begin_session_resume(&mut self) {
+        self.resuming_session = true;
+        self.bottom_pane.ensure_status_indicator();
+        if let Some(status) = self.bottom_pane.status_widget_mut() {
+            status.update_header("Resuming session...".to_string());
+            status.set_interrupt_hint_visible(false);
+            status.set_working_tip_visible(false);
+            status.update_inline_message(None);
+        }
+        self.bottom_pane.set_composer_input_enabled(
+            /*enabled*/ false,
+            Some("Resuming session...".to_string()),
+        );
+        self.set_status_message("Resuming session...");
+    }
+
+    pub(super) fn finish_session_resume(&mut self) {
+        if !self.resuming_session {
+            return;
+        }
+        self.resuming_session = false;
+        self.bottom_pane.hide_status_indicator();
+        self.bottom_pane
+            .set_composer_input_enabled(/*enabled*/ true, /*placeholder*/ None);
+    }
+
+    pub(super) fn block_input_during_resume(&mut self) -> bool {
+        if !self.resuming_session {
+            return false;
+        }
+        self.set_status_message("Cannot send while resuming session");
+        true
+    }
+
+    #[cfg(test)]
+    pub(crate) fn is_resuming_session_for_test(&self) -> bool {
+        self.resuming_session
+    }
+
+    #[cfg(test)]
+    pub(crate) fn status_message_for_test(&self) -> &str {
+        &self.status_message
+    }
+
+    #[cfg(test)]
+    pub(crate) fn status_indicator_header_for_test(&self) -> Option<&str> {
+        self.bottom_pane
+            .status_widget()
+            .map(crate::status_indicator_widget::StatusIndicatorWidget::header)
     }
 }
 
@@ -452,6 +504,7 @@ impl ChatWidget {
             exit_after_onboarding,
             resume_browser: None,
             resume_browser_loading: false,
+            resuming_session: false,
             subagent_monitor: SubagentMonitorState::default(),
             picker_mode: None,
             pending_model_selection: None,

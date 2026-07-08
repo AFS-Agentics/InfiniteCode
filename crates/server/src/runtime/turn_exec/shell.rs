@@ -172,15 +172,10 @@ impl ServerRuntime {
             return;
         };
         if let Some(persistence) = session_handle.turn_persistence_snapshot().await
-            && let Some(record) = persistence.record
-            && let Err(error) = self.rollout_store.append_turn(
-                &record,
-                build_turn_record(
-                    &final_turn,
-                    persistence.session_context,
-                    persistence.latest_turn_context,
-                ),
-            )
+            && persistence.record.is_some()
+            && let Err(error) = self
+                .persist_turn_line_deduped(session_id, &final_turn)
+                .await
         {
             tracing::warn!(session_id = %session_id, error = %error, "failed to persist shell command turn line");
         }

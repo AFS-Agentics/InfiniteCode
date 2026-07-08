@@ -4,7 +4,7 @@ use devo_core::tools::{
     AgentToolCoordinator, ClientFilesystem, ClientTerminal, ToolAgentScope, ToolCall,
     ToolExecutionOptions, ToolRuntime, ToolRuntimeContext,
 };
-use devo_core::{Message, QueryEvent, TurnConfig, query};
+use devo_core::{Message, QueryEvent, QueryOptions, TurnConfig, query_with_options};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -170,17 +170,43 @@ impl ServerRuntime {
         // the actor's reply, not the actor itself. Race the query against the
         // turn's cancellation token so interrupting a turn actually unblocks the
         // actor's mailbox instead of hanging it forever.
-        let result = tokio::select! {
-            biased;
-            () = query_cancel_token.cancelled() => Err(devo_core::AgentError::Aborted),
-            result = query(
+        //
+        // Important: do not drop `query_with_options` immediately on cancel.
+        // Tool handlers observe the same cancel token and still need a chance to
+        // return interrupted tool results that keep tool-use / tool-result pairs
+        // intact in session history.
+        let result = {
+            let mut query_future = std::pin::pin!(query_with_options(
                 &mut state.core,
                 turn_config,
                 runtime_context.provider_for_route(turn_config.provider_route.clone()),
                 registry,
                 &runtime,
                 Some(callback),
-            ) => result,
+                QueryOptions {
+                    cancel_token: Some(query_cancel_token.clone()),
+                },
+            ));
+            tokio::select! {
+                biased;
+                () = query_cancel_token.cancelled() => {
+                    // Give the query loop a short window to drain cancelled tool
+                    // results into session messages / event stream, then map any
+                    // non-abort completion to Interrupted as well.
+                    match tokio::time::timeout(
+                        std::time::Duration::from_secs(2),
+                        &mut query_future,
+                    )
+                    .await
+                    {
+                        Ok(Ok(())) | Ok(Err(devo_core::AgentError::Aborted)) | Err(_) => {
+                            Err(devo_core::AgentError::Aborted)
+                        }
+                        Ok(Err(error)) => Err(error),
+                    }
+                }
+                result = &mut query_future => result,
+            }
         };
         TurnQueryOutcome {
             result,

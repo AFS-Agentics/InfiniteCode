@@ -392,6 +392,19 @@ pub struct ItemLine {
     pub item: ItemRecord,
 }
 
+/// Stores the locked session context once per durable rollout file.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SessionContextUpdatedLine {
+    /// The time when this rollout line was persisted.
+    pub timestamp: DateTime<Utc>,
+    /// The session whose stable context was recorded.
+    pub session_id: SessionId,
+    /// The locked session context captured for replay.
+    pub session_context: SessionContext,
+    /// The schema version for persisted session-context metadata.
+    pub schema_version: u32,
+}
+
 /// Stores one session-title update line in the rollout file.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionTitleUpdatedLine {
@@ -504,6 +517,8 @@ pub enum RolloutLine {
     Item(ItemLine),
     /// Session-title update line.
     SessionTitleUpdated(SessionTitleUpdatedLine),
+    /// Locked session-context update line.
+    SessionContextUpdated(Box<SessionContextUpdatedLine>),
     /// Compaction snapshot line.
     CompactionSnapshot(Box<CompactionSnapshotLine>),
     /// Accepted message-edit record line.
@@ -528,6 +543,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
+    use crate::Model;
     use crate::conversation::{ItemId, SessionId, SessionTitleState, TurnId, TurnStatus};
 
     // ── SessionRecord ──────────────────────────────────────────
@@ -856,6 +872,32 @@ mod tests {
                 title_state: SessionTitleState::Provisional,
                 previous_title: Some("Old Title".into()),
             }),
+            RolloutLine::SessionContextUpdated(Box::new(SessionContextUpdatedLine {
+                timestamp: Utc::now(),
+                session_id: session.id,
+                session_context: SessionContext {
+                    base_instructions: "base".into(),
+                    available_skills: None,
+                    workspace_instructions: None,
+                    locked_agents_snapshot: None,
+                    environment: crate::EnvironmentContext {
+                        cwd: ".".into(),
+                        shell: "bash".into(),
+                        current_date: "2026-07-08".into(),
+                        timezone: "UTC".into(),
+                    },
+                    language: crate::LanguageContext::default(),
+                    persona: crate::Persona::Default,
+                    model: Model {
+                        slug: "test-model".into(),
+                        ..Model::default()
+                    },
+                    reasoning_effort_selection: None,
+                    reasoning_effort: None,
+                    system_prompt_mode: crate::SystemPromptMode::CodingAgent,
+                },
+                schema_version: 1,
+            })),
             RolloutLine::CompactionSnapshot(Box::new(CompactionSnapshotLine {
                 timestamp: Utc::now(),
                 session_id: session.id,

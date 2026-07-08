@@ -2,7 +2,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::super::*;
-use crate::persistence::build_turn_record;
 
 const TURN_INTERRUPT_TERMINAL_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -133,7 +132,9 @@ impl ServerRuntime {
         self.clear_active_turn_runtime_handles(session_id).await;
 
         let deferred = session_handle.take_deferred_items().await;
-        if let Some((item_id, item_seq, text)) = deferred.assistant {
+        if let Some((item_id, item_seq, text)) = deferred.assistant
+            && !text.trim().is_empty()
+        {
             self.complete_item(
                 session_id,
                 interrupted_turn.turn_id,
@@ -158,15 +159,10 @@ impl ServerRuntime {
             .await;
         }
         if let Some(persistence) = session_handle.turn_persistence_snapshot().await
-            && let Some(record) = persistence.record
-            && let Err(error) = self.rollout_store.append_turn(
-                &record,
-                build_turn_record(
-                    &interrupted_turn,
-                    persistence.session_context,
-                    persistence.latest_turn_context,
-                ),
-            )
+            && persistence.record.is_some()
+            && let Err(error) = self
+                .persist_turn_line_deduped(session_id, &interrupted_turn)
+                .await
         {
             return self.error_response(
                 request_id,

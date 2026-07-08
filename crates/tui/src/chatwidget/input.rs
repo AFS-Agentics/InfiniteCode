@@ -100,6 +100,9 @@ impl ChatWidget {
                 input_mode,
                 collaboration_mode,
             } => {
+                if self.block_input_during_resume() {
+                    return;
+                }
                 let user_message = UserMessage {
                     text,
                     local_images,
@@ -135,6 +138,9 @@ impl ChatWidget {
                 }
             }
             InputResult::ShellCommand { command } => {
+                if self.block_input_during_resume() {
+                    return;
+                }
                 if self.busy {
                     self.set_status_message("Cannot run shell command while generating");
                 } else {
@@ -147,6 +153,9 @@ impl ChatWidget {
                 }
             }
             InputResult::ShellInput { command } => {
+                if self.block_input_during_resume() {
+                    return;
+                }
                 if self.busy {
                     self.set_status_message("Cannot run shell command while generating");
                 } else {
@@ -157,6 +166,9 @@ impl ChatWidget {
                 }
             }
             InputResult::Command { command, argument } => {
+                if self.block_input_during_resume() {
+                    return;
+                }
                 self.handle_slash_command(command, argument);
             }
             InputResult::ModelSelected { model } => match self.picker_mode.take() {
@@ -321,6 +333,9 @@ impl ChatWidget {
         collaboration_mode: CollaborationMode,
         input_mode: InputMode,
     ) {
+        if self.block_input_during_resume() {
+            return;
+        }
         if user_message.text.trim().is_empty() {
             return;
         }

@@ -251,6 +251,9 @@ pub struct SessionState {
     /// Total context tokens reported by the model for the most recent turn.
     /// This includes input plus output and drives automatic compaction.
     pub last_turn_tokens: usize,
+    /// True when the most recently finished turn was user-interrupted.
+    /// Consumed when the next query inserts the `<turn_aborted>` notice.
+    pub last_turn_interrupted: bool,
     /// Thread-safe queue for pending turn inputs.
     /// - Source: user sends `turn/start` while a turn is active.
     /// - Lifecycle: preserved across turns; unconsumed items are pushed back
@@ -285,6 +288,7 @@ impl SessionState {
             prompt_token_estimate: 0,
             last_input_tokens: 0,
             last_turn_tokens: 0,
+            last_turn_interrupted: false,
             pending_turn_queue: Arc::new(Mutex::new(VecDeque::new())),
             btw_input_queue: Arc::new(Mutex::new(VecDeque::new())),
             turn_state: None,
@@ -312,10 +316,22 @@ impl SessionState {
             prompt_token_estimate: self.prompt_token_estimate,
             last_input_tokens: self.last_input_tokens,
             last_turn_tokens: self.last_turn_tokens,
+            last_turn_interrupted: self.last_turn_interrupted,
             pending_turn_queue: Arc::clone(&self.pending_turn_queue),
             btw_input_queue: Arc::clone(&self.btw_input_queue),
             turn_state: None,
         }
+    }
+
+    /// Marks that the previous turn ended as interrupted so the next query can
+    /// insert an explicit aborted-turn notice.
+    pub fn mark_last_turn_interrupted(&mut self) {
+        self.last_turn_interrupted = true;
+    }
+
+    /// Takes and clears the interrupted-turn flag for the next query preamble.
+    pub fn take_last_turn_interrupted(&mut self) -> bool {
+        std::mem::take(&mut self.last_turn_interrupted)
     }
 
     pub fn push_message(&mut self, msg: Message) {

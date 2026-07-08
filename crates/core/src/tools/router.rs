@@ -34,6 +34,8 @@ type ExecutionStartCallbackArc = Arc<ExecutionStartCallback>;
 type PermissionFuture = futures::future::BoxFuture<'static, Result<(), String>>;
 type PermissionCheckFn = dyn Fn(ToolPermissionRequest) -> PermissionFuture + Send + Sync;
 const PROGRESS_DRAIN_GRACE_MS: u64 = 50;
+/// Content written into a tool-result item when a tool is cancelled mid-execution.
+pub const INTERRUPTED_TOOL_RESULT_MESSAGE: &str = "tool execution was interrupted";
 
 #[derive(Debug, Clone)]
 pub struct ToolCall {
@@ -126,6 +128,10 @@ impl ToolRuntime {
             context: ToolRuntimeContext::default(),
             execution_options: ToolExecutionOptions::default(),
         }
+    }
+
+    pub fn cancel_token(&self) -> &CancellationToken {
+        &self.execution_options.cancel_token
     }
 
     pub async fn execute_batch(&self, calls: &[ToolCall]) -> Vec<ToolCallResult> {
@@ -323,7 +329,12 @@ impl ToolRuntime {
         };
 
         let input = self.input_for_tool_call(tool_name, &call.input);
-        let result = tool.handle(ctx, input, progress_sender).await;
+        let cancel_token = self.execution_options.cancel_token.clone();
+        let result = tokio::select! {
+            biased;
+            () = cancel_token.cancelled() => Err(crate::contracts::ToolCallError::Cancelled),
+            result = tool.handle(ctx, input, progress_sender) => result,
+        };
         if let Some(progress_task) = progress_task
             && tokio::time::timeout(
                 Duration::from_millis(PROGRESS_DRAIN_GRACE_MS),
@@ -378,6 +389,17 @@ impl ToolRuntime {
                     .await;
                 }
                 result
+            }
+            Err(crate::contracts::ToolCallError::Cancelled) => {
+                let message = INTERRUPTED_TOOL_RESULT_MESSAGE;
+                super::hook_events::post_tool_use_failure(
+                    self.context.hooks.as_ref(),
+                    call,
+                    tool_name,
+                    message,
+                )
+                .await;
+                ToolCallResult::error(&call.id, message)
             }
             Err(e) => {
                 let message = e.to_string();
@@ -1834,6 +1856,61 @@ mod tests {
             supports_cancellation: None,
             supports_streaming: None,
         });
+        let runtime = ToolRuntime::new_with_context_and_options(
+            Arc::new(builder.build()),
+            PermissionChecker::always_allow(),
+            ToolRuntimeContext::default(),
+            ToolExecutionOptions {
+                budgets: ToolBudgets {
+                    output_limit_bytes: 7,
+                    wall_time_limit_ms: Some(11),
+                },
+                cancel_token: CancellationToken::new(),
+                on_tool_execution_start: None,
+            },
+        );
+        let call = ToolCall {
+            id: "ctx".into(),
+            name: "capture_context".into(),
+            input: serde_json::json!({}),
+        };
+
+        let result = runtime.execute_single(&call, &None).await;
+
+        assert!(!result.is_error);
+        assert_eq!(
+            *seen.lock().expect("seen lock"),
+            Some(CapturedContextOptions {
+                output_limit_bytes: 7,
+                wall_time_limit_ms: Some(11),
+                cancel_token_cancelled: false,
+                agent_coordinator_configured: false,
+                agent_scope: ToolAgentScope::Parent,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn runtime_cancels_tool_when_cancel_token_already_fired() {
+        let seen = Arc::new(std::sync::Mutex::new(None));
+        let mut builder = ToolRegistryBuilder::new();
+        builder.register_handler(
+            "capture_context",
+            Arc::new(ContextCaptureTool::new(Arc::clone(&seen))),
+        );
+        builder.push_spec(ToolSpec {
+            name: "capture_context".into(),
+            description: String::new(),
+            input_schema: JsonSchema::object(Default::default(), None, None),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: true,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: None,
+            supports_cancellation: None,
+            supports_streaming: None,
+        });
         let cancel_token = CancellationToken::new();
         cancel_token.cancel();
         let runtime = ToolRuntime::new_with_context_and_options(
@@ -1857,16 +1934,92 @@ mod tests {
 
         let result = runtime.execute_single(&call, &None).await;
 
-        assert!(!result.is_error);
+        assert!(result.is_error);
         assert_eq!(
-            *seen.lock().expect("seen lock"),
-            Some(CapturedContextOptions {
-                output_limit_bytes: 7,
-                wall_time_limit_ms: Some(11),
-                cancel_token_cancelled: true,
-                agent_coordinator_configured: false,
-                agent_scope: ToolAgentScope::Parent,
-            })
+            result.content.into_string(),
+            INTERRUPTED_TOOL_RESULT_MESSAGE
+        );
+        assert!(seen.lock().expect("seen lock").is_none());
+    }
+
+    #[tokio::test]
+    async fn runtime_interrupts_hanging_tool_via_cancel_token() {
+        #[derive(Debug)]
+        struct HangingTool;
+
+        #[async_trait]
+        impl ToolHandler for HangingTool {
+            fn spec(&self) -> &ToolSpec {
+                Box::leak(Box::new(ToolSpec {
+                    name: "hanging".into(),
+                    description: String::new(),
+                    input_schema: JsonSchema::object(Default::default(), None, None),
+                    output_mode: ToolOutputMode::Text,
+                    execution_mode: ToolExecutionMode::ReadOnly,
+                    capability_tags: vec![],
+                    supports_parallel: true,
+                    preparation_feedback: ToolPreparationFeedback::None,
+                    display_name: None,
+                    supports_cancellation: None,
+                    supports_streaming: None,
+                }))
+            }
+
+            async fn handle(
+                &self,
+                _ctx: ToolContext,
+                _input: serde_json::Value,
+                _progress: Option<ToolProgressSender>,
+            ) -> Result<ToolResult, ToolCallError> {
+                std::future::pending::<()>().await;
+                unreachable!("hanging tool should be cancelled")
+            }
+        }
+
+        let mut builder = ToolRegistryBuilder::new();
+        builder.register_handler("hanging", Arc::new(HangingTool));
+        builder.push_spec(ToolSpec {
+            name: "hanging".into(),
+            description: String::new(),
+            input_schema: JsonSchema::object(Default::default(), None, None),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: true,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: None,
+            supports_cancellation: None,
+            supports_streaming: None,
+        });
+        let cancel_token = CancellationToken::new();
+        let runtime = ToolRuntime::new_with_context_and_options(
+            Arc::new(builder.build()),
+            PermissionChecker::always_allow(),
+            ToolRuntimeContext::default(),
+            ToolExecutionOptions {
+                cancel_token: cancel_token.clone(),
+                ..ToolExecutionOptions::default()
+            },
+        );
+        let call = ToolCall {
+            id: "hang-1".into(),
+            name: "hanging".into(),
+            input: serde_json::json!({}),
+        };
+
+        let execute = runtime.execute_single(&call, &None);
+        tokio::pin!(execute);
+        tokio::select! {
+            _ = &mut execute => panic!("hanging tool should not complete before cancel"),
+            () = tokio::time::sleep(Duration::from_millis(10)) => {
+                cancel_token.cancel();
+            }
+        }
+        let result = execute.await;
+        assert!(result.is_error);
+        assert_eq!(
+            result.content.into_string(),
+            INTERRUPTED_TOOL_RESULT_MESSAGE
         );
     }
 

@@ -197,13 +197,9 @@ impl ServerRuntime {
         let requested_reasoning_effort_selection =
             session.summary.reasoning_effort_selection.clone();
         let runtime_context = Arc::clone(&session.runtime_context);
-        let (session_context, turn_context, collaboration_mode) = {
+        let collaboration_mode = {
             let core_session = session.core_session.lock().await;
-            (
-                core_session.session_context.clone(),
-                core_session.latest_turn_context.clone(),
-                core_session.collaboration_mode,
-            )
+            core_session.collaboration_mode
         };
         drop(session);
 
@@ -365,10 +361,10 @@ impl ServerRuntime {
         } else {
             None
         };
-        if let Err(error) = self.rollout_store.append_turn(
-            &record,
-            build_turn_record(&replacement_turn, session_context, turn_context),
-        ) {
+        if let Err(error) = self
+            .persist_turn_line_deduped(params.session_id, &replacement_turn)
+            .await
+        {
             return self.error_response(
                 request_id,
                 ProtocolErrorCode::InternalError,

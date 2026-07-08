@@ -21,6 +21,7 @@ use devo_protocol::TruncationPolicy;
 use futures::StreamExt;
 use futures::future::BoxFuture;
 use tokio::time::sleep;
+use tokio_util::sync::CancellationToken;
 use tracing::debug;
 use tracing::info;
 use tracing::info_span;
@@ -119,6 +120,8 @@ fn estimate_request_prompt_tokens(request: &ModelRequest) -> usize {
 /// Events emitted during a query for the caller (CLI/UI) to observe.
 #[derive(Debug, Clone)]
 pub enum QueryEvent {
+    /// Provider request retry status.
+    ProviderRetryStatus(ProviderRetryStatus),
     /// Incremental text from the assistant.
     TextDelta(String),
     /// Incremental reasoning text from the assistant.
@@ -181,6 +184,27 @@ pub enum QueryEvent {
 /// Awaiting this future is what lets callers use bounded async channels for backpressure instead of
 /// the old synchronous callback bridge.
 pub type EventCallback = Arc<dyn Fn(QueryEvent) -> BoxFuture<'static, ()> + Send + Sync>;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProviderRetryStatus {
+    pub provider: String,
+    pub model: String,
+    pub attempt: usize,
+    pub backoff_ms: u64,
+    pub phase: QueryProviderRetryPhase,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QueryProviderRetryPhase {
+    Scheduled,
+    Resumed,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct QueryOptions {
+    pub cancel_token: Option<CancellationToken>,
+}
 
 async fn emit_query_event(on_event: &Option<EventCallback>, event: QueryEvent) {
     if let Some(callback) = on_event {
@@ -354,6 +378,10 @@ fn classify_error(e: &anyhow::Error) -> ErrorClass {
         || msg.contains("nodename nor servname")
         || msg.contains("could not resolve host")
         || msg.contains("unexpected eof")
+        || msg.contains("invalidcontenttype")
+        || msg.contains("invalid content-type")
+        || msg.contains("invalid header value")
+        || msg.contains("text/event-stream")
     {
         ErrorClass::NetworkError
     } else if msg.contains("400")
@@ -718,6 +746,17 @@ fn assistant_content_contains_dsml_tool_call_text(content: &[ContentBlock]) -> b
     })
 }
 
+fn assistant_content_has_visible_content(content: &[ContentBlock]) -> bool {
+    content.iter().any(|block| match block {
+        ContentBlock::Text { text }
+        | ContentBlock::Reasoning { text }
+        | ContentBlock::ToolResult { content: text, .. } => !text.trim().is_empty(),
+        ContentBlock::ProviderReasoning { .. }
+        | ContentBlock::ToolUse { .. }
+        | ContentBlock::HostedToolUse { .. } => true,
+    })
+}
+
 fn dsml_text_tool_call_continuation_message(
     request_tools: &[ToolDefinition],
     hosted_tools: &[HostedToolDefinition],
@@ -781,6 +820,27 @@ pub async fn query(
     runtime: &ToolRuntime,
     on_event: Option<EventCallback>,
 ) -> Result<(), AgentError> {
+    query_with_options(
+        session,
+        turn_config,
+        provider,
+        registry,
+        runtime,
+        on_event,
+        QueryOptions::default(),
+    )
+    .await
+}
+
+pub async fn query_with_options(
+    session: &mut SessionState,
+    turn_config: &TurnConfig,
+    provider: Arc<dyn ModelProviderSDK>,
+    registry: Arc<ToolRegistry>,
+    runtime: &ToolRuntime,
+    on_event: Option<EventCallback>,
+    options: QueryOptions,
+) -> Result<(), AgentError> {
     let agents_md_manager = AgentsMdManager::new(session.config.agents_md.clone());
     let current_agents_snapshot = load_workspace_instructions(&session.cwd, &agents_md_manager);
     let agent_scope = runtime.agent_scope();
@@ -806,9 +866,11 @@ pub async fn query(
     }
     let current_turn_context =
         TurnContext::capture(session, turn_config, current_agents_snapshot.clone());
-    let context_changes =
-        current_turn_context.context_changes_since(session.latest_turn_context.as_ref());
-    session.insert_context_message(context_changes.to_message());
+    if let Some(context_changes) =
+        current_turn_context.context_changes_since(session.latest_turn_context.as_ref())
+    {
+        session.insert_context_message(context_changes.to_message());
+    }
     if let Some(previous_turn_context) = session.latest_turn_context.as_ref()
         && let Some(diff) = AgentsMdManager::diff(
             previous_turn_context.observed_agents_snapshot.as_ref(),
@@ -837,21 +899,19 @@ pub async fn query(
         session.start_turn(devo_protocol::TurnKind::Regular);
     }
 
+    // Explicit interrupted-turn notice for the next user message after a user
+    // interrupt. Placed before pending-input processing so it sits just above the
+    // latest user text in prompt construction (after any context diff).
+    let previous_turn_interrupted = session.take_last_turn_interrupted();
+    if previous_turn_interrupted {
+        let fragment = TurnAborted::new(TurnAborted::INTERRUPTED_GUIDANCE);
+        if let ResponseItem::Message(msg) = fragment.to_response_item() {
+            session.insert_context_message(msg);
+        }
+    }
+
     'query_loop: loop {
         let pending = session.take_turn_pending_input();
-
-        // If the user interrupted the assistant mid-turn, explain the interruption
-        if !pending.is_empty()
-            && session
-                .messages
-                .last()
-                .is_some_and(|m| m.role == Role::Assistant)
-        {
-            let fragment = TurnAborted::new(TurnAborted::INTERRUPTED_GUIDANCE);
-            if let ResponseItem::Message(msg) = fragment.to_response_item() {
-                session.push_message(msg);
-            }
-        }
 
         for item in &pending {
             match &item.kind {
@@ -1061,7 +1121,15 @@ pub async fn query(
                             backoff_ms = backoff.as_millis(),
                             "transient provider error - retrying with exponential backoff"
                         );
-                        sleep(backoff).await;
+                        wait_for_provider_retry(
+                            &on_event,
+                            options.cancel_token.as_ref(),
+                            provider.name(),
+                            &turn_config.model.slug,
+                            retry_count,
+                            backoff,
+                        )
+                        .await?;
                         session.turn_count -= 1;
                         continue;
                     }
@@ -1242,7 +1310,15 @@ pub async fn query(
                                 backoff_ms = backoff.as_millis(),
                                 "transient provider stream error - retrying with exponential backoff"
                             );
-                            sleep(backoff).await;
+                            wait_for_provider_retry(
+                                &on_event,
+                                options.cancel_token.as_ref(),
+                                provider.name(),
+                                &turn_config.model.slug,
+                                retry_count,
+                                backoff,
+                            )
+                            .await?;
                             session.turn_count -= 1;
                             continue 'query_loop;
                         }
@@ -1520,10 +1596,12 @@ pub async fn query(
 
         let assistant_content_contains_dsml_tool_call =
             assistant_content_contains_dsml_tool_call_text(&assistant_content);
-        session.push_message(Message {
-            role: Role::Assistant,
-            content: assistant_content,
-        });
+        if assistant_content_has_visible_content(&assistant_content) {
+            session.push_message(Message {
+                role: Role::Assistant,
+                content: assistant_content,
+            });
+        }
 
         if deepseek_v4_thinking_only_end_turn {
             if deepseek_v4_thinking_only_continuation_used {
@@ -1677,6 +1755,17 @@ pub async fn query(
             role: Role::User,
             content: result_content,
         });
+
+        // If the turn was cancelled while tools were running, keep the
+        // interrupted tool results above and stop without another model call.
+        if options
+            .cancel_token
+            .as_ref()
+            .is_some_and(CancellationToken::is_cancelled)
+        {
+            session.end_turn();
+            return Err(AgentError::Aborted);
+        }
     }
 }
 
@@ -1744,6 +1833,54 @@ pub async fn test_model_connection(
     Ok(preview.to_string())
 }
 
+async fn wait_for_provider_retry(
+    on_event: &Option<EventCallback>,
+    cancel_token: Option<&CancellationToken>,
+    provider: &str,
+    model: &str,
+    attempt: usize,
+    backoff: Duration,
+) -> Result<(), AgentError> {
+    let backoff_ms = backoff.as_millis().min(u128::from(u64::MAX)) as u64;
+    emit_query_event(
+        on_event,
+        QueryEvent::ProviderRetryStatus(ProviderRetryStatus {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            attempt,
+            backoff_ms,
+            phase: QueryProviderRetryPhase::Scheduled,
+            message: format!("Retrying provider request in {:.1}s", backoff.as_secs_f64()),
+        }),
+    )
+    .await;
+
+    if let Some(cancel_token) = cancel_token {
+        tokio::select! {
+            biased;
+            () = cancel_token.cancelled() => return Err(AgentError::Aborted),
+            () = sleep(backoff) => {}
+        }
+    } else {
+        sleep(backoff).await;
+    }
+
+    emit_query_event(
+        on_event,
+        QueryEvent::ProviderRetryStatus(ProviderRetryStatus {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            attempt,
+            backoff_ms: 0,
+            phase: QueryProviderRetryPhase::Resumed,
+            message: "Retrying provider request now".to_string(),
+        }),
+    )
+    .await;
+
+    Ok(())
+}
+
 fn retry_backoff_duration(attempt: usize) -> Duration {
     let exponent = attempt.saturating_sub(1).min(10) as u32;
     let multiplier = 2u64.pow(exponent);
@@ -1771,6 +1908,7 @@ mod tests {
     use crate::tools::registry::ToolExposure;
     use crate::tools::registry::ToolRegistryBuilder;
     use crate::tools::router::PermissionChecker;
+    use crate::tools::router::ToolExecutionOptions;
     use crate::tools::tool_handler::ToolHandler;
     use crate::tools::tool_spec::ToolExecutionMode;
     use crate::tools::tool_spec::ToolOutputMode;
@@ -1794,18 +1932,71 @@ mod tests {
     use futures::Stream;
     use pretty_assertions::assert_eq;
     use serde_json::json;
+    use tokio_util::sync::CancellationToken;
 
     use super::QueryEvent;
+    use super::QueryOptions;
     use super::hosted_tools_for_web_search;
     use super::insert_subagent_request_reminders;
     use super::query;
+    use super::query_with_options;
     use super::test_model_connection;
     use super::truncate_tool_result_for_model;
+    use crate::AgentError;
     use crate::ContentBlock;
     use crate::Message;
     use crate::Model;
     use crate::ReasoningEffort;
     use crate::Role;
+
+    #[test]
+    fn assistant_content_visibility_requires_visible_content() {
+        assert!(!super::assistant_content_has_visible_content(&[]));
+        assert!(!super::assistant_content_has_visible_content(&[
+            ContentBlock::Text {
+                text: " \n\t".to_string(),
+            },
+        ]));
+        assert!(!super::assistant_content_has_visible_content(&[
+            ContentBlock::ToolResult {
+                tool_use_id: "call-1".to_string(),
+                content: String::new(),
+                is_error: false,
+            },
+        ]));
+
+        for content in [
+            vec![ContentBlock::Text {
+                text: "visible".to_string(),
+            }],
+            vec![ContentBlock::Reasoning {
+                text: "reasoning".to_string(),
+            }],
+            vec![ContentBlock::ProviderReasoning {
+                provider: "test".to_string(),
+                payload: serde_json::json!({"thinking":"hidden"}),
+            }],
+            vec![ContentBlock::ToolUse {
+                id: "call-1".to_string(),
+                name: "read".to_string(),
+                input: serde_json::json!({"filePath":"README.md"}),
+            }],
+            vec![ContentBlock::HostedToolUse {
+                id: "hosted-1".to_string(),
+                name: "web_search".to_string(),
+                input: serde_json::json!({"query":"docs"}),
+                output: None,
+                status: None,
+            }],
+            vec![ContentBlock::ToolResult {
+                tool_use_id: "call-1".to_string(),
+                content: "result".to_string(),
+                is_error: false,
+            }],
+        ] {
+            assert!(super::assistant_content_has_visible_content(&content));
+        }
+    }
 
     #[test]
     fn hosted_tools_follow_resolved_web_search_mode() {
@@ -1845,6 +2036,9 @@ mod tests {
             ),
             anyhow::anyhow!("dns error: failed to lookup address information"),
             anyhow::anyhow!("network is unreachable"),
+            anyhow::anyhow!(
+                "anthropic stream error for model deepseek-v4-flash: invalid header value: \"text/html; charset=utf-8\"; debug=InvalidContentType(\"text/html; charset=utf-8\")"
+            ),
             anyhow::anyhow!("Invalid status code: 408 Request Timeout"),
             anyhow::Error::new(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
@@ -2856,6 +3050,66 @@ mod tests {
             session.messages.last(),
             Some(&Message::assistant_text("done"))
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn query_cancels_stream_creation_retry_backoff() {
+        let provider = Arc::new(TransientStreamCreateProvider {
+            attempts: AtomicUsize::new(0),
+        });
+        let provider_sdk: Arc<dyn ModelProviderSDK> = provider.clone();
+        let registry = Arc::new(ToolRegistry::new());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("hello"));
+        let cancel_token = CancellationToken::new();
+        cancel_token.cancel();
+
+        let result = query_with_options(
+            &mut session,
+            &TurnConfig::new(Model::default(), None),
+            provider_sdk,
+            registry,
+            &runtime,
+            None,
+            QueryOptions {
+                cancel_token: Some(cancel_token),
+            },
+        )
+        .await;
+
+        assert!(matches!(result, Err(AgentError::Aborted)));
+        assert_eq!(provider.attempts.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn query_cancels_stream_event_retry_backoff() {
+        let provider = Arc::new(TransientStreamEventProvider {
+            attempts: AtomicUsize::new(0),
+        });
+        let provider_sdk: Arc<dyn ModelProviderSDK> = provider.clone();
+        let registry = Arc::new(ToolRegistry::new());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("hello"));
+        let cancel_token = CancellationToken::new();
+        cancel_token.cancel();
+
+        let result = query_with_options(
+            &mut session,
+            &TurnConfig::new(Model::default(), None),
+            provider_sdk,
+            registry,
+            &runtime,
+            None,
+            QueryOptions {
+                cancel_token: Some(cancel_token),
+            },
+        )
+        .await;
+
+        assert!(matches!(result, Err(AgentError::Aborted)));
+        assert_eq!(provider.attempts.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
@@ -4067,6 +4321,229 @@ mod tests {
         assert!(text.contains("<name>model</name>"));
         assert!(text.contains("<previous>model-a</previous>"));
         assert!(text.contains("<current>model-b</current>"));
+    }
+
+    #[tokio::test]
+    async fn query_skips_context_diff_when_turn_metadata_unchanged() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
+            requests: Arc::clone(&requests),
+        });
+        let registry = Arc::new(ToolRegistry::new());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let model = Model {
+            slug: "model-a".into(),
+            ..Model::default()
+        };
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+
+        session.push_message(Message::user("hello"));
+        query(
+            &mut session,
+            &TurnConfig::new(model.clone(), None),
+            Arc::clone(&provider),
+            Arc::clone(&registry),
+            &runtime,
+            None,
+        )
+        .await
+        .expect("first query should succeed");
+
+        session.push_message(Message::user("follow up"));
+        query(
+            &mut session,
+            &TurnConfig::new(model, None),
+            Arc::clone(&provider),
+            registry,
+            &runtime,
+            None,
+        )
+        .await
+        .expect("second query should succeed");
+
+        let captured = requests.lock().expect("lock requests");
+        assert_eq!(captured.len(), 2);
+        let follow_up_index = request_message_index_containing(&captured[1], "follow up");
+        assert!(
+            follow_up_index > 0,
+            "follow-up user message should not be the first prompt message"
+        );
+        assert!(
+            !message_contains(
+                &captured[1].messages[follow_up_index - 1],
+                "<context_changes>"
+            ),
+            "unchanged metadata after a completed turn should not insert a new context_changes before the next user message"
+        );
+    }
+
+    #[tokio::test]
+    async fn query_inserts_interrupted_notice_before_next_user_message() {
+        let requests = Arc::new(Mutex::new(Vec::new()));
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(CapturingProvider {
+            requests: Arc::clone(&requests),
+        });
+        let registry = Arc::new(ToolRegistry::new());
+        let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("hello"));
+        session.push_message(Message::assistant_text("partial"));
+        session.mark_last_turn_interrupted();
+        session.push_message(Message::user("continue please"));
+
+        query(
+            &mut session,
+            &TurnConfig::new(Model::default(), None),
+            provider,
+            registry,
+            &runtime,
+            None,
+        )
+        .await
+        .expect("query should succeed");
+
+        let abort_index = session
+            .messages
+            .iter()
+            .position(|message| {
+                message.content.iter().any(|block| {
+                    matches!(
+                        block,
+                        ContentBlock::Text { text } if text.contains("<turn_aborted>")
+                    )
+                })
+            })
+            .expect("interrupted notice should be inserted");
+        let continue_index = session
+            .messages
+            .iter()
+            .position(|message| {
+                message.content.iter().any(|block| {
+                    matches!(
+                        block,
+                        ContentBlock::Text { text } if text.contains("continue please")
+                    )
+                })
+            })
+            .expect("user message should remain");
+        assert!(abort_index < continue_index);
+        assert!(!session.last_turn_interrupted);
+    }
+
+    #[tokio::test]
+    async fn query_pairs_interrupted_tool_result_when_cancel_fires_during_tool() {
+        #[derive(Debug)]
+        struct HangingMutatingTool;
+
+        #[async_trait]
+        impl ToolHandler for HangingMutatingTool {
+            fn spec(&self) -> &crate::tools::tool_spec::ToolSpec {
+                Box::leak(Box::new(crate::tools::tool_spec::ToolSpec {
+                    name: "mutating_tool".into(),
+                    description: "hangs until cancelled".into(),
+                    input_schema: JsonSchema::object(Default::default(), None, None),
+                    output_mode: ToolOutputMode::Text,
+                    execution_mode: ToolExecutionMode::Mutating,
+                    capability_tags: vec![],
+                    supports_parallel: false,
+                    preparation_feedback: ToolPreparationFeedback::None,
+                    display_name: None,
+                    supports_cancellation: None,
+                    supports_streaming: None,
+                }))
+            }
+
+            async fn handle(
+                &self,
+                _ctx: crate::tools::contracts::ToolContext,
+                _input: serde_json::Value,
+                _progress: Option<crate::tools::contracts::ToolProgressSender>,
+            ) -> Result<crate::tools::contracts::ToolResult, crate::tools::contracts::ToolCallError>
+            {
+                std::future::pending::<()>().await;
+                unreachable!("tool should be cancelled")
+            }
+        }
+
+        let mut builder = ToolRegistryBuilder::new();
+        builder.register_handler("mutating_tool", Arc::new(HangingMutatingTool));
+        builder.push_spec(crate::tools::tool_spec::ToolSpec {
+            name: "mutating_tool".into(),
+            description: "hangs until cancelled".into(),
+            input_schema: JsonSchema::object(Default::default(), None, None),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::Mutating,
+            capability_tags: vec![],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: None,
+            supports_cancellation: None,
+            supports_streaming: None,
+        });
+        let registry = Arc::new(builder.build());
+        let cancel_token = CancellationToken::new();
+        let cancel_for_task = cancel_token.clone();
+        let runtime = ToolRuntime::new_with_context_and_options(
+            Arc::clone(&registry),
+            PermissionChecker::always_allow(),
+            ToolRuntimeContext::default(),
+            ToolExecutionOptions {
+                cancel_token: cancel_token.clone(),
+                ..ToolExecutionOptions::default()
+            },
+        );
+        let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
+        session.push_message(Message::user("run the tool"));
+        let turn_config = TurnConfig::new(Model::default(), None);
+        let provider: Arc<dyn ModelProviderSDK> = Arc::new(SingleToolUseProvider {
+            requests: AtomicUsize::new(0),
+        });
+
+        let result = {
+            let mut query_future = std::pin::pin!(query_with_options(
+                &mut session,
+                &turn_config,
+                provider,
+                registry,
+                &runtime,
+                None,
+                QueryOptions {
+                    cancel_token: Some(cancel_token),
+                },
+            ));
+            tokio::select! {
+                result = &mut query_future => {
+                    panic!("query completed before cancel: {result:?}");
+                }
+                () = tokio::time::sleep(std::time::Duration::from_millis(50)) => {
+                    cancel_for_task.cancel();
+                }
+            }
+            query_future.await
+        };
+        assert!(matches!(result, Err(AgentError::Aborted)));
+
+        let tool_use = session.messages.iter().find(|message| {
+            message
+                .content
+                .iter()
+                .any(|block| matches!(block, ContentBlock::ToolUse { id, .. } if id == "tool-1"))
+        });
+        assert!(tool_use.is_some(), "tool call should be retained");
+
+        let tool_result = session.messages.iter().find_map(|message| {
+            message.content.iter().find_map(|block| match block {
+                ContentBlock::ToolResult {
+                    tool_use_id,
+                    content,
+                    is_error,
+                } if tool_use_id == "tool-1" => Some((content.clone(), *is_error)),
+                _ => None,
+            })
+        });
+        let (content, is_error) = tool_result.expect("interrupted tool result should exist");
+        assert!(is_error);
+        assert_eq!(content, crate::tools::INTERRUPTED_TOOL_RESULT_MESSAGE);
     }
 
     #[tokio::test]

@@ -316,15 +316,10 @@ impl ServerRuntime {
         self.maybe_prepare_title_generation_from_user_input(params.session_id, &display_input)
             .await;
         if let Some(persistence) = session_handle.turn_persistence_snapshot().await
-            && let Some(record) = persistence.record
-            && let Err(error) = self.rollout_store.append_turn(
-                &record,
-                build_turn_record(
-                    &turn,
-                    persistence.session_context,
-                    persistence.latest_turn_context,
-                ),
-            )
+            && persistence.record.is_some()
+            && let Err(error) = self
+                .persist_turn_line_deduped(params.session_id, &turn)
+                .await
         {
             let _ = session_handle
                 .clear_active_turn_if_matches(turn.turn_id)
@@ -529,10 +524,10 @@ impl ServerRuntime {
         }
 
         if let Some(persistence) = session_handle.turn_persistence_snapshot().await
-            && let Some(record) = persistence.record
+            && persistence.record.is_some()
             && let Err(error) = self
-                .rollout_store
-                .append_turn(&record, build_turn_record(&turn, None, None))
+                .persist_turn_line_deduped(params.session_id, &turn)
+                .await
         {
             self.clear_active_turn_reservation(&session_handle, turn.turn_id)
                 .await;

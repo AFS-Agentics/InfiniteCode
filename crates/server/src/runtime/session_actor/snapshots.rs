@@ -3,9 +3,7 @@ use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
 use devo_core::SessionConfig;
-use devo_core::SessionContext;
 use devo_core::SessionRecord;
-use devo_core::TurnContext;
 use devo_core::TurnKind;
 use devo_protocol::PendingInputItem;
 use devo_protocol::SessionId;
@@ -44,8 +42,6 @@ pub(crate) struct HookContextSnapshot {
 #[derive(Clone)]
 pub(crate) struct TurnPersistenceSnapshot {
     pub(crate) record: Option<SessionRecord>,
-    pub(crate) session_context: Option<SessionContext>,
-    pub(crate) latest_turn_context: Option<TurnContext>,
 }
 
 /// Permission and tool context for shell-command turns.

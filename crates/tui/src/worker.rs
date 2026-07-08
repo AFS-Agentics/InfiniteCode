@@ -123,6 +123,22 @@ fn active_agent_label_from_session(session: &devo_server::SessionMetadata) -> Op
         .map(|label| format!("Agent: {label}"))
 }
 
+/// Prefer structured session `last_query_usage`, then latest-turn usage, then the
+/// legacy scalar. Context length is latest-query display total, not cumulative
+/// session totals.
+fn last_query_tokens_from_resume(
+    session: &devo_server::SessionMetadata,
+    latest_turn: Option<&devo_protocol::TurnMetadata>,
+) -> (usize, usize) {
+    if let Some(usage) = session.last_query_usage.as_ref() {
+        return (usage.display_total_tokens(), usage.input_tokens as usize);
+    }
+    if let Some(usage) = latest_turn.and_then(|turn| turn.usage.as_ref()) {
+        return (usage.display_total_tokens(), usage.input_tokens as usize);
+    }
+    (session.last_query_total_tokens, 0)
+}
+
 struct EnsureSessionOutcome {
     session_id: SessionId,
     model: Option<String>,
@@ -873,6 +889,8 @@ async fn run_worker_inner(
                 session_id = Some(initial_session_id);
                 session_cwd = resumed.session.cwd.clone();
                 let active_agent_label = active_agent_label_from_session(&resumed.session);
+                let (last_query_total, last_query_input) =
+                    last_query_tokens_from_resume(&resumed.session, resumed.latest_turn.as_ref());
                 let _ = event_tx.send(WorkerEvent::SessionSwitched {
                     session_id: initial_session_id.to_string(),
                     cwd: resumed.session.cwd,
@@ -886,13 +904,8 @@ async fn run_worker_inner(
                     total_output_tokens: resumed.session.total_output_tokens,
                     total_tokens: resumed.session.total_tokens,
                     total_cache_read_tokens: resumed.session.total_cache_read_tokens,
-                    last_query_total_tokens: resumed.session.last_query_total_tokens,
-                    last_query_input_tokens: resumed
-                        .latest_turn
-                        .as_ref()
-                        .and_then(|turn| turn.usage.as_ref())
-                        .map(|usage| usage.input_tokens as usize)
-                        .unwrap_or(0),
+                    last_query_total_tokens: last_query_total,
+                    last_query_input_tokens: last_query_input,
                     prompt_token_estimate: resumed.session.prompt_token_estimate,
                     history_items: project_history_items(&resumed.history_items),
                     rich_history_items: resumed.history_items.clone(),
@@ -906,7 +919,8 @@ async fn run_worker_inner(
                 total_output_tokens = resumed.session.total_output_tokens;
                 total_tokens = resumed.session.total_tokens;
                 total_cache_read_tokens = resumed.session.total_cache_read_tokens;
-                last_query_total_tokens = resumed.session.last_query_total_tokens;
+                last_query_total_tokens = last_query_total;
+                last_query_input_tokens = last_query_input;
                 has_authoritative_usage_totals = true;
             }
             Err(error) => {
@@ -1630,6 +1644,11 @@ async fn run_worker_inner(
                                 input_history_cursor = None;
                                 let active_agent_label =
                                     active_agent_label_from_session(&result.session);
+                                let (last_query_total, last_query_input) =
+                                    last_query_tokens_from_resume(
+                                        &result.session,
+                                        result.latest_turn.as_ref(),
+                                    );
 
                                 let _ = event_tx.send(WorkerEvent::SessionSwitched {
                                     session_id: next_session_id.to_string(),
@@ -1644,15 +1663,8 @@ async fn run_worker_inner(
                                     total_output_tokens: result.session.total_output_tokens,
                                     total_tokens: result.session.total_tokens,
                                     total_cache_read_tokens: result.session.total_cache_read_tokens,
-                                    last_query_total_tokens: result
-                                        .session
-                                        .last_query_total_tokens,
-                                    last_query_input_tokens: result
-                                        .latest_turn
-                                        .as_ref()
-                                        .and_then(|turn| turn.usage.as_ref())
-                                        .map(|usage| usage.input_tokens as usize)
-                                        .unwrap_or(0),
+                                    last_query_total_tokens: last_query_total,
+                                    last_query_input_tokens: last_query_input,
                                     prompt_token_estimate: result.session.prompt_token_estimate,
                                     history_items: project_history_items(&result.history_items),
                                     rich_history_items: result.history_items.clone(),
@@ -1673,8 +1685,8 @@ async fn run_worker_inner(
                                 let _ =
                                     emit_skills_list(&mut client, &session_cwd, event_tx, false)
                                         .await;
-                                last_query_total_tokens =
-                                    result.session.last_query_total_tokens;
+                                last_query_total_tokens = last_query_total;
+                                last_query_input_tokens = last_query_input;
                                 has_authoritative_usage_totals = true;
                             }
                             Err(error) => {
@@ -1776,6 +1788,11 @@ async fn run_worker_inner(
                                 input_history_cursor = None;
                                 let active_agent_label =
                                     active_agent_label_from_session(&result.session);
+                                let (last_query_total, last_query_input) =
+                                    last_query_tokens_from_resume(
+                                        &result.session,
+                                        result.latest_turn.as_ref(),
+                                    );
                                 let _ = event_tx.send(WorkerEvent::SessionSwitched {
                                     session_id: active_session_id.to_string(),
                                     cwd: result.session.cwd,
@@ -1789,15 +1806,8 @@ async fn run_worker_inner(
                                     total_output_tokens: result.session.total_output_tokens,
                                     total_tokens: result.session.total_tokens,
                                     total_cache_read_tokens: result.session.total_cache_read_tokens,
-                                    last_query_total_tokens: result
-                                        .session
-                                        .last_query_total_tokens,
-                                    last_query_input_tokens: result
-                                        .latest_turn
-                                        .as_ref()
-                                        .and_then(|turn| turn.usage.as_ref())
-                                        .map(|usage| usage.input_tokens as usize)
-                                        .unwrap_or(0),
+                                    last_query_total_tokens: last_query_total,
+                                    last_query_input_tokens: last_query_input,
                                     prompt_token_estimate: result.session.prompt_token_estimate,
                                     history_items: project_history_items(&result.history_items),
                                     rich_history_items: result.history_items.clone(),
@@ -1811,8 +1821,8 @@ async fn run_worker_inner(
                                 total_output_tokens = result.session.total_output_tokens;
                                 total_tokens = result.session.total_tokens;
                                 total_cache_read_tokens = result.session.total_cache_read_tokens;
-                                last_query_total_tokens =
-                                    result.session.last_query_total_tokens;
+                                last_query_total_tokens = last_query_total;
+                                last_query_input_tokens = last_query_input;
                                 has_authoritative_usage_totals = true;
                             }
                             Err(error) => {
@@ -1887,6 +1897,11 @@ async fn run_worker_inner(
                                         input_history_cursor = None;
                                         let active_agent_label =
                                             active_agent_label_from_session(&resumed.session);
+                                        let (last_query_total, last_query_input) =
+                                            last_query_tokens_from_resume(
+                                                &resumed.session,
+                                                resumed.latest_turn.as_ref(),
+                                            );
                                         let _ = event_tx.send(WorkerEvent::SessionSwitched {
                                             session_id: next_session_id.to_string(),
                                             cwd: resumed.session.cwd,
@@ -1900,15 +1915,8 @@ async fn run_worker_inner(
                                             total_output_tokens: resumed.session.total_output_tokens,
                                             total_tokens: resumed.session.total_tokens,
                                             total_cache_read_tokens: resumed.session.total_cache_read_tokens,
-                                            last_query_total_tokens: resumed
-                                                .session
-                                                .last_query_total_tokens,
-                                            last_query_input_tokens: resumed
-                                                .latest_turn
-                                                .as_ref()
-                                                .and_then(|turn| turn.usage.as_ref())
-                                                .map(|usage| usage.input_tokens as usize)
-                                                .unwrap_or(0),
+                                            last_query_total_tokens: last_query_total,
+                                            last_query_input_tokens: last_query_input,
                                             prompt_token_estimate: resumed.session.prompt_token_estimate,
                                             history_items: project_history_items(&resumed.history_items),
                                             rich_history_items: resumed.history_items.clone(),
@@ -1922,8 +1930,8 @@ async fn run_worker_inner(
                                         total_output_tokens = resumed.session.total_output_tokens;
                                         total_tokens = resumed.session.total_tokens;
                                         total_cache_read_tokens = resumed.session.total_cache_read_tokens;
-                                        last_query_total_tokens =
-                                            resumed.session.last_query_total_tokens;
+                                        last_query_total_tokens = last_query_total;
+                                        last_query_input_tokens = last_query_input;
                                         has_authoritative_usage_totals = true;
                                     }
                                     Err(error) => {
@@ -2693,6 +2701,19 @@ async fn run_worker_inner(
                                     latest_completed_agent_message = None;
                                 }
                             }
+                            "turn/provider_retry_status" => {
+                                if let ServerEvent::TurnProviderRetryStatus(payload) = event {
+                                    let _ = event_tx.send(WorkerEvent::ProviderRetryStatus {
+                                        turn_id: payload.turn_id,
+                                        attempt: payload.attempt,
+                                        backoff_ms: payload.backoff_ms,
+                                        provider: payload.provider,
+                                        model: payload.model,
+                                        phase: payload.phase,
+                                        message: payload.message,
+                                    });
+                                }
+                            }
                             "turn/usage/updated" => {
                                 if let ServerEvent::TurnUsageUpdated(payload) = event {
                                     saw_usage_update_for_turn = true;
@@ -2700,6 +2721,7 @@ async fn run_worker_inner(
                                     total_output_tokens = payload.total_output_tokens;
                                     total_tokens = payload.total_tokens;
                                     total_cache_read_tokens = payload.total_cache_read_tokens;
+                                    last_query_total_tokens = payload.usage.display_total_tokens();
                                     last_query_input_tokens = payload.last_query_input_tokens;
                                     has_authoritative_usage_totals = true;
                                     let _ = event_tx.send(WorkerEvent::UsageUpdated {
@@ -2851,10 +2873,24 @@ async fn run_worker_inner(
                                     total_input_tokens = payload.session.total_input_tokens;
                                     total_output_tokens = payload.session.total_output_tokens;
                                     total_tokens = payload.session.total_tokens;
+                                    let (compacted_last_query_total, compacted_last_query_input) =
+                                        last_query_tokens_from_resume(&payload.session, None);
+                                    last_query_total_tokens = if payload.session.prompt_token_estimate > 0 {
+                                        payload.session.prompt_token_estimate
+                                    } else {
+                                        compacted_last_query_total
+                                    };
+                                    last_query_input_tokens = if payload.session.prompt_token_estimate > 0 {
+                                        payload.session.prompt_token_estimate
+                                    } else {
+                                        compacted_last_query_input
+                                    };
                                     let _ = event_tx.send(WorkerEvent::SessionCompacted {
                                         total_input_tokens,
                                         total_output_tokens,
                                         total_tokens,
+                                        last_query_total_tokens,
+                                        last_query_input_tokens,
                                         prompt_token_estimate: payload.session.prompt_token_estimate,
                                     });
                                 }
@@ -4548,11 +4584,13 @@ mod tests {
     use super::acp_terminal_snapshot_delta;
     use super::handle_completed_item;
     use super::is_stale_turn_interrupt_error;
+    use super::last_query_tokens_from_resume;
     use super::next_shell_command_exec_start;
     use super::normalize_display_output;
     use super::project_history_items;
     use super::render_skill_list_body;
     use super::research_artifact_delta_event;
+    use super::should_apply_terminal_turn_usage_fallback;
     use super::should_pause_goal_before_session_leave;
     use super::summarize_tool_call;
     use super::tool_call_started_actions;
@@ -5491,21 +5529,14 @@ mod tests {
 
         assert_eq!(
             events,
-            vec![
-                WorkerEvent::AcpUsageUpdated {
-                    used: 90,
-                    size: 200_000,
-                    cost: None,
-                },
-                WorkerEvent::UsageUpdated {
-                    total_input_tokens: 70,
-                    total_output_tokens: 20,
-                    total_tokens: 90,
-                    total_cache_read_tokens: 12,
-                    last_query_total_tokens: 11,
-                    last_query_input_tokens: 7,
-                },
-            ]
+            vec![WorkerEvent::UsageUpdated {
+                total_input_tokens: 70,
+                total_output_tokens: 20,
+                total_tokens: 90,
+                total_cache_read_tokens: 12,
+                last_query_total_tokens: 11,
+                last_query_input_tokens: 7,
+            }]
         );
     }
 
@@ -6076,9 +6107,126 @@ mod tests {
             total_cache_creation_tokens: 0,
             total_cache_read_tokens: 0,
             prompt_token_estimate: 0,
+            last_query_usage: None,
             last_query_total_tokens: 0,
             status: SessionRuntimeStatus::Idle,
         }
+    }
+
+    #[test]
+    fn last_query_tokens_from_resume_prefers_session_last_query_usage() {
+        use devo_protocol::TurnKind;
+        use devo_protocol::TurnMetadata;
+        use devo_protocol::TurnStatus;
+        use devo_protocol::TurnUsage;
+
+        let session_id = SessionId::new();
+        let mut session = test_session_metadata(session_id, None);
+        session.total_input_tokens = 500;
+        session.last_query_total_tokens = 999;
+        session.last_query_usage = Some(TurnUsage {
+            input_tokens: 30,
+            output_tokens: 12,
+            cache_creation_input_tokens: None,
+            cache_read_input_tokens: None,
+            reasoning_output_tokens: None,
+            total_tokens: Some(42),
+        });
+        let turn = TurnMetadata {
+            turn_id: TurnId::new(),
+            session_id,
+            sequence: 1,
+            status: TurnStatus::Completed,
+            kind: TurnKind::Regular,
+            model: "test-model".to_string(),
+            model_binding_id: None,
+            reasoning_effort_selection: None,
+            reasoning_effort: None,
+            request_model: "test-model".to_string(),
+            request_thinking: None,
+            started_at: Utc::now(),
+            completed_at: Some(Utc::now()),
+            usage: Some(TurnUsage {
+                input_tokens: 7,
+                output_tokens: 2,
+                cache_creation_input_tokens: None,
+                cache_read_input_tokens: None,
+                reasoning_output_tokens: None,
+                total_tokens: Some(9),
+            }),
+            stop_reason: None,
+            failure_reason: None,
+        };
+
+        assert_eq!(
+            last_query_tokens_from_resume(&session, Some(&turn)),
+            (42, 30)
+        );
+
+        session.last_query_usage = None;
+        assert_eq!(last_query_tokens_from_resume(&session, Some(&turn)), (9, 7));
+
+        assert_eq!(last_query_tokens_from_resume(&session, None), (999, 0));
+    }
+
+    #[test]
+    fn usage_update_state_keeps_latest_total_for_terminal_event_without_usage() {
+        use devo_protocol::TurnUsage;
+
+        let mut last_query_total_tokens = 42usize;
+        let has_authoritative_usage_totals = false;
+
+        let usage = TurnUsage {
+            input_tokens: 35,
+            output_tokens: 13,
+            cache_creation_input_tokens: None,
+            cache_read_input_tokens: Some(5),
+            reasoning_output_tokens: None,
+            total_tokens: Some(48),
+        };
+        assert_eq!(last_query_total_tokens, 42);
+
+        let saw_usage_update_for_turn = true;
+        let total_input_tokens = 550;
+        let total_output_tokens = 110;
+        let total_tokens = 660;
+        let total_cache_read_tokens = 60;
+        last_query_total_tokens = usage.display_total_tokens();
+        let last_query_input_tokens = usage.input_tokens as usize;
+
+        if !should_apply_terminal_turn_usage_fallback(
+            saw_usage_update_for_turn,
+            has_authoritative_usage_totals,
+        ) {
+            // Simulates a terminal turn/completed event without embedded usage.
+        }
+
+        let terminal_event = WorkerEvent::TurnFinished {
+            stop_reason: "Completed".to_string(),
+            turn_count: 1,
+            total_input_tokens,
+            total_output_tokens,
+            total_tokens,
+            total_cache_read_tokens,
+            last_query_total_tokens,
+            last_query_input_tokens,
+            prompt_token_estimate: total_input_tokens,
+        };
+
+        assert_eq!(
+            terminal_event,
+            WorkerEvent::TurnFinished {
+                stop_reason: "Completed".to_string(),
+                turn_count: 1,
+                total_input_tokens: 550,
+                total_output_tokens: 110,
+                total_tokens: 660,
+                total_cache_read_tokens: 60,
+                last_query_total_tokens: 48,
+                last_query_input_tokens: 35,
+                prompt_token_estimate: 550,
+            }
+        );
     }
 
     #[test]
@@ -6444,6 +6592,7 @@ mod tests {
             total_cache_creation_tokens: 0,
             total_cache_read_tokens: 0,
             prompt_token_estimate: 0,
+            last_query_usage: None,
             last_query_total_tokens: 0,
             status: SessionRuntimeStatus::Idle,
         };
@@ -6487,6 +6636,7 @@ mod tests {
             total_cache_creation_tokens: 0,
             total_cache_read_tokens: 0,
             prompt_token_estimate: 0,
+            last_query_usage: None,
             last_query_total_tokens: 0,
             status: SessionRuntimeStatus::Idle,
         };

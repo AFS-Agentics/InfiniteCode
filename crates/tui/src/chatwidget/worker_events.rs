@@ -5,6 +5,7 @@
 
 use std::time::Instant;
 
+use devo_protocol::ProviderRetryPhase;
 use devo_protocol::parse_command::ParsedCommand;
 use devo_protocol::protocol::ExecCommandSource;
 use ratatui::text::Line;
@@ -31,6 +32,11 @@ use super::PendingApprovalRequest;
 use super::SKILLS_TRANSCRIPT_TITLE;
 use super::session_header::is_web_search_title;
 use super::text_stream::ActiveTextItemId;
+
+fn format_retry_status_message(attempt: usize, backoff_ms: u64) -> String {
+    let seconds = (backoff_ms as f64 / 1000.0).max(0.1);
+    format!("Retrying provider request in {seconds:.1}s (attempt {attempt})")
+}
 
 impl ChatWidget {
     fn start_command_execution_cell(
@@ -139,6 +145,40 @@ impl ChatWidget {
                 self.active_proposed_plan = None;
                 self.stream_chunking_policy.reset();
                 self.bottom_pane.set_task_running(true);
+            }
+            WorkerEvent::ProviderRetryStatus {
+                turn_id,
+                attempt,
+                backoff_ms,
+                provider: _,
+                model: _,
+                phase,
+                message,
+            } => {
+                if self.active_turn_id != Some(turn_id) {
+                    return;
+                }
+                match phase {
+                    ProviderRetryPhase::Scheduled => {
+                        let retry_message = if message.trim().is_empty() {
+                            format_retry_status_message(attempt, backoff_ms)
+                        } else {
+                            message
+                        };
+                        self.bottom_pane.ensure_status_indicator();
+                        if let Some(status) = self.bottom_pane.status_widget_mut() {
+                            status.update_inline_message(Some(retry_message.clone()));
+                        }
+                        self.set_status_message(&retry_message);
+                    }
+                    ProviderRetryPhase::Resumed => {
+                        if let Some(status) = self.bottom_pane.status_widget_mut() {
+                            status.update_inline_message(None);
+                        }
+                        self.set_status_message("Retrying provider request");
+                    }
+                }
+                self.frame_requester.schedule_frame();
             }
             WorkerEvent::TextItemStarted {
                 item_id,
@@ -818,9 +858,11 @@ impl ChatWidget {
                 self.total_input_tokens = total_input_tokens;
                 self.total_output_tokens = total_output_tokens;
                 self.total_cache_read_tokens = total_cache_read_tokens;
+                // Context length uses latest-query totals, not cumulative session
+                // total_input_tokens.
                 self.last_query_total_tokens = last_query_total_tokens;
                 self.last_query_input_tokens = last_query_input_tokens;
-                self.prompt_token_estimate = total_input_tokens;
+                self.prompt_token_estimate = last_query_input_tokens;
                 self.frame_requester.schedule_frame();
             }
             WorkerEvent::TurnFinished {
@@ -911,6 +953,7 @@ impl ChatWidget {
                 last_query_input_tokens,
             } => {
                 self.resume_browser_loading = false;
+                self.finish_session_resume();
                 self.active_turn_is_research = false;
                 self.commit_active_streams(DotStatus::Failed);
                 self.active_tool_calls.clear();
@@ -1081,6 +1124,7 @@ impl ChatWidget {
                 total_cache_read_tokens: _,
             } => {
                 self.resume_browser_loading = false;
+                self.finish_session_resume();
                 self.session.cwd = cwd;
                 self.update_session_model_selection(model, model_binding_id);
                 self.reasoning_effort_selection = reasoning_effort_selection;
@@ -1136,6 +1180,7 @@ impl ChatWidget {
                 pending_texts,
             } => {
                 self.resume_browser_loading = false;
+                self.finish_session_resume();
                 self.session.cwd = cwd;
                 if let Some(model) = model {
                     self.update_session_model_selection(model, model_binding_id);
@@ -1231,33 +1276,40 @@ impl ChatWidget {
             WorkerEvent::SessionCompactionStarted => {
                 self.busy = true;
                 self.bottom_pane.set_task_running(true);
+                if let Some(status) = self.bottom_pane.status_widget_mut() {
+                    status.update_header("Compacting session".to_string());
+                }
                 self.set_status_message("Session compaction in progress");
             }
             WorkerEvent::SessionCompacted {
                 total_input_tokens,
                 total_output_tokens,
                 total_tokens: _,
+                last_query_total_tokens,
+                last_query_input_tokens,
                 prompt_token_estimate,
             } => {
                 self.busy = false;
                 self.bottom_pane.set_task_running(false);
                 self.total_input_tokens = total_input_tokens;
                 self.total_output_tokens = total_output_tokens;
+                self.last_query_total_tokens = last_query_total_tokens;
+                self.last_query_input_tokens = last_query_input_tokens;
                 self.prompt_token_estimate = prompt_token_estimate;
-                self.add_to_history(history_cell::new_info_event(
+                self.add_to_history(history_cell::new_live_aligned_info_event(
                     "Session compaction done".to_string(),
                     None,
                 ));
                 self.set_status_message("Session compacted");
             }
             WorkerEvent::ContextCompactionCompleted { title } => {
-                self.add_to_history(history_cell::new_info_event(title, None));
+                self.add_to_history(history_cell::new_live_aligned_info_event(title, None));
                 self.set_status_message("Context compacted");
             }
             WorkerEvent::SessionCompactionFailed { message } => {
                 self.busy = false;
                 self.bottom_pane.set_task_running(false);
-                self.add_to_history(history_cell::new_error_event_with_hint(
+                self.add_to_history(history_cell::new_live_aligned_error_event_with_hint(
                     message,
                     Some("session compaction failed".to_string()),
                 ));

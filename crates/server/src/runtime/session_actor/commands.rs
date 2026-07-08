@@ -200,6 +200,11 @@ pub(crate) enum SessionCommand {
     EndInlineTurn {
         reply: oneshot::Sender<()>,
     },
+    PersistTurnLine {
+        runtime: Arc<crate::runtime::ServerRuntime>,
+        turn: TurnMetadata,
+        reply: oneshot::Sender<anyhow::Result<()>>,
+    },
     Shutdown {
         reply: oneshot::Sender<()>,
     },

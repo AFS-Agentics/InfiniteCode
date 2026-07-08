@@ -64,6 +64,7 @@ pub(crate) struct StatusIndicatorWidget {
     /// Optional suffix rendered after the elapsed/interrupt segment.
     inline_message: Option<String>,
     show_interrupt_hint: bool,
+    show_working_tip: bool,
     subagent_hint_visible: bool,
 
     elapsed_running: Duration,
@@ -103,6 +104,7 @@ impl StatusIndicatorWidget {
             details_max_lines: STATUS_DETAILS_DEFAULT_MAX_LINES,
             inline_message: None,
             show_interrupt_hint: true,
+            show_working_tip: true,
             subagent_hint_visible: false,
             elapsed_running: Duration::ZERO,
             last_resume_at: Instant::now(),
@@ -161,6 +163,10 @@ impl StatusIndicatorWidget {
 
     pub(crate) fn set_interrupt_hint_visible(&mut self, visible: bool) {
         self.show_interrupt_hint = visible;
+    }
+
+    pub(crate) fn set_working_tip_visible(&mut self, visible: bool) {
+        self.show_working_tip = visible;
     }
 
     pub(crate) fn set_subagent_hint_visible(&mut self, visible: bool) {
@@ -246,7 +252,7 @@ impl StatusIndicatorWidget {
     }
 
     fn working_tip_at(&self, elapsed: Duration) -> Option<&'static str> {
-        if WORKING_TIPS.is_empty() {
+        if !self.show_working_tip || WORKING_TIPS.is_empty() {
             return None;
         }
 
@@ -344,7 +350,7 @@ impl Renderable for StatusIndicatorWidget {
         }
 
         debug_assert_eq!(LIVE_PREFIX_COLS, 2);
-        let left_padding = Span::raw("  ");
+        let left_padding = Span::raw(" ".repeat(LIVE_PREFIX_COLS as usize));
         let lines = prefix_lines(lines, left_padding.clone(), left_padding);
         Paragraph::new(Text::from(lines)).render_ref(area, buf);
     }
@@ -385,6 +391,28 @@ mod tests {
         assert!(top_row.contains("Working"));
         assert!(tip_row.contains("└ Tip: "));
         assert!(tip_row.contains(WORKING_TIPS[0]));
+    }
+
+    #[test]
+    fn status_indicator_can_hide_working_tip() {
+        let (app_event_tx, _app_event_rx) = tokio::sync::mpsc::unbounded_channel();
+        let mut widget = StatusIndicatorWidget::new(
+            AppEventSender::new(app_event_tx),
+            FrameRequester::test_dummy(),
+            false,
+        );
+        widget.update_header("Resuming session...".to_string());
+        widget.set_working_tip_visible(false);
+
+        assert_eq!(widget.desired_height(80), 1);
+
+        let area = Rect::new(0, 0, 100, 2);
+        let mut buf = Buffer::empty(area);
+        widget.render(area, &mut buf);
+
+        let rendered = [row_text(&buf, area.width, 0), row_text(&buf, area.width, 1)].join("\n");
+        assert!(rendered.contains("Resuming session..."));
+        assert!(!rendered.contains("Tip:"));
     }
 
     #[test]

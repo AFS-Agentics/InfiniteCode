@@ -19,8 +19,32 @@ export interface ChatMessageEntry {
  */
 export interface ChatTurn {
 	id: string
+	/** Protocol turn id when available (`Message.turnID` / `devo/turnId`). */
+	turnId?: string
 	userMessage: ChatMessageEntry
 	assistantMessages: ChatMessageEntry[]
+}
+
+function messageProtocolTurnId(entry: ChatMessageEntry): string | undefined {
+	const info = entry.info as {
+		turnID?: unknown
+		turnId?: unknown
+		metadata?: Record<string, unknown>
+	}
+	const direct = info.turnID ?? info.turnId
+	if (typeof direct === "string" && direct.length > 0) return direct
+	const metaTurnId = info.metadata?.["devo/turnId"]
+	return typeof metaTurnId === "string" && metaTurnId.length > 0 ? metaTurnId : undefined
+}
+
+function protocolTurnIdForTurn(
+	userMessage: ChatMessageEntry,
+	assistantMessages: ChatMessageEntry[],
+): string | undefined {
+	return (
+		messageProtocolTurnId(userMessage) ??
+		assistantMessages.map(messageProtocolTurnId).find((turnId): turnId is string => Boolean(turnId))
+	)
 }
 
 // ============================================================
@@ -59,7 +83,7 @@ function messageFingerprint(entry: ChatMessageEntry): string {
 
 function turnFingerprint(turn: ChatTurn): string {
 	const assistantFps = turn.assistantMessages.map(messageFingerprint).join("|")
-	return `${messageFingerprint(turn.userMessage)}>${assistantFps}`
+	return `${turn.turnId ?? ""}:${messageFingerprint(turn.userMessage)}>${assistantFps}`
 }
 
 export function groupIntoTurns(entries: ChatMessageEntry[], prevTurns: ChatTurn[]): ChatTurn[] {
@@ -76,6 +100,7 @@ export function groupIntoTurns(entries: ChatMessageEntry[], prevTurns: ChatTurn[
 		if (!currentUser) return
 		const newTurn: ChatTurn = {
 			id: currentUser.info.id,
+			turnId: protocolTurnIdForTurn(currentUser, currentAssistantMessages),
 			userMessage: currentUser,
 			assistantMessages: currentAssistantMessages,
 		}

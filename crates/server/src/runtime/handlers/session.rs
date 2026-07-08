@@ -86,6 +86,7 @@ impl ServerRuntime {
             total_cache_creation_tokens: 0,
             total_cache_read_tokens: 0,
             prompt_token_estimate: 0,
+            last_query_usage: None,
             last_query_total_tokens: 0,
             status: SessionRuntimeStatus::Idle,
         };
@@ -131,6 +132,7 @@ impl ServerRuntime {
             tool_registry,
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
+            session_context_recorded: false,
         };
         self.insert_session_actor(actor_state).await;
         self.subscribe_connection_to_session(connection_id, session_id, None)
@@ -884,6 +886,11 @@ impl ServerRuntime {
             None
         };
 
+        let latest_query_usage = source
+            .summary
+            .last_query_usage
+            .clone()
+            .or_else(|| latest_turn.as_ref().and_then(|turn| turn.usage.clone()));
         let updated_at = Utc::now();
         let summary = crate::SessionMetadata {
             session_id,
@@ -909,10 +916,10 @@ impl ServerRuntime {
             total_cache_creation_tokens: source_core_session.total_cache_creation_tokens,
             total_cache_read_tokens: source_core_session.total_cache_read_tokens,
             prompt_token_estimate: source_core_session.prompt_token_estimate,
-            last_query_total_tokens: latest_turn
+            last_query_usage: latest_query_usage.clone(),
+            last_query_total_tokens: latest_query_usage
                 .as_ref()
-                .and_then(|turn| turn.usage.as_ref())
-                .map(|usage| usage.input_tokens as usize + usage.output_tokens as usize)
+                .map(devo_protocol::TurnUsage::display_total_tokens)
                 .unwrap_or(0),
             status: SessionRuntimeStatus::Idle,
         };
@@ -945,6 +952,7 @@ impl ServerRuntime {
             tool_registry: source.tool_registry.clone(),
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
+            session_context_recorded: source.session_context_recorded,
         })
     }
 }
