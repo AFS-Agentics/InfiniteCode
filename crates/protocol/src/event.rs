@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
+use ts_rs::TS;
 
 use crate::command_exec::{CommandExecExitedPayload, CommandExecOutputDeltaPayload};
 use crate::parse_command::ParsedCommand;
@@ -114,6 +116,27 @@ pub struct TurnPlanUpdatedPayload {
     pub turn: TurnMetadata,
     pub explanation: Option<String>,
     pub plan: Vec<TurnPlanStepPayload>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ProviderRetryPhase {
+    Scheduled,
+    Resumed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, TS)]
+#[ts(export)]
+pub struct TurnProviderRetryStatusPayload {
+    pub session_id: SessionId,
+    pub turn_id: TurnId,
+    pub attempt: usize,
+    pub backoff_ms: u64,
+    pub provider: String,
+    pub model: String,
+    pub phase: ProviderRetryPhase,
+    pub message: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -340,6 +363,7 @@ pub enum ServerEvent {
     TurnPlanUpdated(TurnPlanUpdatedPayload),
     TurnDiffUpdated(TurnEventPayload),
     TurnUsageUpdated(TurnUsageUpdatedPayload),
+    TurnProviderRetryStatus(TurnProviderRetryStatusPayload),
     WorkspaceChangesUpdated(WorkspaceChangesUpdatedPayload),
     ToolCallStatusUpdated(ToolCallStatusUpdatedPayload),
     RequestUserInput(RequestUserInputPayload),
@@ -383,6 +407,7 @@ impl ServerEvent {
             | Self::TurnDiffUpdated(payload) => Some(payload.session_id),
             Self::TurnPlanUpdated(payload) => Some(payload.session_id),
             Self::TurnUsageUpdated(payload) => Some(payload.session_id),
+            Self::TurnProviderRetryStatus(payload) => Some(payload.session_id),
             Self::WorkspaceChangesUpdated(payload) => Some(payload.session_id),
             Self::ToolCallStatusUpdated(payload) => Some(payload.session_id),
             Self::RequestUserInput(payload) => Some(payload.request.session_id),
@@ -424,6 +449,7 @@ impl ServerEvent {
             Self::TurnPlanUpdated(_) => "turn/plan/updated",
             Self::TurnDiffUpdated(_) => "turn/diff/updated",
             Self::TurnUsageUpdated(_) => "turn/usage/updated",
+            Self::TurnProviderRetryStatus(_) => "turn/provider_retry_status",
             Self::WorkspaceChangesUpdated(_) => "workspace/changes/updated",
             Self::ToolCallStatusUpdated(_) => "tool_call/status_updated",
             Self::RequestUserInput(_) => "item/tool/requestUserInput",
@@ -460,6 +486,7 @@ impl ServerEvent {
             }
             Self::ItemDelta { payload, .. } => payload.context.seq = seq,
             Self::TurnUsageUpdated(_)
+            | Self::TurnProviderRetryStatus(_)
             | Self::WorkspaceChangesUpdated(_)
             | Self::ToolCallStatusUpdated(_)
             | Self::RequestUserInput(_)

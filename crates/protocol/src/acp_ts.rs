@@ -165,6 +165,8 @@ pub fn generate_protocol_typescript() -> String {
     push_decl::<SessionTitleFinalSource>(&cfg, &mut output);
     push_decl::<TurnStatus>(&cfg, &mut output);
     push_decl::<TurnUsage>(&cfg, &mut output);
+    push_decl::<ProviderRetryPhase>(&cfg, &mut output);
+    push_decl::<TurnProviderRetryStatusPayload>(&cfg, &mut output);
     push_decl::<StopReason>(&cfg, &mut output);
     push_decl::<ParsedCommand>(&cfg, &mut output);
     push_decl::<FileChange>(&cfg, &mut output);
