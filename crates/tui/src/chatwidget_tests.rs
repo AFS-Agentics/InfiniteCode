@@ -5705,6 +5705,53 @@ fn status_summary_uses_last_turn_total_when_idle_and_live_estimate_while_busy() 
 }
 
 #[test]
+fn session_compacted_updates_context_bar_to_compacted_prompt_estimate() {
+    let cwd = std::env::current_dir().expect("current directory is available");
+    let model = Model {
+        slug: "test-model".to_string(),
+        display_name: "Test Model".to_string(),
+        ..Model::default()
+    };
+    let (mut widget, _app_event_rx) = widget_with_model(model, cwd);
+
+    widget.handle_worker_event(crate::events::WorkerEvent::SessionSwitched {
+        session_id: "session-1".to_string(),
+        cwd: std::env::current_dir().expect("current directory is available"),
+        title: Some("Resumed".to_string()),
+        model: Some("test-model".to_string()),
+        model_binding_id: None,
+        reasoning_effort_selection: None,
+        reasoning_effort: None,
+        active_agent_label: None,
+        total_input_tokens: 10_000,
+        total_output_tokens: 1_000,
+        total_tokens: 11_000,
+        total_cache_read_tokens: 500,
+        last_query_total_tokens: 9_000,
+        last_query_input_tokens: 8_500,
+        prompt_token_estimate: 8_500,
+        history_items: Vec::new(),
+        rich_history_items: Vec::new(),
+        loaded_item_count: 0,
+        pending_texts: vec![],
+    });
+
+    widget.handle_worker_event(crate::events::WorkerEvent::SessionCompacted {
+        total_input_tokens: 10_000,
+        total_output_tokens: 1_000,
+        total_tokens: 11_000,
+        last_query_total_tokens: 1_200,
+        last_query_input_tokens: 1_200,
+        prompt_token_estimate: 1_200,
+    });
+
+    let summary = widget.status_summary_text();
+    assert!(summary.contains("↑10k"));
+    assert!(summary.contains("1k/200k"));
+    assert!(!summary.contains("9k/200k"));
+}
+
+#[test]
 fn usage_updated_keeps_context_bar_on_last_query_not_cumulative_totals() {
     let cwd = std::env::current_dir().expect("current directory is available");
     let model = Model {
@@ -6021,9 +6068,8 @@ fn session_compaction_live_rows_use_live_prefix_cols() {
 
     let rows = rendered_rows(&widget, 120, 24);
     assert!(
-        rows.iter().any(|row| {
-            row.starts_with(&live_prefix) && row.contains("Compacting session")
-        }),
+        rows.iter()
+            .any(|row| { row.starts_with(&live_prefix) && row.contains("Compacting session") }),
         "compaction in-progress row should align with live prefix:\n{}",
         rows.join("\n")
     );
@@ -6032,6 +6078,8 @@ fn session_compaction_live_rows_use_live_prefix_cols() {
         total_input_tokens: 10,
         total_output_tokens: 5,
         total_tokens: 15,
+        last_query_total_tokens: 8,
+        last_query_input_tokens: 8,
         prompt_token_estimate: 8,
     });
 

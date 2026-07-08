@@ -1285,12 +1285,16 @@ impl ChatWidget {
                 total_input_tokens,
                 total_output_tokens,
                 total_tokens: _,
+                last_query_total_tokens,
+                last_query_input_tokens,
                 prompt_token_estimate,
             } => {
                 self.busy = false;
                 self.bottom_pane.set_task_running(false);
                 self.total_input_tokens = total_input_tokens;
                 self.total_output_tokens = total_output_tokens;
+                self.last_query_total_tokens = last_query_total_tokens;
+                self.last_query_input_tokens = last_query_input_tokens;
                 self.prompt_token_estimate = prompt_token_estimate;
                 self.add_to_history(history_cell::new_live_aligned_info_event(
                     "Session compaction done".to_string(),

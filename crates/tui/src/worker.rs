@@ -2873,10 +2873,24 @@ async fn run_worker_inner(
                                     total_input_tokens = payload.session.total_input_tokens;
                                     total_output_tokens = payload.session.total_output_tokens;
                                     total_tokens = payload.session.total_tokens;
+                                    let (compacted_last_query_total, compacted_last_query_input) =
+                                        last_query_tokens_from_resume(&payload.session, None);
+                                    last_query_total_tokens = if payload.session.prompt_token_estimate > 0 {
+                                        payload.session.prompt_token_estimate
+                                    } else {
+                                        compacted_last_query_total
+                                    };
+                                    last_query_input_tokens = if payload.session.prompt_token_estimate > 0 {
+                                        payload.session.prompt_token_estimate
+                                    } else {
+                                        compacted_last_query_input
+                                    };
                                     let _ = event_tx.send(WorkerEvent::SessionCompacted {
                                         total_input_tokens,
                                         total_output_tokens,
                                         total_tokens,
+                                        last_query_total_tokens,
+                                        last_query_input_tokens,
                                         prompt_token_estimate: payload.session.prompt_token_estimate,
                                     });
                                 }
@@ -5515,21 +5529,14 @@ mod tests {
 
         assert_eq!(
             events,
-            vec![
-                WorkerEvent::AcpUsageUpdated {
-                    used: 90,
-                    size: 200_000,
-                    cost: None,
-                },
-                WorkerEvent::UsageUpdated {
-                    total_input_tokens: 70,
-                    total_output_tokens: 20,
-                    total_tokens: 90,
-                    total_cache_read_tokens: 12,
-                    last_query_total_tokens: 11,
-                    last_query_input_tokens: 7,
-                },
-            ]
+            vec![WorkerEvent::UsageUpdated {
+                total_input_tokens: 70,
+                total_output_tokens: 20,
+                total_tokens: 90,
+                total_cache_read_tokens: 12,
+                last_query_total_tokens: 11,
+                last_query_input_tokens: 7,
+            }]
         );
     }
 

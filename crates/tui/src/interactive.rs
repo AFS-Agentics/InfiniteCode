@@ -909,6 +909,8 @@ fn handle_worker_event(
             total_input_tokens: next_total_input_tokens,
             total_output_tokens: next_total_output_tokens,
             total_tokens: next_total_tokens,
+            last_query_total_tokens: _,
+            last_query_input_tokens: _,
             prompt_token_estimate: _,
         } => {
             loop_state.busy = false;

@@ -596,6 +596,10 @@ pub(crate) enum WorkerEvent {
         total_output_tokens: usize,
         /// Display total tokens accumulated in the compacted session.
         total_tokens: usize,
+        /// Latest/context display total after compaction.
+        last_query_total_tokens: usize,
+        /// Input tokens currently visible to the model after compaction.
+        last_query_input_tokens: usize,
         /// Estimated prompt tokens currently visible to the model.
         prompt_token_estimate: usize,
     },
