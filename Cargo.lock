@@ -1841,6 +1841,7 @@ dependencies = [
  "chrono",
  "crossterm",
  "derive_more",
+ "devo-client",
  "devo-core",
  "devo-protocol",
  "devo-provider",

@@ -292,6 +292,7 @@ mod tests {
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: None,
+            file_read_ledger: None,
             network_proxy: None,
             network_no_proxy: None,
         }

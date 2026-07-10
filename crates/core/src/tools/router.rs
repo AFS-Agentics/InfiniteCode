@@ -22,6 +22,7 @@ use crate::tools::deferred_loading::is_subagent_agent_coordination_tool;
 use devo_tools::AgentToolCoordinator;
 use devo_tools::ClientFilesystem;
 use devo_tools::ClientTerminal;
+use devo_tools::FileReadLedger;
 use devo_tools::ToolAgentScope;
 use tokio_util::sync::CancellationToken;
 
@@ -309,6 +310,7 @@ impl ToolRuntime {
             agent_coordinator: self.context.agent_coordinator.clone(),
             client_filesystem: self.context.client_filesystem.clone(),
             client_terminal: self.context.client_terminal.clone(),
+            file_read_ledger: Some(Arc::clone(&self.context.file_read_ledger)),
             network_proxy: self.context.network_proxy.clone(),
             network_no_proxy: self.context.network_no_proxy.clone(),
         };
@@ -507,7 +509,7 @@ impl PermissionChecker {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ToolRuntimeContext {
     pub session_id: String,
     pub turn_id: Option<String>,
@@ -518,10 +520,32 @@ pub struct ToolRuntimeContext {
     pub agent_coordinator: Option<Arc<dyn AgentToolCoordinator>>,
     pub client_filesystem: Option<Arc<dyn ClientFilesystem>>,
     pub client_terminal: Option<Arc<dyn ClientTerminal>>,
+    pub file_read_ledger: Arc<FileReadLedger>,
     pub local_web_search: Option<ResolvedLocalWebSearchConfig>,
     pub hooks: Option<crate::hooks::HookRuntimeContext>,
     pub network_proxy: Option<String>,
     pub network_no_proxy: Option<String>,
+}
+
+impl Default for ToolRuntimeContext {
+    fn default() -> Self {
+        Self {
+            session_id: String::new(),
+            turn_id: None,
+            cwd: PathBuf::new(),
+            agent_scope: ToolAgentScope::default(),
+            agent_context_mode: devo_protocol::AgentContextMode::default(),
+            collaboration_mode: devo_protocol::CollaborationMode::default(),
+            agent_coordinator: None,
+            client_filesystem: None,
+            client_terminal: None,
+            file_read_ledger: Arc::new(FileReadLedger::new()),
+            local_web_search: None,
+            hooks: None,
+            network_proxy: None,
+            network_no_proxy: None,
+        }
+    }
 }
 
 impl std::fmt::Debug for ToolRuntimeContext {
@@ -545,6 +569,7 @@ impl std::fmt::Debug for ToolRuntimeContext {
                 "client_terminal",
                 &self.client_terminal.as_ref().map(|_| "<configured>"),
             )
+            .field("file_read_ledger", &"<configured>")
             .field(
                 "local_web_search",
                 &self
@@ -661,7 +686,7 @@ fn resource_requires_permission(resource: &ResourceKind) -> bool {
 
 fn path_for_tool_input(tool_name: &str, input: &serde_json::Value, cwd: &Path) -> Option<PathBuf> {
     let raw = match tool_name {
-        "read" | "write" => input
+        "read" | "write" | "edit" => input
             .get("filePath")
             .and_then(serde_json::Value::as_str)
             .or_else(|| input.get("path").and_then(serde_json::Value::as_str)),
@@ -1270,6 +1295,7 @@ mod tests {
                 agent_coordinator: None,
                 client_filesystem: None,
                 client_terminal: None,
+                file_read_ledger: std::sync::Arc::new(devo_tools::FileReadLedger::new()),
                 local_web_search: None,
                 hooks: None,
                 network_proxy: None,

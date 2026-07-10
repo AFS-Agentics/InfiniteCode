@@ -286,7 +286,7 @@ impl ServerRuntime {
         }
 
         let research_display_input = research_display_input(&display_input);
-        self.maybe_prepare_title_generation_from_user_input(
+        self.maybe_start_title_generation_from_user_input(
             params.session_id,
             &research_display_input,
         )

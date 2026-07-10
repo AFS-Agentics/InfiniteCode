@@ -98,6 +98,7 @@ pub(crate) async fn run_prompt(
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: None,
+            file_read_ledger: std::sync::Arc::new(devo_core::tools::FileReadLedger::new()),
             local_web_search: None,
             hooks: (!app_config.hooks.is_empty()).then(|| devo_core::HookRuntimeContext {
                 runner: devo_core::HookRunner::new(app_config.hooks.clone()),

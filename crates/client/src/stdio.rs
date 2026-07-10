@@ -370,6 +370,10 @@ impl StdioServerClient {
         self.core.recv_notification().await
     }
 
+    pub async fn recv_client_event(&mut self) -> Result<Option<crate::ClientEvent>> {
+        self.core.recv_client_event().await
+    }
+
     pub async fn recv_event(&mut self) -> Result<Option<(String, ServerEvent)>> {
         self.core.recv_event().await
     }

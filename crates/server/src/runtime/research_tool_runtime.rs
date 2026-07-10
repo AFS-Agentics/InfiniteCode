@@ -32,13 +32,19 @@ impl ServerRuntime {
         let Some(session_handle) = self.session(session_id).await else {
             anyhow::bail!("session does not exist");
         };
-        let Some(snapshot) = session_handle.hook_context_snapshot().await else {
+        let Some(runtime_session) = session_handle.export_runtime_session().await else {
             anyhow::bail!("session does not exist");
         };
-        let cwd = snapshot.summary.cwd.clone();
-        let permission_mode = snapshot.config.permission_mode;
-        let permission_profile = snapshot.config.permission_profile.clone();
-        let runtime_context = snapshot.runtime_context;
+        let file_read_ledger = Arc::clone(&runtime_session.file_read_ledger);
+        let cwd = runtime_session.summary.cwd.clone();
+        let (permission_mode, permission_profile) = {
+            let core = runtime_session.core_session.lock().await;
+            (
+                core.config.permission_mode,
+                core.config.permission_profile.clone(),
+            )
+        };
+        let runtime_context = Arc::clone(&runtime_session.runtime_context);
         let provider_http = runtime_context
             .config_store
             .lock()
@@ -65,6 +71,7 @@ impl ServerRuntime {
                 agent_coordinator: Some(Arc::clone(self) as Arc<dyn AgentToolCoordinator>),
                 client_filesystem: Some(Arc::clone(self) as Arc<dyn ClientFilesystem>),
                 client_terminal: Some(Arc::clone(self) as Arc<dyn ClientTerminal>),
+                file_read_ledger,
                 local_web_search: match &turn_config.web_search {
                     devo_core::ResolvedWebSearchConfig::Local(config) => Some(config.clone()),
                     devo_core::ResolvedWebSearchConfig::Disabled

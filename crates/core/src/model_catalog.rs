@@ -544,4 +544,33 @@ mod tests {
         assert!(!deepseek_models.is_empty());
         assert!(deepseek_models.iter().any(|m| m.slug == "deepseek-v4-pro"));
     }
+
+    #[test]
+    fn load_from_config_preserves_explicit_base_instructions() {
+        let root = unique_temp_dir("catalog-preserve-base-instructions");
+        let home = root.join("home").join(".devo");
+        std::fs::create_dir_all(&home).expect("create home");
+
+        std::fs::write(
+            home.join("models.json"),
+            r#"[
+                {
+                    "slug": "qwen3-coder-next",
+                    "display_name": "Custom Qwen",
+                    "base_instructions": "Custom catalog instructions"
+                }
+            ]"#,
+        )
+        .expect("write user models");
+
+        let catalog =
+            PresetModelCatalog::load_from_config(&home, /*workspace_root*/ None).expect("load");
+        let model = model_by_slug(&catalog.into_inner(), "qwen3-coder-next");
+
+        assert_eq!(model.display_name, "Custom Qwen");
+        assert_eq!(model.base_instructions, "Custom catalog instructions");
+        assert_ne!(model.base_instructions, default_base_instructions());
+
+        let _ = std::fs::remove_dir_all(root);
+    }
 }

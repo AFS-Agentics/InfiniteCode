@@ -230,6 +230,7 @@ impl ServerRuntime {
             next_item_seq: 1,
             first_user_input: Some(params.message.clone()),
             tool_registry: parent_tool_registry,
+            file_read_ledger: std::sync::Arc::new(devo_core::tools::FileReadLedger::new()),
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
             session_context_recorded: false,

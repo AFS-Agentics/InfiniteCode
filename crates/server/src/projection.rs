@@ -316,7 +316,7 @@ pub(crate) fn history_item_from_turn_item(item: &TurnItem) -> Option<SessionHist
                 item = item.with_metadata(metadata);
             }
             if !*is_error
-                && matches!(tool_name.as_deref(), Some("apply_patch" | "write"))
+                && matches!(tool_name.as_deref(), Some("apply_patch" | "write" | "edit"))
                 && let Some(metadata) = parse_edited_history_metadata(output)
             {
                 item = item.with_metadata(metadata);

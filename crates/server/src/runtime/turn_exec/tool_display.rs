@@ -11,7 +11,7 @@ pub(super) fn is_unified_exec_tool(name: &str) -> bool {
 }
 
 pub(super) fn is_file_change_tool(name: &str) -> bool {
-    matches!(name, "apply_patch" | "write")
+    matches!(name, "apply_patch" | "write" | "edit")
 }
 
 pub(super) fn is_plan_tool(name: &str) -> bool {

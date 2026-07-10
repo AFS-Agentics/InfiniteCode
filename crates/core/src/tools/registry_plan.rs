@@ -11,6 +11,7 @@ use devo_config::AppConfig;
 const BASH_DESCRIPTION: &str = include_str!("bash.txt");
 const READ_DESCRIPTION: &str = include_str!("read.txt");
 const WRITE_DESCRIPTION: &str = include_str!("write.txt");
+const EDIT_DESCRIPTION: &str = include_str!("edit.txt");
 const GLOB_DESCRIPTION: &str = include_str!("glob.txt");
 const GREP_DESCRIPTION: &str = include_str!("grep.txt");
 const WEBFETCH_DESCRIPTION: &str = include_str!("webfetch.txt");
@@ -216,6 +217,41 @@ fn write_schema() -> JsonSchema {
             ),
         ]),
         Some(vec!["filePath".to_string(), "content".to_string()]),
+        Some(false),
+    )
+}
+
+fn edit_schema() -> JsonSchema {
+    JsonSchema::object(
+        BTreeMap::from([
+            (
+                "filePath".to_string(),
+                JsonSchema::string(Some("The absolute path to the file to modify")),
+            ),
+            (
+                "oldString".to_string(),
+                JsonSchema::string(Some(
+                    "The exact text to replace. Must be non-empty and unique unless replaceAll is true.",
+                )),
+            ),
+            (
+                "newString".to_string(),
+                JsonSchema::string(Some(
+                    "The text to replace oldString with. May be empty to delete text.",
+                )),
+            ),
+            (
+                "replaceAll".to_string(),
+                JsonSchema::boolean(Some(
+                    "Replace every occurrence of oldString. Defaults to false.",
+                )),
+            ),
+        ]),
+        Some(vec![
+            "filePath".to_string(),
+            "oldString".to_string(),
+            "newString".to_string(),
+        ]),
         Some(false),
     )
 }
@@ -705,6 +741,23 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
             supports_streaming: None,
         },
         ToolHandlerKind::Write,
+    );
+
+    plan.push(
+        ToolSpec {
+            name: "edit".to_string(),
+            description: EDIT_DESCRIPTION.to_string(),
+            input_schema: edit_schema(),
+            output_mode: ToolOutputMode::Mixed,
+            execution_mode: ToolExecutionMode::Mutating,
+            capability_tags: vec![ToolCapabilityTag::WriteFiles],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::LiveOnly,
+            display_name: None,
+            supports_cancellation: None,
+            supports_streaming: None,
+        },
+        ToolHandlerKind::Edit,
     );
 
     let find_description = GLOB_DESCRIPTION;

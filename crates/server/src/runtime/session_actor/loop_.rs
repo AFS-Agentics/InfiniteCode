@@ -125,6 +125,7 @@ pub(super) async fn run_session_actor(
                     permission_profile: state.core.config.permission_profile.clone(),
                     runtime_context: Arc::clone(&state.runtime_context),
                     tool_registry,
+                    file_read_ledger: Arc::clone(&state.file_read_ledger),
                 });
             }
             SessionCommand::GetTitleGenerationContext { reply } => {

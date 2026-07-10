@@ -51,6 +51,7 @@ pub(crate) struct ShellExecContextSnapshot {
     pub(crate) permission_profile: RuntimePermissionProfile,
     pub(crate) runtime_context: Arc<SessionRuntimeContext>,
     pub(crate) tool_registry: Arc<ToolRegistry>,
+    pub(crate) file_read_ledger: Arc<devo_core::tools::FileReadLedger>,
 }
 
 /// Context for async title generation.

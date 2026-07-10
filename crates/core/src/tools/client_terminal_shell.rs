@@ -431,6 +431,7 @@ mod tests {
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: Some(client_terminal),
+            file_read_ledger: None,
             network_proxy: None,
             network_no_proxy: None,
         }

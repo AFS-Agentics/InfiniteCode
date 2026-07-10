@@ -313,7 +313,7 @@ impl ServerRuntime {
             )
             .await;
         }
-        self.maybe_prepare_title_generation_from_user_input(params.session_id, &display_input)
+        self.maybe_start_title_generation_from_user_input(params.session_id, &display_input)
             .await;
         if let Some(persistence) = session_handle.turn_persistence_snapshot().await
             && persistence.record.is_some()

@@ -48,7 +48,8 @@ pub use deferred_loading::*;
 pub use devo_tools::{
     AgentToolCoordinator, ClientFilesystem, ClientTerminal, ClientTerminalCreate,
     ClientTerminalCreateRequest, ClientTerminalEnv, ClientTerminalExitStatus, ClientTerminalOutput,
-    ClientTerminalRequest, ClientTextFileRead, ClientTextFileWrite,
+    ClientTerminalRequest, ClientTextFileRead, ClientTextFileWrite, FileReadFreshnessError,
+    FileReadLedger,
 };
 pub use errors::*;
 pub use events::ToolEvent;

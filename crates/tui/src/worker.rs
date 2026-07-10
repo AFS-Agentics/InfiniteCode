@@ -10,6 +10,7 @@ use anyhow::Context;
 use anyhow::Result;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use devo_client::{ClientEvent, client_event_from_notification};
 use tokio::sync::mpsc;
 use tokio::task::JoinError;
 use tokio::task::JoinHandle;
@@ -2299,6 +2300,33 @@ async fn run_worker_inner(
                     Some(notification) => {
                         let method = notification.method;
                         let params = notification.params;
+                        let normalized_event = client_event_from_notification(
+                            &devo_client::ServerNotificationMessage {
+                                method: method.clone(),
+                                params: params.clone(),
+                            },
+                        )
+                        .ok()
+                        .flatten();
+                        if let Some(ClientEvent::TurnUsageUpdated(payload)) = normalized_event {
+                            saw_usage_update_for_turn = true;
+                            total_input_tokens = payload.total_input_tokens;
+                            total_output_tokens = payload.total_output_tokens;
+                            total_tokens = payload.total_tokens;
+                            total_cache_read_tokens = payload.total_cache_read_tokens;
+                            last_query_total_tokens = payload.usage.display_total_tokens();
+                            last_query_input_tokens = payload.last_query_input_tokens;
+                            has_authoritative_usage_totals = true;
+                            let _ = event_tx.send(WorkerEvent::UsageUpdated {
+                                total_input_tokens: payload.total_input_tokens,
+                                total_output_tokens: payload.total_output_tokens,
+                                total_tokens: payload.total_tokens,
+                                total_cache_read_tokens: payload.total_cache_read_tokens,
+                                last_query_total_tokens: payload.usage.display_total_tokens(),
+                                last_query_input_tokens: payload.last_query_input_tokens,
+                            });
+                            continue;
+                        }
                         if method == ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD {
                             if let Some(terminal_id) =
                                 params.get("terminalId").and_then(serde_json::Value::as_str)
@@ -2667,8 +2695,10 @@ async fn run_worker_inner(
                                     if completed {
                                         turn_count += 1;
                                         if let Some(usage) = &payload.turn.usage {
-                                            last_query_input_tokens = usage.input_tokens as usize;
-                                            last_query_total_tokens = usage.display_total_tokens();
+                                            if !saw_usage_update_for_turn {
+                                                last_query_input_tokens = usage.input_tokens as usize;
+                                                last_query_total_tokens = usage.display_total_tokens();
+                                            }
                                             if should_apply_terminal_turn_usage_fallback(
                                                 saw_usage_update_for_turn,
                                                 has_authoritative_usage_totals,
@@ -2741,8 +2771,10 @@ async fn run_worker_inner(
                                         .take()
                                         .unwrap_or_else(|| format!("turn failed with status {:?}", turn.status));
                                     if let Some(usage) = &turn.usage {
-                                        last_query_input_tokens = usage.input_tokens as usize;
-                                        last_query_total_tokens = usage.display_total_tokens();
+                                        if !saw_usage_update_for_turn {
+                                            last_query_input_tokens = usage.input_tokens as usize;
+                                            last_query_total_tokens = usage.display_total_tokens();
+                                        }
                                         if should_apply_terminal_turn_usage_fallback(
                                             saw_usage_update_for_turn,
                                             has_authoritative_usage_totals,
@@ -5601,17 +5633,10 @@ mod tests {
         );
         assert_eq!(
             output_events,
-            vec![
-                WorkerEvent::ToolCallUpdated {
-                    tool_use_id: "call-1".to_string(),
-                    summary: "Running".to_string(),
-                    parsed_commands: Vec::new(),
-                },
-                WorkerEvent::ToolOutputDelta {
-                    tool_use_id: "call-1".to_string(),
-                    delta: "streamed output".to_string(),
-                },
-            ]
+            vec![WorkerEvent::ToolOutputDelta {
+                tool_use_id: "call-1".to_string(),
+                delta: "streamed output".to_string(),
+            }]
         );
 
         let result_events = worker_events_from_acp_notification(

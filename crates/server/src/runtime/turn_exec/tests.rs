@@ -50,6 +50,7 @@ fn command_progress_uses_command_execution_item_id() {
 fn file_change_tool_detection_matches_apply_patch_and_write() {
     assert!(is_file_change_tool("apply_patch"));
     assert!(is_file_change_tool("write"));
+    assert!(is_file_change_tool("edit"));
     assert!(!is_file_change_tool("read"));
 }
 

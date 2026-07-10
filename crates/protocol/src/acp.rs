@@ -1087,6 +1087,54 @@ mod tests {
     }
 
     #[test]
+    fn tool_item_started_preserves_original_event_for_legacy_clients() {
+        let session_id = SessionId::new();
+        let turn_id = TurnId::new();
+        let item_id = ItemId::new();
+        let started = ServerEvent::ItemStarted(ItemEventPayload {
+            context: EventContext {
+                session_id,
+                turn_id: Some(turn_id),
+                item_id: Some(item_id),
+                seq: 0,
+            },
+            item: crate::ItemEnvelope {
+                item_id,
+                item_kind: ItemKind::ToolCall,
+                payload: serde_json::to_value(ToolCallPayload {
+                    tool_call_id: "call-1".to_string(),
+                    tool_name: "code_search".to_string(),
+                    parameters: serde_json::json!({
+                        "operation": "search",
+                        "query": "context length display",
+                        "path": "."
+                    }),
+                    command_actions: vec![crate::parse_command::ParsedCommand::Search {
+                        cmd: "code_search context length display in .".to_string(),
+                        query: Some("context length display".to_string()),
+                        path: Some(".".to_string()),
+                    }],
+                })
+                .expect("serialize tool payload"),
+            },
+        });
+
+        let (method, value) = acp_notification_from_server_event("item/started", &started);
+        let notification: AcpSessionNotification =
+            serde_json::from_value(value.clone()).expect("deserialize ACP notification");
+
+        assert_eq!(method, ACP_SESSION_UPDATE_METHOD);
+        assert_eq!(
+            value["update"]["sessionUpdate"],
+            serde_json::json!("tool_call")
+        );
+        assert_eq!(
+            original_event_from_acp_notification(&notification),
+            Some(("item/started".to_string(), started))
+        );
+    }
+
+    #[test]
     fn tool_status_maps_pending_then_in_progress_update() {
         let session_id = SessionId::new();
         let turn_id = TurnId::new();
@@ -1122,6 +1170,12 @@ mod tests {
                 "devo/turnId": turn_id.to_string(),
                 "devo/itemId": item_id.to_string()
             })
+        );
+        assert!(
+            started_value["_meta"]
+                .get(DEVO_ORIGINAL_METHOD_META)
+                .is_some(),
+            "tool item/started should keep original method for legacy clients"
         );
 
         let update = ServerEvent::ToolCallStatusUpdated(crate::ToolCallStatusUpdatedPayload {

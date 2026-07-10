@@ -245,6 +245,8 @@ pub struct ServerRuntime {
     command_exec_manager: command_exec::CommandExecManager,
     /// Turn-scoped workspace baselines captured at actual execution start.
     active_workspace_baselines: Mutex<HashMap<TurnId, ActiveWorkspaceBaseline>>,
+    /// Sessions with an in-flight model title-generation task.
+    title_generation_in_flight: Mutex<HashSet<SessionId>>,
     /// Weak back-reference used when session actors need the owning runtime `Arc`.
     self_weak: std::sync::Weak<ServerRuntime>,
     /// LRU order for loaded root session actors.
@@ -354,6 +356,7 @@ impl ServerRuntime {
             reference_searches: Mutex::new(HashMap::new()),
             command_exec_manager: command_exec::CommandExecManager::new(),
             active_workspace_baselines: Mutex::new(HashMap::new()),
+            title_generation_in_flight: Mutex::new(HashSet::new()),
             self_weak: self_weak.clone(),
             session_lru: Mutex::new(session_cache::ParentSessionLru::new(
                 session_cache::PARENT_SESSION_LRU_CAPACITY,

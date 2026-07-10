@@ -3,7 +3,9 @@ mod apply_patch;
 mod bash;
 #[cfg(feature = "code-search")]
 mod code_search;
+mod edit;
 mod exec_command;
+mod file_change_metadata;
 mod file_write;
 mod glob;
 mod goal_update;
@@ -26,6 +28,7 @@ pub use apply_patch::ApplyPatchHandler;
 pub use bash::BashHandler;
 #[cfg(feature = "code-search")]
 pub use code_search::CodeSearchHandler;
+pub use edit::EditHandler;
 pub use exec_command::{ExecCommandHandler, WriteStdinHandler};
 pub use file_write::WriteHandler;
 pub use glob::GlobHandler;
@@ -149,6 +152,7 @@ fn build_registry_from_builder(
             ToolHandlerKind::ShellCommand => Arc::new(ShellCommandHandler::new()),
             ToolHandlerKind::Read => Arc::new(ReadHandler::new()),
             ToolHandlerKind::Write => Arc::new(WriteHandler::new()),
+            ToolHandlerKind::Edit => Arc::new(EditHandler::new()),
             ToolHandlerKind::Glob => Arc::new(GlobHandler::new()),
             ToolHandlerKind::Grep => Arc::new(GrepHandler::new()),
             ToolHandlerKind::ApplyPatch => Arc::new(ApplyPatchHandler::new()),
@@ -204,6 +208,7 @@ fn build_registry_from_builder(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tool_spec::ToolExecutionMode;
 
     #[test]
     fn default_registry_exposes_shell_command_and_accepts_bash_alias() {
@@ -222,5 +227,16 @@ mod tests {
 
         assert!(registry.spec("update_goal").is_some());
         assert!(registry.get("update_goal").is_some());
+    }
+
+    #[test]
+    fn default_registry_exposes_edit_tool() {
+        let registry = build_registry_from_plan(&ToolPlanConfig::default());
+
+        assert!(registry.spec("edit").is_some());
+        assert!(registry.get("edit").is_some());
+        let spec = registry.spec("edit").expect("edit spec");
+        assert_eq!(spec.execution_mode, ToolExecutionMode::Mutating);
+        assert!(!spec.supports_parallel);
     }
 }

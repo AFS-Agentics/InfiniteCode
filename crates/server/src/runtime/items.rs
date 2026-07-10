@@ -23,13 +23,12 @@ impl ServerRuntime {
     ) {
         self.maybe_prepare_title_generation_from_user_input(session_id, user_input)
             .await;
-        self.maybe_schedule_final_title_generation(session_id, None)
+        self.maybe_schedule_final_title_generation(session_id, Some(user_input.to_string()))
             .await;
     }
 
     /// Assigns a provisional title and records the first user input without
-    /// calling the title model. Used at turn start while the session actor may
-    /// soon block on `ExecuteTurn`; final title generation runs post-turn.
+    /// calling the title model.
     pub(super) async fn maybe_prepare_title_generation_from_user_input(
         self: &Arc<Self>,
         session_id: SessionId,
@@ -46,6 +45,12 @@ impl ServerRuntime {
             .await;
     }
 
+    /// Spawns final (LLM) title generation in the background.
+    ///
+    /// Safe to call at turn start: actor mailbox round-trips happen here, then
+    /// the model call runs on a detached task so it does not block `ExecuteTurn`.
+    /// Duplicate schedules for the same session are ignored while a generation
+    /// task is already in flight.
     pub(super) async fn maybe_schedule_final_title_generation(
         self: &Arc<Self>,
         session_id: SessionId,
@@ -76,11 +81,23 @@ impl ServerRuntime {
         if first_input.is_empty() {
             return;
         }
+        {
+            let mut in_flight = self.title_generation_in_flight.lock().await;
+            if !in_flight.insert(session_id) {
+                return;
+            }
+        }
         let runtime = Arc::clone(self);
         tokio::spawn(async move {
             runtime
+                .clone()
                 .maybe_generate_final_title(session_id, first_input)
                 .await;
+            runtime
+                .title_generation_in_flight
+                .lock()
+                .await
+                .remove(&session_id);
         });
     }
 

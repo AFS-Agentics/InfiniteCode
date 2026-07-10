@@ -1,6 +1,6 @@
 use devo_core::ResearchArtifactType;
 
-pub(super) const RESEARCH_FILE_TOOL_NAMES: &[&str] = &["read", "write", "apply_patch"];
+pub(super) const RESEARCH_FILE_TOOL_NAMES: &[&str] = &["read", "write", "edit", "apply_patch"];
 const RESEARCH_NO_TOOL_NAMES: &[&str] = &[];
 const RESEARCH_CLARIFICATION_TOOL_NAMES: &[&str] = &["request_user_input"];
 const RESEARCH_SUPERVISOR_TOOL_NAMES: &[&str] = &[
@@ -10,8 +10,14 @@ const RESEARCH_SUPERVISOR_TOOL_NAMES: &[&str] = &[
     "list_agents",
     "close_agent",
 ];
-pub(crate) const RESEARCH_WORKER_TOOL_NAMES: &[&str] =
-    &["read", "write", "apply_patch", "web_search", "webfetch"];
+pub(crate) const RESEARCH_WORKER_TOOL_NAMES: &[&str] = &[
+    "read",
+    "write",
+    "edit",
+    "apply_patch",
+    "web_search",
+    "webfetch",
+];
 
 pub(crate) const RESEARCH_PIPELINE_STAGES: &[ResearchStageKind] = &[
     ResearchStageKind::Clarify,
@@ -130,7 +136,7 @@ mod tests {
         assert_eq!(ResearchStageKind::Compress.tool_names(), NO_TOOLS);
         assert_eq!(
             ResearchStageKind::FinalReport.tool_names(),
-            ["read", "write", "apply_patch"].as_slice(),
+            ["read", "write", "edit", "apply_patch"].as_slice(),
         );
     }
 
