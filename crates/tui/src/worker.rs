@@ -3903,7 +3903,8 @@ fn pretty_tool_call_summary(tool_name: &str, input: &serde_json::Value) -> Optio
             .or_else(|| input.get("cmd").and_then(serde_json::Value::as_str))
             .map(|command| format!("Shell {}", compact_tool_summary(command, 96))),
         "read" => path_value().map(|path| format!("Read {path}{}", fmt_line_range(input))),
-        "write" | "edit" => path_value().map(|path| format!("Write {path}")),
+        "write" => path_value().map(|path| format!("Write {path}")),
+        "edit" => path_value().map(|path| format!("Edit {path}")),
         "apply_patch" => path_value().map(|path| format!("Patch {path}")),
         "find" | "glob" => input
             .get("path")
