@@ -713,9 +713,17 @@ impl ReplayState {
                         usage.cache_creation_input_tokens.unwrap_or(0) as usize;
                     self.total_cache_read_tokens +=
                         usage.cache_read_input_tokens.unwrap_or(0) as usize;
+                }
+                if let Some(usage) = &turn.latest_query_usage {
                     self.last_input_tokens = usage.input_tokens as usize;
                     self.last_turn_tokens = usage.display_total_tokens();
                     self.latest_query_usage = Some(usage.clone());
+                } else if turn.usage.is_some() {
+                    // Older rollout records only contain aggregate turn usage.
+                    // Do not mistake it for the latest model query.
+                    self.last_input_tokens = 0;
+                    self.last_turn_tokens = 0;
+                    self.latest_query_usage = None;
                 }
                 self.latest_turn_metadata = Some(turn_metadata_from_record(&turn));
                 self.turn_kinds_by_id.insert(turn.id, turn.kind.clone());
@@ -946,14 +954,25 @@ impl ReplayState {
         core_session.total_tokens = self.total_tokens;
         core_session.total_cache_creation_tokens = self.total_cache_creation_tokens;
         core_session.total_cache_read_tokens = self.total_cache_read_tokens;
-        core_session.last_input_tokens = self.last_input_tokens;
-        core_session.last_turn_tokens = self.last_turn_tokens;
-        core_session.prompt_token_estimate = core_session
+        let prompt_bytes = core_session
             .prompt_source_messages()
             .iter()
             .map(|message| serde_json::to_string(message).map_or(0, |json| json.len()))
-            .sum::<usize>()
-            .div_ceil(4);
+            .sum::<usize>();
+        core_session.prompt_token_estimate =
+            devo_protocol::approx_tokens_from_byte_count(prompt_bytes)
+                .try_into()
+                .unwrap_or(usize::MAX);
+        core_session.last_input_tokens = self
+            .latest_query_usage
+            .as_ref()
+            .map(|usage| usage.input_tokens as usize)
+            .unwrap_or(core_session.prompt_token_estimate);
+        core_session.last_turn_tokens = self
+            .latest_query_usage
+            .as_ref()
+            .map(devo_protocol::TurnUsage::display_total_tokens)
+            .unwrap_or(core_session.prompt_token_estimate);
         let pending_turn_queue = std::sync::Arc::clone(&core_session.pending_turn_queue);
         let btw_input_queue = std::sync::Arc::clone(&core_session.btw_input_queue);
         let summary_model_selection = self
@@ -1261,9 +1280,15 @@ impl ReplayState {
                 self.total_cache_creation_tokens +=
                     usage.cache_creation_input_tokens.unwrap_or(0) as usize;
                 self.total_cache_read_tokens += usage.cache_read_input_tokens.unwrap_or(0) as usize;
+            }
+            if let Some(usage) = &turn.latest_query_usage {
                 self.last_input_tokens = usage.input_tokens as usize;
                 self.last_turn_tokens = usage.display_total_tokens();
                 self.latest_query_usage = Some(usage.clone());
+            } else if turn.usage.is_some() {
+                self.last_input_tokens = 0;
+                self.last_turn_tokens = 0;
+                self.latest_query_usage = None;
             }
         }
     }
@@ -1759,6 +1784,7 @@ pub(crate) fn build_turn_record(
     turn: &TurnMetadata,
     session_context: Option<devo_core::SessionContext>,
     turn_context: Option<devo_core::TurnContext>,
+    latest_query_usage: Option<devo_core::TurnUsage>,
 ) -> TurnRecord {
     TurnRecord {
         id: turn.turn_id,
@@ -1775,11 +1801,12 @@ pub(crate) fn build_turn_record(
         request_thinking: turn.request_thinking.clone(),
         input_token_estimate: None,
         usage: turn.usage.clone(),
+        latest_query_usage,
         stop_reason: turn.stop_reason.clone(),
         failure_reason: turn.failure_reason,
         session_context,
         turn_context,
-        schema_version: 2,
+        schema_version: 3,
     }
 }
 
@@ -2000,6 +2027,7 @@ mod tests {
                     request_thinking: None,
                     input_token_estimate: None,
                     usage: Some(usage.clone()),
+                    latest_query_usage: Some(usage.clone()),
                     stop_reason: None,
                     failure_reason: None,
                     session_context: None,
@@ -2026,6 +2054,7 @@ mod tests {
                     request_thinking: None,
                     input_token_estimate: None,
                     usage: None,
+                    latest_query_usage: None,
                     stop_reason: None,
                     failure_reason: Some(devo_protocol::TurnFailureReason::MaxTurnRequests),
                     session_context: None,
@@ -2038,6 +2067,55 @@ mod tests {
         assert_eq!(replay.latest_query_usage, Some(usage));
         assert_eq!(replay.last_turn_tokens, 42);
         assert_eq!(replay.last_input_tokens, 30);
+    }
+
+    #[test]
+    fn replay_does_not_promote_aggregate_turn_usage_to_latest_query_usage() {
+        use devo_protocol::TurnUsage;
+
+        let now = Utc.with_ymd_and_hms(2026, 7, 8, 10, 0, 0).unwrap();
+        let session_id = SessionId::new();
+        let aggregate_usage = TurnUsage {
+            input_tokens: 10_000,
+            output_tokens: 2_000,
+            cache_creation_input_tokens: None,
+            cache_read_input_tokens: None,
+            reasoning_output_tokens: None,
+            total_tokens: Some(12_000),
+        };
+        let mut replay = ReplayState::default();
+
+        replay
+            .apply_line(RolloutLine::Turn(Box::new(TurnLine {
+                timestamp: now,
+                turn: TurnRecord {
+                    id: TurnId::new(),
+                    session_id,
+                    sequence: 1,
+                    started_at: now,
+                    completed_at: Some(now),
+                    status: TurnStatus::Completed,
+                    kind: TurnKind::Regular,
+                    model: "model-a".into(),
+                    model_binding_id: None,
+                    reasoning_effort_selection: None,
+                    request_model: "model-a".into(),
+                    request_thinking: None,
+                    input_token_estimate: None,
+                    usage: Some(aggregate_usage),
+                    latest_query_usage: None,
+                    stop_reason: None,
+                    failure_reason: None,
+                    session_context: None,
+                    turn_context: None,
+                    schema_version: 2,
+                },
+            })))
+            .expect("apply legacy aggregate-only turn");
+
+        assert_eq!(replay.latest_query_usage, None);
+        assert_eq!(replay.last_turn_tokens, 0);
+        assert_eq!(replay.last_input_tokens, 0);
     }
 
     #[test]
@@ -2069,6 +2147,7 @@ mod tests {
                     request_thinking: None,
                     input_token_estimate: None,
                     usage: None,
+                    latest_query_usage: None,
                     stop_reason: None,
                     failure_reason: None,
                     session_context: None,
@@ -2155,6 +2234,7 @@ mod tests {
                     request_thinking: None,
                     input_token_estimate: None,
                     usage: None,
+                    latest_query_usage: None,
                     stop_reason: None,
                     failure_reason: None,
                     session_context: None,
@@ -2795,6 +2875,7 @@ mod tests {
                     request_thinking: Some("enabled".into()),
                     input_token_estimate: None,
                     usage: None,
+                    latest_query_usage: None,
                     stop_reason: None,
                     failure_reason: None,
                     session_context: Some(session_context.clone()),
@@ -2923,6 +3004,7 @@ mod tests {
                     request_thinking: Some("enabled".into()),
                     input_token_estimate: None,
                     usage: None,
+                    latest_query_usage: None,
                     stop_reason: None,
                     failure_reason: None,
                     session_context: None,
@@ -3027,6 +3109,7 @@ mod tests {
                     request_thinking: Some("enabled".into()),
                     input_token_estimate: None,
                     usage: None,
+                    latest_query_usage: None,
                     stop_reason: None,
                     failure_reason: None,
                     session_context: None,
@@ -3106,7 +3189,7 @@ mod tests {
                 .append_turn_deduped(
                     &record,
                     &mut session_context_recorded,
-                    super::build_turn_record(&metadata, None, None),
+                    super::build_turn_record(&metadata, None, None, None),
                     Some(session_context.clone()),
                 )
                 .expect("append deduped turn");

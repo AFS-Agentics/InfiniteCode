@@ -770,6 +770,7 @@ async fn resume_normalizes_historical_default_reasoning_effort() -> Result<()> {
             request_thinking: Some("default".into()),
             input_token_estimate: None,
             usage: None,
+            latest_query_usage: None,
             stop_reason: None,
             failure_reason: None,
             session_context: None,

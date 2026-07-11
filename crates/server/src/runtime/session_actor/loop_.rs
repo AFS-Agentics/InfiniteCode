@@ -519,7 +519,12 @@ pub(super) async fn run_session_actor(
                     runtime.rollout_store.append_turn_deduped(
                         record,
                         &mut state.session_context_recorded,
-                        build_turn_record(&turn, None, state.core.latest_turn_context.clone()),
+                        build_turn_record(
+                            &turn,
+                            None,
+                            state.core.latest_turn_context.clone(),
+                            None,
+                        ),
                         state.core.session_context.clone(),
                     )
                 })();

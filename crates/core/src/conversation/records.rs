@@ -116,6 +116,12 @@ pub struct TurnRecord {
     pub input_token_estimate: Option<u32>,
     /// The authoritative provider token usage, when available.
     pub usage: Option<TurnUsage>,
+    /// The provider token usage from the latest model query in this turn.
+    ///
+    /// Unlike [`Self::usage`], this excludes earlier model queries that may
+    /// have been performed for tools, retries, or delegated work.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_query_usage: Option<TurnUsage>,
     /// The terminal provider/model stop reason, when available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_reason: Option<StopReason>,
@@ -1147,6 +1153,7 @@ mod tests {
             request_thinking: None,
             input_token_estimate: Some(100),
             usage: None,
+            latest_query_usage: None,
             stop_reason: None,
             failure_reason: None,
             session_context: None,

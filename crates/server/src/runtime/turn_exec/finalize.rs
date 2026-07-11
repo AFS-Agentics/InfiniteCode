@@ -132,7 +132,7 @@ impl ServerRuntime {
                 &turn,
                 &result,
                 turn_usage,
-                latest_query_usage,
+                latest_query_usage.clone(),
                 terminal_stop_reason,
                 session_total_input_tokens,
                 session_total_output_tokens,
@@ -149,7 +149,7 @@ impl ServerRuntime {
             state.core.last_turn_interrupted = false;
         }
         self.clear_btw_input_queue(state, session_id).await;
-        self.append_terminal_turn_record(state, session_id, &final_turn)
+        self.append_terminal_turn_record(state, session_id, &final_turn, latest_query_usage)
             .await;
         self.finalize_turn_workspace_changes(session_id, &final_turn)
             .await;
@@ -266,6 +266,7 @@ impl ServerRuntime {
         state: &mut SessionActorState,
         session_id: SessionId,
         final_turn: &crate::TurnMetadata,
+        latest_query_usage: Option<devo_core::TurnUsage>,
     ) {
         let record = state.record.clone();
         let turn_context = state.core.latest_turn_context.clone();
@@ -274,7 +275,7 @@ impl ServerRuntime {
             && let Err(error) = self.rollout_store.append_turn_deduped(
                 &record,
                 &mut state.session_context_recorded,
-                build_turn_record(final_turn, None, turn_context),
+                build_turn_record(final_turn, None, turn_context, latest_query_usage),
                 session_context,
             )
         {
