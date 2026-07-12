@@ -35,8 +35,6 @@ pub const DEVO_ACTIVITY_AT_META: &str = "devo/activityAt";
 pub const DEVO_HISTORY_INDEX_META: &str = "devo/historyIndex";
 pub const DEVO_PARENT_MESSAGE_ID_META: &str = "devo/parentMessageId";
 pub const DEVO_ITEM_KIND_META: &str = "devo/itemKind";
-pub const DEVO_RESEARCH_ARTIFACT_TYPE_META: &str = "devo/researchArtifactType";
-pub const DEVO_RESEARCH_ARTIFACT_TITLE_META: &str = "devo/researchArtifactTitle";
 pub const DEVO_TURN_USAGE_META: &str = "devo/turnUsage";
 
 pub type AcpMeta = serde_json::Map<String, serde_json::Value>;
@@ -1325,42 +1323,5 @@ mod tests {
         );
         assert_eq!(value.get("_meta"), None);
         assert_eq!(original_event_from_acp_notification(&notification), None);
-    }
-
-    #[test]
-    fn unsupported_session_update_preserves_devo_event_in_meta() {
-        let session_id = SessionId::new();
-        let item_id = ItemId::new();
-        let event = ServerEvent::ItemDelta {
-            delta_kind: ItemDeltaKind::ResearchArtifactDelta,
-            payload: ItemDeltaPayload {
-                context: EventContext {
-                    session_id,
-                    turn_id: None,
-                    item_id: Some(item_id),
-                    seq: 7,
-                },
-                delta: "artifact".to_string(),
-                stream_index: None,
-                channel: None,
-            },
-        };
-
-        let (method, value) =
-            acp_notification_from_server_event("item/researchArtifact/delta", &event);
-        let notification: AcpSessionNotification =
-            serde_json::from_value(value.clone()).expect("deserialize ACP notification");
-
-        assert_eq!(method, ACP_SESSION_UPDATE_METHOD);
-        assert_eq!(
-            value["update"],
-            serde_json::json!({
-                "sessionUpdate": "session_info_update"
-            })
-        );
-        assert_eq!(
-            original_event_from_acp_notification(&notification),
-            Some(("item/researchArtifact/delta".to_string(), event))
-        );
     }
 }

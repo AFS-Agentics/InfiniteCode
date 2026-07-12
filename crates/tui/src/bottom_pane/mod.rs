@@ -915,15 +915,20 @@ impl Renderable for PendingCellList<'_> {
         }
         let mut lines: Vec<Line<'static>> = Vec::new();
         for text in self.texts {
+            lines.push(Line::from(""));
+            lines.push(Line::from("  QUEUED".cyan().bold()));
             let wrapped = crate::wrapping::adaptive_wrap_lines(
                 text.lines().map(|line| Line::from(line.to_string())),
                 crate::wrapping::RtOptions::new(area.width as usize),
             );
-            lines.push(Line::from(""));
             if !wrapped.is_empty() {
-                lines.extend(prefix_lines(wrapped, "┃ ".cyan(), "┃ ".cyan()));
+                let has_more = wrapped.len() > 3;
+                let truncated: Vec<_> = wrapped.into_iter().take(3).collect();
+                lines.extend(prefix_lines(truncated, "┃ ".cyan(), "┃ ".cyan()));
+                if has_more {
+                    lines.push(Line::from("┃ …".cyan())); // truncated_extra
+                }
             }
-            lines.push(Line::from("  QUEUED".cyan().bold()));
         }
         Paragraph::new(lines).render(area, buf);
     }
@@ -937,9 +942,11 @@ impl Renderable for PendingCellList<'_> {
             .texts
             .iter()
             .map(|t| {
-                let line_count = t.lines().count();
-                // blank + content + QUEUED
-                line_count + 2
+                // blank + QUEUED badge + min(content_lines, 3) + "..."
+                let line_count = t.lines().count().min(3);
+                let truncated_extra = if t.lines().count() > 3 { 1 } else { 0 };
+                // blank line + QUEUED + content +
+                2 + line_count + truncated_extra
             })
             .sum();
         content_lines as u16

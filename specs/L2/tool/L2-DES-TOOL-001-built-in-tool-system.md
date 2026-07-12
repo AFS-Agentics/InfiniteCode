@@ -170,6 +170,7 @@ The semantic retrieval tool should:
 - Chunk supported programming and structured config languages with tree-sitter AST boundaries, while using line-based fallback for docs, data, unsupported language labels, parser errors, or empty AST output.
 - Cache indexes locally when possible, while invalidating them when the indexed file manifest, content mode, or embedding model changes.
 - Refresh cached indexes incrementally when possible, re-embedding changed files while reusing unchanged file records, and use watcher-backed warm reuse only when the watched root is clean and within a bounded safety interval.
+- Warm the default code-only index on a dedicated background thread when a root session establishes its authoritative workspace. Session readiness must not wait for indexing, concurrent searches must share the in-flight build, and warmup failure must remain retryable by the first foreground search.
 - Store local vector cache data in compact binary form where practical, and use approximate nearest-neighbor candidate search plus exact reranking for large semantic indexes while preserving exact fallbacks for filtered or small searches.
 - Return a structured unavailable result when the embedding model cannot be loaded or cached, rather than fabricating semantic results.
 

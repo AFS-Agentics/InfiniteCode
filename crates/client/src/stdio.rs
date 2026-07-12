@@ -899,7 +899,7 @@ mod tests {
             approval_policy: Some("on-request".to_string()),
             cwd: Some(PathBuf::from("workspace")),
             collaboration_mode: devo_protocol::CollaborationMode::Plan,
-            execution_mode: devo_protocol::TurnExecutionMode::Research,
+            execution_mode: devo_protocol::TurnExecutionMode::Regular,
         };
         let expected_params = serde_json::to_value(&params).expect("serialize turn params");
         let mut stdout_lines = BufReader::new(stdout).lines();

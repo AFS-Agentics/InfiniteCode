@@ -258,6 +258,13 @@ impl ChatWidget {
             }
             AppEvent::Interrupt => {}
             AppEvent::Command(command) => {
+                if let AppCommand::UserTurn {
+                    collaboration_mode, ..
+                } = &command
+                {
+                    self.bottom_pane
+                        .set_input_mode(InputMode::from_collaboration_mode(*collaboration_mode));
+                }
                 if matches!(
                     &command,
                     AppCommand::RunUserShellCommand { command } if command == "session list"

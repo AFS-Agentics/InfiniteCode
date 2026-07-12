@@ -86,7 +86,6 @@ use crate::bottom_pane::SkillInterfaceMetadata;
 use crate::bottom_pane::SkillMetadata;
 use crate::events::PlanStep;
 use crate::events::PlanStepStatus;
-use crate::events::ResearchArtifactMetadata;
 use crate::events::SessionListEntry;
 use crate::events::SubagentMonitorAgent;
 use crate::events::SubagentMonitorEvent;
@@ -345,9 +344,6 @@ enum OperationCommand {
     },
     /// Ask a side question in a one-turn forked agent.
     RunBtwQuestion {
-        question: String,
-    },
-    RunResearch {
         question: String,
     },
     ApprovalRespond {
@@ -720,12 +716,6 @@ impl QueryWorkerHandle {
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
     }
 
-    pub(crate) fn run_research(&self, question: String) -> Result<()> {
-        self.command_tx
-            .send(OperationCommand::RunResearch { question })
-            .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
-    }
-
     pub(crate) fn approval_respond(
         &self,
         session_id: SessionId,
@@ -863,8 +853,6 @@ async fn run_worker_inner(
     let mut latest_completed_agent_message: Option<String> = None;
     let mut child_agent_sessions: HashSet<SessionId> = HashSet::new();
     let mut btw_agent_sessions: HashMap<SessionId, BtwQuestionState> = HashMap::new();
-    let mut research_artifacts: HashMap<devo_core::ItemId, ResearchArtifactMetadata> =
-        HashMap::new();
     let mut input_history_cursor: Option<usize> = None;
     let mut active_reference_search_id: Option<ReferenceSearchId> = None;
     let mut active_shell_process_ids: HashSet<String> = HashSet::new();
@@ -1981,7 +1969,6 @@ async fn run_worker_inner(
                                 fork_turns: Some("all".to_string()),
                                 max_turns: Some(1),
                                 tool_policy: AgentToolPolicy::DenyAll,
-                                context_mode: devo_protocol::AgentContextMode::CodingAgent,
                                 ephemeral: true,
                             })
                             .await
@@ -2000,50 +1987,6 @@ async fn run_worker_inner(
                             Err(error) => {
                                 let _ = event_tx.send(WorkerEvent::BtwFailed {
                                     message: error.to_string(),
-                                });
-                            }
-                        }
-                    }
-                    Some(OperationCommand::RunResearch { question }) => {
-                        let active_session_id = prepare_session_for_command(
-                            &mut client,
-                            &config.cwd,
-                            &mut model,
-                            &mut model_binding_id,
-                            &mut reasoning_effort_selection,
-                            &mut session_id,
-                            permission_preset,
-                            event_tx,
-                        )
-                        .await?;
-                        match client
-                            .turn_start(TurnStartParams {
-                                session_id: active_session_id,
-                                input: vec![InputItem::Text { text: question }],
-                                model: Some(model.clone()),
-                                model_binding_id: model_binding_id.clone(),
-                                reasoning_effort_selection: reasoning_effort_selection.clone(),
-                                sandbox: None,
-                                approval_policy: None,
-                                cwd: Some(session_cwd.clone()),
-                                collaboration_mode: CollaborationMode::Build,
-                                execution_mode: TurnExecutionMode::Research,
-                            })
-                            .await
-                        {
-                            Ok(result) => {
-                                handle_turn_start_result(result, &mut active_turn_id);
-                            }
-                            Err(error) => {
-                                let _ = event_tx.send(WorkerEvent::TurnFailed {
-                                    message: error.to_string(),
-                                    turn_count,
-                                    total_input_tokens,
-                                    total_output_tokens,
-                                    total_tokens,
-                                    total_cache_read_tokens,
-                                    prompt_token_estimate: total_input_tokens,
-                                    last_query_input_tokens,
                                 });
                             }
                         }
@@ -2432,27 +2375,12 @@ async fn run_worker_inner(
                                             let _ = event_tx.send(WorkerEvent::TextItemStarted {
                                                 item_id: payload.item.item_id,
                                                 kind: TextItemKind::Assistant,
-                                                research: None,
                                             });
                                         }
                                         ItemKind::Reasoning => {
                                             let _ = event_tx.send(WorkerEvent::TextItemStarted {
                                                 item_id: payload.item.item_id,
                                                 kind: TextItemKind::Reasoning,
-                                                research: None,
-                                            });
-                                        }
-                                        ItemKind::ResearchArtifact => {
-                                            let research =
-                                                research_artifact_metadata(&payload.item.payload);
-                                            if let Some(research) = research.clone() {
-                                                research_artifacts
-                                                    .insert(payload.item.item_id, research);
-                                            }
-                                            let _ = event_tx.send(WorkerEvent::TextItemStarted {
-                                                item_id: payload.item.item_id,
-                                                kind: TextItemKind::ResearchArtifact,
-                                                research,
                                             });
                                         }
                                         ItemKind::Plan => {
@@ -2531,20 +2459,11 @@ async fn run_worker_inner(
                                         let _ = event_tx.send(WorkerEvent::TextItemDelta {
                                             item_id,
                                             kind: TextItemKind::Assistant,
-                                            research: None,
                                             delta: payload.delta,
                                         });
                                     } else {
                                         let _ = event_tx.send(WorkerEvent::TextDelta(payload.delta));
                                     }
-                                }
-                            }
-                            "item/researchArtifact/delta" => {
-                                if let ServerEvent::ItemDelta { payload, .. } = event
-                                    && let Some(worker_event) =
-                                        research_artifact_delta_event(payload, &research_artifacts)
-                                {
-                                    let _ = event_tx.send(worker_event);
                                 }
                             }
                             "item/plan/delta" => {
@@ -2637,7 +2556,6 @@ async fn run_worker_inner(
                                         let _ = event_tx.send(WorkerEvent::TextItemDelta {
                                             item_id,
                                             kind: TextItemKind::Reasoning,
-                                            research: None,
                                             delta: payload.delta,
                                         });
                                     } else {
@@ -2654,9 +2572,6 @@ async fn run_worker_inner(
                                     );
                                     if let Some(text) = completed_agent_message_text(&payload) {
                                         latest_completed_agent_message = Some(text);
-                                    }
-                                    if payload.item.item_kind == ItemKind::ResearchArtifact {
-                                        research_artifacts.remove(&payload.item.item_id);
                                     }
                                     // Completed tool items are mapped into compact UI events
                                     // with pre-rendered summaries and previews.
@@ -3023,7 +2938,6 @@ async fn ensure_session_started(
 /// Prepares the worker session state before turn or goal commands run.
 ///
 /// Commands such as [`OperationCommand::SubmitInput`], [`OperationCommand::SetGoalObjective`],
-/// and [`OperationCommand::RunResearch`] share this path instead of duplicating session-start
 /// follow-up. When no session is active yet, [`ensure_session_started`] creates one on the
 /// server; the returned metadata is merged into the worker's current model, model binding, and
 /// reasoning-effort selection. For a newly created session, this also notifies the UI via
@@ -3290,44 +3204,6 @@ fn completed_agent_message_text(payload: &ItemEventPayload) -> Option<String> {
     }
 }
 
-fn research_artifact_delta_event(
-    payload: devo_server::ItemDeltaPayload,
-    research_artifacts: &HashMap<devo_core::ItemId, ResearchArtifactMetadata>,
-) -> Option<WorkerEvent> {
-    payload.context.item_id.map(|item_id| {
-        let research = research_artifacts.get(&item_id).cloned();
-        WorkerEvent::TextItemDelta {
-            item_id,
-            kind: TextItemKind::ResearchArtifact,
-            research,
-            delta: payload.delta,
-        }
-    })
-}
-
-fn research_artifact_metadata(payload: &serde_json::Value) -> Option<ResearchArtifactMetadata> {
-    let artifact_type = payload
-        .get("artifact_type")
-        .and_then(serde_json::Value::as_str)
-        .or_else(|| {
-            payload
-                .get("artifactType")
-                .and_then(serde_json::Value::as_str)
-        })
-        .map(str::trim)
-        .filter(|artifact_type| !artifact_type.is_empty())?;
-    let title = payload
-        .get("title")
-        .and_then(serde_json::Value::as_str)
-        .map(str::trim)
-        .filter(|title| !title.is_empty())
-        .unwrap_or("Research Artifact");
-    Some(ResearchArtifactMetadata {
-        artifact_type: artifact_type.to_string(),
-        title: title.to_string(),
-    })
-}
-
 fn btw_agent_prompt(question: &str) -> String {
     format!(
         "You are answering a /btw side question in a lightweight forked agent.\n\
@@ -3439,7 +3315,6 @@ pub(crate) fn handle_completed_item(
                 let _ = event_tx.send(WorkerEvent::TextItemCompleted {
                     item_id,
                     kind: TextItemKind::Assistant,
-                    research: None,
                     final_text: text,
                 });
             }
@@ -3465,39 +3340,9 @@ pub(crate) fn handle_completed_item(
                 let _ = event_tx.send(WorkerEvent::TextItemCompleted {
                     item_id,
                     kind: TextItemKind::Reasoning,
-                    research: None,
                     final_text: text,
                 });
             }
-        }
-        ItemEnvelope {
-            item_id,
-            item_kind: ItemKind::ResearchArtifact,
-            payload,
-            ..
-        } => {
-            let title = payload
-                .get("title")
-                .and_then(serde_json::Value::as_str)
-                .map(str::trim)
-                .filter(|text| !text.is_empty())
-                .unwrap_or("Research Artifact");
-            let content = payload
-                .get("content")
-                .and_then(serde_json::Value::as_str)
-                .map(str::trim)
-                .filter(|text| !text.is_empty());
-            let research = research_artifact_metadata(&payload);
-            let final_text = match content {
-                Some(content) => format!("### {title}\n\n{content}"),
-                None => format!("### {title}"),
-            };
-            let _ = event_tx.send(WorkerEvent::TextItemCompleted {
-                item_id,
-                kind: TextItemKind::ResearchArtifact,
-                research,
-                final_text,
-            });
         }
         ItemEnvelope {
             item_kind: ItemKind::ToolCall,
@@ -3753,8 +3598,7 @@ fn project_history_items(items: &[SessionHistoryItem]) -> Vec<TranscriptItem> {
                     index += 1;
                     continue;
                 }
-                SessionHistoryMetadata::Edited { .. }
-                | SessionHistoryMetadata::ResearchArtifact { .. } => {}
+                SessionHistoryMetadata::Edited { .. } => {}
             }
         }
         if item.kind == SessionHistoryItemKind::ToolCall
@@ -4620,7 +4464,6 @@ mod tests {
     use super::normalize_display_output;
     use super::project_history_items;
     use super::render_skill_list_body;
-    use super::research_artifact_delta_event;
     use super::should_apply_terminal_turn_usage_fallback;
     use super::should_pause_goal_before_session_leave;
     use super::summarize_tool_call;
@@ -4646,8 +4489,6 @@ mod tests {
     use devo_protocol::SessionPlanStepStatus;
     use devo_protocol::ThreadGoal;
     use devo_protocol::ThreadGoalStatus;
-    use devo_server::EventContext;
-    use devo_server::ItemDeltaPayload;
     use devo_server::ItemEnvelope;
     use devo_server::ItemEventPayload;
     use devo_server::ItemKind;
@@ -4674,40 +4515,6 @@ mod tests {
             .unwrap_or(false);
 
         assert_eq!([completed], [true]);
-    }
-
-    #[test]
-    fn research_artifact_delta_maps_to_research_artifact_text_item_delta() {
-        // Trace: L2-DES-RESEARCH-001
-        // Verifies: research artifact deltas append through the normal TUI text item path
-        // without occupying the assistant stream.
-        let session_id = SessionId::new();
-        let turn_id = TurnId::new();
-        let item_id = ItemId::new();
-        let event = research_artifact_delta_event(
-            ItemDeltaPayload {
-                context: EventContext {
-                    session_id,
-                    turn_id: Some(turn_id),
-                    item_id: Some(item_id),
-                    seq: 0,
-                },
-                delta: "partial finding".to_string(),
-                stream_index: None,
-                channel: None,
-            },
-            &HashMap::new(),
-        );
-
-        assert_eq!(
-            event,
-            Some(WorkerEvent::TextItemDelta {
-                item_id,
-                kind: TextItemKind::ResearchArtifact,
-                research: None,
-                delta: "partial finding".to_string()
-            })
-        );
     }
 
     #[test]
@@ -5453,7 +5260,6 @@ mod tests {
             vec![WorkerEvent::TextItemDelta {
                 item_id,
                 kind: TextItemKind::Assistant,
-                research: None,
                 delta: "streamed answer".to_string()
             }]
         );

@@ -183,53 +183,34 @@ impl ChatWidget {
                 }
                 self.frame_requester.schedule_frame();
             }
-            WorkerEvent::TextItemStarted {
-                item_id,
-                kind,
-                research,
-            } => {
+            WorkerEvent::TextItemStarted { item_id, kind } => {
                 self.flush_active_cell();
-                self.start_text_item(ActiveTextItemId::Server(item_id), kind, research);
+                self.start_text_item(ActiveTextItemId::Server(item_id), kind);
                 self.set_status_message(match kind {
                     TextItemKind::Assistant => "Generating",
                     TextItemKind::Reasoning => "Thinking",
-                    TextItemKind::ResearchArtifact => "Researching",
                 });
             }
             WorkerEvent::TextItemDelta {
                 item_id,
                 kind,
-                research,
                 delta,
             } => {
-                self.push_text_item_delta(
-                    ActiveTextItemId::Server(item_id),
-                    kind,
-                    research,
-                    &delta,
-                );
+                self.push_text_item_delta(ActiveTextItemId::Server(item_id), kind, &delta);
                 self.set_status_message(match kind {
                     TextItemKind::Assistant => "Generating",
                     TextItemKind::Reasoning => "Thinking",
-                    TextItemKind::ResearchArtifact => "Researching",
                 });
             }
             WorkerEvent::TextItemCompleted {
                 item_id,
                 kind,
-                research,
                 final_text,
             } => {
-                self.complete_text_item(
-                    ActiveTextItemId::Server(item_id),
-                    kind,
-                    research,
-                    final_text,
-                );
+                self.complete_text_item(ActiveTextItemId::Server(item_id), kind, final_text);
                 self.set_status_message(match kind {
                     TextItemKind::Assistant => "Generating",
                     TextItemKind::Reasoning => "Thought",
-                    TextItemKind::ResearchArtifact => "Researching",
                 });
             }
             WorkerEvent::ProposedPlanStarted { item_id } => {
@@ -250,7 +231,6 @@ impl ChatWidget {
                     self.push_text_item_delta(
                         ActiveTextItemId::Legacy(TextItemKind::Assistant),
                         TextItemKind::Assistant,
-                        None,
                         &text,
                     );
                 }
@@ -262,7 +242,6 @@ impl ChatWidget {
                     self.push_text_item_delta(
                         ActiveTextItemId::Legacy(TextItemKind::Reasoning),
                         TextItemKind::Reasoning,
-                        None,
                         &text,
                     );
                 }
@@ -279,7 +258,6 @@ impl ChatWidget {
                     self.complete_text_item(
                         ActiveTextItemId::Legacy(TextItemKind::Assistant),
                         TextItemKind::Assistant,
-                        None,
                         text,
                     );
                 }
@@ -290,7 +268,6 @@ impl ChatWidget {
                     self.complete_text_item(
                         ActiveTextItemId::Legacy(TextItemKind::Reasoning),
                         TextItemKind::Reasoning,
-                        None,
                         text,
                     );
                 }
@@ -904,7 +881,6 @@ impl ChatWidget {
                 prompt_token_estimate,
             } => {
                 let was_interrupted = stop_reason.contains("Interrupted");
-                self.active_turn_is_research = false;
                 self.commit_active_streams(DotStatus::Completed);
                 if was_interrupted
                     && let Some(cell) = self
@@ -982,7 +958,6 @@ impl ChatWidget {
             } => {
                 self.resume_browser_loading = false;
                 self.finish_session_resume();
-                self.active_turn_is_research = false;
                 self.commit_active_streams(DotStatus::Failed);
                 self.active_tool_calls.clear();
                 self.pending_tool_calls.clear();

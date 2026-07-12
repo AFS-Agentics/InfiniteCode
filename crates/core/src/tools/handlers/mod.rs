@@ -137,12 +137,18 @@ fn build_registry_from_builder(
         let handler: Arc<dyn ToolHandler> = match kind {
             ToolHandlerKind::Bash => Arc::new(BashHandler::new()),
             #[cfg(feature = "code-search")]
-            ToolHandlerKind::CodeSearch => Arc::new(CodeSearchHandler::new_with_network_proxy(
-                devo_network_proxy::NetworkProxyConfig {
-                    proxy_url: config.network_proxy.clone(),
-                    no_proxy: config.network_no_proxy.clone(),
-                },
-            )),
+            ToolHandlerKind::CodeSearch => {
+                let service = Arc::new(
+                    devo_code_search::CodeSearchService::production_with_network_proxy(
+                        devo_network_proxy::NetworkProxyConfig {
+                            proxy_url: config.network_proxy.clone(),
+                            no_proxy: config.network_no_proxy.clone(),
+                        },
+                    ),
+                );
+                builder.set_code_search_service(Arc::clone(&service));
+                Arc::new(CodeSearchHandler::with_service(service))
+            }
             // When the `code-search` feature is disabled the planner never emits
             // this handler kind (see registry_plan), so the arm is unreachable.
             #[cfg(not(feature = "code-search"))]
@@ -218,6 +224,27 @@ mod tests {
         assert!(registry.spec("bash").is_none());
         assert!(registry.get("shell_command").is_some());
         assert!(registry.get("bash").is_some());
+    }
+
+    #[cfg(feature = "code-search")]
+    #[test]
+    fn registry_exposes_the_code_search_handlers_shared_service() {
+        let registry = build_registry_from_plan(&ToolPlanConfig::default());
+
+        assert!(registry.get("code_search").is_some());
+        assert!(registry.code_search_service().is_some());
+    }
+
+    #[cfg(feature = "code-search")]
+    #[test]
+    fn registry_has_no_code_search_service_when_the_tool_is_disabled() {
+        let registry = build_registry_from_plan(&ToolPlanConfig {
+            code_search: false,
+            ..ToolPlanConfig::default()
+        });
+
+        assert!(registry.get("code_search").is_none());
+        assert!(registry.code_search_service().is_none());
     }
 
     #[test]

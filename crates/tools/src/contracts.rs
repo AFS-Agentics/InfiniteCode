@@ -49,7 +49,6 @@ pub struct ToolContext {
     pub budgets: ToolBudgets,
     pub cancel_token: CancellationToken,
     pub agent_scope: ToolAgentScope,
-    pub agent_context_mode: devo_protocol::AgentContextMode,
     pub collaboration_mode: CollaborationMode,
     pub agent_coordinator: Option<Arc<dyn AgentToolCoordinator>>,
     pub client_filesystem: Option<Arc<dyn ClientFilesystem>>,
@@ -70,7 +69,6 @@ impl std::fmt::Debug for ToolContext {
             .field("budgets", &self.budgets)
             .field("cancel_token", &self.cancel_token)
             .field("agent_scope", &self.agent_scope)
-            .field("agent_context_mode", &self.agent_context_mode)
             .field("collaboration_mode", &self.collaboration_mode)
             .field(
                 "agent_coordinator",

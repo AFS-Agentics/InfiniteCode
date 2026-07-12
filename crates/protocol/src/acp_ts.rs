@@ -186,7 +186,6 @@ pub fn generate_protocol_typescript() -> String {
     push_decl::<SessionHistoryItemKind>(&cfg, &mut output);
     push_decl::<SessionPlanStepStatus>(&cfg, &mut output);
     push_decl::<SessionPlanStep>(&cfg, &mut output);
-    push_decl::<SessionHistoryResearchArtifactType>(&cfg, &mut output);
     push_decl::<SessionHistoryMetadata>(&cfg, &mut output);
     push_decl::<SessionHistoryToolIo>(&cfg, &mut output);
     push_decl::<SessionHistoryItem>(&cfg, &mut output);
@@ -327,7 +326,6 @@ pub fn generate_protocol_typescript() -> String {
     push_decl::<ReferenceSearchFailedPayload>(&cfg, &mut output);
 
     push_decl::<AgentToolPolicy>(&cfg, &mut output);
-    push_decl::<AgentContextMode>(&cfg, &mut output);
     push_decl::<SpawnAgentParams>(&cfg, &mut output);
     push_decl::<SpawnAgentResult>(&cfg, &mut output);
     push_decl::<AgentMessageParams>(&cfg, &mut output);

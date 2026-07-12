@@ -169,7 +169,6 @@ impl ChatWidget {
                         self.apply_restored_exec_tool_io(item, result_item);
                         true
                     }
-                    SessionHistoryMetadata::ResearchArtifact { .. } => false,
                 };
                 if handled_metadata {
                     continue;

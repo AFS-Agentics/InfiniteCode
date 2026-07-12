@@ -488,24 +488,6 @@ pub(super) async fn run_session_actor(
                 state = *new_state;
                 let _ = reply.send(());
             }
-            SessionCommand::BeginInlineTurn { turn, reply } => {
-                {
-                    let mut stream = state.stream.lock().await;
-                    stream.turn_inline =
-                        Some(super::turn_inline::TurnInlineState::new(&state, &turn));
-                }
-                let _ = reply.send(Arc::clone(&state.stream));
-            }
-            SessionCommand::EndInlineTurn { reply } => {
-                let inline = {
-                    let mut stream = state.stream.lock().await;
-                    stream.turn_inline.take()
-                };
-                if let Some(inline) = inline {
-                    inline.merge_into(&mut state);
-                }
-                let _ = reply.send(());
-            }
             SessionCommand::PersistTurnLine {
                 runtime,
                 turn,
@@ -646,44 +628,6 @@ fn subagent_usage_owner_from_pending_metadata(
     Some((parent_session_id, parent_turn_id))
 }
 
-#[cfg(test)]
-mod tests {
-    use chrono::Utc;
-    use devo_protocol::PendingInputItem;
-    use devo_protocol::PendingInputKind;
-    use pretty_assertions::assert_eq;
-
-    use super::QueuedTurnInputData;
-    use super::pop_queued_turn_input_data;
-
-    #[test]
-    fn pop_queued_turn_input_data_preserves_pending_input_id() {
-        let item = PendingInputItem::new(
-            PendingInputKind::UserText {
-                text: "queued prompt".to_string(),
-            },
-            None,
-            Utc::now(),
-        );
-        let queued_input_id = item.id;
-
-        let popped = pop_queued_turn_input_data(item).expect("user input should be queued");
-
-        assert_eq!(
-            popped,
-            QueuedTurnInputData {
-                queued_input_id,
-                display_input: "queued prompt".to_string(),
-                input_text: "queued prompt".to_string(),
-                input_messages: Vec::new(),
-                collaboration_mode: devo_protocol::CollaborationMode::default(),
-                model_selection: None,
-                subagent_usage_owner: None,
-            }
-        );
-    }
-}
-
 fn apply_approval_scope_to_state(
     state: &mut SessionActorState,
     scope: &ApprovalScopeValue,
@@ -727,5 +671,43 @@ fn apply_approval_scope_to_state(
                     .insert(command_prefix);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::Utc;
+    use devo_protocol::PendingInputItem;
+    use devo_protocol::PendingInputKind;
+    use pretty_assertions::assert_eq;
+
+    use super::QueuedTurnInputData;
+    use super::pop_queued_turn_input_data;
+
+    #[test]
+    fn pop_queued_turn_input_data_preserves_pending_input_id() {
+        let item = PendingInputItem::new(
+            PendingInputKind::UserText {
+                text: "queued prompt".to_string(),
+            },
+            None,
+            Utc::now(),
+        );
+        let queued_input_id = item.id;
+
+        let popped = pop_queued_turn_input_data(item).expect("user input should be queued");
+
+        assert_eq!(
+            popped,
+            QueuedTurnInputData {
+                queued_input_id,
+                display_input: "queued prompt".to_string(),
+                input_text: "queued prompt".to_string(),
+                input_messages: Vec::new(),
+                collaboration_mode: devo_protocol::CollaborationMode::default(),
+                model_selection: None,
+                subagent_usage_owner: None,
+            }
+        );
     }
 }

@@ -24,8 +24,6 @@ use devo_core::ItemRecord;
 use devo_core::Message;
 use devo_core::MessageEditRecordedLine;
 use devo_core::MessageEditRecordedRecord;
-use devo_core::ResearchArtifactItem;
-use devo_core::ResearchArtifactType;
 use devo_core::Role;
 use devo_core::RolloutLine;
 use devo_core::SessionContext;
@@ -1400,22 +1398,10 @@ pub(crate) fn build_prompt_messages_from_snapshot(
 }
 
 pub(crate) fn prompt_visible_persisted_turn_item(item: &PersistedTurnItem) -> bool {
-    prompt_visible_turn_item(&item.turn_kind, &item.turn_item)
+    prompt_visible_turn_item(&item.turn_item)
 }
 
-fn prompt_visible_turn_item(turn_kind: &TurnKind, item: &TurnItem) -> bool {
-    if *turn_kind == TurnKind::Research {
-        return matches!(
-            item,
-            TurnItem::UserMessage(_)
-                | TurnItem::AgentMessage(_)
-                | TurnItem::ResearchArtifact(ResearchArtifactItem {
-                    artifact_type: ResearchArtifactType::FinalReportMetadata,
-                    ..
-                })
-        );
-    }
-
+fn prompt_visible_turn_item(item: &TurnItem) -> bool {
     matches!(
         item,
         TurnItem::ContextCompaction(_)
@@ -1427,7 +1413,6 @@ fn prompt_visible_turn_item(turn_kind: &TurnKind, item: &TurnItem) -> bool {
             | TurnItem::ToolResult(_)
             | TurnItem::CommandExecution(_)
             | TurnItem::Plan(_)
-            | TurnItem::ResearchArtifact(_)
             | TurnItem::WebSearch(_)
             | TurnItem::ImageGeneration(_)
             | TurnItem::HookPrompt(_)
@@ -1438,7 +1423,7 @@ pub(crate) fn apply_turn_item(
     messages: &mut Vec<Message>,
     history_items: &mut Vec<crate::SessionHistoryItem>,
     tool_names_by_id: &mut HashMap<String, String>,
-    turn_kind: &TurnKind,
+    _turn_kind: &TurnKind,
     item: TurnItem,
 ) {
     let item = match item {
@@ -1492,7 +1477,7 @@ pub(crate) fn apply_turn_item(
         history_items.push(history_item);
     }
 
-    if prompt_visible_turn_item(turn_kind, &item) {
+    if prompt_visible_turn_item(&item) {
         apply_prompt_turn_item(messages, tool_names_by_id, item);
     }
 }
@@ -1561,9 +1546,6 @@ fn apply_prompt_turn_item(
         | TurnItem::ContextCompaction(TextItem { text })
         | TurnItem::HookPrompt(TextItem { text }) => {
             messages.push(Message::assistant_text(text));
-        }
-        TurnItem::ResearchArtifact(ResearchArtifactItem { title, content, .. }) => {
-            messages.push(Message::assistant_text(format!("### {title}\n\n{content}")));
         }
         TurnItem::ToolCall(ToolCallItem {
             tool_call_id,
@@ -1893,8 +1875,6 @@ mod tests {
     use devo_core::MessageEditRecordedRecord;
     use devo_core::Model;
     use devo_core::Persona;
-    use devo_core::ResearchArtifactItem;
-    use devo_core::ResearchArtifactType;
     use devo_core::RolloutLine;
     use devo_core::SessionContext;
     use devo_core::SessionId;
@@ -2609,106 +2589,6 @@ mod tests {
                     is_error: false,
                 }],
             })
-        );
-    }
-
-    #[test]
-    fn replay_projects_regular_research_artifact_into_history_and_prompt() {
-        // Trace: L2-DES-RESEARCH-001
-        // Verifies: non-research prompt projection keeps existing artifact behavior.
-        let mut messages = Vec::new();
-        let mut history_items = Vec::new();
-        let mut tool_names_by_id = HashMap::new();
-
-        apply_turn_item(
-            &mut messages,
-            &mut history_items,
-            &mut tool_names_by_id,
-            &TurnKind::Regular,
-            TurnItem::ResearchArtifact(ResearchArtifactItem {
-                artifact_type: ResearchArtifactType::Plan,
-                title: "Research Plan".to_string(),
-                content: "1. Inspect sources".to_string(),
-            }),
-        );
-
-        assert_eq!(history_items.len(), 1);
-        assert_eq!(history_items[0].title, "Research Plan");
-        assert_eq!(history_items[0].body, "1. Inspect sources");
-        assert_eq!(
-            messages,
-            vec![Message::assistant_text(
-                "### Research Plan\n\n1. Inspect sources"
-            )]
-        );
-    }
-
-    #[test]
-    fn replay_projects_research_turn_into_compact_prompt_handoff() {
-        // Trace: L2-DES-RESEARCH-001
-        // Verifies: completed research turns do not leak internal artifacts or tool payloads into regular prompts.
-        let mut messages = Vec::new();
-        let mut history_items = Vec::new();
-        let mut tool_names_by_id = HashMap::new();
-        let turn_kind = TurnKind::Research;
-
-        for item in [
-            TurnItem::UserMessage(TextItem {
-                text: "/research original question".to_string(),
-            }),
-            TurnItem::ResearchArtifact(ResearchArtifactItem {
-                artifact_type: ResearchArtifactType::Brief,
-                title: "Research Brief".to_string(),
-                content: "internal brief should stay hidden".to_string(),
-            }),
-            TurnItem::ToolCall(ToolCallItem {
-                tool_call_id: "search-1".to_string(),
-                tool_name: "web_search".to_string(),
-                input: serde_json::json!({"query":"secret internal query"}),
-            }),
-            TurnItem::ToolResult(ToolResultItem {
-                tool_call_id: "search-1".to_string(),
-                tool_name: Some("web_search".to_string()),
-                output: serde_json::Value::String("opaque provider payload".to_string()),
-                display_content: None,
-                is_error: false,
-            }),
-            TurnItem::Reasoning(TextItem {
-                text: "internal research reasoning".to_string(),
-            }),
-            TurnItem::AgentMessage(TextItem {
-                text: "final report".to_string(),
-            }),
-            TurnItem::ResearchArtifact(ResearchArtifactItem {
-                artifact_type: ResearchArtifactType::FinalReportMetadata,
-                title: "Research Context Reference".to_string(),
-                content: "compact reference".to_string(),
-            }),
-        ] {
-            apply_turn_item(
-                &mut messages,
-                &mut history_items,
-                &mut tool_names_by_id,
-                &turn_kind,
-                item,
-            );
-        }
-
-        assert_eq!(history_items.len(), 6);
-        assert!(
-            history_items
-                .iter()
-                .all(|item| item.title != "Research Context Reference")
-        );
-        assert_eq!(
-            messages,
-            vec![
-                Message::user("/research original question".to_string()),
-                Message::assistant_text("final report".to_string()),
-                Message::assistant_text(
-                    "### Research Context Reference\n\ncompact reference".to_string()
-                ),
-            ]
         );
     }
 

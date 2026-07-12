@@ -1037,9 +1037,6 @@ fn handle_app_command(
         AppCommand::RunBtwQuestion { question } => {
             worker.run_btw_question(question.clone())?;
         }
-        AppCommand::RunResearch { question } => {
-            worker.run_research(question.clone())?;
-        }
         AppCommand::ApprovalRespond {
             session_id,
             turn_id,

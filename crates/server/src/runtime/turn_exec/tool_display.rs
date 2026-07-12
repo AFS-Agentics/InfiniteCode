@@ -86,8 +86,7 @@ fn tool_start_item(
         | ItemKind::ImageView
         | ItemKind::ContextCompaction
         | ItemKind::ApprovalRequest
-        | ItemKind::ApprovalDecision
-        | ItemKind::ResearchArtifact => unreachable!("tool start item kind must be tool-like"),
+        | ItemKind::ApprovalDecision => unreachable!("tool start item kind must be tool-like"),
     };
     ToolStartItem { item_kind, payload }
 }

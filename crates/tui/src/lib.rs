@@ -50,7 +50,6 @@ mod onboarding_widget_tests;
 mod pager_overlay;
 mod read_display;
 mod render;
-mod research_artifact_cell;
 mod shimmer;
 mod slash_command;
 mod startup_header;
