@@ -623,8 +623,8 @@ const DESKTOP_INITIALIZE_PARAMS = {
 		terminal: false,
 	},
 	clientInfo: {
-		name: "devo-desktop",
-		title: "Devo Desktop",
+		name: "infinitecode-desktop",
+		title: "InfiniteCode Desktop",
 		version: "0.1.0",
 	},
 } as const
