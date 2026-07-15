@@ -30,17 +30,17 @@ export function useServerSettingsSync() {
 
 		if (!isElectron) return
 
-		window.devo.getSettings().then((settings) => {
+		window.infinitecode.getSettings().then((settings) => {
 			if (
 				settings.servers?.activeServerId !== DEFAULT_SERVER_SETTINGS.activeServerId ||
 				settings.servers?.servers.length !== 1 ||
 				settings.servers.servers[0]?.id !== DEFAULT_LOCAL_SERVER.id
 			) {
-				void window.devo.updateSettings({ servers: DEFAULT_SERVER_SETTINGS })
+				void window.infinitecode.updateSettings({ servers: DEFAULT_SERVER_SETTINGS })
 			}
 		})
 
-		return window.devo.onSettingsChanged(() => {
+		return window.infinitecode.onSettingsChanged(() => {
 			setServers(DEFAULT_SERVER_SETTINGS.servers)
 			setActiveServerId(DEFAULT_SERVER_SETTINGS.activeServerId)
 		})
@@ -66,7 +66,7 @@ export function useServerActions() {
 	const switchServer = useCallback(async (serverId: string) => {
 		if (serverId !== DEFAULT_LOCAL_SERVER.id) return
 		if (isElectron) {
-			await window.devo.updateSettings({ servers: DEFAULT_SERVER_SETTINGS })
+			await window.infinitecode.updateSettings({ servers: DEFAULT_SERVER_SETTINGS })
 		}
 		triggerServerSwitch(DEFAULT_LOCAL_SERVER.id)
 	}, [])

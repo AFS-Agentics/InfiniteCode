@@ -106,8 +106,8 @@ function getTerminalTheme() {
 }
 
 function getTerminalBridge() {
-	if (!isElectron || !("terminal" in window.devo)) return null;
-	return window.devo.terminal;
+	if (!isElectron || !("terminal" in window.infinitecode)) return null;
+	return window.infinitecode.terminal;
 }
 
 function statusLabel(status: TerminalStatus): string {

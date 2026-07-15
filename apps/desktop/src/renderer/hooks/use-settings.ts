@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import type { AppSettings } from "../../preload/api"
 import { DEFAULT_APP_SETTINGS } from "../../shared/app-settings"
 
-const isElectron = typeof window !== "undefined" && "devo" in window
+const isElectron = typeof window !== "undefined" && "infinitecode" in window
 
 const DEFAULT_SETTINGS: AppSettings = DEFAULT_APP_SETTINGS
 
@@ -15,7 +15,7 @@ export function useSettings() {
 			setLoading(false)
 			return
 		}
-		window.devo
+		window.infinitecode
 			.getSettings()
 			.then((s) => {
 				setSettings(s as AppSettings)
@@ -33,7 +33,7 @@ export function useSettings() {
 	// (e.g. notification action buttons update a setting from the main process).
 	useEffect(() => {
 		if (!isElectron) return
-		return window.devo.onSettingsChanged((updated) => {
+		return window.infinitecode.onSettingsChanged((updated) => {
 			setSettings(updated)
 		})
 	}, [])
@@ -43,7 +43,7 @@ export function useSettings() {
 			if (!isElectron) return
 			const prev = settings
 			try {
-				const updated = (await window.devo.updateSettings(partial)) as AppSettings
+				const updated = (await window.infinitecode.updateSettings(partial)) as AppSettings
 				setSettings(updated)
 			} catch (err) {
 				console.error("Failed to update settings:", err)

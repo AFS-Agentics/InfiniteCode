@@ -2,9 +2,9 @@ import { appendFileSync, mkdirSync, statSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 
-export const PROTOCOL_TRACE_ENV = "DEVO_PROTOCOL_TRACE"
-export const PROTOCOL_TRACE_FILE_ENV = "DEVO_PROTOCOL_TRACE_FILE"
-export const DEVO_HOME_ENV = "DEVO_HOME"
+export const PROTOCOL_TRACE_ENV = "INFINITECODE_PROTOCOL_TRACE"
+export const PROTOCOL_TRACE_FILE_ENV = "INFINITECODE_PROTOCOL_TRACE_FILE"
+export const INFINITECODE_HOME_ENV = "INFINITECODE_HOME"
 
 export type AcpTrafficDirection = "desktop-to-server" | "server-to-desktop" | "system"
 export type AcpTrafficKind = "request" | "response" | "notification" | "invalid" | "closed"
@@ -40,17 +40,17 @@ export function isProtocolTraceEnabled(value: string | undefined): boolean {
 	return normalized === "1" || normalized.toLowerCase() === "true"
 }
 
-export function findDevoHome(env: Record<string, string | undefined> = process.env): string {
-	const explicit = env[DEVO_HOME_ENV]?.trim()
+export function findInfiniteCodeHome(env: Record<string, string | undefined> = process.env): string {
+	const explicit = env[INFINITECODE_HOME_ENV]?.trim()
 	if (explicit) {
 		const resolved = path.resolve(explicit)
 		const stat = statSync(resolved, { throwIfNoEntry: false })
 		if (!stat?.isDirectory()) {
-			throw new Error(`DEVO_HOME points to ${explicit}, but that path is not a directory`)
+			throw new Error(`INFINITECODE_HOME points to ${explicit}, but that path is not a directory`)
 		}
 		return resolved
 	}
-	return path.join(homedir(), ".devo")
+	return path.join(homedir(), ".infinitecode")
 }
 
 export function formatProtocolTraceTimestamp(date: Date): string {
@@ -78,11 +78,11 @@ export function resolveProtocolTracePath({
 	const fileName = `protocol-${pid}-${formatProtocolTraceTimestamp(clock())}.ndjsonl`
 
 	try {
-		const base = path.join(findDevoHome(env), "traces")
+		const base = path.join(findInfiniteCodeHome(env), "traces")
 		mkdirSync(base, { recursive: true })
 		return path.join(base, fileName)
 	} catch {
-		const base = path.join(tmpdir(), "devo-traces")
+		const base = path.join(tmpdir(), "infinitecode-traces")
 		mkdirSync(base, { recursive: true })
 		return path.join(base, fileName)
 	}

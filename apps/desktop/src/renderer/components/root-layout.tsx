@@ -35,7 +35,7 @@ export function RootLayout() {
 	const setOnboardingState = useSetAtom(onboardingStateAtom)
 
 	// Only run discovery/connection after onboarding is complete (or in browser mode / mock mode)
-	const isElectronEnv = typeof window !== "undefined" && "devo" in window
+	const isElectronEnv = typeof window !== "undefined" && "infinitecode" in window
 	const showOnboarding = isElectronEnv && !onboardingState.completed && !isMockMode
 
 	// Track discovery phase to coordinate startup overlay / content crossfade
@@ -145,9 +145,9 @@ export function RootLayout() {
 	}, [handleKeyDown])
 
 	useEffect(() => {
-		if (typeof window === "undefined" || !("devo" in window)) return
-		if (typeof window.devo.onTerminalToggle !== "function") return
-		return window.devo.onTerminalToggle(() => {
+		if (typeof window === "undefined" || !("infinitecode" in window)) return
+		if (typeof window.infinitecode.onTerminalToggle !== "function") return
+		return window.infinitecode.onTerminalToggle(() => {
 			setTerminalPanelOpen((open) => !open)
 		})
 	}, [setTerminalPanelOpen])

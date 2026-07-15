@@ -45,7 +45,7 @@ interface MigrationPreviewStepProps {
 const PROVIDER_LABELS: Record<MigrationProvider, string> = {
 	"claude-code": "Claude Code",
 	cursor: "Cursor",
-	devo: "Devo",
+	devo: "InfiniteCode",
 	opencode: "OpenCode",
 }
 
@@ -67,13 +67,13 @@ export function MigrationPreviewStep({
 	const [error, setError] = useState<string | null>(null)
 	const [progress, setProgress] = useState<MigrationProgress | null>(null)
 
-	const isElectron = typeof window !== "undefined" && "devo" in window
+	const isElectron = typeof window !== "undefined" && "infinitecode" in window
 	const label = PROVIDER_LABELS[provider]
 
 	// Subscribe to migration progress events during execution
 	useEffect(() => {
 		if (!isElectron || !executing) return
-		const unsub = window.devo.onboarding.onMigrationProgress((p) => {
+		const unsub = window.infinitecode.onboarding.onMigrationProgress((p) => {
 			setProgress(p as MigrationProgress)
 		})
 		return unsub
@@ -86,7 +86,7 @@ export function MigrationPreviewStep({
 		setProgress(null)
 
 		try {
-			const result = await window.devo.onboarding.executeMigration(
+			const result = await window.infinitecode.onboarding.executeMigration(
 				provider,
 				scanResult,
 				categories,

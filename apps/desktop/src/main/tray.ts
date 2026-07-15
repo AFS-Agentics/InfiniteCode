@@ -1,12 +1,12 @@
 /**
- * Dynamic system tray for Devo.
+ * Dynamic system tray for InfiniteCode.
  *
  * Shows live agent statuses grouped by project, pending action counts,
  * and quick-access actions. Rebuilds the context menu whenever session
  * state changes via the notification-watcher's ACP event stream.
  *
  * macOS features:
- * - Full-color tray icon that preserves the Devo black rounded-square mark
+ * - Full-color tray icon that preserves the InfiniteCode brand mark
  * - Tray title badge showing pending permission/question count
  * - Status indicators via Unicode symbols (●/◐/○)
  */
@@ -83,7 +83,7 @@ export function createTray(windowGetter: () => BrowserWindow | undefined): void 
 	}
 
 	tray = new Tray(icon)
-	tray.setToolTip("Devo")
+	tray.setToolTip("InfiniteCode")
 	installTrayIconInteractions(tray, { showWindow })
 
 	// Subscribe to notification-watcher state changes for live updates
@@ -188,8 +188,8 @@ function rebuildMenu(): void {
 		pendingCount,
 		onNavigateToSession: navigateToSession,
 		onNewChat: navigateToNewChat,
-		onOpenDevo: showWindow,
-		onQuitDevo: () => app.quit(),
+		onOpenApp: showWindow,
+		onQuitApp: () => app.quit(),
 	})
 
 	const contextMenu = Menu.buildFromTemplate(template)
@@ -231,7 +231,7 @@ function updateTrayTitle(
 		(s) => !s.parentID && (s.status === "busy" || s.status === "retry"),
 	).length
 
-	let tooltip = "Devo"
+	let tooltip = "InfiniteCode"
 	if (totalSessions > 0) {
 		tooltip += ` - ${totalSessions} agent${totalSessions !== 1 ? "s" : ""}`
 		if (busyCount > 0) {
@@ -245,7 +245,7 @@ function updateTrayTitle(
 }
 
 // ============================================================
-// Discovery Data — fetched from Devo API via SDK
+// Discovery Data — fetched from API via SDK
 // ============================================================
 
 async function refreshDiscovery(): Promise<void> {

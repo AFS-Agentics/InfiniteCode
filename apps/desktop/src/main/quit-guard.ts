@@ -38,11 +38,11 @@ export function createWorkingSessionsQuitDialogOptions(workingSessionCount: numb
 	const plural = workingSessionCount === 1 ? "session is" : "sessions are"
 	return {
 		type: "warning",
-		buttons: ["Cancel", "Quit Devo"],
+		buttons: ["Cancel", "Quit InfiniteCode"],
 		defaultId: CANCEL_QUIT_BUTTON_INDEX,
 		cancelId: CANCEL_QUIT_BUTTON_INDEX,
-		title: "Quit Devo?",
+		title: "Quit InfiniteCode?",
 		message: `${workingSessionCount} ${plural} still working.`,
-		detail: "Quitting Devo will stop the local server and interrupt active work.",
+		detail: "Quitting InfiniteCode will stop the local server and interrupt active work.",
 	}
 }

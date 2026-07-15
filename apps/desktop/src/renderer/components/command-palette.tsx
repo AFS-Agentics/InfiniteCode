@@ -97,7 +97,7 @@ export function CommandPalette({ open, onOpenChange, agents, onForkSession }: Co
 	const undoShortcut = formatShortcut(["mod", "Z"])
 	const redoShortcut = formatShortcut(["shift", "mod", "Z"])
 
-	const isElectron = typeof window !== "undefined" && "devo" in window
+	const isElectron = typeof window !== "undefined" && "infinitecode" in window
 
 	const handleToggleTransparency = useCallback(async () => {
 		const newValue = !opaqueWindows
@@ -105,13 +105,13 @@ export function CommandPalette({ open, onOpenChange, agents, onForkSession }: Co
 
 		// Persist to main process so the next window creation uses the correct chrome tier
 		if (isElectron) {
-			await window.devo.setOpaqueWindows(newValue)
+			await window.infinitecode.setOpaqueWindows(newValue)
 			// BrowserWindow.transparent is a creation-time option — prompt for restart
 			const shouldRestart = window.confirm(
 				"Transparency changes take effect after restarting the app.\n\nRestart now?",
 			)
 			if (shouldRestart) {
-				window.devo.relaunch()
+				window.infinitecode.relaunch()
 			}
 		}
 	}, [opaqueWindows, setOpaqueWindows, isElectron])

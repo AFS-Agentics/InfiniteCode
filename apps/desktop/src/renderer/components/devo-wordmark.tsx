@@ -6,7 +6,7 @@ export function DevoWordmark({ className }: { className?: string }) {
 			xmlns="http://www.w3.org/2000/svg"
 			className={className}
 			role="img"
-			aria-label="Devo"
+			aria-label="InfiniteCode"
 		>
 			<defs>
 				<path
@@ -32,7 +32,7 @@ export function DevoWordmark({ className }: { className?: string }) {
 				fontWeight="650"
 				letterSpacing="0"
 			>
-				Devo
+				InfiniteCode
 			</text>
 		</svg>
 	)

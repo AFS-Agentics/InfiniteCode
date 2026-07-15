@@ -182,23 +182,23 @@ export function registerIpcHandlers(): void {
 		isDev: !app.isPackaged,
 	}))
 
-	// --- Devo server lifecycle ---
+	// --- InfiniteCode server lifecycle ---
 
 	ipcMain.handle(
-		"devo:ensure",
-		withLogging("devo:ensure", async () => await ensureServer()),
+		"infinitecode:ensure",
+		withLogging("infinitecode:ensure", async () => await ensureServer()),
 	)
 
-	ipcMain.handle("devo:url", () => getServerUrl())
+	ipcMain.handle("infinitecode:url", () => getServerUrl())
 
 	ipcMain.handle(
-		"devo:stop",
-		withLogging("devo:stop", () => stopServer()),
+		"infinitecode:stop",
+		withLogging("infinitecode:stop", () => stopServer()),
 	)
 
 	ipcMain.handle(
-		"devo:restart",
-		withLogging("devo:restart", async () => await restartServer()),
+		"infinitecode:restart",
+		withLogging("infinitecode:restart", async () => await restartServer()),
 	)
 
 	ipcMain.handle(

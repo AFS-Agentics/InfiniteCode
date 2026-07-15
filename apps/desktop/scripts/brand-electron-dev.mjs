@@ -7,8 +7,8 @@ if (process.platform !== "darwin") {
 	process.exit(0)
 }
 
-const appName = "Devo"
-const bundleIdentifier = "com.devo.desktop.dev"
+const appName = "InfiniteCode"
+const bundleIdentifier = "com.infinitecode.desktop.dev"
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const desktopDir = dirname(scriptDir)
 const electronAppPath = join(desktopDir, "node_modules/electron/dist/Electron.app")

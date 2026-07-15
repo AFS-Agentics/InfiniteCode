@@ -2,7 +2,7 @@ export function DevoSplashBrand({ className = "" }: { className?: string }) {
 	const classes = ["devo-splash-brand", className].filter(Boolean).join(" ")
 
 	return (
-		<span className={classes} role="img" aria-label="Devo">
+		<span className={classes} role="img" 		aria-label="InfiniteCode">
 			<span className="devo-splash-brand-mark-frame" aria-hidden="true">
 				<svg
 					viewBox="0 0 128 128"
@@ -38,9 +38,9 @@ export function DevoSplashBrand({ className = "" }: { className?: string }) {
 			</span>
 			<span aria-hidden="true" className="devo-brand-word devo-brand-word-attention">
 				<span className="devo-brand-word-track">
-					<span>DEVO</span>
-					<span>devo</span>
-					<span>Devo</span>
+					<span>INFINITECODE</span>
+					<span>infiniteCode</span>
+					<span>InfiniteCode</span>
 				</span>
 			</span>
 		</span>

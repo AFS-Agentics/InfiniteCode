@@ -5,7 +5,7 @@ import { useUpdater } from "../../hooks/use-updater"
 import { SettingsRow } from "./settings-row"
 import { SettingsSection } from "./settings-section"
 
-const isElectron = typeof window !== "undefined" && "devo" in window
+const isElectron = typeof window !== "undefined" && "infinitecode" in window
 
 export function AboutSettings() {
 	const [appVersion, setAppVersion] = useState("")
@@ -15,7 +15,7 @@ export function AboutSettings() {
 
 	useEffect(() => {
 		if (!isElectron) return
-		window.devo.getAppInfo().then((info) => {
+		window.infinitecode.getAppInfo().then((info) => {
 			setAppVersion(info.version)
 			setIsDev(info.isDev)
 		})

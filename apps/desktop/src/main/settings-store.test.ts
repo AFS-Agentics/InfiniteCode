@@ -57,7 +57,7 @@ async function loadSettingsStore(name: string) {
 
 describe("settings-store", () => {
 	beforeEach(() => {
-		userDataDir = mkdtempSync(join(tmpdir(), "devo-settings-store-"))
+		userDataDir = mkdtempSync(join(tmpdir(), "infinitecode-settings-store-"))
 	})
 
 	afterEach(() => {

@@ -31,8 +31,8 @@ interface CompleteStepProps {
 // Component
 // ============================================================
 
-const isElectron = typeof window !== "undefined" && "devo" in window
-const isMac = isElectron && window.devo.platform === "darwin"
+const isElectron = typeof window !== "undefined" && "infinitecode" in window
+const isMac = isElectron && window.infinitecode.platform === "darwin"
 
 export function CompleteStep({
 	devoVersion,
@@ -53,7 +53,7 @@ export function CompleteStep({
 		hasDetected.current = true
 		setDetecting(true)
 
-		window.devo.onboarding
+		window.infinitecode.onboarding
 			.detectProviders()
 			.then((detections) => {
 				// Only show providers that were found and aren't Devo itself
@@ -100,8 +100,8 @@ export function CompleteStep({
 					<h2 className="text-2xl font-semibold text-foreground">You're all set.</h2>
 					<p className="text-sm text-muted-foreground">
 						{devoVersion
-							? `Devo is connected to Devo ${formatVersion(devoVersion)}`
-							: "Devo is ready to go"}
+							? `InfiniteCode is connected to CLI ${formatVersion(devoVersion)}`
+							: "InfiniteCode is ready to go"}
 						{hasMigrated ? " and your configuration has been migrated." : "."}
 					</p>
 				</motion.div>

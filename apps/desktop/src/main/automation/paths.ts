@@ -1,11 +1,11 @@
 /**
- * XDG Base Directory paths for Devo automation storage.
+ * XDG Base Directory paths for InfiniteCode automation storage.
  *
  * Follows the XDG Base Directory Specification, matching the convention
- * used by Devo (see packages/devo/src/global/index.ts):
+ * used by InfiniteCode:
  *
- *   Config:  $XDG_CONFIG_HOME/devo  (default ~/.config/devo)
- *   Data:    $XDG_DATA_HOME/devo    (default ~/.local/share/devo)
+ *   Config:  $XDG_CONFIG_HOME/infinitecode  (default ~/.config/infinitecode)
+ *   Data:    $XDG_DATA_HOME/infinitecode    (default ~/.local/share/infinitecode)
  *
  * Automation configs live under config (human-editable JSON + prompt.md).
  * The SQLite database lives under data (machine-managed state).
@@ -14,10 +14,10 @@
 import os from "node:os"
 import path from "node:path"
 
-const APP_NAME = "devo"
+const APP_NAME = "infinitecode"
 
 /**
- * Returns the XDG config directory for Devo.
+ * Returns the XDG config directory for InfiniteCode.
  * Automations configs are stored at `<config>/automations/<id>/`.
  */
 export function getConfigDir(): string {
@@ -26,8 +26,8 @@ export function getConfigDir(): string {
 }
 
 /**
- * Returns the XDG data directory for Devo.
- * The SQLite database is stored at `<data>/devo.db`.
+ * Returns the XDG data directory for InfiniteCode.
+ * The SQLite database is stored at `<data>/infinitecode.db`.
  */
 export function getDataDir(): string {
 	const xdgData = process.env.XDG_DATA_HOME || path.join(os.homedir(), ".local", "share")

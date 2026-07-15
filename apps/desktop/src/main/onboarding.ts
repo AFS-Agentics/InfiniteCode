@@ -1,11 +1,11 @@
 /**
- * Onboarding handlers for the Devo desktop app.
+ * Onboarding handlers for the InfiniteCode desktop app.
  *
  * Provides IPC-callable functions for the first-run experience:
- * - Devo CLI detection and version compatibility check
- * - Devo CLI installation (via curl/shell)
+ * - CLI detection and version compatibility check
+ * - CLI installation (via curl/shell)
  * - Multi-provider config detection and migration via @devo/configconv
- *   Supported providers: Claude Code, Cursor, Devo, OpenCode
+ *   Supported providers: Claude Code, Cursor, InfiniteCode, OpenCode
  */
 
 import { type ChildProcess, spawn } from "node:child_process"
@@ -111,12 +111,12 @@ export interface MigrationResult {
 const PROVIDER_LABELS: Record<MigrationProvider, string> = {
 	"claude-code": "Claude Code",
 	cursor: "Cursor",
-	devo: "Devo",
+	devo: "InfiniteCode",
 	opencode: "OpenCode",
 }
 
 // ============================================================
-// Devo check (delegates to compatibility module)
+// CLI check (delegates to compatibility module)
 // ============================================================
 
 export async function checkDevoInstallation(): Promise<DevoCheckResult> {
@@ -130,7 +130,7 @@ export async function checkDevoInstallation(): Promise<DevoCheckResult> {
 let installProcess: ChildProcess | null = null
 
 /**
- * Installs Devo CLI by running the official install script.
+ * Installs InfiniteCode CLI by running the official install script.
  * Streams output lines to the renderer via the "onboarding:install-output" channel.
  * Returns when the install process exits.
  */
@@ -191,10 +191,10 @@ export async function installDevo(): Promise<{ success: boolean; error?: string 
 		proc.on("exit", (code) => {
 			installProcess = null
 			if (code === 0) {
-				log.info("Devo install completed successfully")
+				log.info("InfiniteCode install completed successfully")
 				resolve({ success: true })
 			} else {
-				log.warn("Devo install exited with code", code)
+				log.warn("InfiniteCode install exited with code", code)
 				resolve({ success: false, error: `Install script exited with code ${code}` })
 			}
 		})
@@ -436,20 +436,20 @@ async function detectOpenCode(): Promise<ProviderDetection> {
 }
 
 /**
- * Quickly detects whether Devo configuration exists on this machine.
- * Parses devo.json to count MCP servers.
+ * Quickly detects whether InfiniteCode configuration exists on this machine.
+ * Parses infinitecode.json to count MCP servers.
  */
 async function detectDevoProvider(): Promise<ProviderDetection> {
 	const { readFileSync, readdirSync } = await import("node:fs")
 	const home = homedir()
 	const xdgConfig = process.env.XDG_CONFIG_HOME || path.join(home, ".config")
-	const ocDir = path.join(xdgConfig, "devo")
+	const ocDir = path.join(xdgConfig, "infinitecode")
 
-	// Parse devo.json to count MCP servers
+	// Parse infinitecode.json to count MCP servers
 	let mcpServerCount = 0
 	let hasConfig = false
 	let hasPermissions = false
-	const configPath = path.join(ocDir, "devo.json")
+	const configPath = path.join(ocDir, "infinitecode.json")
 	if (existsSync(configPath)) {
 		hasConfig = true
 		try {
@@ -516,7 +516,7 @@ async function detectDevoProvider(): Promise<ProviderDetection> {
 		provider: "devo",
 		found,
 		label: PROVIDER_LABELS.devo,
-		summary: found ? `Found ${summaryParts.join(", ")}` : "No Devo configuration detected",
+		summary: found ? `Found ${summaryParts.join(", ")}` : "No InfiniteCode configuration detected",
 		hasGlobalSettings: hasConfig,
 		hasPermissions,
 		projectCount: 0,
@@ -600,7 +600,7 @@ export async function previewMigration(
 			itemCount: 1,
 			files: [
 				{
-					path: "~/.config/devo/devo.json",
+					path: "~/.config/infinitecode/infinitecode.json",
 					status: "new",
 					lineCount: content.split("\n").length,
 					content,
@@ -618,7 +618,7 @@ export async function previewMigration(
 				itemCount: 1,
 				files: [
 					{
-						path: path.join(projectPath, "devo.json"),
+						path: path.join(projectPath, "infinitecode.json"),
 						status: "new",
 						lineCount: content.split("\n").length,
 						content,
@@ -702,7 +702,7 @@ export async function previewMigration(
 					itemCount: sessionCount,
 					files: [
 						{
-							path: "~/.local/share/devo/storage/",
+							path: "~/.local/share/infinitecode/storage/",
 							status: "new",
 							lineCount: 0,
 							content: `${sessionCount} chat sessions across ${sessionProjectCount} projects will be imported`,
@@ -839,7 +839,7 @@ export async function executeMigration(
 }
 
 /**
- * Execute history migration: convert sessions and write to Devo storage.
+ * Execute history migration: convert sessions and write to InfiniteCode storage.
  * Uses the detailed writer with deduplication and sends progress to the renderer.
  */
 async function executeHistoryMigration(

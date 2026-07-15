@@ -60,7 +60,7 @@ pub(crate) fn build_devo_logo_intro(width: u16, accent_color: Color) -> Vec<Line
     }
     if available_width < STARTUP_HEADER_MIN_FULL_WIDTH {
         return vec![Line::from(Span::styled(
-            truncate_right("Devo", available_width),
+            truncate_right("InfiniteCode", available_width),
             Style::default().fg(accent_color).bold(),
         ))];
     }
@@ -114,7 +114,7 @@ fn build_compact_header(data: StartupHeaderData<'_>, inner_width: usize) -> Vec<
     let accent_style = Style::default().fg(data.accent_color).bold();
     let version = format!("v{}", data.version);
 
-    let title = truncate_right(&format!("Devo {version}"), inner_width);
+    let title = truncate_right(&format!("InfiniteCode {version}"), inner_width);
 
     vec![
         border_line('┏', '━', '┓', inner_width, border_style),

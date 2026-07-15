@@ -13,12 +13,12 @@ import {
 	UndoIcon,
 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
-import type { DevoCheckResult } from "../../../preload/api"
+import type { InfiniteCodeCheckResult } from "../../../preload/api"
 import { onboardingStateAtom } from "../../atoms/onboarding"
 import { SettingsRow } from "./settings-row"
 import { SettingsSection } from "./settings-section"
 
-const isElectron = typeof window !== "undefined" && "devo" in window
+const isElectron = typeof window !== "undefined" && "infinitecode" in window
 
 // ============================================================
 // Provider display metadata
@@ -27,7 +27,7 @@ const isElectron = typeof window !== "undefined" && "devo" in window
 const PROVIDER_LABELS: Record<string, string> = {
 	"claude-code": "Claude Code",
 	cursor: "Cursor",
-	devo: "Devo",
+	devo: "InfiniteCode",
 	opencode: "OpenCode",
 }
 
@@ -51,13 +51,13 @@ export function SetupSettings() {
 
 function DevoStatusSection() {
 	const [checking, setChecking] = useState(false)
-	const [result, setResult] = useState<DevoCheckResult | null>(null)
+	const [result, setResult] = useState<InfiniteCodeCheckResult | null>(null)
 
 	const checkStatus = useCallback(async () => {
 		if (!isElectron) return
 		setChecking(true)
 		try {
-			const r = await window.devo.onboarding.checkDevo()
+			const r = await window.infinitecode.onboarding.checkInfiniteCode()
 			setResult(r)
 		} catch {
 			// ignore
@@ -126,7 +126,7 @@ function MigrationSection() {
 		setRestoring(true)
 		setRestoreResult(null)
 		try {
-			const result = await window.devo.onboarding.restoreBackup()
+			const result = await window.infinitecode.onboarding.restoreBackup()
 			if (result.success) {
 				setRestoreResult(`Restored ${result.restored.length} file(s)`)
 			} else {
@@ -215,7 +215,7 @@ function OnboardingSection() {
 		})
 		// Relaunch the app to show onboarding fresh
 		if (isElectron) {
-			window.devo.relaunch()
+			window.infinitecode.relaunch()
 		}
 	}, [setOnboardingState])
 

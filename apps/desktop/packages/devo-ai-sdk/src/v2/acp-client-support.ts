@@ -56,8 +56,8 @@ let sharedIpcTransport: DevoAcpTransport | null = null
 export function createIpcTransport(): DevoAcpTransport {
 	if (sharedIpcTransport) return sharedIpcTransport
 
-	const api = globalThis.window?.devo?.acp
-	if (!api) throw new Error("window.devo.acp is not available")
+	const api = globalThis.window?.infinitecode?.acp
+	if (!api) throw new Error("window.infinitecode.acp is not available")
 	sharedIpcTransport = {
 		request: (method, params, directory) => api.request({ method, params, directory }),
 		respond: (id, result) => api.respond({ id, result }),

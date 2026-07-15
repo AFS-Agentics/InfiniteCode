@@ -3,10 +3,10 @@ import { contextBridge, ipcRenderer } from "electron"
 /**
  * Preload bridge — exposes a typed API from the main process to the renderer.
  *
- * The renderer accesses these via `window.devo.*`.
+ * The renderer accesses these via `window.infinitecode.*`.
  * All methods return Promises (backed by `ipcRenderer.invoke`).
  */
-contextBridge.exposeInMainWorld("devo", {
+contextBridge.exposeInMainWorld("infinitecode", {
 	/** The host platform: "darwin", "win32", or "linux". */
 	platform: process.platform,
 
@@ -36,17 +36,17 @@ contextBridge.exposeInMainWorld("devo", {
 	/** Get the current chrome tier (pull-based, avoids race with push event). */
 	getChromeTier: () => ipcRenderer.invoke("chrome-tier:get"),
 
-	/** Ensures the Devo server is running. Spawns it if not. */
-	ensureDevo: () => ipcRenderer.invoke("devo:ensure"),
+	/** Ensures the InfiniteCode server is running. Spawns it if not. */
+	ensureInfiniteCode: () => ipcRenderer.invoke("infinitecode:ensure"),
 
 	/** Gets the URL of the running server, or null. */
-	getServerUrl: () => ipcRenderer.invoke("devo:url"),
+	getServerUrl: () => ipcRenderer.invoke("infinitecode:url"),
 
-	/** Stops the managed Devo server. */
-	stopDevo: () => ipcRenderer.invoke("devo:stop"),
+	/** Stops the managed InfiniteCode server. */
+	stopInfiniteCode: () => ipcRenderer.invoke("infinitecode:stop"),
 
-	/** Restarts the managed Devo server (stops and re-starts with current settings). */
-	restartDevo: () => ipcRenderer.invoke("devo:restart"),
+	/** Restarts the managed InfiniteCode server (stops and re-starts with current settings). */
+	restartInfiniteCode: () => ipcRenderer.invoke("infinitecode:restart"),
 
 	onTerminalToggle: (callback: () => void) => {
 		const listener = () => callback()
@@ -310,7 +310,7 @@ contextBridge.exposeInMainWorld("devo", {
 
 	onboarding: {
 		/** Check if the bundled Devo runtime is installed and compatible. */
-		checkDevo: () => ipcRenderer.invoke("onboarding:check-devo"),
+		checkInfiniteCode: () => ipcRenderer.invoke("onboarding:check-devo"),
 		/** Quick detect all supported providers (Claude Code, Cursor, Devo). */
 		detectProviders: () => ipcRenderer.invoke("onboarding:detect-providers"),
 		/** Full scan of a specific provider's configuration. */

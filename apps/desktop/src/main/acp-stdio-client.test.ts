@@ -54,7 +54,7 @@ describe("StdioAcpClient", () => {
 		expect(env).toMatchObject({
 			CUSTOM_FLAG: "1",
 			KEEP: "base",
-			PATH: `${path.join("/Users/tester", ".devo", "bin")}:/custom/bin`,
+			PATH: `${path.join("/Users/tester", ".infinitecode", "bin")}:/custom/bin`,
 		})
 	})
 
@@ -63,12 +63,12 @@ describe("StdioAcpClient", () => {
 			baseEnv: { PATH: "/usr/bin", KEEP: "base" },
 			homeDir: "/Users/tester",
 			pathSeparator: ":",
-			runtimeBinDir: "/Applications/Devo.app/Contents/Resources/runtime/bin",
+			runtimeBinDir: "/Applications/InfiniteCode.app/Contents/Resources/runtime/bin",
 		})
 
 		expect(env).toMatchObject({
 			KEEP: "base",
-			PATH: "/Applications/Devo.app/Contents/Resources/runtime/bin:/usr/bin",
+			PATH: "/Applications/InfiniteCode.app/Contents/Resources/runtime/bin:/usr/bin",
 		})
 	})
 
@@ -410,7 +410,7 @@ describe("StdioAcpClient", () => {
 			{
 				direction: "system",
 				kind: "closed",
-				payload: { error: "Devo ACP stdio client stopped" },
+				payload: { error: "InfiniteCode ACP stdio client stopped" },
 			},
 		])
 	})

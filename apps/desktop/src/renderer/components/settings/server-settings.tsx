@@ -21,7 +21,7 @@ import { useSettings } from "../../hooks/use-settings"
 import { SettingsRow } from "./settings-row"
 import { SettingsSection } from "./settings-section"
 
-const isElectron = typeof window !== "undefined" && "devo" in window
+const isElectron = typeof window !== "undefined" && "infinitecode" in window
 
 interface ServerSettingsProps {
 	initialAcpTrafficLogState?: AcpTrafficLogState | null
@@ -41,7 +41,7 @@ export function ServerSettings({ initialAcpTrafficLogState = null }: ServerSetti
 	useEffect(() => {
 		if (!isElectron) return
 		let cancelled = false
-		void window.devo.acpTraffic
+		void window.infinitecode.acpTraffic
 			.getState()
 			.then((state) => {
 				if (!cancelled) setAcpTrafficLogState(state)
@@ -58,7 +58,7 @@ export function ServerSettings({ initialAcpTrafficLogState = null }: ServerSetti
 		if (!isElectron) return
 		setRestarting(true)
 		try {
-			await window.devo.restartDevo()
+			await window.infinitecode.restartInfiniteCode()
 		} finally {
 			setRestarting(false)
 		}

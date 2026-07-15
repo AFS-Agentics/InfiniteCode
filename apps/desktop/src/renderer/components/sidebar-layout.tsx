@@ -60,9 +60,9 @@ import { UpdateBanner } from "./update-banner"
 // ============================================================
 
 const isMac =
-	typeof window !== "undefined" && "devo" in window && window.devo.platform === "darwin"
-const isElectronEnv = typeof window !== "undefined" && "devo" in window
-const isWindowsElectron = isElectronEnv && window.devo.platform === "win32"
+	typeof window !== "undefined" && "infinitecode" in window && window.infinitecode.platform === "darwin"
+const isElectronEnv = typeof window !== "undefined" && "infinitecode" in window
+const isWindowsElectron = isElectronEnv && window.infinitecode.platform === "win32"
 
 /** Pixel offset from the left edge where window controls start */
 const WINDOW_CONTROLS_LEFT = isMac && isElectronEnv ? 93 : 8
@@ -125,7 +125,7 @@ function AppMenuBar() {
 	const handleMenuClick = useCallback(
 		(event: MouseEvent<HTMLButtonElement>, id: (typeof APP_MENU_ITEMS)[number]["id"]) => {
 			const rect = event.currentTarget.getBoundingClientRect()
-			void window.devo.appMenu.popup(id, {
+			void window.infinitecode.appMenu.popup(id, {
 				x: Math.round(rect.left),
 				y: Math.round(rect.bottom),
 			})
@@ -325,7 +325,7 @@ export function SidebarLayout() {
 				setDesktopFolders(folders)
 				return folders
 			}
-			const settings = await window.devo.updateSettings({ desktopFolders: { folders } })
+			const settings = await window.infinitecode.updateSettings({ desktopFolders: { folders } })
 			setDesktopFolders(settings.desktopFolders.folders)
 			return settings.desktopFolders.folders
 		},

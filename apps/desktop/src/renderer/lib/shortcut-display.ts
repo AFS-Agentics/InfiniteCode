@@ -1,8 +1,8 @@
 export type ShortcutToken = "mod" | "shift" | string
 
 function currentPlatform(): string | undefined {
-	if (typeof window === "undefined" || !("devo" in window)) return undefined
-	return window.devo.platform
+	if (typeof window === "undefined" || !("infinitecode" in window)) return undefined
+	return window.infinitecode.platform
 }
 
 export function formatShortcut(

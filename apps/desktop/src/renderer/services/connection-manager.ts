@@ -45,7 +45,7 @@ const log = createLogger("connection-manager")
 async function checkHealth(url: string, authHeader: string | null): Promise<boolean> {
 	void url
 	void authHeader
-	return typeof window !== "undefined" && "devo" in window ? window.devo.acp.connected() : true
+	return typeof window !== "undefined" && "infinitecode" in window ? window.infinitecode.acp.connected() : true
 }
 
 // ============================================================

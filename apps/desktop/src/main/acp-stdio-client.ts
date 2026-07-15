@@ -197,8 +197,8 @@ export class StdioAcpClient implements AcpTransport {
 	start(): void {
 		if (this.child) return
 
-		const devoBinDir = path.join(homedir(), ".devo", "bin")
-		const program = this.options.program ?? "devo"
+		const devoBinDir = path.join(homedir(), ".infinitecode", "bin")
+		const program = this.options.program ?? "infinitecode"
 		const runtimeBinDir = path.isAbsolute(program) ? path.dirname(program) : undefined
 		const env = buildServerProcessEnv({
 			optionsEnv: this.options.env,
@@ -208,7 +208,7 @@ export class StdioAcpClient implements AcpTransport {
 		const args = this.options.args ?? ["server", "--transport", "stdio"]
 		const cwd = this.options.cwd ?? homedir()
 
-		log.info("Spawning Devo ACP stdio server", {
+		log.info("Spawning InfiniteCode ACP stdio server", {
 			program,
 			args,
 			cwd,
@@ -232,18 +232,18 @@ export class StdioAcpClient implements AcpTransport {
 
 		child.stdin.on("error", (error) => {
 			const reason = toError(error)
-			log.warn("Devo ACP stdio stdin failed", reason)
+			log.warn("InfiniteCode ACP stdio stdin failed", reason)
 			this.close(reason)
 		})
 
 		child.on("error", (error) => {
-			log.error("Devo ACP stdio process failed", error)
+			log.error("InfiniteCode ACP stdio process failed", error)
 			this.close(error)
 		})
 
 		child.on("exit", (code, signal) => {
 			if (this.stopped) return
-			const reason = `Devo ACP stdio process exited with code ${code ?? "null"} signal ${signal ?? "null"}`
+			const reason = `InfiniteCode ACP stdio process exited with code ${code ?? "null"} signal ${signal ?? "null"}`
 			log.warn(reason)
 			this.close(new Error(reason))
 		})
@@ -341,7 +341,7 @@ export class StdioAcpClient implements AcpTransport {
 		const child = this.child
 		this.child = null
 		if (child && !child.killed) child.kill()
-		this.close(new Error("Devo ACP stdio client stopped"))
+		this.close(new Error("InfiniteCode ACP stdio client stopped"))
 	}
 
 	private handleLine(line: string): void {
@@ -362,7 +362,7 @@ export class StdioAcpClient implements AcpTransport {
 				this.pending.delete(routed.id)
 				const error = routed.message.error as { message?: string } | undefined
 				if (error) {
-					pending.reject(new Error(error.message ?? "Devo ACP request failed"))
+					pending.reject(new Error(error.message ?? "InfiniteCode ACP request failed"))
 				} else {
 					pending.resolve(routed.message.result)
 				}
@@ -410,7 +410,7 @@ export class StdioAcpClient implements AcpTransport {
 	private writeJson(child: ChildProcessWithoutNullStreams, value: unknown): Promise<void> {
 		const line = `${JSON.stringify(value)}\n`
 		if (child.stdin.destroyed || child.stdin.writableEnded || !child.stdin.writable) {
-			return Promise.reject(new Error("Devo ACP stdio stdin is closed"))
+			return Promise.reject(new Error("InfiniteCode ACP stdio stdin is closed"))
 		}
 
 		return new Promise((resolve, reject) => {
@@ -431,7 +431,7 @@ export class StdioAcpClient implements AcpTransport {
 	}
 
 	private requireChild(): ChildProcessWithoutNullStreams {
-		if (!this.child) throw new Error("Devo ACP stdio process is not running")
+		if (!this.child) throw new Error("InfiniteCode ACP stdio process is not running")
 		return this.child
 	}
 

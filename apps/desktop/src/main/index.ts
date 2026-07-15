@@ -24,7 +24,7 @@ import { createTray, destroyTray } from "./tray"
 import { initAutoUpdater, stopAutoUpdater } from "./updater"
 
 const log = createLogger("app")
-const appName = "Devo"
+const appName = "InfiniteCode"
 let isQuitting = false
 
 app.setName(appName)
@@ -216,7 +216,7 @@ if (isDev) {
 // The single-instance lock and user-data directory are both keyed on app name,
 // so changing it here prevents the two from conflicting.
 if (isDev) {
-	app.setPath("userData", path.join(app.getPath("appData"), "Devo Dev"))
+	app.setPath("userData", path.join(app.getPath("appData"), "InfiniteCode Dev"))
 }
 
 async function createWindow(): Promise<BrowserWindow> {

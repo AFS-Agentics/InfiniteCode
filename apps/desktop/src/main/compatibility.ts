@@ -1,7 +1,7 @@
 /**
- * Devo runtime version compatibility definitions for Desktop.
+ * InfiniteCode runtime version compatibility definitions for Desktop.
  *
- * Updated with each Devo release to reflect tested Devo versions.
+ * Updated with each release to reflect tested versions.
  * The environment check in the onboarding flow uses these ranges to
  * decide whether to pass, warn, or block.
  */
@@ -18,7 +18,7 @@ const log = createLogger("compatibility")
 // Compatibility ranges (standard semver range syntax)
 // ============================================================
 
-export const DEVO_COMPAT = {
+export const INFINITECODE_COMPAT = {
 	/** Supported range -- versions that should work. Below this: hard block. */
 	supported: ">=0.1.21",
 	/** Tested range -- versions actively tested against. Subset of supported. */
@@ -57,9 +57,9 @@ export interface CheckDevoProgramOptions {
 // Binary detection
 // ============================================================
 
-/** Build the augmented PATH that includes ~/.devo/bin. */
+/** Build the augmented PATH that includes ~/.infinitecode/bin. */
 function getAugmentedPath(): string {
-	const devoBinDir = path.join(homedir(), ".devo", "bin")
+	const devoBinDir = path.join(homedir(), ".infinitecode", "bin")
 	const sep = process.platform === "win32" ? ";" : ":"
 	return `${devoBinDir}${sep}${process.env.PATH ?? ""}`
 }
@@ -72,7 +72,7 @@ function execAsync(
 	execFileImpl: ExecFileForCheck = execFile as unknown as ExecFileForCheck,
 ): Promise<string | null> {
 	return new Promise((resolve) => {
-		execFileImpl(cmd, args, { env, timeout: 5000 }, (err, stdout) => {
+		execFileImpl(cmd, args, { env, timeout: 30_000 }, (err, stdout) => {
 			if (err) {
 				resolve(null)
 				return
@@ -82,28 +82,28 @@ function execAsync(
 	})
 }
 
-/** Try to find the devo binary and get its version. */
-async function detectDevo(): Promise<{ version: string | null; path: string | null }> {
+/** Try to find the infinitecode binary and get its version. */
+async function detectInfiniteCode(): Promise<{ version: string | null; path: string | null }> {
 	const augmentedPath = getAugmentedPath()
 	const env = { ...process.env, PATH: augmentedPath }
 
-	// Try `devo --version` (the correct flag)
-	const versionOutput = await execAsync("devo", ["--version"], env)
+	// Try `infinitecode --version`
+	const versionOutput = await execAsync("infinitecode", ["--version"], env)
 	if (versionOutput) {
-		// Parse version from output -- could be "v0.2.14", "devo v0.2.14", or "local"
+		// Parse version from output
 		const match = versionOutput.match(/v?(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?)/)
 		const version = match ? match[1] : versionOutput.trim()
 
 		// Try to find the path with `which` or `where`
 		const whichCmd = process.platform === "win32" ? "where" : "which"
-		const binaryPath = await execAsync(whichCmd, ["devo"], env)
+		const binaryPath = await execAsync(whichCmd, ["infinitecode"], env)
 
 		return { version, path: binaryPath }
 	}
 
 	// Fallback: check if the binary exists at all (might not support --version)
 	const whichCmd = process.platform === "win32" ? "where" : "which"
-	const binaryPath = await execAsync(whichCmd, ["devo"], env)
+	const binaryPath = await execAsync(whichCmd, ["infinitecode"], env)
 	if (binaryPath) {
 		return { version: "unknown", path: binaryPath }
 	}
@@ -120,23 +120,23 @@ async function detectDevo(): Promise<{ version: string | null; path: string | nu
  * Runs the binary to get its version, then compares against the compatibility range.
  */
 export async function checkDevo(): Promise<DevoCheckResult> {
-	log.info("Checking Devo installation...")
+	log.info("Checking InfiniteCode CLI installation...")
 
-	const { version, path: binaryPath } = await detectDevo()
+	const { version, path: binaryPath } = await detectInfiniteCode()
 
 	if (!version) {
-		log.warn("Devo CLI not found")
+		log.warn("InfiniteCode CLI not found")
 		return {
 			installed: false,
 			version: null,
 			path: null,
 			compatible: false,
 			compatibility: "unknown",
-			message: "Devo CLI not found. Install it from https://devo.ai",
+			message: "InfiniteCode CLI not found. Install it from https://github.com/7df-lab/infinitecode",
 		}
 	}
 
-	log.info("Devo found", { version, path: binaryPath })
+	log.info("InfiniteCode CLI found", { version, path: binaryPath })
 
 	return compatibilityResult(version, binaryPath)
 }
@@ -146,7 +146,7 @@ export async function checkDevoProgram({
 	env = process.env,
 	execFile: execFileImpl,
 }: CheckDevoProgramOptions): Promise<DevoCheckResult> {
-	log.info("Checking Devo runtime...", { program })
+	log.info("Checking InfiniteCode runtime...", { program })
 	const versionOutput = await execAsync(program, ["--version"], env, execFileImpl)
 	if (!versionOutput) {
 		return {
@@ -155,12 +155,12 @@ export async function checkDevoProgram({
 			path: program,
 			compatible: false,
 			compatibility: "unknown",
-			message: `Devo runtime not found at ${program}`,
+			message: `InfiniteCode runtime not found at ${program}`,
 		}
 	}
 
 	const version = parseDevoVersion(versionOutput)
-	log.info("Devo runtime found", { version, path: program })
+	log.info("InfiniteCode runtime found", { version, path: program })
 	return compatibilityResult(version, program)
 }
 
@@ -187,7 +187,7 @@ function compatibilityResult(version: string, binaryPath: string | null): DevoCh
 	}
 
 	// Check blocked versions
-	for (const blocked of DEVO_COMPAT.blocked) {
+	for (const blocked of INFINITECODE_COMPAT.blocked) {
 		if (satisfies(parsed, blocked)) {
 			return {
 				installed: true,
@@ -195,32 +195,32 @@ function compatibilityResult(version: string, binaryPath: string | null): DevoCh
 				path: binaryPath,
 				compatible: false,
 				compatibility: "blocked",
-				message: `Devo ${version} has known issues with this version of Devo. Please update.`,
+				message: `InfiniteCode CLI ${version} has known issues with this version. Please update.`,
 			}
 		}
 	}
 
 	// Check supported range -- hard block if below minimum
-	if (!satisfies(parsed, DEVO_COMPAT.supported)) {
+	if (!satisfies(parsed, INFINITECODE_COMPAT.supported)) {
 		return {
 			installed: true,
 			version,
 			path: binaryPath,
 			compatible: false,
 			compatibility: "too-old",
-			message: `Devo ${version} is too old. Devo requires ${DEVO_COMPAT.supported}.`,
+			message: `InfiniteCode CLI ${version} is too old. Requires ${DEVO_COMPAT.supported}.`,
 		}
 	}
 
 	// Check tested range -- supported but newer than what we've tested against
-	if (!satisfies(parsed, DEVO_COMPAT.tested)) {
+	if (!satisfies(parsed, INFINITECODE_COMPAT.tested)) {
 		return {
 			installed: true,
 			version,
 			path: binaryPath,
 			compatible: true,
 			compatibility: "too-new",
-			message: `Devo ${version} is newer than tested. Devo is tested with ${DEVO_COMPAT.tested}. Some features may not work as expected.`,
+			message: `InfiniteCode CLI ${version} is newer than tested. Tested with ${DEVO_COMPAT.tested}. Some features may not work as expected.`,
 		}
 	}
 

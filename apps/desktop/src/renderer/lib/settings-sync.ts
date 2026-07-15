@@ -63,6 +63,6 @@ export function buildAppearanceSettingsPatch(
 export async function persistAppearanceSettings(
 	appearance: Partial<AppearanceSettings>,
 ): Promise<void> {
-	if (typeof window === "undefined" || !("devo" in window)) return
-	await window.devo.updateSettings(buildAppearanceSettingsPatch(appearance))
+	if (typeof window === "undefined" || !("infinitecode" in window)) return
+	await window.infinitecode.updateSettings(buildAppearanceSettingsPatch(appearance))
 }

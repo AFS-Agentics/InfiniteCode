@@ -54,15 +54,15 @@ function applyAccentColor(hex: string): void {
 
 export function useSystemAccentColor(): void {
 	useEffect(() => {
-		if (!("devo" in window)) return
+		if (!("infinitecode" in window)) return
 
 		// Read initial value
-		window.devo.getAccentColor().then((color) => {
+		window.infinitecode.getAccentColor().then((color) => {
 			if (color) applyAccentColor(color)
 		})
 
 		// Subscribe to live changes
-		const unsubscribe = window.devo.onAccentColorChanged((color) => {
+		const unsubscribe = window.infinitecode.onAccentColorChanged((color) => {
 			applyAccentColor(color)
 		})
 

@@ -22,7 +22,7 @@ export function WelcomeStep({ onContinue }: WelcomeStepProps) {
 							data-slot="welcome-brand-mark"
 							className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-foreground"
 							role="img"
-							aria-label="Devo"
+							aria-label="InfiniteCode"
 						>
 							<svg
 								viewBox="0 0 128 128"
@@ -64,15 +64,15 @@ export function WelcomeStep({ onContinue }: WelcomeStepProps) {
 							</svg>
 						</div>
 					</div>
-					<h2 className="text-2xl font-semibold text-foreground">Devo</h2>
+					<h2 className="text-2xl font-semibold text-foreground">InfiniteCode</h2>
 				</div>
 
 				{/* Description */}
 				<div className="space-y-3">
-					<p className="text-lg text-muted-foreground">Your desktop companion for Devo.</p>
+					<p className="text-lg text-muted-foreground">Native AI agent for your terminal and IDE.</p>
 					<p className="text-sm leading-relaxed text-muted-foreground/70">
-						Devo gives you a native experience for managing Devo sessions across all your
-						projects, with real-time streaming, native notifications, and multi-session support.
+						Run coding agents in the background, manage sessions across projects, and stream results
+						to your editor — all from one place.
 					</p>
 				</div>
 

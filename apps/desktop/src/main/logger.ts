@@ -2,7 +2,7 @@
  * Lightweight tagged logger for the Electron main process.
  *
  * Usage:
- *   const log = createLogger("devo-manager")
+ *   const log = createLogger("infinitecode-manager")
  *   log.info("Server started", { url, pid })
  *   log.error("Spawn failed", err)
  */

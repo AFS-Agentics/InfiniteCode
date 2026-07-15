@@ -42,7 +42,7 @@ use upgrade_command::run_upgrade;
 /// of the supporting runtime subcommands.
 ///
 #[derive(Debug, Parser)]
-#[command(name = "devo", version, about = "Devo CLI")]
+#[command(name = "infinitecode", version, about = "InfiniteCode CLI")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
@@ -297,7 +297,7 @@ enum Command {
     Onboard,
     /// Resume a saved interactive session by id.
     Resume {
-        /// Session identifier printed by Devo at exit time.
+        /// Session identifier printed by InfiniteCode at exit time.
         session_id: SessionId,
     },
     /// Send a single prompt to the model and print the response (non-interactive).
@@ -310,7 +310,7 @@ enum Command {
     },
     /// Diagnose configuration, provider connectivity, and system health.
     Doctor,
-    /// Upgrade Devo to the latest released version.
+    /// Upgrade InfiniteCode to the latest released version.
     Upgrade,
     /// Start the runtime server process.
     #[command(hide = true)]

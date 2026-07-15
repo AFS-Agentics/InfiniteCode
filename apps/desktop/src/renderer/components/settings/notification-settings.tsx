@@ -23,7 +23,7 @@ export function NotificationSettings() {
 	)
 
 	const isMac =
-		typeof window !== "undefined" && "devo" in window && window.devo.platform === "darwin"
+		typeof window !== "undefined" && "infinitecode" in window && window.infinitecode.platform === "darwin"
 
 	return (
 		<div className="space-y-8">

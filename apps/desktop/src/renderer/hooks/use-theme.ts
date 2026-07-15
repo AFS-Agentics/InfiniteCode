@@ -101,8 +101,8 @@ export function useThemeEffect() {
 
 		// Sync native theme with OS chrome so macOS glass tint and Windows window
 		// control symbols match the app's CSS color scheme.
-		if ("devo" in window) {
-			window.devo.setNativeTheme(colorScheme === "system" ? "system" : cls)
+		if ("infinitecode" in window) {
+			window.infinitecode.setNativeTheme(colorScheme === "system" ? "system" : cls)
 		}
 
 		if (theme.fonts?.sans) {
@@ -143,7 +143,7 @@ export function useColorScheme(): ColorScheme {
 
 export function useAvailableThemes(): ThemeDefinition[] {
 	const platform =
-		typeof window !== "undefined" && "devo" in window ? window.devo.platform : undefined
+		typeof window !== "undefined" && "infinitecode" in window ? window.infinitecode.platform : undefined
 	return useMemo(() => getAvailableThemes(platform), [platform])
 }
 

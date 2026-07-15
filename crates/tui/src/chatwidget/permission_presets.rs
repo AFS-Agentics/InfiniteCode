@@ -14,12 +14,12 @@ pub(super) fn permission_preset_items(current: PermissionPreset) -> Vec<Selectio
         (
             PermissionPreset::ReadOnly,
             "Read Only",
-            "Devo can read files in the current workspace. Approval is required to edit files, run commands, or access the internet.",
+            "InfiniteCode can read files in the current workspace. Approval is required to edit files, run commands, or access the internet.",
         ),
         (
             PermissionPreset::Default,
             "Default",
-            "Devo can read and edit files in the current workspace, and run commands. Approval is required to access the internet or edit other files.",
+            "InfiniteCode can read and edit files in the current workspace, and run commands. Approval is required to access the internet or edit other files.",
         ),
         (
             PermissionPreset::AutoReview,
@@ -29,7 +29,7 @@ pub(super) fn permission_preset_items(current: PermissionPreset) -> Vec<Selectio
         (
             PermissionPreset::FullAccess,
             "Full Access",
-            "Devo can edit files outside this workspace and access the internet without asking for approval. Exercise caution when using.",
+            "InfiniteCode can edit files outside this workspace and access the internet without asking for approval. Exercise caution when using.",
         ),
     ]
     .into_iter()

@@ -269,7 +269,7 @@ export function AppSidebarContent({
 	const automationsEnabled = useAtomValue(automationsEnabledAtom)
 	const activeServer = useAtomValue(activeServerConfigAtom)
 	const isLocalServer = activeServer.type === "local"
-	const canRevealInFinder = typeof window !== "undefined" && "devo" in window
+	const canRevealInFinder = typeof window !== "undefined" && "infinitecode" in window
 	const stableProjectOrderRef = useRef<Map<string, number>>(new Map())
 
 	const visibleAgents = useMemo(() => agents.filter((agent) => !agent.parentId), [agents])

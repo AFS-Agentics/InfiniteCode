@@ -4,10 +4,10 @@ import type { WindowChromeTier } from "../../preload/api"
 import { chromeTierAtom, isTransparentAtom, opaqueWindowsAtom } from "../atoms/preferences"
 
 /**
- * Detect whether we're running inside Electron (preload injects `window.devo`).
+ * Detect whether we're running inside Electron (preload injects `window.infinitecode`).
  */
 function isElectron(): boolean {
-	return typeof window !== "undefined" && "devo" in window
+	return typeof window !== "undefined" && "infinitecode" in window
 }
 
 /** All glass-related CSS classes that we toggle on <html>. */
@@ -40,7 +40,7 @@ export function useChromeTier() {
 	useEffect(() => {
 		if (!isElectron()) return
 
-		window.devo.getChromeTier().then((tier) => {
+		window.infinitecode.getChromeTier().then((tier) => {
 			setChromeTier(tier)
 		})
 	}, [setChromeTier])
@@ -49,7 +49,7 @@ export function useChromeTier() {
 	useEffect(() => {
 		if (!isElectron()) return
 
-		const unsubscribe = window.devo.onChromeTier((tier: string) => {
+		const unsubscribe = window.infinitecode.onChromeTier((tier: string) => {
 			setChromeTier(tier as WindowChromeTier)
 		})
 
@@ -83,7 +83,7 @@ export function useChromeTier() {
 	// (e.g. disabling hover states on macOS to match native sidebar behavior)
 	useEffect(() => {
 		if (!isElectron()) return
-		document.documentElement.dataset.platform = window.devo.platform
+		document.documentElement.dataset.platform = window.infinitecode.platform
 	}, [])
 
 	// Track native window focus for Windows chrome styling.

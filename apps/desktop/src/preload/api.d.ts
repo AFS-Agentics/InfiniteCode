@@ -2,10 +2,10 @@
  * Type definitions for the Electron preload bridge.
  *
  * These types are shared between the preload script and the renderer.
- * The renderer accesses these via `window.devo`.
+ * The renderer accesses these via `window.infinitecode`.
  */
 
-export interface DevoServerInfo {
+export interface InfiniteCodeServerInfo {
 	url: string
 	transport: "stdio"
 	pid: number | null
@@ -130,7 +130,7 @@ export interface OpenInTargetsResult {
 // Server config types (shared between main process and renderer)
 // ============================================================
 
-/** Built-in local server, auto-managed by Devo via DevoManager. */
+/** Built-in local server, auto-managed by InfiniteCode. */
 export interface LocalServerConfig {
 	id: "local"
 	name: string
@@ -224,7 +224,7 @@ export interface AppSettings {
 	appearance: AppearanceSettings
 	/** External app target preferences for opening projects. */
 	openIn: OpenInSettings
-	/** User-managed folders shown in Devo Desktop. */
+	/** User-managed folders shown in InfiniteCode Desktop. */
 	desktopFolders: DesktopFolderSettings
 	/** Server connection configuration. */
 	servers: ServerSettings
@@ -234,7 +234,7 @@ export interface AppSettings {
 // Onboarding types
 // ============================================================
 
-export interface DevoCheckResult {
+export interface InfiniteCodeCheckResult {
 	installed: boolean
 	version: string | null
 	path: string | null
@@ -431,7 +431,7 @@ export interface UpdateAutomationInput {
 	execution?: Partial<ExecutionConfig>
 }
 
-export interface DevoAPI {
+export interface InfiniteCodeAPI {
 	/** The host platform: "darwin", "win32", or "linux". */
 	platform: NodeJS.Platform
 	getAppInfo: () => Promise<AppInfo>
@@ -444,10 +444,10 @@ export interface DevoAPI {
 	/** Get the current chrome tier (pull-based, avoids race with push event). */
 	getChromeTier: () => Promise<WindowChromeTier>
 
-	ensureDevo: () => Promise<DevoServerInfo>
+	ensureInfiniteCode: () => Promise<InfiniteCodeServerInfo>
 	getServerUrl: () => Promise<string | null>
-	stopDevo: () => Promise<boolean>
-	restartDevo: () => Promise<DevoServerInfo>
+	stopInfiniteCode: () => Promise<boolean>
+	restartInfiniteCode: () => Promise<InfiniteCodeServerInfo>
 	onTerminalToggle: (callback: () => void) => () => void
 	acp: {
 		request: (request: {
@@ -590,8 +590,8 @@ export interface DevoAPI {
 	onAutomationRunsUpdated: (callback: () => void) => () => void
 
 	onboarding: {
-		checkDevo: () => Promise<DevoCheckResult>
-		/** Quick-detect all supported providers (Claude Code, Cursor, Devo, OpenCode). */
+		checkInfiniteCode: () => Promise<InfiniteCodeCheckResult>
+		/** Quick-detect all supported providers (Claude Code, Cursor, InfiniteCode, OpenCode). */
 		detectProviders: () => Promise<ProviderDetection[]>
 		/** Full scan of a specific provider's configuration. */
 		scanProvider: (
@@ -623,6 +623,6 @@ export interface DevoAPI {
 
 declare global {
 	interface Window {
-		devo: DevoAPI
+		infinitecode: InfiniteCodeAPI
 	}
 }

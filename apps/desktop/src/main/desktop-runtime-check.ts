@@ -1,11 +1,11 @@
 import { app } from "electron"
 import { checkDevoProgram, type DevoCheckResult } from "./compatibility"
-import { resolveDevoProgram } from "./devo-program"
+import { resolveProgram } from "./devo-program"
 
 export async function checkDesktopRuntime(): Promise<DevoCheckResult> {
 	let program: string
 	try {
-		program = resolveDevoProgram({
+		program = resolveProgram({
 			appPath: app.getAppPath(),
 			env: process.env,
 			isPackaged: app.isPackaged,

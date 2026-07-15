@@ -56,12 +56,12 @@ describe("desktop quit guard", () => {
 	test("builds the native dialog options for active work", () => {
 		expect(createWorkingSessionsQuitDialogOptions(2)).toEqual({
 			type: "warning",
-			buttons: ["Cancel", "Quit Devo"],
+			buttons: ["Cancel", "Quit InfiniteCode"],
 			defaultId: CANCEL_QUIT_BUTTON_INDEX,
 			cancelId: CANCEL_QUIT_BUTTON_INDEX,
-			title: "Quit Devo?",
+			title: "Quit InfiniteCode?",
 			message: "2 sessions are still working.",
-			detail: "Quitting Devo will stop the local server and interrupt active work.",
+			detail: "Quitting InfiniteCode will stop the local server and interrupt active work.",
 		})
 		expect(CONFIRM_QUIT_BUTTON_INDEX).toBe(1)
 	})

@@ -1,6 +1,6 @@
 appId: com.devo.desktop
-productName: Devo
-copyright: Copyright (c) 2025 Devo Contributors
+productName: InfiniteCode
+copyright: Copyright (c) 2025 InfiniteCode Contributors
 directories:
   buildResources: resources
   output: release
@@ -70,10 +70,10 @@ linux:
   maintainer: devo
   desktop:
     entry:
-      Name: Devo
+      Name: InfiniteCode
       Comment: AI-powered coding assistant
       Categories: Development;IDE;
-      StartupWMClass: Devo
+      StartupWMClass: InfiniteCode
 
 nsis:
   oneClick: false

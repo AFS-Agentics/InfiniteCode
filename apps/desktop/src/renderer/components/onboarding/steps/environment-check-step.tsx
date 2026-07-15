@@ -14,7 +14,7 @@ import {
 	XCircleIcon,
 } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { DevoCheckResult } from "../../../../preload/api"
+import type { InfiniteCodeCheckResult } from "../../../../preload/api"
 
 type CheckStatus = "pending" | "running" | "success" | "warning" | "error"
 
@@ -31,13 +31,13 @@ interface EnvironmentCheckStepProps {
 
 export function EnvironmentCheckStep({ onComplete }: EnvironmentCheckStepProps) {
 	const [checks, setChecks] = useState<CheckItem[]>([
-		{ id: "locate", label: "Locating bundled Devo runtime", status: "pending" },
+		{ id: "locate", label: "Locating bundled InfiniteCode runtime", status: "pending" },
 		{ id: "version", label: "Checking version compatibility", status: "pending" },
 	])
-	const [devoResult, setDevoResult] = useState<DevoCheckResult | null>(null)
+	const [devoResult, setDevoResult] = useState<InfiniteCodeCheckResult | null>(null)
 	const [allDone, setAllDone] = useState(false)
 	const hasRun = useRef(false)
-	const isElectron = typeof window !== "undefined" && "devo" in window
+	const isElectron = typeof window !== "undefined" && "infinitecode" in window
 
 	const updateCheck = useCallback((id: string, update: Partial<CheckItem>) => {
 		setChecks((prev) => prev.map((check) => (check.id === id ? { ...check, ...update } : check)))
@@ -48,26 +48,26 @@ export function EnvironmentCheckStep({ onComplete }: EnvironmentCheckStepProps) 
 		setAllDone(false)
 		setDevoResult(null)
 		setChecks([
-			{ id: "locate", label: "Locating bundled Devo runtime", status: "running" },
+			{ id: "locate", label: "Locating bundled InfiniteCode runtime", status: "running" },
 			{ id: "version", label: "Checking version compatibility", status: "pending" },
 		])
 
 		try {
-			const result = await window.devo.onboarding.checkDevo()
+			const result = await window.infinitecode.onboarding.checkInfiniteCode()
 			setDevoResult(result)
 
 			if (!result.installed) {
 				updateCheck("locate", {
 					status: "error",
-					label: "Bundled Devo runtime not found",
-					detail: result.message ?? "Reinstall Devo Desktop to continue.",
+					label: "Bundled InfiniteCode runtime not found",
+					detail: result.message ?? "Reinstall InfiniteCode Desktop to continue.",
 				})
 				return
 			}
 
 			updateCheck("locate", {
 				status: "success",
-				label: `Devo ${result.version} found`,
+				label: `InfiniteCode ${result.version} found`,
 				detail: result.path ?? undefined,
 			})
 			updateCheck("version", { status: "running" })
@@ -112,7 +112,7 @@ export function EnvironmentCheckStep({ onComplete }: EnvironmentCheckStepProps) 
 				<div className="text-center">
 					<h2 className="text-xl font-semibold text-foreground">Environment Check</h2>
 					<p className="mt-1 text-sm text-muted-foreground">
-						Verifying your local setup is ready for Devo.
+						Verifying your local setup is ready for InfiniteCode.
 					</p>
 				</div>
 

@@ -4,7 +4,7 @@ import { agentFamily } from "../atoms/derived/agents"
 import { pendingCountAtom } from "../atoms/derived/waiting"
 import { appStore } from "../atoms/store"
 
-const isElectron = typeof window !== "undefined" && "devo" in window
+const isElectron = typeof window !== "undefined" && "infinitecode" in window
 
 /**
  * Handles native OS notification integration:
@@ -22,7 +22,7 @@ export function useNotifications(
 
 	useEffect(() => {
 		if (!isElectron) return
-		window.devo.updateBadgeCount(pendingCount)
+		window.infinitecode.updateBadgeCount(pendingCount)
 	}, [pendingCount])
 
 	// --- Notification click -> navigate to session ---
@@ -45,17 +45,17 @@ export function useNotifications(
 
 	useEffect(() => {
 		if (!isElectron) return
-		return window.devo.onNotificationNavigate(handleNavigate)
+		return window.infinitecode.onNotificationNavigate(handleNavigate)
 	}, [handleNavigate])
 
 	useEffect(() => {
 		if (!isElectron) return
-		return window.devo.onTrayNewChat(() => navigate({ to: "/", params: {} }))
+		return window.infinitecode.onTrayNewChat(() => navigate({ to: "/", params: {} }))
 	}, [navigate])
 
 	// --- Auto-dismiss when viewing a session ---
 	useEffect(() => {
 		if (!isElectron || !currentSessionId) return
-		window.devo.dismissNotification(currentSessionId)
+		window.infinitecode.dismissNotification(currentSessionId)
 	}, [currentSessionId])
 }

@@ -3,18 +3,18 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
-	DEVO_HOME_ENV,
+	INFINITECODE_HOME_ENV,
 	PROTOCOL_TRACE_ENV,
 	PROTOCOL_TRACE_FILE_ENV,
 	createAcpTrafficLoggerFromEnv,
-	findDevoHome,
+	findInfiniteCodeHome,
 	formatProtocolTraceTimestamp,
 	isProtocolTraceEnabled,
 	resolveProtocolTracePath,
 } from "./acp-traffic-log"
 
 function withTempDir<T>(run: (dir: string) => T): T {
-	const dir = mkdtempSync(path.join(tmpdir(), "devo-acp-traffic-log-"))
+	const dir = mkdtempSync(path.join(tmpdir(), "infinitecode-acp-traffic-log-"))
 	try {
 		return run(dir)
 	} finally {
@@ -43,10 +43,10 @@ describe("protocol trace env trigger", () => {
 		})
 	})
 
-	test("does not create or write a log when DEVO_PROTOCOL_TRACE is unset or empty", () => {
+	test("does not create or write a log when INFINITECODE_PROTOCOL_TRACE is unset or empty", () => {
 		withTempDir((dir) => {
 			const logger = createAcpTrafficLoggerFromEnv({
-				env: { [DEVO_HOME_ENV]: dir },
+				env: { [INFINITECODE_HOME_ENV]: dir },
 				clock: fixedClock,
 				pid: 42,
 			})
@@ -71,7 +71,7 @@ describe("protocol trace env trigger", () => {
 		withTempDir((dir) => {
 			const logger = createAcpTrafficLoggerFromEnv({
 				env: {
-					[DEVO_HOME_ENV]: dir,
+					[INFINITECODE_HOME_ENV]: dir,
 					[PROTOCOL_TRACE_ENV]: " ",
 				},
 				clock: fixedClock,
@@ -98,7 +98,7 @@ describe("protocol trace env trigger", () => {
 		withTempDir((dir) => {
 			const logger = createAcpTrafficLoggerFromEnv({
 				env: {
-					[DEVO_HOME_ENV]: dir,
+					[INFINITECODE_HOME_ENV]: dir,
 					DEVO_DESKTOP_ACP_TRAFFIC_LOG: "1",
 					DEVO_DESKTOP_ACP_TRAFFIC_LOG_PATH: path.join(dir, "old", "traffic.jsonl"),
 					TRAFFIC_LOG_PATH: path.join(dir, "old", "traffic.jsonl"),
@@ -125,12 +125,12 @@ describe("protocol trace env trigger", () => {
 		})
 	})
 
-	test("writes JSONL to DEVO_HOME/traces when DEVO_PROTOCOL_TRACE is enabled", () => {
+	test("writes JSONL to INFINITECODE_HOME/traces when INFINITECODE_PROTOCOL_TRACE is enabled", () => {
 		withTempDir((dir) => {
 			const expectedPath = path.join(dir, "traces", "protocol-42-20260627T010203Z.ndjsonl")
 			const logger = createAcpTrafficLoggerFromEnv({
 				env: {
-					[DEVO_HOME_ENV]: dir,
+					[INFINITECODE_HOME_ENV]: dir,
 					[PROTOCOL_TRACE_ENV]: "1",
 				},
 				clock: fixedClock,
@@ -159,12 +159,12 @@ describe("protocol trace env trigger", () => {
 		})
 	})
 
-	test("writes JSONL to DEVO_PROTOCOL_TRACE_FILE when provided", () => {
+	test("writes JSONL to INFINITECODE_PROTOCOL_TRACE_FILE when provided", () => {
 		withTempDir((dir) => {
 			const logPath = path.join(dir, "custom", "trace.ndjsonl")
 			const logger = createAcpTrafficLoggerFromEnv({
 				env: {
-					[DEVO_HOME_ENV]: dir,
+					[INFINITECODE_HOME_ENV]: dir,
 					[PROTOCOL_TRACE_ENV]: "true",
 					[PROTOCOL_TRACE_FILE_ENV]: ` ${logPath} `,
 				},
@@ -194,22 +194,22 @@ describe("protocol trace env trigger", () => {
 		})
 	})
 
-	test("falls back to temp devo-traces when DEVO_HOME is invalid", () => {
+	test("falls back to temp infinitecode-traces when INFINITECODE_HOME is invalid", () => {
 		const logPath = resolveProtocolTracePath({
 			env: {
-				[DEVO_HOME_ENV]: path.join(tmpdir(), "missing-devo-home-for-trace"),
+				[INFINITECODE_HOME_ENV]: path.join(tmpdir(), "missing-infinitecode-home-for-trace"),
 				[PROTOCOL_TRACE_ENV]: "1",
 			},
 			clock: fixedClock,
 			pid: 99,
 		})
 
-		expect(logPath).toMatch(/devo-traces[\\/]protocol-99-20260627T010203Z\.ndjsonl$/)
+		expect(logPath).toMatch(/infinitecode-traces[\\/]protocol-99-20260627T010203Z\.ndjsonl$/)
 	})
 
-	test("findDevoHome honors DEVO_HOME and defaults to ~/.devo", () => {
+	test("findInfiniteCodeHome honors INFINITECODE_HOME and defaults to ~/.infinitecode", () => {
 		withTempDir((dir) => {
-			expect(findDevoHome({ [DEVO_HOME_ENV]: dir })).toBe(path.resolve(dir))
+			expect(findInfiniteCodeHome({ [INFINITECODE_HOME_ENV]: dir })).toBe(path.resolve(dir))
 		})
 	})
 

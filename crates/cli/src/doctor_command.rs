@@ -1,4 +1,4 @@
-//! `devo doctor` health checks for local configuration and provider readiness.
+//! `infinitecode doctor` health checks for local configuration and provider readiness.
 //!
 //! This command is intentionally diagnostic rather than mutating: it reports
 //! toolchain, config, provider-resolution, and model-catalog state so users can
@@ -13,7 +13,7 @@ pub(crate) async fn run_doctor() -> Result<()> {
     use colored::Colorize;
     use std::process::Command;
 
-    println!("{}", "=== Devo Doctor ===".bold());
+    println!("{}", "=== InfiniteCode Doctor ===".bold());
     println!();
 
     let mut all_ok = true;
@@ -32,7 +32,7 @@ pub(crate) async fn run_doctor() -> Result<()> {
     }
     println!();
 
-    println!("{} Config home (DEVO_HOME):", "✓".green().bold());
+    println!("{} Config home (INFINITECODE_HOME):", "✓".green().bold());
     match find_devo_home() {
         Ok(home) => {
             println!("  {}", home.display());
@@ -67,7 +67,7 @@ pub(crate) async fn run_doctor() -> Result<()> {
                 "missing".yellow(),
                 config_path.display()
             );
-            println!("  Run `devo onboard` to create it.");
+            println!("  Run `infinitecode onboard` to create it.");
             all_ok = false;
         }
     }

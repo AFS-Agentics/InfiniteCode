@@ -22,13 +22,13 @@ export function useUpdater() {
 		if (!isElectron) return
 
 		// Get current state on mount
-		window.devo
+		window.infinitecode
 			.getUpdateState()
 			.then(setState)
 			.catch(() => {})
 
 		// Subscribe to state changes pushed from main process
-		const unsubscribe = window.devo.onUpdateStateChanged((newState) => {
+		const unsubscribe = window.infinitecode.onUpdateStateChanged((newState) => {
 			setState(newState)
 		})
 
@@ -37,22 +37,22 @@ export function useUpdater() {
 
 	const checkForUpdates = useCallback(async () => {
 		if (!isElectron) return
-		await window.devo.checkForUpdates()
+		await window.infinitecode.checkForUpdates()
 	}, [])
 
 	const downloadUpdate = useCallback(async () => {
 		if (!isElectron) return
-		await window.devo.downloadUpdate()
+		await window.infinitecode.downloadUpdate()
 	}, [])
 
 	const installUpdate = useCallback(() => {
 		if (!isElectron) return
-		window.devo.installUpdate()
+		window.infinitecode.installUpdate()
 	}, [])
 
 	const openReleasePage = useCallback(async () => {
 		if (!isElectron) return
-		await window.devo.openReleasePage()
+		await window.infinitecode.openReleasePage()
 	}, [])
 
 	return {

@@ -92,9 +92,9 @@ export function ProviderSetupStep({ onComplete, onSkip }: ProviderSetupStepProps
 			<div className="flex h-full flex-col items-center justify-center space-y-6 text-center">
 				<div className="flex flex-col items-center space-y-2">
 					<Spinner className="size-8 text-muted-foreground" />
-					<h2 className="text-xl font-semibold">Waiting for Devo server...</h2>
+					<h2 className="text-xl font-semibold">Starting the AI engine...</h2>
 					<p className="max-w-md text-sm text-muted-foreground">
-						Devo is connecting to the Devo background process. This should only take a moment.
+						The background agent process is starting up. This should only take a moment.
 					</p>
 				</div>
 				<div className="flex gap-3">
@@ -119,7 +119,7 @@ export function ProviderSetupStep({ onComplete, onSkip }: ProviderSetupStepProps
 				</motion.div>
 				<h2 className="text-2xl font-bold tracking-tight">AI Providers</h2>
 				<p className="text-muted-foreground">
-					Devo supports connecting your own model API keys for more model choices.
+					InfiniteCode supports connecting your own model API keys for more model choices.
 				</p>
 			</div>
 

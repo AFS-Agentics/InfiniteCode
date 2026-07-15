@@ -17,8 +17,8 @@ export interface CodexStyleTrayMenuOptions {
 	pendingCount: number
 	onNavigateToSession: (sessionId: string) => void
 	onNewChat: () => void
-	onOpenDevo: () => void
-	onQuitDevo: () => void
+	onOpenApp: () => void
+	onQuitApp: () => void
 }
 
 interface TraySession {
@@ -50,7 +50,7 @@ export function buildCodexStyleTrayMenuTemplate(
 			label: `${options.pendingCount} Pending ${
 				options.pendingCount === 1 ? "Approval" : "Approvals"
 			}`,
-			click: options.onOpenDevo,
+			click: options.onOpenApp,
 		})
 		template.push(separator())
 	}
@@ -84,13 +84,13 @@ export function buildCodexStyleTrayMenuTemplate(
 	})
 	template.push(separator())
 	template.push({
-		label: "Open Devo",
-		click: options.onOpenDevo,
+		label: "Open InfiniteCode",
+		click: options.onOpenApp,
 	})
 	template.push(separator())
 	template.push({
-		label: "Quit Devo",
-		click: options.onQuitDevo,
+		label: "Quit InfiniteCode",
+		click: options.onQuitApp,
 	})
 
 	return template

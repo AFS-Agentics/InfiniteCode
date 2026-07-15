@@ -284,7 +284,7 @@ impl ChatWidget {
                 Line::from("Please wait.".dim()),
             ];
             Paragraph::new(Text::from(lines))
-                .block(Block::default().title("Devo Sessions"))
+                .block(Block::default().title("InfiniteCode Sessions"))
                 .wrap(Wrap { trim: false })
                 .render(area, buf);
             return true;
@@ -384,7 +384,7 @@ impl ChatWidget {
             !browser.sessions.is_empty(),
         ));
         Paragraph::new(Text::from(lines))
-            .block(Block::default().title("Devo Sessions"))
+            .block(Block::default().title("InfiniteCode Sessions"))
             .wrap(Wrap { trim: false })
             .render(area, buf);
         true

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use crate::find_devo_home;
 
 /// The fixed directory name used for user-level and project-level config folders.
-pub const APP_CONFIG_DIR_NAME: &str = ".devo";
+pub const APP_CONFIG_DIR_NAME: &str = ".infinitecode";
 
 /// The fixed TOML filename used for application config.
 pub const APP_CONFIG_FILE_NAME: &str = "config.toml";
@@ -121,8 +121,8 @@ mod tests {
             ConfigPaths {
                 user_config_file: PathBuf::from("/home/tester/config.toml"),
                 user_config_dir: PathBuf::from("/home/tester"),
-                project_config_file: Some(PathBuf::from("/repo/.devo/config.toml")),
-                project_config_dir: Some(PathBuf::from("/repo/.devo")),
+                project_config_file: Some(PathBuf::from("/repo/.infinitecode/config.toml")),
+                project_config_dir: Some(PathBuf::from("/repo/.infinitecode")),
             }
         );
     }
@@ -130,14 +130,14 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn resolver_supports_user_only_paths_windows() {
-        let resolver = FileSystemConfigPathResolver::new(PathBuf::from("C:\\Users\\tester\\.devo"));
+        let resolver = FileSystemConfigPathResolver::new(PathBuf::from("C:\\Users\\tester\\.infinitecode"));
         let paths = resolver.resolve_paths(None).expect("paths");
 
         assert_eq!(
             paths,
             ConfigPaths {
-                user_config_file: PathBuf::from("C:\\Users\\tester\\.devo\\config.toml"),
-                user_config_dir: PathBuf::from("C:\\Users\\tester\\.devo"),
+                user_config_file: PathBuf::from("C:\\Users\\tester\\.infinitecode\\config.toml"),
+                user_config_dir: PathBuf::from("C:\\Users\\tester\\.infinitecode"),
                 project_config_file: None,
                 project_config_dir: None,
             }
@@ -147,14 +147,14 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn resolver_supports_user_only_paths_unix() {
-        let resolver = FileSystemConfigPathResolver::new(PathBuf::from("/home/tester/.devo"));
+        let resolver = FileSystemConfigPathResolver::new(PathBuf::from("/home/tester/.infinitecode"));
         let paths = resolver.resolve_paths(None).expect("paths");
 
         assert_eq!(
             paths,
             ConfigPaths {
-                user_config_file: PathBuf::from("/home/tester/.devo/config.toml"),
-                user_config_dir: PathBuf::from("/home/tester/.devo"),
+                user_config_file: PathBuf::from("/home/tester/.infinitecode/config.toml"),
+                user_config_dir: PathBuf::from("/home/tester/.infinitecode"),
                 project_config_file: None,
                 project_config_dir: None,
             }

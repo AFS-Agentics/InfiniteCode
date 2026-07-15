@@ -1,7 +1,7 @@
 import type { AcpTransport, AcpTransportEvent, AcpTransportListener, JsonRpcId } from "./acp-stdio-client"
 import { app } from "electron"
 import {
-	DEVO_HOME_ENV,
+	INFINITECODE_HOME_ENV,
 	PROTOCOL_TRACE_ENV,
 	PROTOCOL_TRACE_FILE_ENV,
 	createAcpTrafficLoggerFromEnv,
@@ -9,17 +9,17 @@ import {
 	type AcpTrafficLogState,
 } from "./acp-traffic-log"
 import { StdioAcpClient } from "./acp-stdio-client"
-import { resolveDevoProgram } from "./devo-program"
+import { resolveProgram } from "./devo-program"
 import { createLogger } from "./logger"
 import { startNotificationWatcher, stopNotificationWatcher } from "./notification-watcher"
 import { getSettings } from "./settings-store"
 import { waitForEnv } from "./shell-env"
 
-const log = createLogger("devo-manager")
+const log = createLogger("infinitecode-manager")
 
 const STDIO_URL = "stdio://local"
 const acpTrafficLogStartupEnv = {
-	[DEVO_HOME_ENV]: process.env[DEVO_HOME_ENV],
+	[INFINITECODE_HOME_ENV]: process.env[INFINITECODE_HOME_ENV],
 	[PROTOCOL_TRACE_ENV]: process.env[PROTOCOL_TRACE_ENV],
 	[PROTOCOL_TRACE_FILE_ENV]: process.env[PROTOCOL_TRACE_FILE_ENV],
 }
@@ -134,7 +134,7 @@ async function startServer(): Promise<DevoServer> {
 	}
 	startNotificationWatcher(getAcpTransport())
 	notifyServerReady()
-	log.info("Devo ACP stdio server ready", { pid: server.pid })
+	log.info("InfiniteCode ACP stdio server ready", { pid: server.pid })
 	return server
 }
 
@@ -145,7 +145,7 @@ async function ensureClient(): Promise<StdioAcpClient> {
 
 function getOrCreateClient(): StdioAcpClient {
 	if (!stdioClient) {
-		const program = resolveDevoProgram({
+		const program = resolveProgram({
 			appPath: app.getAppPath(),
 			env: process.env,
 			isPackaged: app.isPackaged,
@@ -172,7 +172,7 @@ function getAcpTrafficLogger(): AcpTrafficLogger {
 
 function handleTransportEvent(event: AcpTransportEvent): void {
 	if (event.type === "closed") {
-		log.warn("Devo ACP stdio transport closed", { error: event.error })
+		log.warn("InfiniteCode ACP stdio transport closed", { error: event.error })
 		server = null
 	}
 }
@@ -195,8 +195,8 @@ async function initialize(client: StdioAcpClient): Promise<void> {
 			terminal: false,
 		},
 		clientInfo: {
-			name: "devo-desktop",
-			title: "Devo Desktop",
+			name: "infinitecode-desktop",
+			title: "InfiniteCode Desktop",
 			version: "0.1.0",
 		},
 	})

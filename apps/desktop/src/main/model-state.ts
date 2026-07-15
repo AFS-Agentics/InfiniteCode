@@ -25,7 +25,7 @@ const EMPTY_STATE: ModelState = { recent: [], favorite: [], variant: {} }
 const MAX_RECENT = 10
 
 /**
- * Resolves the Devo state directory path.
+ * Resolves the InfiniteCode state directory path.
  * Queries the running server first, falls back to default XDG path.
  */
 async function resolveStatePath(): Promise<string> {
@@ -40,7 +40,7 @@ async function resolveStatePath(): Promise<string> {
 	} catch {
 		// Server unreachable — fall through
 	}
-	return join(homedir(), ".local", "state", "devo")
+	return join(homedir(), ".local", "state", "infinitecode")
 }
 
 // ============================================================
@@ -48,9 +48,9 @@ async function resolveStatePath(): Promise<string> {
 // ============================================================
 
 /**
- * Reads the Devo model state (recent models, favorites, variants).
+ * Reads the InfiniteCode model state (recent models, favorites, variants).
  *
- * First discovers the state directory by querying the running Devo server,
+ * First discovers the state directory by querying the running InfiniteCode server,
  * then reads `{state}/model.json`.
  * Falls back to the default XDG path if the server is unreachable.
  */

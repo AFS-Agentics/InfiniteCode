@@ -17,7 +17,7 @@ import { fetchOpenInTargets, setOpenInPreferred } from "../../services/backend"
 import { SettingsRow } from "./settings-row"
 import { SettingsSection } from "./settings-section"
 
-const isElectron = typeof window !== "undefined" && "devo" in window
+const isElectron = typeof window !== "undefined" && "infinitecode" in window
 
 export function GeneralSettings() {
 	return (
@@ -133,9 +133,9 @@ function OpaqueWindowsRow() {
 		async (checked: boolean) => {
 			setOpaque(checked)
 			if (isElectron) {
-				await window.devo.setOpaqueWindows(checked)
+				await window.infinitecode.setOpaqueWindows(checked)
 				// Requires relaunch -- prompt or auto-relaunch
-				window.devo.relaunch()
+				window.infinitecode.relaunch()
 			}
 		},
 		[setOpaque],

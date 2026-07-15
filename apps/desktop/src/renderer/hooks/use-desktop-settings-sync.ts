@@ -6,7 +6,7 @@ import { colorSchemeAtom, displayModeAtom, hideThinkingWhileWorkingAtom, opaqueW
 import { buildRendererPreferencesMigrationPatch } from "../lib/settings-sync"
 
 function isElectron(): boolean {
-	return typeof window !== "undefined" && "devo" in window
+	return typeof window !== "undefined" && "infinitecode" in window
 }
 
 export function useDesktopSettingsSync() {
@@ -36,10 +36,10 @@ export function useDesktopSettingsSync() {
 
 		const hydrateSettings = async () => {
 			try {
-				let settings = await window.devo.getSettings()
+				let settings = await window.infinitecode.getSettings()
 				const migrationPatch = buildRendererPreferencesMigrationPatch(settings, window.localStorage)
 				if (migrationPatch) {
-					settings = await window.devo.updateSettings(migrationPatch)
+					settings = await window.infinitecode.updateSettings(migrationPatch)
 				}
 				if (!cancelled) applySettings(settings)
 			} catch (err) {
@@ -49,7 +49,7 @@ export function useDesktopSettingsSync() {
 
 		void hydrateSettings()
 
-		const unsubscribe = window.devo.onSettingsChanged((settings) => {
+		const unsubscribe = window.infinitecode.onSettingsChanged((settings) => {
 			if (!cancelled) applySettings(settings)
 		})
 

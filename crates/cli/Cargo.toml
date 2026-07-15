@@ -6,7 +6,7 @@ name = "devo-cli"
 version.workspace = true
 
 [[bin]]
-name = "devo"
+name = "infinitecode"
 path = "src/main.rs"
 
 [dependencies]

@@ -54,7 +54,7 @@ interface MigrationOfferStepProps {
 const PROVIDER_LABELS: Record<MigrationProvider, string> = {
 	"claude-code": "Claude Code",
 	cursor: "Cursor",
-	devo: "Devo",
+	devo: "InfiniteCode",
 	opencode: "OpenCode",
 }
 
@@ -70,7 +70,7 @@ export function MigrationOfferStep({ provider, onPreview, onSkip }: MigrationOff
 	const hasScanned = useRef(false)
 	const scanResultRef = useRef<unknown>(null)
 
-	const isElectron = typeof window !== "undefined" && "devo" in window
+	const isElectron = typeof window !== "undefined" && "infinitecode" in window
 	const label = PROVIDER_LABELS[provider]
 
 	// Run full scan on mount (user explicitly opted in)
@@ -79,7 +79,7 @@ export function MigrationOfferStep({ provider, onPreview, onSkip }: MigrationOff
 		hasScanned.current = true
 		setScanning(true)
 
-		window.devo.onboarding
+		window.infinitecode.onboarding
 			.scanProvider(provider)
 			.then(({ detection, scanResult }) => {
 				scanResultRef.current = scanResult
@@ -104,7 +104,7 @@ export function MigrationOfferStep({ provider, onPreview, onSkip }: MigrationOff
 		const selectedIds = categories.filter((c) => c.enabled).map((c) => c.id)
 
 		try {
-			const preview = await window.devo.onboarding.previewMigration(
+			const preview = await window.infinitecode.onboarding.previewMigration(
 				provider,
 				scanResultRef.current,
 				selectedIds,

@@ -82,8 +82,8 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			},
 			onNavigateToSession: () => {},
 			onNewChat: () => {},
-			onOpenDevo: () => {},
-			onQuitDevo: () => {},
+			onOpenApp: () => {},
+			onQuitApp: () => {},
 			pendingCount: 0,
 		})
 
@@ -162,9 +162,9 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			{ label: undefined, sublabel: undefined, enabled: undefined, type: "separator", click: false, submenu: undefined },
 			{ label: "New Chat", sublabel: undefined, enabled: undefined, type: undefined, click: true, submenu: undefined },
 			{ label: undefined, sublabel: undefined, enabled: undefined, type: "separator", click: false, submenu: undefined },
-			{ label: "Open Devo", sublabel: undefined, enabled: undefined, type: undefined, click: true, submenu: undefined },
+			{ label: "Open InfiniteCode", sublabel: undefined, enabled: undefined, type: undefined, click: true, submenu: undefined },
 			{ label: undefined, sublabel: undefined, enabled: undefined, type: "separator", click: false, submenu: undefined },
-			{ label: "Quit Devo", sublabel: undefined, enabled: undefined, type: undefined, click: true, submenu: undefined },
+			{ label: "Quit InfiniteCode", sublabel: undefined, enabled: undefined, type: undefined, click: true, submenu: undefined },
 		])
 	})
 })
