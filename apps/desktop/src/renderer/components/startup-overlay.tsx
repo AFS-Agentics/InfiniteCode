@@ -79,7 +79,7 @@ export function StartupOverlay() {
 	return (
 		<div
 			data-slot="startup-overlay"
-			className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background text-foreground transition-opacity ${isVisible ? "opacity-100" : "opacity-0"}`}
+			className={`fixed inset-0 z-[9999] flex flex-col bg-background text-foreground transition-opacity ${isVisible ? "opacity-100" : "opacity-0"}`}
 			style={{
 				transitionDuration: `${FADE_DURATION_MS}ms`,
 				transitionTimingFunction: "ease-out",
@@ -89,17 +89,19 @@ export function StartupOverlay() {
 				WebkitAppRegion: "drag",
 			}}
 		>
-			<img
-				src="/logo.png"
-				alt="InfiniteCode"
-				className="mb-6 h-24 w-auto object-contain"
-			/>
-			<div className="devo-loading-dots mt-8" aria-hidden="true">
-				<span />
-				<span />
-				<span />
+			<div className="flex flex-1 flex-col items-center justify-center">
+				<img
+					src="/logo.png"
+					alt="InfiniteCode"
+					className="mb-6 h-24 w-auto object-contain"
+				/>
+				<div className="devo-loading-dots mt-8" aria-hidden="true">
+					<span />
+					<span />
+					<span />
+				</div>
 			</div>
-			<p className="mt-12 text-xs text-muted-foreground">By AFS Agentics</p>
+			<p className="pb-4 text-center text-xs text-muted-foreground">By AFS Agentics</p>
 		</div>
 	)
 }

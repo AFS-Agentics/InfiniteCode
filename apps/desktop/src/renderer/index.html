@@ -24,8 +24,6 @@
         z-index: 99999;
         display: flex;
         flex-direction: column;
-        align-items: center;
-        justify-content: center;
         background: var(--devo-startup-background);
         transition: opacity 300ms ease-out;
         /* Allow dragging the window from the splash on macOS */
@@ -35,8 +33,16 @@
         opacity: 0;
         pointer-events: none;
       }
+      .splash-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
       .splash-copyright {
-        margin-top: 24px;
+        padding-bottom: 16px;
+        text-align: center;
         font-size: 12px;
         color: rgba(255, 255, 255, 0.4);
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -207,6 +213,7 @@
     <!-- Splash screen: renders immediately before React/JS loads.
          The React StartupOverlay component removes this element once it mounts. -->
     <div id="splash">
+      <div class="splash-body">
       <span class="devo-splash-brand" role="img" aria-label="InfiniteCode">
         <span class="devo-splash-brand-mark-frame" aria-hidden="true">
           <svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" class="devo-splash-brand-mark devo-brand-mark-attention">
@@ -230,6 +237,7 @@
         </span>
       </span>
       <div class="devo-loading-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      </div>
       <p class="splash-copyright">By AFS Agentics</p>
     </div>
     <div id="root"></div>
