@@ -1,0 +1,8 @@
+{
+	"rootDirectory": "apps/website",
+	"github": {
+		"silent": true,
+		"autoJobCancelation": true
+	},
+	"ignoreCommand": "git diff --quiet HEAD~1 HEAD -- apps/website/"
+}
