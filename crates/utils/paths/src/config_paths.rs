@@ -130,7 +130,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn resolver_supports_user_only_paths_windows() {
-        let resolver = FileSystemConfigPathResolver::new(PathBuf::from("C:\\Users\\tester\\.infinitecode"));
+        let resolver =
+            FileSystemConfigPathResolver::new(PathBuf::from("C:\\Users\\tester\\.infinitecode"));
         let paths = resolver.resolve_paths(None).expect("paths");
 
         assert_eq!(
@@ -147,7 +148,8 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn resolver_supports_user_only_paths_unix() {
-        let resolver = FileSystemConfigPathResolver::new(PathBuf::from("/home/tester/.infinitecode"));
+        let resolver =
+            FileSystemConfigPathResolver::new(PathBuf::from("/home/tester/.infinitecode"));
         let paths = resolver.resolve_paths(None).expect("paths");
 
         assert_eq!(

@@ -47,7 +47,9 @@ fn find_devo_home_from_env(devo_home_env: Option<&str>) -> std::io::Result<PathB
             if !metadata.is_dir() {
                 Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
-                    format!("INFINITECODE_HOME points to {val:?}, but that path is not a directory"),
+                    format!(
+                        "INFINITECODE_HOME points to {val:?}, but that path is not a directory"
+                    ),
                 ))
             } else {
                 path.canonicalize().map(strip_unc_prefix).map_err(|err| {
@@ -87,7 +89,8 @@ mod tests {
             .to_str()
             .expect("missing path should be valid utf-8");
 
-        let err = find_devo_home_from_env(Some(missing_str)).expect_err("missing INFINITECODE_HOME");
+        let err =
+            find_devo_home_from_env(Some(missing_str)).expect_err("missing INFINITECODE_HOME");
         assert_eq!(err.kind(), ErrorKind::NotFound);
         assert!(
             err.to_string().contains("INFINITECODE_HOME"),
@@ -100,9 +103,7 @@ mod tests {
         let temp_home = TempDir::new().expect("temp home");
         let file_path = temp_home.path().join("infinitecode-home.txt");
         fs::write(&file_path, "not a directory").expect("write temp file");
-        let file_str = file_path
-            .to_str()
-            .expect("file path should be valid utf-8");
+        let file_str = file_path.to_str().expect("file path should be valid utf-8");
 
         let err = find_devo_home_from_env(Some(file_str)).expect_err("file INFINITECODE_HOME");
         assert_eq!(err.kind(), ErrorKind::InvalidInput);
@@ -132,7 +133,8 @@ mod tests {
 
     #[test]
     fn find_devo_home_without_env_uses_default_home_dir() {
-        let resolved = find_devo_home_from_env(/*devo_home_env*/ None).expect("default INFINITECODE_HOME");
+        let resolved =
+            find_devo_home_from_env(/*devo_home_env*/ None).expect("default INFINITECODE_HOME");
         let mut expected = home_dir().expect("home dir");
         expected.push(".infinitecode");
         assert_eq!(resolved, expected);
