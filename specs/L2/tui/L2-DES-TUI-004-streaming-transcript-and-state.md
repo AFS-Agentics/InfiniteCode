@@ -77,7 +77,7 @@ Compact shell placement:
 ⠋ Working · ⏱ 12s
 
 <composer>
-┃ Ask Devo
+┃ Ask InfiniteCode
 
 <status>
   BUILD · deepseek-v4-pro high  ↑420[cached 300 71%]  ↓12  ▰▰▱▱▱▱▱▱▱▱  20%  190k/950k
@@ -507,7 +507,7 @@ Example:
 ```text
 ⠋ Working · ⏱ 12s
 
-┃ Ask Devo
+┃ Ask InfiniteCode
 ```
 
 Rules:

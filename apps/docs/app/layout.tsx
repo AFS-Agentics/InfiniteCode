@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Devo",
-  description: "Documentation for the Devo coding agent.",
+  title: "InfiniteCode",
+  description: "Documentation for the InfiniteCode coding agent.",
 };
 
 export default function RootLayout({

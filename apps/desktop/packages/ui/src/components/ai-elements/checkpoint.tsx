@@ -1,9 +1,9 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { Separator } from "@devo/ui/components/separator"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { Separator } from "@infinitecode/ui/components/separator"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { LucideProps } from "lucide-react"
 import { BookmarkIcon } from "lucide-react"
 import type { ComponentProps, HTMLAttributes } from "react"

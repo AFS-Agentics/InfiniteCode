@@ -66,14 +66,14 @@ impl ServerRuntime {
             Ok(resolved_input) => resolved_input,
             Err(error) => {
                 let code = match error {
-                    devo_core::SkillError::SkillNotFound { .. }
-                    | devo_core::SkillError::AmbiguousSkillName { .. }
-                    | devo_core::SkillError::SkillDisabled { .. } => {
+                    infinitecode_core::SkillError::SkillNotFound { .. }
+                    | infinitecode_core::SkillError::AmbiguousSkillName { .. }
+                    | infinitecode_core::SkillError::SkillDisabled { .. } => {
                         ProtocolErrorCode::InvalidParams
                     }
-                    devo_core::SkillError::SkillParseFailed { .. }
-                    | devo_core::SkillError::SkillRootUnavailable { .. }
-                    | devo_core::SkillError::DuplicateSkillId { .. } => {
+                    infinitecode_core::SkillError::SkillParseFailed { .. }
+                    | infinitecode_core::SkillError::SkillRootUnavailable { .. }
+                    | infinitecode_core::SkillError::DuplicateSkillId { .. } => {
                         ProtocolErrorCode::InternalError
                     }
                 };
@@ -93,7 +93,7 @@ impl ServerRuntime {
         let prompt_hook_report = self
             .run_session_hook(
                 params.session_id,
-                devo_core::HookEvent::UserPromptSubmit,
+                infinitecode_core::HookEvent::UserPromptSubmit,
                 serde_json::Map::from_iter([(
                     "prompt".to_string(),
                     serde_json::Value::String(resolved_input.prompt_text.clone()),
@@ -111,7 +111,7 @@ impl ServerRuntime {
             .edited_mentions
             .iter()
             .cloned()
-            .map(serde_json::from_value::<devo_core::Mention>)
+            .map(serde_json::from_value::<infinitecode_core::Mention>)
             .collect::<Result<Vec<_>, _>>()
         {
             Ok(mentions) => mentions,
@@ -123,7 +123,7 @@ impl ServerRuntime {
                 );
             }
         };
-        if params.edit_mode != devo_protocol::EditMode::Normal {
+        if params.edit_mode != infinitecode_protocol::EditMode::Normal {
             return self.error_response(
                 request_id,
                 ProtocolErrorCode::WorkspaceRestoreFailedToStart,
@@ -212,16 +212,16 @@ impl ServerRuntime {
             .resolve_reasoning_effort_selection(turn_config.reasoning_effort_selection.as_deref());
         let request_model = turn_config.provider_request_model(&resolved_request.request_model);
         let replacement_message_id = ItemId::new();
-        let records = devo_core::create_edit_records(
+        let records = infinitecode_core::create_edit_records(
             params.session_id,
             target_message_id,
             Some(target_turn_id),
             replacement_message_id,
-            vec![devo_core::ContentPart::Text(display_input.clone())],
+            vec![infinitecode_core::ContentPart::Text(display_input.clone())],
             edited_mentions,
             workspace_restore_policy,
         );
-        let [first_record, second_record]: [devo_core::DurableRecord; 2] = match records.try_into()
+        let [first_record, second_record]: [infinitecode_core::DurableRecord; 2] = match records.try_into()
         {
             Ok(records) => records,
             Err(_) => {
@@ -233,8 +233,8 @@ impl ServerRuntime {
             }
         };
         let (
-            devo_core::DurableRecord::MessageEditRecorded(mut edit_record),
-            devo_core::DurableRecord::TurnSuperseded(mut superseded_record),
+            infinitecode_core::DurableRecord::MessageEditRecorded(mut edit_record),
+            infinitecode_core::DurableRecord::TurnSuperseded(mut superseded_record),
         ) = (first_record, second_record)
         else {
             return self.error_response(
@@ -244,19 +244,19 @@ impl ServerRuntime {
             );
         };
         edit_record.requested_by_client_id = params.client_edit_id.clone();
-        let restore_plan = if workspace_restore_policy == devo_core::WorkspaceRestorePolicy::Skip {
+        let restore_plan = if workspace_restore_policy == infinitecode_core::WorkspaceRestorePolicy::Skip {
             None
         } else {
             let restore_candidates =
                 discover_restore_candidates(&target_turn_items, target_turn_id);
             let restore_candidate_files = candidate_files(&restore_candidates);
-            let (restore_record, restore_id) = devo_core::plan_workspace_restore(
+            let (restore_record, restore_id) = infinitecode_core::plan_workspace_restore(
                 params.session_id,
                 target_turn_id,
                 restore_candidate_files,
                 workspace_restore_policy,
             );
-            let devo_core::DurableRecord::TurnWorkspaceRestoreStarted(restore_started_record) =
+            let infinitecode_core::DurableRecord::TurnWorkspaceRestoreStarted(restore_started_record) =
                 restore_record
             else {
                 return self.error_response(
@@ -275,7 +275,7 @@ impl ServerRuntime {
             session_id: params.session_id,
             sequence,
             status: TurnStatus::Running,
-            kind: devo_core::TurnKind::Regular,
+            kind: infinitecode_core::TurnKind::Regular,
             model: turn_config.model.slug.clone(),
             model_binding_id: turn_config.model_binding_id.clone(),
             reasoning_effort_selection: turn_config.reasoning_effort_selection.clone(),
@@ -323,12 +323,12 @@ impl ServerRuntime {
             }
             let restore_outcomes =
                 apply_safe_workspace_restore(&workspace_root, &restore_candidates).await;
-            let restore_completed_record = devo_core::complete_workspace_restore(
+            let restore_completed_record = infinitecode_core::complete_workspace_restore(
                 params.session_id,
                 restore_started_record.restore_id,
                 restore_outcomes,
             );
-            let devo_core::DurableRecord::TurnWorkspaceRestoreCompleted(restore_completed_record) =
+            let infinitecode_core::DurableRecord::TurnWorkspaceRestoreCompleted(restore_completed_record) =
                 restore_completed_record
             else {
                 return self.error_response(
@@ -471,10 +471,10 @@ impl ServerRuntime {
                 .get(&params.session_id)
                 .and_then(GoalStore::get)
                 .map(Goal::to_thread_goal)
-                .unwrap_or(devo_protocol::ThreadGoal {
+                .unwrap_or(infinitecode_protocol::ThreadGoal {
                     thread_id: session_id,
                     objective: "message edit replacement".to_string(),
-                    status: devo_protocol::ThreadGoalStatus::Complete,
+                    status: infinitecode_protocol::ThreadGoalStatus::Complete,
                     token_budget: None,
                     tokens_used: 0,
                     time_used_seconds: 0,

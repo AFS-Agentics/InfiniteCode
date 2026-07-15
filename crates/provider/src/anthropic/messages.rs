@@ -7,19 +7,19 @@ use std::pin::Pin;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ReasoningEffort;
-use devo_protocol::RequestContent;
-use devo_protocol::RequestMessage;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseExtra;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_protocol::normalize_tool_result_messages;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ReasoningEffort;
+use infinitecode_protocol::RequestContent;
+use infinitecode_protocol::RequestMessage;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseExtra;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_protocol::normalize_tool_result_messages;
 use futures::Stream;
 use reqwest::Client;
 use reqwest::header::ACCEPT_ENCODING;
@@ -1437,26 +1437,26 @@ fn build_output_config(
 #[cfg(test)]
 mod tests {
     use crate::dsml::DsmlToolCallHealer;
-    use devo_protocol::ModelRequest;
-    use devo_protocol::ReasoningEffort;
-    use devo_protocol::RequestContent;
-    use devo_protocol::RequestMessage;
-    use devo_protocol::SamplingControls;
-    use devo_protocol::ToolDefinition;
+    use infinitecode_protocol::ModelRequest;
+    use infinitecode_protocol::ReasoningEffort;
+    use infinitecode_protocol::RequestContent;
+    use infinitecode_protocol::RequestMessage;
+    use infinitecode_protocol::SamplingControls;
+    use infinitecode_protocol::ToolDefinition;
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
     use super::build_request;
     use super::parse_response;
     use super::parse_stop_reason;
-    use devo_protocol::ResponseContent;
-    use devo_protocol::ResponseExtra;
-    use devo_protocol::StopReason;
+    use infinitecode_protocol::ResponseContent;
+    use infinitecode_protocol::ResponseExtra;
+    use infinitecode_protocol::StopReason;
 
     #[test]
     fn build_request_includes_sampling_tools_and_thinking() {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: "claude-sonnet-4-6".to_string(),
             system: Some("You are helpful.".to_string()),
             messages: vec![
@@ -1527,7 +1527,7 @@ mod tests {
     #[test]
     fn build_request_skips_unsigned_reasoning_blocks() {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: "deepseek-v4-flash".to_string(),
             system: None,
             messages: vec![RequestMessage {
@@ -1577,7 +1577,7 @@ mod tests {
     #[test]
     fn build_request_omits_messages_with_no_anthropic_content() {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: "claude-sonnet-4-6".to_string(),
             system: None,
             messages: vec![
@@ -1613,7 +1613,7 @@ mod tests {
     #[test]
     fn build_request_serializes_provider_reasoning_with_signature() {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: "deepseek-v4-pro".to_string(),
             system: None,
             messages: vec![RequestMessage {
@@ -1651,7 +1651,7 @@ mod tests {
     #[test]
     fn build_request_serializes_hosted_tool_use_blocks() {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: "deepseek-v4-pro".to_string(),
             system: None,
             messages: vec![RequestMessage {
@@ -1712,7 +1712,7 @@ mod tests {
     #[test]
     fn build_request_sends_disabled_thinking_without_output_config() {
         let mut request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: "deepseek-v4-flash".to_string(),
             system: None,
             messages: vec![RequestMessage {
@@ -1743,7 +1743,7 @@ mod tests {
     #[test]
     fn build_request_maps_max_thinking_to_output_config_effort() {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: "deepseek-v4-pro".to_string(),
             system: None,
             messages: vec![RequestMessage {
@@ -1770,7 +1770,7 @@ mod tests {
     #[test]
     fn build_request_prefers_reasoning_effort_for_output_config_effort() {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: "deepseek-v4-pro".to_string(),
             system: None,
             messages: vec![RequestMessage {

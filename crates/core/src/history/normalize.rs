@@ -9,7 +9,7 @@
 
 use std::collections::HashSet;
 
-use devo_protocol::InputModality;
+use infinitecode_protocol::InputModality;
 
 use crate::response_item::ResponseItem;
 
@@ -89,12 +89,12 @@ pub fn filter_by_modality(
                     .content
                     .iter()
                     .filter(|block| match block {
-                        devo_protocol::ContentBlock::Text { .. } => supports_text,
-                        devo_protocol::ContentBlock::Reasoning { .. } => supports_text,
-                        devo_protocol::ContentBlock::ProviderReasoning { .. } => true,
-                        devo_protocol::ContentBlock::ToolUse { .. } => true,
-                        devo_protocol::ContentBlock::HostedToolUse { .. } => true,
-                        devo_protocol::ContentBlock::ToolResult { .. } => true,
+                        infinitecode_protocol::ContentBlock::Text { .. } => supports_text,
+                        infinitecode_protocol::ContentBlock::Reasoning { .. } => supports_text,
+                        infinitecode_protocol::ContentBlock::ProviderReasoning { .. } => true,
+                        infinitecode_protocol::ContentBlock::ToolUse { .. } => true,
+                        infinitecode_protocol::ContentBlock::HostedToolUse { .. } => true,
+                        infinitecode_protocol::ContentBlock::ToolResult { .. } => true,
                     })
                     .cloned()
                     .collect();
@@ -102,7 +102,7 @@ pub fn filter_by_modality(
                 if filtered_content.is_empty() {
                     None // Remove empty messages
                 } else {
-                    Some(ResponseItem::Message(devo_protocol::Message {
+                    Some(ResponseItem::Message(infinitecode_protocol::Message {
                         role: msg.role,
                         content: filtered_content,
                     }))
@@ -117,12 +117,12 @@ pub fn filter_by_modality(
 pub(crate) fn text_modality_keeps_all_items(items: &[ResponseItem]) -> bool {
     items.iter().all(|item| match item {
         ResponseItem::Message(msg) => msg.content.iter().all(|block| match block {
-            devo_protocol::ContentBlock::Text { .. }
-            | devo_protocol::ContentBlock::Reasoning { .. }
-            | devo_protocol::ContentBlock::ProviderReasoning { .. }
-            | devo_protocol::ContentBlock::ToolUse { .. }
-            | devo_protocol::ContentBlock::HostedToolUse { .. }
-            | devo_protocol::ContentBlock::ToolResult { .. } => true,
+            infinitecode_protocol::ContentBlock::Text { .. }
+            | infinitecode_protocol::ContentBlock::Reasoning { .. }
+            | infinitecode_protocol::ContentBlock::ProviderReasoning { .. }
+            | infinitecode_protocol::ContentBlock::ToolUse { .. }
+            | infinitecode_protocol::ContentBlock::HostedToolUse { .. }
+            | infinitecode_protocol::ContentBlock::ToolResult { .. } => true,
         }),
         ResponseItem::Reason { .. }
         | ResponseItem::ToolCall { .. }
@@ -226,7 +226,7 @@ mod tests {
 
     use super::*;
     use crate::response_item::ResponseItem;
-    use devo_protocol::Message;
+    use infinitecode_protocol::Message;
 
     #[test]
     fn remove_paired_removes_tool_call_and_output() {
@@ -459,12 +459,12 @@ mod tests {
         let items = (0..2_000)
             .map(|index| {
                 ResponseItem::Message(Message {
-                    role: devo_protocol::Role::Assistant,
+                    role: infinitecode_protocol::Role::Assistant,
                     content: vec![
-                        devo_protocol::ContentBlock::Text {
+                        infinitecode_protocol::ContentBlock::Text {
                             text: format!("assistant text {index}"),
                         },
-                        devo_protocol::ContentBlock::Reasoning {
+                        infinitecode_protocol::ContentBlock::Reasoning {
                             text: format!("reasoning {index}"),
                         },
                     ],

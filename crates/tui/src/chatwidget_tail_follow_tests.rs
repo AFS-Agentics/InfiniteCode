@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use devo_protocol::ItemId;
-use devo_protocol::Model;
+use infinitecode_protocol::ItemId;
+use infinitecode_protocol::Model;
 use ratatui::text::Line;
 use tokio::sync::mpsc;
 
@@ -22,7 +22,7 @@ fn widget_with_model(model: Model, cwd: PathBuf) -> ChatWidget {
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, Some(model)),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,

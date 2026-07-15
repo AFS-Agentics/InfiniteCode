@@ -15,10 +15,10 @@
 		"noEmit": true,
 		"paths": {
 			"@/*": ["./src/renderer/*"],
-			"@devo/configconv": ["./packages/configconv/src/index.ts"],
-			"@devo/configconv/*": ["./packages/configconv/src/*"],
-			"@devo/ui/*": ["./packages/ui/src/*"],
-			"@devo-ai/sdk/v2/client": ["./packages/devo-ai-sdk/src/v2/client.ts"]
+			"@infinitecode/configconv": ["./packages/configconv/src/index.ts"],
+			"@infinitecode/configconv/*": ["./packages/configconv/src/*"],
+			"@infinitecode/ui/*": ["./packages/ui/src/*"],
+			"@infinitecode-ai/sdk/v2/client": ["./packages/infinitecode-ai-sdk/src/v2/client.ts"]
 		}
 	},
 	"include": [

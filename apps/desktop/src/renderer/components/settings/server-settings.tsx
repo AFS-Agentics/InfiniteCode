@@ -1,16 +1,16 @@
 /**
- * Settings tab for the local Devo stdio runtime.
+ * Settings tab for the local InfiniteCode stdio runtime.
  */
 
-import { Button } from "@devo/ui/components/button"
-import { Input } from "@devo/ui/components/input"
+import { Button } from "@infinitecode/ui/components/button"
+import { Input } from "@infinitecode/ui/components/input"
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@devo/ui/components/select"
+} from "@infinitecode/ui/components/select"
 import { ChevronDownIcon, ChevronRightIcon, RefreshCwIcon } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useAtomValue } from "jotai"
@@ -69,7 +69,7 @@ export function ServerSettings({ initialAcpTrafficLogState = null }: ServerSetti
 			<div>
 				<h2 className="text-xl font-semibold">Server</h2>
 				<p className="mt-1 text-sm text-muted-foreground">
-					Devo Desktop manages a private local stdio ACP process.
+					InfiniteCode Desktop manages a private local stdio ACP process.
 				</p>
 			</div>
 
@@ -176,7 +176,7 @@ export function ServerSettings({ initialAcpTrafficLogState = null }: ServerSetti
 			<SettingsSection>
 				<SettingsRow
 					label="Restart runtime"
-					description="Stop the current child process and start a fresh Devo stdio server"
+					description="Stop the current child process and start a fresh InfiniteCode stdio server"
 				>
 					<Button size="sm" variant="outline" onClick={restart} disabled={restarting}>
 						<RefreshCwIcon
@@ -213,7 +213,7 @@ export function AcpTrafficLogStatus({
 		>
 			<SettingsRow
 				label="ACP traffic log"
-				description="Protocol trace enabled via DEVO_PROTOCOL_TRACE"
+				description="Protocol trace enabled via INFINITECODE_PROTOCOL_TRACE"
 			>
 				<Button
 					type="button"
@@ -237,7 +237,7 @@ export function AcpTrafficLogStatus({
 						<p className="text-sm text-muted-foreground">No log file path is available.</p>
 					)}
 					<p className="text-xs text-muted-foreground">
-						Traces are written under DEVO_HOME/traces/ (default ~/.devo/traces/). The log may
+						Traces are written under INFINITECODE_HOME/traces/ (default ~/.infinitecode/traces/). The log may
 						include prompts, paths, tool arguments, and provider details.
 					</p>
 				</div>

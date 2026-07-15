@@ -1,13 +1,13 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use devo_core::tools::ClientTerminal;
-use devo_core::tools::ClientTerminalCreate;
-use devo_core::tools::ClientTerminalCreateRequest;
-use devo_core::tools::ClientTerminalEnv;
-use devo_core::tools::ClientTerminalExitStatus;
-use devo_core::tools::ClientTerminalOutput;
-use devo_core::tools::ClientTerminalRequest;
+use infinitecode_core::tools::ClientTerminal;
+use infinitecode_core::tools::ClientTerminalCreate;
+use infinitecode_core::tools::ClientTerminalCreateRequest;
+use infinitecode_core::tools::ClientTerminalEnv;
+use infinitecode_core::tools::ClientTerminalExitStatus;
+use infinitecode_core::tools::ClientTerminalOutput;
+use infinitecode_core::tools::ClientTerminalRequest;
 use tokio_util::sync::CancellationToken;
 
 use super::*;

@@ -297,7 +297,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        path.push(format!("devo-tools-read-{prefix}-{ticks}"));
+        path.push(format!("infinitecode-tools-read-{prefix}-{ticks}"));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).unwrap();
         path

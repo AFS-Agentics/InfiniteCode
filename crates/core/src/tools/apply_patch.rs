@@ -780,7 +780,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system time")
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("devo-apply-patch-{name}-{nanos}"));
+        let path = std::env::temp_dir().join(format!("infinitecode-apply-patch-{name}-{nanos}"));
         std::fs::create_dir_all(&path).expect("create temp dir");
         path
     }

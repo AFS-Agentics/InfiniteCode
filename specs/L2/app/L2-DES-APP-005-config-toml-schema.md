@@ -24,12 +24,12 @@ This design makes model/provider persistence, `/model` selection defaults, MCP s
 The same schema is used for:
 
 - User-scoped configuration:
-  - Windows: `C:\Users\username\.devo\config.toml`
-  - Windows auth file: `C:\Users\username\.devo\auth.json`
-  - macOS and Linux: `~/.devo/config.toml`
-  - macOS and Linux auth file: `~/.devo/auth.json`
+  - Windows: `C:\Users\username\.infinitecode\config.toml`
+  - Windows auth file: `C:\Users\username\.infinitecode\auth.json`
+  - macOS and Linux: `~/.infinitecode/config.toml`
+  - macOS and Linux auth file: `~/.infinitecode/auth.json`
 - Workspace-scoped configuration:
-  - `<workspace>/.devo/config.toml`
+  - `<workspace>/.infinitecode/config.toml`
 
 The TOML schema stores durable preferences and durable setup records. It must not store transient session state, resolved runtime profiles, provider request payloads, routine client projections, API keys, or other secret values.
 
@@ -114,7 +114,7 @@ enabled = true
 name = "OpenRouter"
 base_url = "https://openrouter.ai/api/v1"
 credential = "openrouter_api_key"
-headers = '{"X-Title":"Devo","Authorization":"custom-token"}'
+headers = '{"X-Title":"InfiniteCode","Authorization":"custom-token"}'
 
 [providers.openai]
 enabled = true
@@ -172,7 +172,7 @@ auto_activate = false
 
 [skills.roots.user]
 enabled = true
-path = "~/.devo/skills"
+path = "~/.infinitecode/skills"
 trust_policy = "user"
 
 [skills.roots.interop]
@@ -644,7 +644,7 @@ When a setup flow writes both `config.toml` and `auth.json`, the program should 
 |---:|---|---|---|---|
 | 1 | 2026-05-25 | Assistant | Initial | Initial TOML schema design for durable user and project configuration. |
 | 1 | 2026-05-25 | Human | Refinement | Moved API keys and other credential material into dedicated `auth.json` files and removed environment variables or external stores as the recommended credential persistence mechanism. |
-| 2 | 2026-05-27 | Human | Refinement | Moved workspace config to `<workspace>/.devo/config.toml`, made `auth.json` user-scoped only, and changed record precedence to field-level merge. |
+| 2 | 2026-05-27 | Human | Refinement | Moved workspace config to `<workspace>/.infinitecode/config.toml`, made `auth.json` user-scoped only, and changed record precedence to field-level merge. |
 | 1 | 2026-05-25 | Assistant | Refinement | Linked persisted `permission_policy` defaults to application safety requirements. |
 | 1 | 2026-05-26 | Human | Refinement | Added explicit model binding `display_name` examples and clarified display-name fallback and identifier rules. |
 | 2 | 2026-06-08 | Human | Refinement | Added global provider HTTP proxy configuration and per-provider raw custom header configuration. |

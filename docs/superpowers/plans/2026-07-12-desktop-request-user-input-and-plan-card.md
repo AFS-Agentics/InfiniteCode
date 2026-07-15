@@ -19,18 +19,18 @@
 ### Task 1: Normalize real request-user-input events
 
 **Files:**
-- Modify: `apps/desktop/packages/devo-ai-sdk/src/v2/acp-client-support.ts`
-- Modify: `apps/desktop/packages/devo-ai-sdk/src/v2/client.ts`
-- Test: `apps/desktop/packages/devo-ai-sdk/src/v2/client.test.ts`
+- Modify: `apps/desktop/packages/infinitecode-ai-sdk/src/v2/acp-client-support.ts`
+- Modify: `apps/desktop/packages/infinitecode-ai-sdk/src/v2/client.ts`
+- Test: `apps/desktop/packages/infinitecode-ai-sdk/src/v2/client.test.ts`
 
 **Interfaces:**
-- Consumes: `_meta["devo/originalEvent"]` values serialized as `{ kind: "request_user_input", request, questions }` and legacy `{ RequestUserInput: payload }` values.
-- Produces: the existing `question.asked` event and `_devo/request_user_input/respond` request path.
+- Consumes: `_meta["infinitecode/originalEvent"]` values serialized as `{ kind: "request_user_input", request, questions }` and legacy `{ RequestUserInput: payload }` values.
+- Produces: the existing `question.asked` event and `_infinitecode/request_user_input/respond` request path.
 
 - [x] **Step 1: Change the SDK test fixture to the actual tagged wire shape**
 
 ```ts
-"devo/originalEvent": {
+"infinitecode/originalEvent": {
   kind: "request_user_input",
   request: {
     request_id: "rq1",
@@ -53,7 +53,7 @@
 
 - [x] **Step 2: Run the focused test and verify it fails before the fix**
 
-Run: `bun test packages/devo-ai-sdk/src/v2/client.test.ts --test-name-pattern "maps original request_user_input"`
+Run: `bun test packages/infinitecode-ai-sdk/src/v2/client.test.ts --test-name-pattern "maps original request_user_input"`
 
 Expected: FAIL because no `question.asked` event is emitted for the tagged event.
 
@@ -75,7 +75,7 @@ Replace the legacy-only branch in `handleOriginalEvent` with a call to this pars
 
 - [x] **Step 4: Run the focused SDK test and verify it passes**
 
-Run: `bun test packages/devo-ai-sdk/src/v2/client.test.ts --test-name-pattern "maps original request_user_input"`
+Run: `bun test packages/infinitecode-ai-sdk/src/v2/client.test.ts --test-name-pattern "maps original request_user_input"`
 
 Expected: PASS, including the full `question.asked` payload and response request equality.
 
@@ -126,7 +126,7 @@ Use `ChevronDownIcon` when expanded and `ChevronUpIcon` when collapsed, add `ari
 
 - [x] **Step 3: Run formatting and focused checks**
 
-Run: `bunx biome check src/renderer/components/chat/chat-question.tsx src/renderer/components/chat/session-task-list.tsx packages/devo-ai-sdk/src/v2/acp-client-support.ts packages/devo-ai-sdk/src/v2/client.test.ts`
+Run: `bunx biome check src/renderer/components/chat/chat-question.tsx src/renderer/components/chat/session-task-list.tsx packages/infinitecode-ai-sdk/src/v2/acp-client-support.ts packages/infinitecode-ai-sdk/src/v2/client.test.ts`
 
 Expected: PASS.
 
@@ -143,7 +143,7 @@ Actual: focused source inspection and `git diff --check` pass. The repository's 
 
 - [x] **Step 1: Run the SDK test file**
 
-Run: `bun test packages/devo-ai-sdk/src/v2/client.test.ts`
+Run: `bun test packages/infinitecode-ai-sdk/src/v2/client.test.ts`
 
 Expected: all tests pass.
 

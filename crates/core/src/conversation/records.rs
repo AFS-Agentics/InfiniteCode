@@ -9,7 +9,7 @@ use crate::{
     TurnWorkspaceChangeRecordedRecord, TurnWorkspaceCheckpointRecordedRecord,
     TurnWorkspaceRestoreCompletedRecord, TurnWorkspaceRestoreStartedRecord,
 };
-use devo_protocol::{StopReason, TurnFailureReason};
+use infinitecode_protocol::{StopReason, TurnFailureReason};
 
 /// Stores persistent metadata for one session.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

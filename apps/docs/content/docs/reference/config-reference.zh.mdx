@@ -1,6 +1,6 @@
 ---
 title: Config Reference
-description: 在用户向导稳定后查阅 Devo config fields。
+description: 在用户向导稳定后查阅 InfiniteCode config fields。
 ---
 
 本页列出主要 config files 和 fields。引导式配置请先读[配置基础](../configuration/config-basics)、[提供商配置](../configuration/provider-setup) 和[模型绑定](../configuration/model-bindings)。
@@ -9,26 +9,26 @@ description: 在用户向导稳定后查阅 Devo config fields。
 
 | File | Purpose |
 | --- | --- |
-| `<DEVO_HOME>/config.toml` | User-level Devo config。 |
-| `<DEVO_HOME>/auth.json` | User-level secrets 和 credentials。 |
-| `<workspace>/.devo/config.toml` | Workspace-level config overlay。 |
+| `<INFINITECODE_HOME>/config.toml` | User-level InfiniteCode config。 |
+| `<INFINITECODE_HOME>/auth.json` | User-level secrets 和 credentials。 |
+| `<workspace>/.infinitecode/config.toml` | Workspace-level config overlay。 |
 
-默认 `DEVO_HOME` 路径：
+默认 `INFINITECODE_HOME` 路径：
 
 | Platform | Default |
 | --- | --- |
-| macOS/Linux | `~/.devo` |
-| Windows | `C:/Users/your-username/.devo` |
+| macOS/Linux | `~/.infinitecode` |
+| Windows | `C:/Users/your-username/.infinitecode` |
 
-如果设置了 `DEVO_HOME`，它必须指向已经存在的目录。
+如果设置了 `INFINITECODE_HOME`，它必须指向已经存在的目录。
 
 ## 优先级
 
 Effective config 按以下顺序解析，优先级从高到低：
 
 1. command-line startup arguments；
-2. `<workspace>/.devo/config.toml`；
-3. `<DEVO_HOME>/config.toml`；
+2. `<workspace>/.infinitecode/config.toml`；
+3. `<INFINITECODE_HOME>/config.toml`；
 4. built-in defaults。
 
 `auth.json` 是 user-scoped，不应提交到仓库。
@@ -96,7 +96,7 @@ override 这些值，不会修改 `config.toml`。
 | `logout` | bool | Auth enabled 时是否 advertise 并支持 ACP `logout`。默认 `true`。 |
 
 启用后，auth state 按 connection 隔离，并同时 gate ACP methods 和 legacy
-Devo server methods。
+InfiniteCode server methods。
 
 ## `[defaults]`
 

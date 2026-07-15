@@ -9,20 +9,20 @@ use std::sync::Arc;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use devo_core::AppConfigStore;
-use devo_core::McpConfig;
-use devo_core::McpOutputLimits;
-use devo_core::McpRootsPolicy;
-use devo_core::McpServerId;
-use devo_core::McpServerRecord;
-use devo_core::McpStartupPolicy;
-use devo_core::McpTransportConfig;
-use devo_core::McpTrustPolicy;
-use devo_core::tools::ToolPlanConfig;
-use devo_mcp::manager::RmcpMcpManager;
-use devo_protocol::AcpMeta;
-use devo_protocol::DEVO_HISTORY_INDEX_META;
-use devo_protocol::DEVO_PARENT_MESSAGE_ID_META;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::McpConfig;
+use infinitecode_core::McpOutputLimits;
+use infinitecode_core::McpRootsPolicy;
+use infinitecode_core::McpServerId;
+use infinitecode_core::McpServerRecord;
+use infinitecode_core::McpStartupPolicy;
+use infinitecode_core::McpTransportConfig;
+use infinitecode_core::McpTrustPolicy;
+use infinitecode_core::tools::ToolPlanConfig;
+use infinitecode_mcp::manager::RmcpMcpManager;
+use infinitecode_protocol::AcpMeta;
+use infinitecode_protocol::INFINITECODE_HISTORY_INDEX_META;
+use infinitecode_protocol::INFINITECODE_PARENT_MESSAGE_ID_META;
 
 use crate::ACP_SESSION_UPDATE_METHOD;
 use crate::AcpAgentCapabilities;
@@ -70,8 +70,8 @@ use crate::AcpToolCallContent;
 use crate::AcpToolCallStatus;
 use crate::AcpToolKind;
 use crate::CollaborationMode;
-use crate::DEVO_SESSION_META;
-use crate::DEVO_SESSION_RESUME_META;
+use crate::INFINITECODE_SESSION_META;
+use crate::INFINITECODE_SESSION_RESUME_META;
 use crate::SessionHistoryItem;
 use crate::SessionHistoryItemKind;
 use crate::SessionHistoryMetadata;
@@ -129,16 +129,16 @@ impl ServerRuntime {
         );
         let mut meta = serde_json::Map::new();
         meta.insert(
-            "devo/platformFamily".to_string(),
+            "infinitecode/platformFamily".to_string(),
             serde_json::Value::String(self.metadata.platform_family.clone()),
         );
         meta.insert(
-            "devo/platformOs".to_string(),
+            "infinitecode/platformOs".to_string(),
             serde_json::Value::String(self.metadata.platform_os.clone()),
         );
         if !acp_auth_config.enabled {
             meta.insert(
-                "devo/serverHome".to_string(),
+                "infinitecode/serverHome".to_string(),
                 serde_json::Value::String(self.metadata.server_home.display().to_string()),
             );
         }
@@ -176,7 +176,7 @@ impl ServerRuntime {
                         self.metadata.server_name.clone(),
                         self.metadata.server_version.clone(),
                     )
-                    .with_title("Devo"),
+                    .with_title("InfiniteCode"),
                 ),
                 meta: Some(meta),
             },

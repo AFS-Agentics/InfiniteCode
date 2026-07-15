@@ -8,8 +8,8 @@
  * Context window usage is displayed separately in the StatusBar below
  * the chat input (see prompt-toolbar.tsx).
  */
-import { Popover, PopoverContent, PopoverTrigger } from "@devo/ui/components/popover"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
+import { Popover, PopoverContent, PopoverTrigger } from "@infinitecode/ui/components/popover"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
 import { useAtomValue } from "jotai"
 import { BarChart3Icon, CoinsIcon, TimerIcon } from "lucide-react"
 import { Fragment, memo, useCallback, useEffect, useRef, useState } from "react"

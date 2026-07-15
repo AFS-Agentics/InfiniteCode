@@ -8,8 +8,8 @@
  * - Keyboard navigation (Arrow keys, Enter/Tab, Escape)
  */
 
-import { ScrollArea } from "@devo/ui/components/scroll-area"
-import { cn } from "@devo/ui/lib/utils"
+import { ScrollArea } from "@infinitecode/ui/components/scroll-area"
+import { cn } from "@infinitecode/ui/lib/utils"
 import fuzzysort from "fuzzysort"
 import {
 	GoalIcon,

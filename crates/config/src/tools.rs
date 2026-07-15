@@ -29,7 +29,7 @@ impl ToolsConfig {
     }
 }
 
-/// Selects how Devo exposes web search for a provider/model.
+/// Selects how InfiniteCode exposes web search for a provider/model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum WebSearchMode {
@@ -58,7 +58,7 @@ impl WebSearchConfig {
     }
 }
 
-/// Selects how Devo exposes web fetch for a provider/model.
+/// Selects how InfiniteCode exposes web fetch for a provider/model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum WebFetchMode {

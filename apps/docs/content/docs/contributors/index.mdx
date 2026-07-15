@@ -1,6 +1,6 @@
 ---
 title: Contributors
-description: Understand Devo before changing it.
+description: Understand InfiniteCode before changing it.
 ---
 
 Read this section before making non-trivial runtime, TUI, provider, or config
@@ -26,13 +26,13 @@ Keep ownership boundaries clear:
 
 | Layer | Owns |
 | --- | --- |
-| `devo-cli` | Process entrypoints and command-line parsing. |
-| `devo-tui` | Terminal UI state, composer behavior, overlays, and rendering. |
-| `devo-server` | Session runtime, persistence, event protocol, goals, subagents, and command execution. |
-| `devo-core` | Agent loop, tools, context, compaction, permissions, hooks, and instruction discovery. |
-| `devo-provider` | Provider request and streaming adapters. |
-| `devo-config` | Serialized config schema and effective config loading. |
-| `devo-protocol` | Shared DTOs that cross crate boundaries. |
+| `infinitecode-cli` | Process entrypoints and command-line parsing. |
+| `infinitecode-tui` | Terminal UI state, composer behavior, overlays, and rendering. |
+| `infinitecode-server` | Session runtime, persistence, event protocol, goals, subagents, and command execution. |
+| `infinitecode-core` | Agent loop, tools, context, compaction, permissions, hooks, and instruction discovery. |
+| `infinitecode-provider` | Provider request and streaming adapters. |
+| `infinitecode-config` | Serialized config schema and effective config loading. |
+| `infinitecode-protocol` | Shared DTOs that cross crate boundaries. |
 
 When a feature crosses the TUI/server boundary, update protocol types first,
 then server handling, worker mapping, and TUI rendering.

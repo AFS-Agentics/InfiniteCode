@@ -52,13 +52,13 @@ function makeSession(overrides: { projectId?: string; sessionId?: string } = {})
 }
 
 function tempDir(): string {
-	return join(tmpdir(), `devo-history-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+	return join(tmpdir(), `infinitecode-history-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
 }
 
 function tempDbPath(): string {
 	return join(
 		tmpdir(),
-		`devo-history-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
+		`infinitecode-history-test-${Date.now()}-${Math.random().toString(36).slice(2)}.db`,
 	)
 }
 

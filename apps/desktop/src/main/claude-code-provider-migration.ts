@@ -1,8 +1,8 @@
 import {
 	extractClaudeCodeProviderSettings,
 	formatClaudeCodeProviderSettingsPreview,
-} from "@devo/configconv"
-import type { ClaudeCodeProviderSettings, ClaudeSettings } from "@devo/configconv"
+} from "@infinitecode/configconv"
+import type { ClaudeCodeProviderSettings, ClaudeSettings } from "@infinitecode/configconv"
 
 interface MigrationFilePreview {
 	path: string

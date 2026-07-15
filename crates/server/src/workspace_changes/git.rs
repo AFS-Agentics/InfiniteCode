@@ -2,13 +2,13 @@ use std::path::{Path, PathBuf};
 use std::process::Output;
 
 use anyhow::{Context, Result};
-use devo_core::ChangeSetCoverage;
-use devo_protocol::{
+use infinitecode_core::ChangeSetCoverage;
+use infinitecode_protocol::{
     SessionId, TurnId, WorkspaceChangeAttribution, WorkspaceChangeBase, WorkspaceChangeCoverage,
     WorkspaceChangeScope, WorkspaceChangeSetStatus, WorkspaceChangeView,
     WorkspaceCheckpointBackend, WorkspaceDiffDetail,
 };
-use devo_util_git::{
+use infinitecode_util_git::{
     CreateGhostCommitOptions, GhostCommit, GhostSnapshotReport, create_ghost_commit_with_report,
     default_branch_name, diff_ghost_commits, get_git_repo_root, merge_base_with_head,
 };
@@ -36,7 +36,7 @@ pub(crate) fn capture_git_baseline(
 ) -> Result<CapturedWorkspaceBaseline> {
     let (ghost, report) = create_ghost_commit_with_report(
         &CreateGhostCommitOptions::new(repo_root)
-            .message("devo turn workspace baseline")
+            .message("infinitecode turn workspace baseline")
             .ignore_large_untracked_files(10 * 1024 * 1024),
     )
     .with_context(|| format!("create git ghost baseline at {}", repo_root.display()))?;
@@ -84,7 +84,7 @@ pub(crate) fn diff_git_baseline(
 ) -> Result<WorkspaceChangeView> {
     let (current, report) = create_ghost_commit_with_report(
         &CreateGhostCommitOptions::new(baseline.workspace_root.as_path())
-            .message("devo turn workspace current")
+            .message("infinitecode turn workspace current")
             .ignore_large_untracked_files(10 * 1024 * 1024),
     )?;
     let diff = diff_ghost_commits(baseline.workspace_root.as_path(), &baseline.ghost, &current)?;

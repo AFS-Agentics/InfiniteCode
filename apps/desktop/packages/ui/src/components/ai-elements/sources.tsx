@@ -4,8 +4,8 @@ import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
-} from "@devo/ui/components/collapsible"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/collapsible"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { BookIcon, ChevronDownIcon } from "lucide-react"
 import type { ComponentProps } from "react"
 

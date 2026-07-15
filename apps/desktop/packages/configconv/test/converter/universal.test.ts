@@ -104,7 +104,7 @@ describe("universalConvert", () => {
 		expect(agentEntries[0][0]).toContain(".cursor/agents/review.md")
 	})
 
-	test("Cursor -> Devo: converts MCP servers", () => {
+	test("Cursor -> InfiniteCode: converts MCP servers", () => {
 		const cursorScan: CursorScanResult = {
 			global: {
 				skills: [],
@@ -119,16 +119,16 @@ describe("universalConvert", () => {
 			projects: [],
 		}
 
-		const result = universalConvert({ format: "cursor", data: cursorScan }, { to: "devo" })
+		const result = universalConvert({ format: "cursor", data: cursorScan }, { to: "infinitecode" })
 
-		expect(result.targetFormat).toBe("devo")
+		expect(result.targetFormat).toBe("infinitecode")
 		const config = result.globalConfig as Record<string, unknown>
 		const mcp = config.mcp as Record<string, { type: string; url: string }>
 		expect(mcp.Figma.type).toBe("remote")
 		expect(mcp.Figma.url).toBe("http://127.0.0.1:3845/mcp")
 	})
 
-	test("Cursor -> Devo: converts rules to AGENTS.md", () => {
+	test("Cursor -> InfiniteCode: converts rules to AGENTS.md", () => {
 		const cursorScan: CursorScanResult = {
 			global: { skills: [], commands: [], agents: [] },
 			projects: [
@@ -150,7 +150,7 @@ describe("universalConvert", () => {
 			],
 		}
 
-		const result = universalConvert({ format: "cursor", data: cursorScan }, { to: "devo" })
+		const result = universalConvert({ format: "cursor", data: cursorScan }, { to: "infinitecode" })
 
 		expect(result.rules.size).toBeGreaterThan(0)
 		const rulesEntries = [...result.rules.entries()]
@@ -281,19 +281,19 @@ describe("getSupportedConversions", () => {
 		const pairs = getSupportedConversions()
 
 		expect(pairs).toHaveLength(6)
-		expect(pairs).toContainEqual({ from: "claude-code", to: "devo" })
+		expect(pairs).toContainEqual({ from: "claude-code", to: "infinitecode" })
 		expect(pairs).toContainEqual({ from: "claude-code", to: "cursor" })
-		expect(pairs).toContainEqual({ from: "devo", to: "claude-code" })
-		expect(pairs).toContainEqual({ from: "devo", to: "cursor" })
+		expect(pairs).toContainEqual({ from: "infinitecode", to: "claude-code" })
+		expect(pairs).toContainEqual({ from: "infinitecode", to: "cursor" })
 		expect(pairs).toContainEqual({ from: "cursor", to: "claude-code" })
-		expect(pairs).toContainEqual({ from: "cursor", to: "devo" })
+		expect(pairs).toContainEqual({ from: "cursor", to: "infinitecode" })
 	})
 })
 
 describe("formatName", () => {
 	test("returns human-readable names", () => {
 		expect(formatName("claude-code")).toBe("Claude Code")
-		expect(formatName("devo")).toBe("Devo")
+		expect(formatName("infinitecode")).toBe("InfiniteCode")
 		expect(formatName("cursor")).toBe("Cursor")
 	})
 })

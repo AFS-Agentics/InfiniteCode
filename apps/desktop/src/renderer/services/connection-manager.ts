@@ -1,4 +1,4 @@
-import type { DevoClient } from "@devo-ai/sdk/v2/client"
+import type { InfiniteCodeClient } from "@infinitecode-ai/sdk/v2/client"
 import { processEvent } from "../atoms/actions/event-processor"
 import { authHeaderAtom, serverConnectedAtom, serverUrlAtom } from "../atoms/connection"
 import { batchUpsertPartsAtom } from "../atoms/parts"
@@ -29,7 +29,7 @@ import {
 	listSessions,
 	projectsFromSessions,
 	subscribeToGlobalEvents,
-} from "./devo"
+} from "./infinitecode"
 
 const log = createLogger("connection-manager")
 
@@ -38,7 +38,7 @@ const log = createLogger("connection-manager")
 // ============================================================
 
 /**
- * Lightweight ACP health probe. Devo desktop talks to the runtime through
+ * Lightweight ACP health probe. InfiniteCode desktop talks to the runtime through
  * Electron's preload bridge, so readiness means the main-process stdio
  * transport is connected.
  */
@@ -52,18 +52,18 @@ async function checkHealth(url: string, authHeader: string | null): Promise<bool
 // State — single server connection + per-project clients
 // ============================================================
 
-/** The single Devo server connection */
+/** The single InfiniteCode server connection */
 let connection: {
 	url: string
 	/** Auth header for stdio compatibility (currently null). */
 	authHeader: string | null
 	/** Base client (no directory) — used for the ACP event subscription */
-	baseClient: DevoClient
+	baseClient: InfiniteCodeClient
 	abortController: AbortController
 } | null = null
 
 /** Per-project SDK clients, keyed by directory path */
-const projectClients = new Map<string, DevoClient>()
+const projectClients = new Map<string, InfiniteCodeClient>()
 
 /** Unscoped `session/list` snapshot from the latest discovery pass. */
 let discoveredSessions: Session[] | null = null
@@ -83,7 +83,7 @@ let eventLoopGeneration = 0
  * with an unreachable AbortController. By storing it on `window`, the
  * new module can abort the stale loop on reconnect.
  */
-const ACP_ABORT_KEY = "__devo_acp_abort__" as const
+const ACP_ABORT_KEY = "__infinitecode_acp_abort__" as const
 
 function getGlobalAbort(): AbortController | undefined {
 	// biome-ignore lint/suspicious/noExplicitAny: accessing dynamic window property for ACP event abort controller
@@ -171,13 +171,13 @@ async function hydrateProjectSessionsFromCache(
 // ============================================================
 
 /**
- * Connect to an Devo server.
+ * Connect to an InfiniteCode server.
  * Starts ACP event subscription for all-project events.
  *
- * @param url       Base URL of the Devo server
+ * @param url       Base URL of the InfiniteCode server
  * @param authHeader  Deprecated compatibility auth header
  */
-export async function connectToDevo(url: string, authHeader?: string | null): Promise<void> {
+export async function connectToInfiniteCode(url: string, authHeader?: string | null): Promise<void> {
 	// Disconnect existing connection if any
 	if (connection) {
 		log.info("Disconnecting previous connection", { url: connection.url })
@@ -209,7 +209,7 @@ export async function connectToDevo(url: string, authHeader?: string | null): Pr
 	connection = { url, authHeader: resolvedAuth, baseClient, abortController }
 	setGlobalAbort(abortController)
 
-	log.info("Connecting to Devo server", { url, authenticated: !!resolvedAuth, generation: gen })
+	log.info("Connecting to InfiniteCode server", { url, authenticated: !!resolvedAuth, generation: gen })
 
 	// Ping the server to check if it's reachable before starting the event loop.
 	// This sets the initial connected state accurately instead of optimistically.
@@ -227,7 +227,7 @@ export async function connectToDevo(url: string, authHeader?: string | null): Pr
 }
 
 /**
- * List all projects known to the Devo server via the API.
+ * List all projects known to the InfiniteCode server via the API.
  * Uses the base client (no directory scope) since project.list() is global.
  */
 export async function loadAllProjects() {
@@ -408,7 +408,7 @@ export async function refillProjectSessionsAfterDelete(
  * If the module-level connection was lost (e.g. Vite HMR wiped it) but
  * the Jotai store still knows the server URL, we transparently reconnect.
  */
-export function getProjectClient(directory: string): DevoClient | null {
+export function getProjectClient(directory: string): InfiniteCodeClient | null {
 	if (!connection) {
 		// HMR recovery: module state is gone but the store remembers the URL
 		const storeUrl = appStore.get(serverUrlAtom)
@@ -468,7 +468,7 @@ export async function fetchSessionById(sessionId: string): Promise<import("../li
  * Used for global operations like auth set/remove, provider list, global config.
  * Returns null if not connected.
  */
-export function getBaseClient(): DevoClient | null {
+export function getBaseClient(): InfiniteCodeClient | null {
 	if (!connection) {
 		// HMR recovery
 		const storeUrl = appStore.get(serverUrlAtom)
@@ -493,7 +493,7 @@ export function getBaseClient(): DevoClient | null {
  * Provider updates mutate server config, so model/config must be reloaded.
  */
 export function invalidateConfigOptionCaches(): void {
-	const clients = new Set<DevoClient>()
+	const clients = new Set<InfiniteCodeClient>()
 	if (connection?.baseClient) {
 		clients.add(connection.baseClient)
 	}
@@ -506,7 +506,7 @@ export function invalidateConfigOptionCaches(): void {
 }
 
 /**
- * Check if we're connected to the Devo server.
+ * Check if we're connected to the InfiniteCode server.
  */
 export function isConnected(): boolean {
 	return connection !== null
@@ -520,7 +520,7 @@ export function getServerUrl(): string | null {
 }
 
 /**
- * Reload all Devo configuration by disposing all server instances.
+ * Reload all InfiniteCode configuration by disposing all server instances.
  * This forces the server to re-read config files, agents, skills, commands, etc.
  * The resulting ACP events automatically invalidate UI queries.
  */
@@ -529,15 +529,15 @@ export async function reloadConfig(): Promise<void> {
 		log.warn("Cannot reload config: not connected to server")
 		return
 	}
-	log.info("Reloading Devo config (disposing all instances)")
+	log.info("Reloading InfiniteCode config (disposing all instances)")
 	await disposeAllInstances(connection.baseClient)
 }
 
 /**
- * Disconnect from the Devo server.
+ * Disconnect from the InfiniteCode server.
  */
 export function disconnect(): void {
-	log.info("Disconnecting from Devo server")
+	log.info("Disconnecting from InfiniteCode server")
 	if (connection) {
 		connection.abortController.abort()
 		connection = null
@@ -549,7 +549,7 @@ export function disconnect(): void {
 }
 
 // ============================================================
-// Event Batching (Devo-inspired 16ms flush with coalescing)
+// Event Batching (InfiniteCode-inspired 16ms flush with coalescing)
 // ============================================================
 
 const FRAME_BUDGET_MS = 16
@@ -700,7 +700,7 @@ function createEventBatcher() {
 // ============================================================
 
 async function startEventLoop(
-	client: DevoClient,
+	client: InfiniteCodeClient,
 	signal: AbortSignal,
 	generation: number,
 ): Promise<void> {
@@ -775,7 +775,7 @@ async function startEventLoop(
 	log.info("ACP event loop exited", { generation, stale: generation !== eventLoopGeneration })
 }
 
-function startProjectEventBridge(client: DevoClient, directory: string, signal: AbortSignal): void {
+function startProjectEventBridge(client: InfiniteCodeClient, directory: string, signal: AbortSignal): void {
 	if (projectEventBridgeDirs.has(directory)) return
 	projectEventBridgeDirs.add(directory)
 

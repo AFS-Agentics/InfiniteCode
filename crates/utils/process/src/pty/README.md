@@ -1,6 +1,6 @@
-# devo_util_process
+# infinitecode_util_process
 
-Lightweight helpers for spawning interactive processes either under a PTY (pseudo terminal) or regular pipes. This is the `devo-util-process` crate. The public API is minimal and mirrors both backends so callers can switch based on their needs (e.g., enabling or disabling TTY).
+Lightweight helpers for spawning interactive processes either under a PTY (pseudo terminal) or regular pipes. This is the `infinitecode-util-process` crate. The public API is minimal and mirrors both backends so callers can switch based on their needs (e.g., enabling or disabling TTY).
 
 ## API surface
 
@@ -22,9 +22,9 @@ Lightweight helpers for spawning interactive processes either under a PTY (pseud
 ```rust
 use std::collections::HashMap;
 use std::path::Path;
-use devo_util_process::combine_output_receivers;
-use devo_util_process::spawn_pty_process;
-use devo_util_process::TerminalSize;
+use infinitecode_util_process::combine_output_receivers;
+use infinitecode_util_process::spawn_pty_process;
+use infinitecode_util_process::TerminalSize;
 
 # tokio_test::block_on(async {
 let env_map: HashMap<String, String> = std::env::vars().collect();
@@ -60,5 +60,5 @@ Use `spawn_pipe_process_no_stdin` to force stdin closed (commands that read stdi
 Unit tests live in `crates/utils/src/pty/tests.rs` and cover both backends (PTY Python REPL and pipe-based stdin roundtrip). Run with:
 
 ```
-cargo test -p devo-util-process pty -- --nocapture
+cargo test -p infinitecode-util-process pty -- --nocapture
 ```

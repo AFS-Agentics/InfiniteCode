@@ -545,11 +545,11 @@ where
         Ok(())
     }
 
-    /// Clear only the rows currently managed by the inline devo session.
+    /// Clear only the rows currently managed by the inline infinitecode session.
     ///
-    /// This preserves shell scrollback above the original devo invocation while
+    /// This preserves shell scrollback above the original infinitecode invocation while
     /// erasing the visible transcript and viewport so the shell prompt can
-    /// resume at the line where devo started rendering.
+    /// resume at the line where infinitecode started rendering.
     pub fn clear_managed_inline_area(&mut self) -> io::Result<()> {
         if self.viewport_area.is_empty() {
             return Ok(());
@@ -581,7 +581,7 @@ where
     /// Clear only the live inline viewport while preserving transcript rows already inserted
     /// above it.
     ///
-    /// This is useful when Devo exits in inline mode: we want the shell prompt to resume at the
+    /// This is useful when InfiniteCode exits in inline mode: we want the shell prompt to resume at the
     /// top of the live viewport without erasing prior conversation output that has already been
     /// committed into normal terminal scrollback.
     pub fn clear_inline_viewport(&mut self) -> io::Result<()> {

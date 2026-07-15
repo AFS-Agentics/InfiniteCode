@@ -14,9 +14,9 @@ import {
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
-} from "@devo/ui/components/dropdown-menu"
+} from "@infinitecode/ui/components/dropdown-menu"
 
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { CheckIcon } from "lucide-react"
 import type * as React from "react"
 

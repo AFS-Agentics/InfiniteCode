@@ -7,9 +7,9 @@
 use std::path::PathBuf;
 
 use crossterm::event::KeyCode;
-use devo_protocol::ReferenceSearchResult;
-use devo_protocol::ReferenceSearchResultKind;
-use devo_protocol::ReferenceSearchSnapshot;
+use infinitecode_protocol::ReferenceSearchResult;
+use infinitecode_protocol::ReferenceSearchResultKind;
+use infinitecode_protocol::ReferenceSearchSnapshot;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Constraint;
 use ratatui::layout::Layout;
@@ -250,7 +250,7 @@ fn reference_popup_hint_line() -> Line<'static> {
 
 #[cfg(test)]
 mod tests {
-    use devo_protocol::ReferenceSearchId;
+    use infinitecode_protocol::ReferenceSearchId;
     use pretty_assertions::assert_eq;
 
     use super::*;

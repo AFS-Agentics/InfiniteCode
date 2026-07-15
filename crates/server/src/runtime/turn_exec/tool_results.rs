@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use devo_core::tools::ToolContent;
-use devo_core::{
+use infinitecode_core::tools::ToolContent;
+use infinitecode_core::{
     CommandExecutionItem, SessionId, TextItem, ToolCallItem, ToolResultItem, TurnId, TurnItem,
 };
-use devo_util_git::extract_paths_from_patch;
+use infinitecode_util_git::extract_paths_from_patch;
 
 use super::super::*;
 use super::tool_display::{command_actions_from_tool_result, is_file_change_tool, is_plan_tool};
@@ -112,7 +112,7 @@ async fn complete_plan_tool_call(
     session_id: SessionId,
     turn_id: TurnId,
     turn_for_plan_updates: &crate::TurnMetadata,
-    pending_item_id: devo_core::ItemId,
+    pending_item_id: infinitecode_core::ItemId,
     pending_item_seq: u64,
     content: &ToolContent,
 ) {
@@ -173,7 +173,7 @@ async fn complete_file_change_tool_call(
     content: &ToolContent,
     display_content: Option<String>,
     is_error: bool,
-    pending_item_id: devo_core::ItemId,
+    pending_item_id: infinitecode_core::ItemId,
     pending_item_seq: u64,
 ) {
     let output_json = tool_content_to_json(content.clone());
@@ -206,7 +206,7 @@ async fn complete_file_change_tool_call(
 
 fn file_changes_from_output(
     output_json: &serde_json::Value,
-) -> Vec<(std::path::PathBuf, devo_protocol::protocol::FileChange)> {
+) -> Vec<(std::path::PathBuf, infinitecode_protocol::protocol::FileChange)> {
     let changes = output_json
         .get("files")
         .and_then(serde_json::Value::as_array)
@@ -225,21 +225,21 @@ fn file_changes_from_output(
                 .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             let change = match kind {
-                "add" => devo_protocol::protocol::FileChange::Add {
+                "add" => infinitecode_protocol::protocol::FileChange::Add {
                     content: file
                         .get("content")
                         .and_then(serde_json::Value::as_str)
                         .map(ToOwned::to_owned)
                         .unwrap_or_else(|| "\n".repeat(additions as usize)),
                 },
-                "delete" => devo_protocol::protocol::FileChange::Delete {
+                "delete" => infinitecode_protocol::protocol::FileChange::Delete {
                     content: file
                         .get("content")
                         .and_then(serde_json::Value::as_str)
                         .map(ToOwned::to_owned)
                         .unwrap_or_else(|| "\n".repeat(deletions as usize)),
                 },
-                "update" | "move" => devo_protocol::protocol::FileChange::Update {
+                "update" | "move" => infinitecode_protocol::protocol::FileChange::Update {
                     unified_diff: file
                         .get("diff")
                         .or_else(|| file.get("patch"))
@@ -280,7 +280,7 @@ fn file_changes_from_output(
             .map(|path| {
                 (
                     std::path::PathBuf::from(path),
-                    devo_protocol::protocol::FileChange::Update {
+                    infinitecode_protocol::protocol::FileChange::Update {
                         unified_diff: output_json
                             .get("diff")
                             .and_then(serde_json::Value::as_str)
@@ -309,7 +309,7 @@ async fn complete_command_execution_tool_call(
     content: &ToolContent,
     is_error: bool,
     summary: &str,
-    pending_item_id: devo_core::ItemId,
+    pending_item_id: infinitecode_core::ItemId,
     pending_item_seq: u64,
 ) {
     let output = tool_content_to_json(content.clone());
@@ -318,7 +318,7 @@ async fn complete_command_execution_tool_call(
         tool_name: tool_name.to_string(),
         command: pending.command.clone(),
         input: Some(pending.input.clone()),
-        source: devo_protocol::protocol::ExecCommandSource::Agent,
+        source: infinitecode_protocol::protocol::ExecCommandSource::Agent,
         command_actions: command_actions_from_tool_result(
             tool_name,
             &pending.command,
@@ -358,7 +358,7 @@ async fn complete_generic_tool_call(
     tool_name: String,
     pending: &PendingToolCall,
     summary: &str,
-    pending_item_id: devo_core::ItemId,
+    pending_item_id: infinitecode_core::ItemId,
     pending_item_seq: u64,
 ) {
     let completed_payload = serde_json::to_value(ToolCallPayload {

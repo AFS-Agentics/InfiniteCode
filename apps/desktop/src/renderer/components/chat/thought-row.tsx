@@ -1,5 +1,5 @@
-import { ReasoningText } from "@devo/ui/components/ai-elements/reasoning"
-import { Shimmer } from "@devo/ui/components/ai-elements/shimmer"
+import { ReasoningText } from "@infinitecode/ui/components/ai-elements/reasoning"
+import { Shimmer } from "@infinitecode/ui/components/ai-elements/shimmer"
 import { memo } from "react"
 import type { ReasoningPart } from "../../lib/types"
 import {

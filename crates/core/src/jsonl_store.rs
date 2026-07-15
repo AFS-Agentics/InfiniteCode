@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
 
-use devo_protocol::SessionId;
+use infinitecode_protocol::SessionId;
 
 use crate::durable_record::DurableRecord;
 use crate::session_store::{ReplayStream, SessionStore, StoreError, StoreErrorCode};
@@ -225,7 +225,7 @@ mod tests {
     use super::*;
     use crate::durable_record::*;
     use chrono::Utc;
-    use devo_protocol::TurnId;
+    use infinitecode_protocol::TurnId;
     use tempfile::TempDir;
 
     fn make_store() -> (JsonlSessionStore, TempDir) {
@@ -249,8 +249,8 @@ mod tests {
             session_id,
             turn_id,
             sequence: 0,
-            status: devo_protocol::TurnStatus::Running,
-            kind: devo_protocol::TurnKind::Regular,
+            status: infinitecode_protocol::TurnStatus::Running,
+            kind: infinitecode_protocol::TurnKind::Regular,
             resume_of_turn_id: None,
             submitted_by_client_id: None,
             model: Some("test-model".into()),

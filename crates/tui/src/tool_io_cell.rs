@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use devo_protocol::protocol::FileChange;
+use infinitecode_protocol::protocol::FileChange;
 use ratatui::prelude::*;
 use ratatui::style::Style;
 use ratatui::style::Stylize;

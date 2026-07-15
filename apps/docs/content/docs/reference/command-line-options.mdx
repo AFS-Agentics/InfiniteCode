@@ -1,9 +1,9 @@
 ---
 title: Command Line Options
-description: Reference top-level Devo CLI flags and commands.
+description: Reference top-level InfiniteCode CLI flags and commands.
 ---
 
-The `devo` binary starts the interactive TUI when no subcommand is provided.
+The `infinitecode` binary starts the interactive TUI when no subcommand is provided.
 Global flags can be used with interactive mode and subcommands.
 
 ## Global Flags
@@ -14,67 +14,67 @@ Global flags can be used with interactive mode and subcommands.
 | `--log-level` | `trace`, `debug`, `info`, `warn`, `error` | Override process logging level. |
 | `--dangerously-skip-permissions`, `--yolo` | none | Start the interactive TUI with full-access permissions, skipping approval prompts. |
 | `--help` | none | Print command help. |
-| `--version` | none | Print Devo version. |
+| `--version` | none | Print InfiniteCode version. |
 
 Example:
 
 ```bash
-devo --model deepseek-v4-pro --log-level debug
-devo --yolo
+infinitecode --model deepseek-v4-pro --log-level debug
+infinitecode --yolo
 ```
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `devo` | Start the interactive TUI. |
-| `devo onboard` | Launch onboarding and configure a model provider. |
-| `devo resume <session-id>` | Resume a saved interactive session by id. |
-| `devo prompt [--format <format>] <input>` | Send one prompt and print the response. |
-| `devo doctor` | Diagnose configuration, provider connectivity, and system health. |
-| `devo upgrade` | Upgrade Devo to the latest released version. |
+| `infinitecode` | Start the interactive TUI. |
+| `infinitecode onboard` | Launch onboarding and configure a model provider. |
+| `infinitecode resume <session-id>` | Resume a saved interactive session by id. |
+| `infinitecode prompt [--format <format>] <input>` | Send one prompt and print the response. |
+| `infinitecode doctor` | Diagnose configuration, provider connectivity, and system health. |
+| `infinitecode upgrade` | Upgrade InfiniteCode to the latest released version. |
 
 There is also a hidden `server` command used by the runtime. It is not part of
 the user-facing CLI contract.
 
-## `devo`
+## `infinitecode`
 
 Starts an interactive session in the current working directory:
 
 ```bash
-devo
+infinitecode
 ```
 
 Use this for normal coding-agent work.
 
-## `devo onboard`
+## `infinitecode onboard`
 
 Forces the onboarding flow:
 
 ```bash
-devo onboard
+infinitecode onboard
 ```
 
 Use this when setting up a provider for the first time or replacing the current
 provider setup.
 
-## `devo resume`
+## `infinitecode resume`
 
 Resumes a saved interactive session:
 
 ```bash
-devo resume <session-id>
+infinitecode resume <session-id>
 ```
 
 The session id is printed when an interactive session exits. Inside the TUI,
 `/resume` opens the session browser.
 
-## `devo prompt`
+## `infinitecode prompt`
 
 Runs one non-interactive prompt:
 
 ```bash
-devo prompt "Explain this repository."
+infinitecode prompt "Explain this repository."
 ```
 
 Output formats:
@@ -88,33 +88,33 @@ Output formats:
 Examples:
 
 ```bash
-devo prompt --format text "List the main crates."
-devo prompt --format json "Summarize current config."
-devo prompt --format jsonl "Inspect project structure."
+infinitecode prompt --format text "List the main crates."
+infinitecode prompt --format json "Summarize current config."
+infinitecode prompt --format jsonl "Inspect project structure."
 ```
 
-`--model` also applies to `devo prompt`:
+`--model` also applies to `infinitecode prompt`:
 
 ```bash
-devo --model deepseek-v4-flash prompt "Summarize this file tree."
+infinitecode --model deepseek-v4-flash prompt "Summarize this file tree."
 ```
 
-## `devo doctor`
+## `infinitecode doctor`
 
 Runs local diagnostics:
 
 ```bash
-devo doctor
+infinitecode doctor
 ```
 
 Run this after editing config files, credentials, or provider endpoints.
 
-## `devo upgrade`
+## `infinitecode upgrade`
 
 Runs the built-in upgrade command:
 
 ```bash
-devo upgrade
+infinitecode upgrade
 ```
 
 For offline machines, use the offline install or upgrade process instead of

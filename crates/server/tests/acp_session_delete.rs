@@ -5,36 +5,36 @@ use std::sync::Arc;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::Model;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::SessionId;
-use devo_protocol::SessionMetadata;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::SingleProviderRouter;
-use devo_server::AcpDeleteSessionResult;
-use devo_server::AcpInitializeResult;
-use devo_server::AcpListSessionsResult;
-use devo_server::AcpNewSessionResult;
-use devo_server::AcpSessionDeleteCapabilities;
-use devo_server::AcpSuccessResponse;
-use devo_server::ClientTransportKind;
-use devo_server::DEVO_SESSION_META;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
-use devo_server::acp_session_info_from_metadata;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::SessionMetadata;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_server::AcpDeleteSessionResult;
+use infinitecode_server::AcpInitializeResult;
+use infinitecode_server::AcpListSessionsResult;
+use infinitecode_server::AcpNewSessionResult;
+use infinitecode_server::AcpSessionDeleteCapabilities;
+use infinitecode_server::AcpSuccessResponse;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::INFINITECODE_SESSION_META;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
+use infinitecode_server::acp_session_info_from_metadata;
 use futures::Stream;
 use futures::stream;
 use pretty_assertions::assert_eq;
@@ -113,7 +113,7 @@ impl ModelProviderSDK for BlockingProvider {
 async fn acp_session_delete_removes_session_from_history_and_is_idempotent() -> Result<()> {
     let data_root = TempDir::new()?;
     let provider: Arc<dyn ModelProviderSDK> = Arc::new(NoopProvider);
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         data_root.path().join("acp_session_delete.db"),
     )?);
     let runtime = ServerRuntime::new(
@@ -133,7 +133,7 @@ async fn acp_session_delete_removes_session_from_history_and_is_idempotent() -> 
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 data_root.path().to_path_buf(),
@@ -141,7 +141,7 @@ async fn acp_session_delete_removes_session_from_history_and_is_idempotent() -> 
             )?)),
         ),
     );
-    let (notifications_tx, _notifications_rx) = devo_server::test_outbound_channel(4096);
+    let (notifications_tx, _notifications_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -199,9 +199,9 @@ async fn acp_session_delete_removes_session_from_history_and_is_idempotent() -> 
             .result
             .meta
             .as_ref()
-            .and_then(|meta| meta.get(DEVO_SESSION_META))
+            .and_then(|meta| meta.get(INFINITECODE_SESSION_META))
             .cloned()
-            .context("missing Devo session metadata")?,
+            .context("missing InfiniteCode session metadata")?,
     )?;
 
     assert_eq!(
@@ -339,7 +339,7 @@ async fn acp_session_delete_broadcasts_deleted_session_ids() -> Result<()> {
         .await
         .context("observer should receive session/deleted broadcast")?;
     assert_eq!(
-        notification["params"]["_meta"]["devo/originalEvent"]["deleted_session_ids"],
+        notification["params"]["_meta"]["infinitecode/originalEvent"]["deleted_session_ids"],
         serde_json::json!([new_session.session_id])
     );
     Ok(())
@@ -398,7 +398,7 @@ fn build_runtime_with_provider(
     data_root: &Path,
     provider: Arc<dyn ModelProviderSDK>,
 ) -> Result<Arc<ServerRuntime>> {
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         data_root.join("acp_session_delete.db"),
     )?);
     Ok(ServerRuntime::new(
@@ -418,7 +418,7 @@ fn build_runtime_with_provider(
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 data_root.to_path_buf(),
@@ -431,7 +431,7 @@ fn build_runtime_with_provider(
 async fn initialize_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(4096);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -492,11 +492,11 @@ async fn create_acp_session(
             .result
             .meta
             .as_ref()
-            .and_then(|meta| meta.get(DEVO_SESSION_META))
+            .and_then(|meta| meta.get(INFINITECODE_SESSION_META))
             .cloned()
-            .context("missing Devo session metadata")?,
+            .context("missing InfiniteCode session metadata")?,
     )
-    .context("decode Devo session metadata")
+    .context("decode InfiniteCode session metadata")
 }
 
 async fn start_legacy_session(
@@ -521,7 +521,7 @@ async fn start_legacy_session(
         )
         .await
         .context("session/start response")?;
-    let response: devo_server::SuccessResponse<devo_server::SessionStartResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult> =
         serde_json::from_value(response)?;
     Ok(response.result.session)
 }
@@ -549,7 +549,7 @@ async fn start_turn(
             connection_id,
             serde_json::json!({
                 "id": request_id,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "seed fork history" }],
@@ -564,7 +564,7 @@ async fn start_turn(
         )
         .await
         .context("turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(response)?;
     Ok(())
 }
@@ -579,7 +579,7 @@ async fn fork_session(
             connection_id,
             serde_json::json!({
                 "id": 9,
-                "method": "_devo/session/fork",
+                "method": "_infinitecode/session/fork",
                 "params": {
                     "session_id": session_id,
                     "title": "Forked child",
@@ -590,7 +590,7 @@ async fn fork_session(
         )
         .await
         .context("session/fork response")?;
-    let response: devo_server::SuccessResponse<devo_server::SessionForkResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_server::SessionForkResult> =
         serde_json::from_value(response)?;
     Ok(response.result.session)
 }
@@ -615,7 +615,7 @@ async fn subscribe_to_all_events(
         )
         .await
         .context("events/subscribe response")?;
-    let _: devo_server::SuccessResponse<devo_server::EventsSubscribeResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::EventsSubscribeResult> =
         serde_json::from_value(response)?;
     Ok(())
 }
@@ -630,7 +630,7 @@ async fn wait_for_original_method(
                 return Ok(value);
             }
             if value.get("method") == Some(&serde_json::json!("session/update"))
-                && value["params"]["_meta"]["devo/originalMethod"].as_str() == Some(method)
+                && value["params"]["_meta"]["infinitecode/originalMethod"].as_str() == Some(method)
             {
                 return Ok(value);
             }

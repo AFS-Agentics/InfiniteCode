@@ -2,9 +2,9 @@ import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
-} from "@devo/ui/components/collapsible"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/collapsible"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { ChevronRightIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { memo, useState } from "react"

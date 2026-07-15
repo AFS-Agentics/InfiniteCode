@@ -53,7 +53,7 @@ Responding to every session immediately with a full consolidation pass would be 
 
 A filesystem-based memory store makes memory visible, inspectable, editable (for debugging), and portable. Using a git-backed workspace provides natural change detection, rollback, and audit history.
 
-**Decision**: Memory is stored as Markdown files under `~/.devo/memories/`. The directory is git-initialized. Phase 2 operates on a workspace diff to detect what changed and avoid redundant consolidation passes. Files are structured for both human readability and model consumption.
+**Decision**: Memory is stored as Markdown files under `~/.infinitecode/memories/`. The directory is git-initialized. Phase 2 operates on a workspace diff to detect what changed and avoid redundant consolidation passes. Files are structured for both human readability and model consumption.
 
 ### DD-4: Job-based distributed locking prevents duplicate work
 
@@ -137,7 +137,7 @@ Not all users want memory. Even for users who do, extraction cost should respect
 ### Memory Filesystem Layout
 
 ```
-~/.devo/memories/                    ← git-initialized root
+~/.infinitecode/memories/                    ← git-initialized root
 ├── .git/                            ← git baseline for change detection
 ├── memory_summary.md                ← summary index (agent reads first)
 ├── MEMORY.md                        ← structured searchable registry
@@ -229,7 +229,7 @@ Phase 2 runs after Phase 1 completion within the same startup task.
 
 **a) Claim global lock**: Atomically claim the global Phase 2 job. If another worker holds it (still within lease), skipped. If less than the cooldown window since last success, skipped. If retries exhausted, skipped.
 
-**b) Prepare workspace**: Ensure `~/.devo/memories/` exists, has a git baseline. If no `.git` directory, `git init` and initial commit.
+**b) Prepare workspace**: Ensure `~/.infinitecode/memories/` exists, has a git baseline. If no `.git` directory, `git init` and initial commit.
 
 **c) Load inputs**: Query `stage1_outputs` ordered by usage count descending, recency descending, limited to `max_raw_memories_for_consolidation` rows. Exclude rows unused beyond `max_unused_days`.
 

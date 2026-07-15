@@ -5,26 +5,26 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::InputItem;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ServerEvent;
-use devo_protocol::StreamEvent;
-use devo_protocol::TurnId;
-use devo_protocol::TurnInterruptParams;
-use devo_protocol::TurnStartParams;
-use devo_provider::ModelProviderSDK;
-use devo_provider::SingleProviderRouter;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
-use devo_server::WebSocketServerClient;
-use devo_server::WebSocketServerClientConfig;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::InputItem;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ServerEvent;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::TurnId;
+use infinitecode_protocol::TurnInterruptParams;
+use infinitecode_protocol::TurnStartParams;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
+use infinitecode_server::WebSocketServerClient;
+use infinitecode_server::WebSocketServerClientConfig;
 use futures::stream;
 use tempfile::TempDir;
 use tokio::time::timeout;
@@ -54,7 +54,7 @@ async fn websocket_server_client_drives_listener_session_and_notifications() -> 
     let workspace = TempDir::new()?;
     let server_home = TempDir::new()?;
     let bind_address = free_loopback_address()?;
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         server_home.path().join("websocket-client-e2e.db"),
     )?);
     let provider: Arc<dyn ModelProviderSDK> = Arc::new(PendingProvider);
@@ -68,7 +68,7 @@ async fn websocket_server_client_drives_listener_session_and_notifications() -> 
             Arc::new(PresetModelCatalog::default()),
             Arc::new(ProviderVendorCatalog::default()),
             Box::new(FileSystemSkillCatalog::new(SkillsConfig::default())),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 server_home.path().to_path_buf(),
@@ -79,7 +79,7 @@ async fn websocket_server_client_drives_listener_session_and_notifications() -> 
     let listen = vec![format!("ws://{bind_address}")];
     let listener_task =
         tokio::spawn(
-            async move { devo_server::run_listeners(Arc::clone(&runtime), &listen).await },
+            async move { infinitecode_server::run_listeners(Arc::clone(&runtime), &listen).await },
         );
     tokio::time::sleep(Duration::from_millis(200)).await;
 
@@ -89,10 +89,10 @@ async fn websocket_server_client_drives_listener_session_and_notifications() -> 
     })
     .await?;
     let initialize = client.initialize().await?;
-    assert_eq!(initialize.server_name, "devo-server");
+    assert_eq!(initialize.server_name, "infinitecode-server");
 
     let session = client
-        .session_start(devo_protocol::SessionStartParams {
+        .session_start(infinitecode_protocol::SessionStartParams {
             cwd: workspace.path().to_path_buf(),
             additional_directories: Vec::new(),
             ephemeral: false,

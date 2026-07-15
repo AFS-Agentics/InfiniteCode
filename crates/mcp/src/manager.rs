@@ -1,4 +1,4 @@
-//! MCP server manager backed by `devo-rmcp-client`.
+//! MCP server manager backed by `infinitecode-rmcp-client`.
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -7,11 +7,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use devo_config::OAuthCredentialsStoreMode;
-use devo_rmcp_client::ElicitationAction;
-use devo_rmcp_client::ElicitationResponse;
-use devo_rmcp_client::LocalStdioServerLauncher;
-use devo_rmcp_client::RmcpClient;
+use infinitecode_config::OAuthCredentialsStoreMode;
+use infinitecode_rmcp_client::ElicitationAction;
+use infinitecode_rmcp_client::ElicitationResponse;
+use infinitecode_rmcp_client::LocalStdioServerLauncher;
+use infinitecode_rmcp_client::RmcpClient;
 use rmcp::model::ClientCapabilities;
 use rmcp::model::Implementation;
 use rmcp::model::InitializeRequestParams;
@@ -21,20 +21,20 @@ use serde_json::Value;
 use tokio::sync::RwLock;
 use tracing::warn;
 
-use devo_core::mcp::McpAuthConfig;
-use devo_core::mcp::McpAuthState;
-use devo_core::mcp::McpCapability;
-use devo_core::mcp::McpConfig;
-use devo_core::mcp::McpError;
-use devo_core::mcp::McpManager;
-use devo_core::mcp::McpServerId;
-use devo_core::mcp::McpServerRecord;
-use devo_core::mcp::McpServerStatus;
-use devo_core::mcp::McpStartupPolicy;
-use devo_core::mcp::McpStartupState;
-use devo_core::mcp::McpToolDescriptor;
-use devo_core::mcp::McpToolInfo;
-use devo_core::mcp::McpTransportConfig;
+use infinitecode_core::mcp::McpAuthConfig;
+use infinitecode_core::mcp::McpAuthState;
+use infinitecode_core::mcp::McpCapability;
+use infinitecode_core::mcp::McpConfig;
+use infinitecode_core::mcp::McpError;
+use infinitecode_core::mcp::McpManager;
+use infinitecode_core::mcp::McpServerId;
+use infinitecode_core::mcp::McpServerRecord;
+use infinitecode_core::mcp::McpServerStatus;
+use infinitecode_core::mcp::McpStartupPolicy;
+use infinitecode_core::mcp::McpStartupState;
+use infinitecode_core::mcp::McpToolDescriptor;
+use infinitecode_core::mcp::McpToolInfo;
+use infinitecode_core::mcp::McpTransportConfig;
 
 const MCP_OPERATION_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -396,9 +396,9 @@ fn init_params() -> InitializeRequestParams {
     InitializeRequestParams {
         capabilities: ClientCapabilities::default(),
         client_info: Implementation {
-            name: "devo".into(),
+            name: "infinitecode".into(),
             version: env!("CARGO_PKG_VERSION").into(),
-            title: Some("Devo".into()),
+            title: Some("InfiniteCode".into()),
             description: None,
             icons: None,
             website_url: None,

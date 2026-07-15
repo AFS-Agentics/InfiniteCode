@@ -38,10 +38,10 @@ use crate::context::TokenBudget;
 use crate::context::compaction_summary::CompactionSummary;
 use crate::response_item::ResponseItem;
 
-use devo_protocol::RequestContent;
-use devo_protocol::RequestMessage;
-use devo_protocol::RequestRole;
-use devo_protocol::normalize_tool_result_messages;
+use infinitecode_protocol::RequestContent;
+use infinitecode_protocol::RequestMessage;
+use infinitecode_protocol::RequestRole;
+use infinitecode_protocol::normalize_tool_result_messages;
 
 use super::TokenInfo;
 use super::normalize;
@@ -347,7 +347,7 @@ fn summarizer_request_messages(to_compact: &[ResponseItem]) -> Vec<RequestMessag
 /// Returns an empty vector when no user message exists.
 fn preserve_suffix_from_latest_user_message(items: &[ResponseItem]) -> Vec<ResponseItem> {
     let Some(latest_user_index) = items.iter().rposition(
-        |item| matches!(item, ResponseItem::Message(msg) if msg.role == devo_protocol::Role::User),
+        |item| matches!(item, ResponseItem::Message(msg) if msg.role == infinitecode_protocol::Role::User),
     ) else {
         return Vec::new();
     };
@@ -400,12 +400,12 @@ fn estimate_item_tokens(item: &ResponseItem) -> usize {
             let mut text_blocks = 0;
             for block in &msg.content {
                 let text = match block {
-                    devo_protocol::ContentBlock::Text { text }
-                    | devo_protocol::ContentBlock::Reasoning { text } => text,
-                    devo_protocol::ContentBlock::ProviderReasoning { .. }
-                    | devo_protocol::ContentBlock::ToolUse { .. }
-                    | devo_protocol::ContentBlock::HostedToolUse { .. }
-                    | devo_protocol::ContentBlock::ToolResult { .. } => continue,
+                    infinitecode_protocol::ContentBlock::Text { text }
+                    | infinitecode_protocol::ContentBlock::Reasoning { text } => text,
+                    infinitecode_protocol::ContentBlock::ProviderReasoning { .. }
+                    | infinitecode_protocol::ContentBlock::ToolUse { .. }
+                    | infinitecode_protocol::ContentBlock::HostedToolUse { .. }
+                    | infinitecode_protocol::ContentBlock::ToolResult { .. } => continue,
                 };
                 if text_blocks > 0 {
                     bytes += 1;
@@ -432,8 +432,8 @@ mod tests {
     use std::hint::black_box;
     use std::time::Instant;
 
-    use devo_protocol::Message;
-    use devo_protocol::RequestContent;
+    use infinitecode_protocol::Message;
+    use infinitecode_protocol::RequestContent;
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -635,7 +635,7 @@ mod tests {
                         matches!(
                             item,
                             ResponseItem::Message(msg)
-                                if msg.role == devo_protocol::Role::Assistant
+                                if msg.role == infinitecode_protocol::Role::Assistant
                         )
                     }),
                     "auto compaction should preserve assistant tail items beyond the latest user message"
@@ -757,7 +757,7 @@ mod tests {
                 name: "shell_command".into(),
                 input: serde_json::json!({
                     "cmd": "rg --json \"ResponseItem::ToolCall\" crates/core/src -g !target",
-                    "cwd": "/Users/tsiao/Desktop/devo-opt",
+                    "cwd": "/Users/tsiao/Desktop/infinitecode-opt",
                     "timeout_ms": 10000,
                     "metadata": {
                         "index": index,

@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 use std::time::Duration;
 use std::time::Instant;
 
-use devo_core::ItemId;
+use infinitecode_core::ItemId;
 use ratatui::text::Span;
 
 use crate::events::TextItemKind;
@@ -558,7 +558,7 @@ fn maybe_warn_stream_commit_stall(item: &mut ActiveTextItem, queued_lines: usize
 fn stream_stall_warning_threshold() -> Duration {
     static STREAM_STALL_WARNING_THRESHOLD: OnceLock<Duration> = OnceLock::new();
     *STREAM_STALL_WARNING_THRESHOLD.get_or_init(|| {
-        std::env::var("DEVO_TUI_STREAM_STALL_WARN_MS")
+        std::env::var("INFINITECODE_TUI_STREAM_STALL_WARN_MS")
             .ok()
             .and_then(|value| value.parse::<u64>().ok())
             .map(Duration::from_millis)
@@ -593,7 +593,7 @@ fn assistant_token_log_preview_with_enabled(
 fn assistant_token_logging_enabled() -> bool {
     static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
     *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
-        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+        std::env::var("INFINITECODE_LOG_ASSISTANT_TOKEN_TEXT")
             .ok()
             .is_some_and(|value| {
                 matches!(
@@ -607,7 +607,7 @@ fn assistant_token_logging_enabled() -> bool {
 fn assistant_token_log_max_chars() -> usize {
     static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
     *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
-        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+        std::env::var("INFINITECODE_ASSISTANT_TOKEN_LOG_MAX_CHARS")
             .ok()
             .and_then(|value| value.parse::<usize>().ok())
             .filter(|value| *value > 0)

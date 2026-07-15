@@ -1,7 +1,7 @@
 /**
  * Differ tests.
  *
- * Tests for comparing Claude Code configs against Devo configs.
+ * Tests for comparing Claude Code configs against InfiniteCode configs.
  */
 import { describe, expect, it } from "bun:test"
 import { diff } from "../../src/differ"
@@ -18,7 +18,7 @@ describe("differ", () => {
 			const result = await diff(emptyResult)
 
 			expect(result.onlyInClaudeCode).toEqual([])
-			expect(result.onlyInDevo).toEqual([])
+			expect(result.onlyInInfiniteCode).toEqual([])
 			expect(result.different).toEqual([])
 			expect(result.matching).toEqual([])
 			expect(result.report).toBeDefined()
@@ -308,7 +308,7 @@ describe("differ", () => {
 			// Should have some items to report
 			const totalItems =
 				result.onlyInClaudeCode.length +
-				result.onlyInDevo.length +
+				result.onlyInInfiniteCode.length +
 				result.different.length +
 				result.matching.length
 

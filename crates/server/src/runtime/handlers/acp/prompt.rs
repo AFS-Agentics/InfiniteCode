@@ -2,14 +2,14 @@
 //!
 //! Portable ACP clients submit turns through blocking `session/prompt`: the JSON-RPC
 //! response is deferred until the turn reaches a terminal state, while progress is
-//! streamed on `session/update`. Devo's TUI uses `_devo/turn/start` instead; this
+//! streamed on `session/update`. InfiniteCode's TUI uses `_infinitecode/turn/start` instead; this
 //! module serves external ACP integrations.
 
 use super::super::acp_slash_commands::AcpSlashCommandPromptResult;
 use super::*;
 
 impl ServerRuntime {
-    /// Handles ACP `session/prompt` for non-Devo clients.
+    /// Handles ACP `session/prompt` for non-InfiniteCode clients.
     ///
     /// Returns `None` when the prompt turn was accepted and the JSON-RPC response
     /// will be sent asynchronously after the turn finishes (ACP blocking semantics).
@@ -71,7 +71,7 @@ impl ServerRuntime {
                 ));
             }
         };
-        // Reuse the Devo turn engine with ACP-default params (no model/sandbox
+        // Reuse the InfiniteCode turn engine with ACP-default params (no model/sandbox
         // extensions on the prompt RPC). Reject if another turn is already active.
         let legacy_response = self
             .handle_turn_start_with_queue_policy(
@@ -186,17 +186,17 @@ impl ServerRuntime {
 fn acp_stop_reason_from_terminal_turn(snapshot: TerminalTurnSnapshot) -> AcpStopReason {
     match snapshot.status {
         TurnStatus::Completed => match snapshot.stop_reason {
-            Some(devo_core::StopReason::MaxTokens) => AcpStopReason::MaxTokens,
+            Some(infinitecode_core::StopReason::MaxTokens) => AcpStopReason::MaxTokens,
             Some(
-                devo_core::StopReason::EndTurn
-                | devo_core::StopReason::ToolUse
-                | devo_core::StopReason::StopSequence,
+                infinitecode_core::StopReason::EndTurn
+                | infinitecode_core::StopReason::ToolUse
+                | infinitecode_core::StopReason::StopSequence,
             )
             | None => AcpStopReason::EndTurn,
         },
         TurnStatus::Interrupted => AcpStopReason::Cancelled,
         TurnStatus::Failed => match snapshot.failure_reason {
-            Some(devo_protocol::TurnFailureReason::MaxTurnRequests) => {
+            Some(infinitecode_protocol::TurnFailureReason::MaxTurnRequests) => {
                 AcpStopReason::MaxTurnRequests
             }
             None => AcpStopReason::Refusal,
@@ -220,7 +220,7 @@ mod tests {
             session_id: SessionId::new(),
             sequence: 1,
             status: TurnStatus::Completed,
-            kind: devo_protocol::TurnKind::Regular,
+            kind: infinitecode_protocol::TurnKind::Regular,
             model: "test-model".to_string(),
             model_binding_id: None,
             reasoning_effort_selection: None,
@@ -230,7 +230,7 @@ mod tests {
             started_at: chrono::Utc::now(),
             completed_at: Some(chrono::Utc::now()),
             usage: None,
-            stop_reason: Some(devo_core::StopReason::MaxTokens),
+            stop_reason: Some(infinitecode_core::StopReason::MaxTokens),
             failure_reason: None,
         };
         assert_eq!(
@@ -240,7 +240,7 @@ mod tests {
 
         turn.status = TurnStatus::Failed;
         turn.stop_reason = None;
-        turn.failure_reason = Some(devo_protocol::TurnFailureReason::MaxTurnRequests);
+        turn.failure_reason = Some(infinitecode_protocol::TurnFailureReason::MaxTurnRequests);
         assert_eq!(
             acp_stop_reason_from_terminal_turn(TerminalTurnSnapshot::from_turn(&turn)),
             AcpStopReason::MaxTurnRequests

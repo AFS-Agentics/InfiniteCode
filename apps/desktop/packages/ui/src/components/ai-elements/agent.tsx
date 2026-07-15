@@ -5,9 +5,9 @@ import {
 	AccordionContent,
 	AccordionItem,
 	AccordionTrigger,
-} from "@devo/ui/components/accordion"
-import { Badge } from "@devo/ui/components/badge"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/accordion"
+import { Badge } from "@infinitecode/ui/components/badge"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { Tool } from "ai"
 import { BotIcon } from "lucide-react"
 import type { ComponentProps } from "react"

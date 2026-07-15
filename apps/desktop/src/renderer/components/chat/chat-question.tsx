@@ -1,4 +1,4 @@
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	ArrowRightIcon,
 	Loader2Icon,

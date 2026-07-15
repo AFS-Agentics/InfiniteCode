@@ -2,13 +2,13 @@
  * Multi-provider Migration Offer.
  *
  * Scans the selected provider's configuration and lets the user select which
- * categories to migrate to Devo format. The user explicitly opted in
+ * categories to migrate to InfiniteCode format. The user explicitly opted in
  * (from the complete step), so scanning happens on mount.
  */
 
-import { Button } from "@devo/ui/components/button"
-import { Checkbox } from "@devo/ui/components/checkbox"
-import { Spinner } from "@devo/ui/components/spinner"
+import { Button } from "@infinitecode/ui/components/button"
+import { Checkbox } from "@infinitecode/ui/components/checkbox"
+import { Spinner } from "@infinitecode/ui/components/spinner"
 import {
 	ArrowRightIcon,
 	BotIcon,
@@ -54,7 +54,7 @@ interface MigrationOfferStepProps {
 const PROVIDER_LABELS: Record<MigrationProvider, string> = {
 	"claude-code": "Claude Code",
 	cursor: "Cursor",
-	devo: "InfiniteCode",
+	infinitecode: "InfiniteCode",
 	opencode: "OpenCode",
 }
 
@@ -125,7 +125,7 @@ export function MigrationOfferStep({ provider, onPreview, onSkip }: MigrationOff
 				<div className="text-center">
 					<h2 className="text-xl font-semibold text-foreground">Migrate from {label}</h2>
 					<p className="mt-1 text-sm text-muted-foreground">
-						We detected an existing {label} setup. Devo can migrate your configuration to Devo
+						We detected an existing {label} setup. InfiniteCode can migrate your configuration to InfiniteCode
 						format.
 					</p>
 				</div>
@@ -230,13 +230,13 @@ export function MigrationOfferStep({ provider, onPreview, onSkip }: MigrationOff
 function getMigrationDescription(provider: MigrationProvider): string {
 	switch (provider) {
 		case "claude-code":
-			return "Model IDs are translated automatically. MCP servers are converted to Devo format. Agent frontmatter is adapted. A backup is created before any changes, and you can undo at any time from Settings."
+			return "Model IDs are translated automatically. MCP servers are converted to InfiniteCode format. Agent frontmatter is adapted. A backup is created before any changes, and you can undo at any time from Settings."
 		case "cursor":
-			return "MCP servers, rules (.mdc), agents, and commands are converted to Devo format. Cursor-specific features like OAuth and rule modes are adapted where possible. A backup is created before any changes."
-		case "devo":
+			return "MCP servers, rules (.mdc), agents, and commands are converted to InfiniteCode format. Cursor-specific features like OAuth and rule modes are adapted where possible. A backup is created before any changes."
+		case "infinitecode":
 			return "Configuration, agents, commands, and rules are imported. A backup is created before any changes, and you can undo at any time from Settings."
 		case "opencode":
-			return "OpenCode providers and model bindings are imported through Devo provider settings. API keys are stored through Devo's provider credential flow."
+			return "OpenCode providers and model bindings are imported through InfiniteCode provider settings. API keys are stored through InfiniteCode's provider credential flow."
 	}
 }
 
@@ -249,8 +249,8 @@ function buildCategories(
 			return buildClaudeCodeCategories(detection)
 		case "cursor":
 			return buildCursorCategories(detection)
-		case "devo":
-			return buildDevoCategories(detection)
+		case "infinitecode":
+			return buildInfiniteCodeCategories(detection)
 		case "opencode":
 			return buildOpenCodeCategories(detection)
 	}
@@ -311,7 +311,7 @@ function buildClaudeCodeCategories(detection: ProviderDetection): MigrationCateg
 		{
 			id: "rules",
 			label: "Project rules (CLAUDE.md)",
-			description: "Copied as AGENTS.md for Devo",
+			description: "Copied as AGENTS.md for InfiniteCode",
 			icon: ScrollTextIcon,
 			count: detection.ruleCount,
 			enabled: true,
@@ -424,12 +424,12 @@ function buildCursorCategories(detection: ProviderDetection): MigrationCategory[
 	]
 }
 
-function buildDevoCategories(detection: ProviderDetection): MigrationCategory[] {
+function buildInfiniteCodeCategories(detection: ProviderDetection): MigrationCategory[] {
 	return [
 		{
 			id: "config",
 			label: "Global configuration",
-			description: "devo.json settings and model preferences",
+			description: "infinitecode.json settings and model preferences",
 			icon: CogIcon,
 			count: detection.hasGlobalSettings ? 1 : 0,
 			enabled: true,
@@ -445,7 +445,7 @@ function buildDevoCategories(detection: ProviderDetection): MigrationCategory[] 
 		{
 			id: "agents",
 			label: "Custom agents",
-			description: "Agent definitions from .devo/agents/",
+			description: "Agent definitions from .infinitecode/agents/",
 			icon: BotIcon,
 			count: detection.agentCount,
 			enabled: true,
@@ -453,7 +453,7 @@ function buildDevoCategories(detection: ProviderDetection): MigrationCategory[] 
 		{
 			id: "commands",
 			label: "Custom commands",
-			description: "Command files from .devo/commands/",
+			description: "Command files from .infinitecode/commands/",
 			icon: TerminalIcon,
 			count: detection.commandCount,
 			enabled: true,

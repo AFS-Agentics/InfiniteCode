@@ -1,4 +1,4 @@
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { NodeToolbar, Position } from "@xyflow/react"
 import type { ComponentProps } from "react"
 

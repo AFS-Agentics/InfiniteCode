@@ -1,11 +1,11 @@
 /**
- * Model ID translation between Claude Code and Devo formats.
+ * Model ID translation between Claude Code and InfiniteCode formats.
  *
  * Claude Code: "claude-opus-4-6" or "anthropic.claude-opus-4-6-v1:0:1m" (Bedrock ARN)
- * Devo: "provider/model" format (e.g., "anthropic/claude-opus-4-6")
+ * InfiniteCode: "provider/model" format (e.g., "anthropic/claude-opus-4-6")
  */
 
-/** Known model name -> Devo provider/model mappings */
+/** Known model name -> InfiniteCode provider/model mappings */
 const MODEL_MAP: Record<string, string> = {
 	// Anthropic direct models
 	"claude-opus-4-6": "anthropic/claude-opus-4-6",
@@ -50,12 +50,12 @@ export function detectProvider(
 }
 
 /**
- * Translate a Claude Code model ID to Devo format.
+ * Translate a Claude Code model ID to InfiniteCode format.
  *
  * @param ccModelId - Claude Code model identifier
  * @param provider - Detected or overridden provider
  * @param overrides - Manual model ID overrides
- * @returns Devo "provider/model" string
+ * @returns InfiniteCode "provider/model" string
  */
 export function translateModelId(
 	ccModelId: string,

@@ -54,7 +54,7 @@ import {
 	restartServer,
 	stopServer,
 	subscribeAcp,
-} from "./devo-manager"
+} from "./infinitecode-manager"
 import { getOpaqueWindows, getSettings, onSettingsChanged, updateSettings } from "./settings-store"
 import { desktopTerminalManager } from "./terminal-manager"
 import {
@@ -105,7 +105,7 @@ interface SerializedResponse {
  * The response is serialized back to the renderer.
  *
  * This bypasses Chromium's 6-connections-per-origin HTTP/1.1 limit, which
- * causes severe queueing when many parallel requests hit the Devo server.
+ * causes severe queueing when many parallel requests hit the InfiniteCode server.
  */
 async function handleFetchProxy(
 	_event: Electron.IpcMainInvokeEvent,
@@ -524,8 +524,8 @@ export function registerIpcHandlers(): void {
 	// --- Onboarding ---
 
 	ipcMain.handle(
-		"onboarding:check-devo",
-		withLogging("onboarding:check-devo", async () => await checkDesktopRuntime()),
+		"onboarding:check-infinitecode",
+		withLogging("onboarding:check-infinitecode", async () => await checkDesktopRuntime()),
 	)
 
 	ipcMain.handle(

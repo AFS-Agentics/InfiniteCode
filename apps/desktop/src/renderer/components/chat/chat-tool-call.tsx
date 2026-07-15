@@ -5,17 +5,17 @@ import {
 	CodeBlockCopyButton,
 	CodeBlockHeader,
 	CodeBlockTitle,
-} from "@devo/ui/components/ai-elements/code-block"
-import { Diff, DiffContent } from "@devo/ui/components/ai-elements/diff"
+} from "@infinitecode/ui/components/ai-elements/code-block"
+import { Diff, DiffContent } from "@infinitecode/ui/components/ai-elements/diff"
 import {
 	Terminal,
 	TerminalContent,
 	TerminalCopyButton,
 	TerminalHeader,
 	TerminalTitle,
-} from "@devo/ui/components/ai-elements/terminal"
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@devo/ui/components/dialog"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/ai-elements/terminal"
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@infinitecode/ui/components/dialog"
+import { cn } from "@infinitecode/ui/lib/utils"
 
 import { useSetAtom } from "jotai"
 import {
@@ -82,7 +82,7 @@ const LINE_NUM_REGEX = /^\s*(\d+)[|:\t]\s?(.*)$/
  * Parses output from various read tools.
  * Handles:
  * 1. Claude Code's `cat -n` format: <file>00001| content</file>
- * 2. Devo's XML-wrapped format: <path>...</path><content>1: content</content>
+ * 2. InfiniteCode's XML-wrapped format: <path>...</path><content>1: content</content>
  *
  * This function strips the wrapper tags, removes the line-number
  * prefixes, and returns the clean content + the starting line number.
@@ -90,7 +90,7 @@ const LINE_NUM_REGEX = /^\s*(\d+)[|:\t]\s?(.*)$/
 function parseReadOutput(raw: string): { content: string; startLine: number } {
 	let text = raw
 
-	// 1. Strip Devo XML-style tags
+	// 1. Strip InfiniteCode XML-style tags
 	text = text.replace(/<path>[\s\S]*?<\/path>\s*\n?/g, "")
 	text = text.replace(/<type>[\s\S]*?<\/type>\s*\n?/g, "")
 
@@ -230,7 +230,7 @@ function extractFromRaw(state: ToolPart["state"], ...fields: string[]): string |
 /**
  * Returns a "Preparing ..." fallback label for tools in the `pending` state
  * when no meaningful subtitle could be resolved from input/raw yet.
- * Mirrors the Devo TUI's `InlineTool` behaviour (e.g. "~ Preparing write ...").
+ * Mirrors the InfiniteCode TUI's `InlineTool` behaviour (e.g. "~ Preparing write ...").
  */
 function getPendingLabel(tool: string): string {
 	switch (tool) {
@@ -365,7 +365,7 @@ export function getToolSubtitle(
 	}
 
 	// When pending with no resolved subtitle, show a "Preparing ..." label so
-	// the user sees activity instead of a blank card (matches Devo TUI behaviour).
+	// the user sees activity instead of a blank card (matches InfiniteCode TUI behaviour).
 	if (!subtitle && state.status === "pending") {
 		return getPendingLabel(part.tool)
 	}
@@ -419,7 +419,7 @@ export function getToolDuration(part: ToolPart): string | undefined {
  * During `running` state the server streams incremental output via
  * `state.metadata.output` (accumulated string, updated on every stdout/stderr
  * chunk). We read that field so the terminal updates in real-time, matching the
- * behaviour of the Devo TUI and web UI.
+ * behaviour of the InfiniteCode TUI and web UI.
  */
 function BashContent({ part }: { part: ToolPart }) {
 	const command = part.state.input?.command as string | undefined
@@ -641,7 +641,7 @@ function ReadContent({ part }: { part: ToolPart }) {
 			code={displayContent}
 			language={language}
 			showLineNumbers
-			className="devo-read-output max-h-96 border-0 shadow-none rounded-none"
+			className="infinitecode-read-output max-h-96 border-0 shadow-none rounded-none"
 		>
 			<CodeBlockContent
 				code={displayContent}

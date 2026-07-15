@@ -7,13 +7,13 @@
 //! - provide the concrete builtin implementation of the shared `ModelCatalog` trait
 //!
 //! Design:
-//! - catalog loading stays in `devo-core` because the embedded assets live here
+//! - catalog loading stays in `infinitecode-core` because the embedded assets live here
 //! - this module is the bridge between raw preset/config data and runtime model consumers
 //! - models are sorted and materialized here so downstream code can work only with resolved `Model`
-//! - precedence is: `<workspace>/.devo/models.json` > `~/.devo/models.json` > builtin
+//! - precedence is: `<workspace>/.infinitecode/models.json` > `~/.infinitecode/models.json` > builtin
 //!
 //! Boundary:
-//! - this module should not define the runtime model shape itself; that lives in `devo-protocol`
+//! - this module should not define the runtime model shape itself; that lives in `infinitecode-protocol`
 //! - serde compatibility for the raw preset file belongs in `model_preset.rs`
 //! - execution logic should depend on `ModelCatalog` and `Model`, not on how this module reads JSON
 //!
@@ -52,7 +52,7 @@ impl PresetModelCatalog {
     }
 
     /// Loads the effective catalog from three layers. Precedence is:
-    /// 1. `<workspace_root>/.devo/models.json` (project overrides)
+    /// 1. `<workspace_root>/.infinitecode/models.json` (project overrides)
     /// 2. `config_home/models.json` (user overrides)
     /// 3. built-in models (embedded fallback)
     ///
@@ -77,7 +77,7 @@ impl PresetModelCatalog {
         );
 
         if let Some(workspace_root) = workspace_root {
-            let project_path = workspace_root.join(".devo").join("models.json");
+            let project_path = workspace_root.join(".infinitecode").join("models.json");
             merge_filesystem_model_presets(&mut presets, &mut warnings, &project_path);
         }
 
@@ -242,7 +242,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system time")
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("devo-{name}-{nanos}"));
+        let path = std::env::temp_dir().join(format!("infinitecode-{name}-{nanos}"));
         std::fs::create_dir_all(&path).expect("create temp dir");
         path
     }
@@ -314,7 +314,7 @@ mod tests {
     #[test]
     fn load_from_config_returns_builtin_when_no_filesystem_files() {
         let root = unique_temp_dir("catalog-builtin-only");
-        let home = root.join("home").join(".devo");
+        let home = root.join("home").join(".infinitecode");
         std::fs::create_dir_all(&home).expect("create home");
 
         let catalog =
@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn load_from_config_seeds_user_file_when_missing() {
         let root = unique_temp_dir("catalog-seed");
-        let home = root.join("home").join(".devo");
+        let home = root.join("home").join(".infinitecode");
         std::fs::create_dir_all(&home).expect("create home");
 
         let user_file = home.join("models.json");
@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn load_from_config_does_not_overwrite_existing_user_file() {
         let root = unique_temp_dir("catalog-no-overwrite");
-        let home = root.join("home").join(".devo");
+        let home = root.join("home").join(".infinitecode");
         std::fs::create_dir_all(&home).expect("create home");
 
         let user_file = home.join("models.json");
@@ -371,7 +371,7 @@ mod tests {
     #[test]
     fn load_from_config_applies_user_model_token_overrides() {
         let root = unique_temp_dir("catalog-user-token-overrides");
-        let home = root.join("home").join(".devo");
+        let home = root.join("home").join(".infinitecode");
         std::fs::create_dir_all(&home).expect("create home");
 
         std::fs::write(
@@ -402,7 +402,7 @@ mod tests {
     #[test]
     fn load_from_config_missing_base_instructions_fall_back_to_default() {
         let root = unique_temp_dir("catalog-missing-base-instructions");
-        let home = root.join("home").join(".devo");
+        let home = root.join("home").join(".infinitecode");
         std::fs::create_dir_all(&home).expect("create home");
 
         std::fs::write(
@@ -429,10 +429,10 @@ mod tests {
     #[test]
     fn load_from_config_project_overrides_user_by_slug() {
         let root = unique_temp_dir("catalog-project-wins");
-        let home = root.join("home").join(".devo");
+        let home = root.join("home").join(".infinitecode");
         let workspace = root.join("workspace");
         std::fs::create_dir_all(&home).expect("create home");
-        std::fs::create_dir_all(workspace.join(".devo")).expect("create project");
+        std::fs::create_dir_all(workspace.join(".infinitecode")).expect("create project");
 
         std::fs::write(
             home.join("models.json"),
@@ -440,7 +440,7 @@ mod tests {
         )
         .expect("write user models");
         std::fs::write(
-            workspace.join(".devo").join("models.json"),
+            workspace.join(".infinitecode").join("models.json"),
             r#"[{"slug":"custom","display_name":"Project","context_window":333,"effective_context_window_percent":88,"max_tokens":444}]"#,
         )
         .expect("write project models");
@@ -459,13 +459,13 @@ mod tests {
     #[test]
     fn load_from_config_uses_workspace_user_builtin_precedence_by_slug() {
         let root = unique_temp_dir("catalog-precedence");
-        let home = root.join("home").join(".devo");
+        let home = root.join("home").join(".infinitecode");
         let workspace = root.join("workspace");
         std::fs::create_dir_all(&home).expect("create home");
-        std::fs::create_dir_all(workspace.join(".devo")).expect("create project");
+        std::fs::create_dir_all(workspace.join(".infinitecode")).expect("create project");
 
         let user_models = home.join("models.json");
-        let workspace_models = workspace.join(".devo").join("models.json");
+        let workspace_models = workspace.join(".infinitecode").join("models.json");
         std::fs::write(
             &user_models,
             r#"[{"slug":"qwen3-coder-next","display_name":"User","context_window":111,"effective_context_window_percent":66,"max_tokens":222}]"#,
@@ -499,7 +499,7 @@ mod tests {
     #[test]
     fn load_from_config_records_warning_and_continues_for_invalid_filesystem_catalog() {
         let root = unique_temp_dir("catalog-invalid-warning");
-        let home = root.join("home").join(".devo");
+        let home = root.join("home").join(".infinitecode");
         std::fs::create_dir_all(&home).expect("create home");
         let user_file = home.join("models.json");
         std::fs::write(&user_file, "{not valid json").expect("write invalid user models");
@@ -533,7 +533,7 @@ mod tests {
     #[test]
     fn load_from_config_preserves_explicit_base_instructions() {
         let root = unique_temp_dir("catalog-preserve-base-instructions");
-        let home = root.join("home").join(".devo");
+        let home = root.join("home").join(".infinitecode");
         std::fs::create_dir_all(&home).expect("create home");
 
         std::fs::write(

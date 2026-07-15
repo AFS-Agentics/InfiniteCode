@@ -13,7 +13,7 @@ pub(crate) enum RuntimeSessionToolRegistryUpdate {
     KeepCurrent,
     ReplaceIfCwdMatches {
         cwd: PathBuf,
-        tool_registry: Option<Arc<devo_core::tools::ToolRegistry>>,
+        tool_registry: Option<Arc<infinitecode_core::tools::ToolRegistry>>,
     },
 }
 
@@ -23,7 +23,7 @@ impl ServerRuntime {
         connection_id: u64,
         request_id: serde_json::Value,
         params: SessionStartParams,
-        tool_registry: Option<Arc<devo_core::tools::ToolRegistry>>,
+        tool_registry: Option<Arc<infinitecode_core::tools::ToolRegistry>>,
     ) -> serde_json::Value {
         let now = Utc::now();
         let session_id = SessionId::new();
@@ -130,7 +130,7 @@ impl ServerRuntime {
             next_item_seq: 1,
             first_user_input: None,
             tool_registry,
-            file_read_ledger: Arc::new(devo_core::tools::FileReadLedger::new()),
+            file_read_ledger: Arc::new(infinitecode_core::tools::FileReadLedger::new()),
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
             session_context_recorded: false,
@@ -171,7 +171,7 @@ impl ServerRuntime {
         .await;
         self.run_session_hook(
             session_id,
-            devo_core::HookEvent::SessionStart,
+            infinitecode_core::HookEvent::SessionStart,
             serde_json::Map::from_iter([
                 ("source".to_string(), serde_json::json!("startup")),
                 ("model".to_string(), serde_json::json!(model)),
@@ -532,7 +532,7 @@ impl ServerRuntime {
             .await;
         self.run_session_hook(
             params.session_id,
-            devo_core::HookEvent::SessionStart,
+            infinitecode_core::HookEvent::SessionStart,
             serde_json::Map::from_iter([("source".to_string(), serde_json::json!("resume"))]),
         )
         .await;
@@ -866,7 +866,7 @@ impl ServerRuntime {
                         session_id,
                         sequence,
                         status: TurnStatus::Completed,
-                        kind: devo_protocol::TurnKind::Regular,
+                        kind: infinitecode_protocol::TurnKind::Regular,
                         model,
                         model_binding_id: source.summary.model_binding_id.clone(),
                         reasoning_effort_selection: source
@@ -920,7 +920,7 @@ impl ServerRuntime {
             last_query_usage: latest_query_usage.clone(),
             last_query_total_tokens: latest_query_usage
                 .as_ref()
-                .map(devo_protocol::TurnUsage::display_total_tokens)
+                .map(infinitecode_protocol::TurnUsage::display_total_tokens)
                 .unwrap_or(0),
             status: SessionRuntimeStatus::Idle,
         };
@@ -951,7 +951,7 @@ impl ServerRuntime {
                 .unwrap_or(u64::MAX),
             first_user_input: source.first_user_input.clone(),
             tool_registry: source.tool_registry.clone(),
-            file_read_ledger: std::sync::Arc::new(devo_core::tools::FileReadLedger::new()),
+            file_read_ledger: std::sync::Arc::new(infinitecode_core::tools::FileReadLedger::new()),
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
             session_context_recorded: source.session_context_recorded,
@@ -1005,7 +1005,7 @@ fn kept_items_for_user_turn_cut(
 
 fn retained_ids_for_persisted_items(
     items: &[crate::execution::PersistedTurnItem],
-) -> (Vec<TurnId>, Vec<devo_core::ItemId>) {
+) -> (Vec<TurnId>, Vec<infinitecode_core::ItemId>) {
     let mut retained_turn_ids = Vec::new();
     let mut retained_item_ids = Vec::new();
     for item in items {
@@ -1028,9 +1028,9 @@ mod tests {
     fn user_item(turn_id: TurnId, text: &str) -> crate::execution::PersistedTurnItem {
         crate::execution::PersistedTurnItem {
             turn_id,
-            turn_kind: devo_core::TurnKind::Regular,
-            item_id: devo_core::ItemId::new(),
-            turn_item: TurnItem::UserMessage(devo_core::TextItem {
+            turn_kind: infinitecode_core::TurnKind::Regular,
+            item_id: infinitecode_core::ItemId::new(),
+            turn_item: TurnItem::UserMessage(infinitecode_core::TextItem {
                 text: text.to_string(),
             }),
         }
@@ -1039,9 +1039,9 @@ mod tests {
     fn assistant_item(turn_id: TurnId, text: &str) -> crate::execution::PersistedTurnItem {
         crate::execution::PersistedTurnItem {
             turn_id,
-            turn_kind: devo_core::TurnKind::Regular,
-            item_id: devo_core::ItemId::new(),
-            turn_item: TurnItem::AgentMessage(devo_core::TextItem {
+            turn_kind: infinitecode_core::TurnKind::Regular,
+            item_id: infinitecode_core::ItemId::new(),
+            turn_item: TurnItem::AgentMessage(infinitecode_core::TextItem {
                 text: text.to_string(),
             }),
         }

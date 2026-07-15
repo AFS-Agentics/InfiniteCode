@@ -18,7 +18,7 @@ use crate::system::uninstall_system_skills;
 
 const MAX_CACHED_CWDS: usize = 64;
 
-/// Minimal skill config shape consumed by `devo-skills`.
+/// Minimal skill config shape consumed by `infinitecode-skills`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SkillsRuntimeConfig {
     pub enabled: bool,
@@ -52,7 +52,7 @@ pub struct PluginSkillRoot {
 
 #[derive(Debug)]
 pub struct SkillsManager {
-    devo_home: PathBuf,
+    infinitecode_home: PathBuf,
     config: RwLock<SkillsRuntimeConfig>,
     plugin_roots: RwLock<Vec<PluginSkillRoot>>,
     extra_roots: RwLock<Vec<PathBuf>>,
@@ -60,16 +60,16 @@ pub struct SkillsManager {
 }
 
 impl SkillsManager {
-    pub fn new(devo_home: PathBuf, config: SkillsRuntimeConfig) -> Self {
+    pub fn new(infinitecode_home: PathBuf, config: SkillsRuntimeConfig) -> Self {
         if config.bundled_enabled {
-            if let Err(error) = install_system_skills(&devo_home) {
+            if let Err(error) = install_system_skills(&infinitecode_home) {
                 tracing::warn!(error = %error, "failed to install system skills");
             }
         } else {
-            uninstall_system_skills(&devo_home);
+            uninstall_system_skills(&infinitecode_home);
         }
         Self {
-            devo_home,
+            infinitecode_home,
             config: RwLock::new(config),
             plugin_roots: RwLock::new(Vec::new()),
             extra_roots: RwLock::new(Vec::new()),
@@ -94,11 +94,11 @@ impl SkillsManager {
 
     pub fn set_config(&self, config: SkillsRuntimeConfig) {
         if config.bundled_enabled {
-            if let Err(error) = install_system_skills(&self.devo_home) {
+            if let Err(error) = install_system_skills(&self.infinitecode_home) {
                 tracing::warn!(error = %error, "failed to install system skills");
             }
         } else {
-            uninstall_system_skills(&self.devo_home);
+            uninstall_system_skills(&self.infinitecode_home);
         }
         {
             let mut guard = self
@@ -169,7 +169,7 @@ impl SkillsManager {
         let mut roots =
             Vec::with_capacity(config.workspace_roots.len() + config.user_roots.len() + 2);
         roots.extend(workspace_native_roots(cwd, config));
-        roots.extend(user_native_roots(&self.devo_home, config));
+        roots.extend(user_native_roots(&self.infinitecode_home, config));
         if let Some(home) = home_dir() {
             roots.push(SkillRoot {
                 path: home.join(".agents").join("skills"),
@@ -179,7 +179,7 @@ impl SkillsManager {
         }
         if config.bundled_enabled {
             roots.push(SkillRoot {
-                path: system_cache_root_dir(&self.devo_home),
+                path: system_cache_root_dir(&self.infinitecode_home),
                 scope: SkillScope::System,
                 plugin_id: None,
             });
@@ -256,7 +256,7 @@ fn workspace_native_roots<'a>(
         let path = if root.is_absolute() {
             root.clone()
         } else {
-            cwd.join(".devo").join(root)
+            cwd.join(".infinitecode").join(root)
         };
         SkillRoot {
             path,
@@ -267,14 +267,14 @@ fn workspace_native_roots<'a>(
 }
 
 fn user_native_roots<'a>(
-    devo_home: &'a Path,
+    infinitecode_home: &'a Path,
     config: &'a SkillsRuntimeConfig,
 ) -> impl Iterator<Item = SkillRoot> + 'a {
     config.user_roots.iter().map(|root| {
         let path = if root.is_absolute() {
             root.clone()
         } else {
-            devo_home.join(root)
+            infinitecode_home.join(root)
         };
         SkillRoot {
             path,

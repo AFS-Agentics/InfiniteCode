@@ -1,4 +1,4 @@
-import type { WorkspaceChangeScope, WorkspaceChangeView } from "@devo-ai/sdk/v2/client"
+import type { WorkspaceChangeScope, WorkspaceChangeView } from "@infinitecode-ai/sdk/v2/client"
 import { useAtomValue, useSetAtom } from "jotai"
 import { useCallback, useEffect, useMemo } from "react"
 import { isMockModeAtom } from "../atoms/mock-mode"
@@ -11,7 +11,7 @@ import {
 	workspaceChangesStateFamily,
 } from "../atoms/workspace-changes"
 import { getProjectClient } from "../services/connection-manager"
-import { getWorkspaceChanges } from "../services/devo"
+import { getWorkspaceChanges } from "../services/infinitecode"
 
 const FULL_DIFF_LIMIT_BYTES = 2_000_000
 

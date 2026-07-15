@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use devo_core::SessionRecord;
-use devo_core::TurnId;
-use devo_core::TurnKind;
-use devo_core::TurnUsage;
-use devo_protocol::CollaborationMode;
+use infinitecode_core::SessionRecord;
+use infinitecode_core::TurnId;
+use infinitecode_core::TurnKind;
+use infinitecode_core::TurnUsage;
+use infinitecode_protocol::CollaborationMode;
 
 use crate::execution::ApprovalGrantCache;
 use crate::execution::PersistedTurnItem;

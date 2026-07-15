@@ -8,25 +8,25 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::tools::ToolCallError;
-use devo_core::tools::ToolHandler;
-use devo_core::tools::ToolRegistry;
-use devo_core::tools::ToolRegistryBuilder;
-use devo_core::tools::ToolResult;
-use devo_core::tools::ToolResultContent;
-use devo_core::tools::create_default_tool_registry;
-use devo_core::tools::json_schema::JsonSchema;
-use devo_core::tools::tool_spec::ToolExecutionMode;
-use devo_core::tools::tool_spec::ToolOutputMode;
-use devo_core::tools::tool_spec::ToolSpec;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
+use infinitecode_core::tools::ToolCallError;
+use infinitecode_core::tools::ToolHandler;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_core::tools::ToolRegistryBuilder;
+use infinitecode_core::tools::ToolResult;
+use infinitecode_core::tools::ToolResultContent;
+use infinitecode_core::tools::create_default_tool_registry;
+use infinitecode_core::tools::json_schema::JsonSchema;
+use infinitecode_core::tools::tool_spec::ToolExecutionMode;
+use infinitecode_core::tools::tool_spec::ToolOutputMode;
+use infinitecode_core::tools::tool_spec::ToolSpec;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
 use futures::Stream;
 use futures::stream;
 use pretty_assertions::assert_eq;
@@ -59,7 +59,7 @@ async fn goal_set_does_not_start_continuation_in_plan_mode() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 40,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "plan first" }],
@@ -81,7 +81,7 @@ async fn goal_set_does_not_start_continuation_in_plan_mode() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 41,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "do not continue in plan mode",
@@ -167,9 +167,9 @@ impl ToolHandler for EscalatingTool {
 
     async fn handle(
         &self,
-        _ctx: devo_core::tools::ToolContext,
+        _ctx: infinitecode_core::tools::ToolContext,
         _input: serde_json::Value,
-        _progress: Option<devo_core::tools::ToolProgressSender>,
+        _progress: Option<infinitecode_core::tools::ToolProgressSender>,
     ) -> std::result::Result<ToolResult, ToolCallError> {
         Ok(ToolResult::success(
             ToolResultContent::Text("approved".to_string()),
@@ -194,7 +194,7 @@ fn escalating_tool_spec() -> ToolSpec {
         execution_mode: ToolExecutionMode::Mutating,
         capability_tags: vec![],
         supports_parallel: false,
-        preparation_feedback: devo_core::tools::ToolPreparationFeedback::None,
+        preparation_feedback: infinitecode_core::tools::ToolPreparationFeedback::None,
         display_name: None,
         supports_cancellation: None,
         supports_streaming: None,
@@ -222,7 +222,7 @@ async fn goal_set_does_not_start_continuation_while_approval_is_pending() -> Res
             connection_id,
             serde_json::json!({
                 "id": 50,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "ask for approval" }],
@@ -235,7 +235,7 @@ async fn goal_set_does_not_start_continuation_while_approval_is_pending() -> Res
         )
         .await
         .context("approval turn/start response")?;
-    let start_result: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let start_result: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(start_response)?;
     wait_for_approval_request(&mut notifications_rx).await?;
     assert_eq!(provider.requests.load(Ordering::SeqCst), 1);
@@ -245,7 +245,7 @@ async fn goal_set_does_not_start_continuation_while_approval_is_pending() -> Res
             connection_id,
             serde_json::json!({
                 "id": 51,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "wait for approval first",
@@ -294,7 +294,7 @@ async fn goal_set_does_not_start_continuation_while_user_input_is_pending() -> R
             connection_id,
             serde_json::json!({
                 "id": 60,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "ask the user" }],
@@ -308,7 +308,7 @@ async fn goal_set_does_not_start_continuation_while_user_input_is_pending() -> R
         )
         .await
         .context("request_user_input turn/start response")?;
-    let start_result: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let start_result: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(start_response)?;
     wait_for_notification(&mut notifications_rx, "item/tool/requestUserInput").await?;
     assert_eq!(provider.requests.load(Ordering::SeqCst), 1);
@@ -318,7 +318,7 @@ async fn goal_set_does_not_start_continuation_while_user_input_is_pending() -> R
             connection_id,
             serde_json::json!({
                 "id": 61,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "wait for user input first",

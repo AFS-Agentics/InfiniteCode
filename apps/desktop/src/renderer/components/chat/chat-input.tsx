@@ -8,18 +8,18 @@ import {
 	PromptInputTools,
 	usePromptInputAttachments,
 	usePromptInputController,
-} from "@devo/ui/components/ai-elements/prompt-input"
+} from "@infinitecode/ui/components/ai-elements/prompt-input"
 import { PlusIcon } from "lucide-react"
 import { useCallback, useEffect, useRef, useState, useTransition } from "react"
 import { setProjectModelAtom } from "../../atoms/preferences"
 import { appStore } from "../../atoms/store"
 import { useDraftActions, useDraftSnapshot } from "../../hooks/use-draft"
-import type { ConfigData, ModelRef, ProvidersData, SdkAgent } from "../../hooks/use-devo-data"
+import type { ConfigData, ModelRef, ProvidersData, SdkAgent } from "../../hooks/use-infinitecode-data"
 import {
 	getModelInputCapabilities,
 	resolveEffectiveModel,
 	useModelState,
-} from "../../hooks/use-devo-data"
+} from "../../hooks/use-infinitecode-data"
 
 import type { Agent, FileAttachment } from "../../lib/types"
 import { ContextItems } from "./context-items"
@@ -47,7 +47,7 @@ interface ChatInputProps {
 	onStop?: (agent: Agent) => Promise<void>
 	providers?: ProvidersData | null
 	config?: ConfigData | null
-	devoAgents?: SdkAgent[]
+	infinitecodeAgents?: SdkAgent[]
 	onScrollToBottom: (behavior?: "instant" | "smooth") => void
 	handleSlashCommand: (text: string) => Promise<boolean>
 }
@@ -160,7 +160,7 @@ export function ChatInput({
 	onStop,
 	providers,
 	config,
-	devoAgents,
+	infinitecodeAgents,
 	onScrollToBottom,
 	handleSlashCommand,
 }: ChatInputProps) {
@@ -182,7 +182,7 @@ export function ChatInput({
 
 	const effectiveModel = resolveEffectiveModel(
 		selectedModel,
-		devoAgents?.find((a) => a.name === (selectedAgent ?? config?.defaultAgent)) ?? null,
+		infinitecodeAgents?.find((a) => a.name === (selectedAgent ?? config?.defaultAgent)) ?? null,
 		config?.model,
 		providers?.defaults ?? {},
 		providers?.providers ?? [],
@@ -340,12 +340,12 @@ export function ChatInput({
 					query={mentionQuery}
 					open={mentionOpen}
 					directory={agent.directory}
-					agents={devoAgents ?? []}
+					agents={infinitecodeAgents ?? []}
 					onSelect={handleMentionSelect}
 					onClose={() => setMentionOpen(false)}
 				/>
 				<PromptInput
-					className="devo-composer"
+					className="infinitecode-composer"
 					onSubmit={(message) => {
 						if (message.text.trim() && isConnected && !sending)
 							handleSend(message.text, message.files.length > 0 ? message.files : undefined)
@@ -377,7 +377,7 @@ export function ChatInput({
 						<PromptInputTools>
 							<AttachButton disabled={!isConnected} />
 							<PromptToolbar
-								agents={devoAgents ?? []}
+								agents={infinitecodeAgents ?? []}
 								selectedAgent={selectedAgent}
 								defaultAgent={config?.defaultAgent}
 								onSelectAgent={(a) => startTransition(() => setSelectedAgent(a))}

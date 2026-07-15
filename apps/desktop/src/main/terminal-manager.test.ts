@@ -73,14 +73,14 @@ describe("DesktopTerminalManager", () => {
 
 		manager.onData((id, data) => received.push({ id, data }));
 		const session = await manager.create({
-			cwd: "/repo/devo",
+			cwd: "/repo/infinitecode",
 			cols: 100,
 			rows: 30,
 		});
 
 		expect(session).toEqual({
 			id: "terminal-1",
-			cwd: "/repo/devo",
+			cwd: "/repo/infinitecode",
 			shell: "/bin/zsh",
 			cols: 100,
 			rows: 30,
@@ -89,7 +89,7 @@ describe("DesktopTerminalManager", () => {
 			{
 				shell: "/bin/zsh",
 				args: ["-l"],
-				cwd: "/repo/devo",
+				cwd: "/repo/infinitecode",
 				env: {
 					DISABLE_AUTO_UPDATE: "true",
 					PATH: "/usr/bin",
@@ -146,14 +146,14 @@ describe("DesktopTerminalManager", () => {
 		});
 
 		const session = await manager.create({
-			cwd: "C:\\repo\\devo",
+			cwd: "C:\\repo\\infinitecode",
 			cols: 120,
 			rows: 40,
 		});
 
 		expect(session).toEqual({
 			id: "terminal-pwsh",
-			cwd: "C:\\repo\\devo",
+			cwd: "C:\\repo\\infinitecode",
 			shell: "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
 			cols: 120,
 			rows: 40,
@@ -162,7 +162,7 @@ describe("DesktopTerminalManager", () => {
 			{
 				shell: "C:\\Program Files\\PowerShell\\7\\pwsh.exe",
 				args: [],
-				cwd: "C:\\repo\\devo",
+				cwd: "C:\\repo\\infinitecode",
 				env: {
 					COLORTERM: "truecolor",
 					DISABLE_AUTO_UPDATE: "true",
@@ -211,14 +211,14 @@ describe("DesktopTerminalManager", () => {
 				}),
 		});
 
-		await manager.create({ cwd: "C:\\repo\\devo" });
+		await manager.create({ cwd: "C:\\repo\\infinitecode" });
 
 		expect(createOptions).toEqual([
 			{
 				shell:
 					"C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
 				args: ["-NoLogo"],
-				cwd: "C:\\repo\\devo",
+				cwd: "C:\\repo\\infinitecode",
 				env: {
 					COLORTERM: "truecolor",
 					DISABLE_AUTO_UPDATE: "true",

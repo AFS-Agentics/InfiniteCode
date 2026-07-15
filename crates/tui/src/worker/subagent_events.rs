@@ -4,8 +4,8 @@
 //! notifications. This module only normalizes agent metadata returned by ACP
 //! session info and `agent/list`.
 
-use devo_protocol::AgentInfo;
-use devo_protocol::SessionMetadata;
+use infinitecode_protocol::AgentInfo;
+use infinitecode_protocol::SessionMetadata;
 
 use crate::events::SubagentMonitorAgent;
 

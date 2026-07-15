@@ -7,9 +7,9 @@ use std::task;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::ProviderVendorCatalog;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::ProviderVendorCatalog;
 use futures::stream::Stream;
 use futures::stream::{self};
 use pretty_assertions::assert_eq;
@@ -19,41 +19,41 @@ use tokio::sync::oneshot;
 use tokio::time::Duration;
 use tokio::time::timeout;
 
-use devo_core::FileSystemSkillCatalog;
-use devo_core::ItemLine;
-use devo_core::ItemRecord;
-use devo_core::PresetModelCatalog;
-use devo_core::RolloutLine;
-use devo_core::SessionMetaLine;
-use devo_core::SessionRecord;
-use devo_core::SkillsConfig;
-use devo_core::TextItem;
-use devo_core::TurnError;
-use devo_core::TurnItem;
-use devo_core::TurnLine;
-use devo_core::TurnRecord;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::DEVO_TURN_USAGE_META;
-use devo_protocol::Model;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ReasoningCapability;
-use devo_protocol::ReasoningEffort;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::ServerEvent;
-use devo_protocol::SessionHistoryItemKind;
-use devo_protocol::SessionId;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::TurnStatus;
-use devo_protocol::TurnUsageUpdatedPayload;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::SingleProviderRouter;
-use devo_server::ClientTransportKind;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::ItemLine;
+use infinitecode_core::ItemRecord;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::RolloutLine;
+use infinitecode_core::SessionMetaLine;
+use infinitecode_core::SessionRecord;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::TextItem;
+use infinitecode_core::TurnError;
+use infinitecode_core::TurnItem;
+use infinitecode_core::TurnLine;
+use infinitecode_core::TurnRecord;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::INFINITECODE_TURN_USAGE_META;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ReasoningCapability;
+use infinitecode_protocol::ReasoningEffort;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::ServerEvent;
+use infinitecode_protocol::SessionHistoryItemKind;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::TurnStatus;
+use infinitecode_protocol::TurnUsageUpdatedPayload;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
 
 struct SingleReplyProvider;
 
@@ -334,7 +334,7 @@ async fn runtime_rebuilds_sessions_from_rollout_and_resume_works() -> Result<()>
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -345,7 +345,7 @@ async fn runtime_rebuilds_sessions_from_rollout_and_resume_works() -> Result<()>
             connection_id,
             serde_json::json!({
                 "id": 2,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "persist this session" }],
@@ -357,7 +357,7 @@ async fn runtime_rebuilds_sessions_from_rollout_and_resume_works() -> Result<()>
         )
         .await
         .context("turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(turn_start_response)?;
 
     wait_for_turn_completed(&mut notifications_rx).await?;
@@ -388,7 +388,7 @@ async fn runtime_rebuilds_sessions_from_rollout_and_resume_works() -> Result<()>
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 4,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": {
                     "session_id": session_id
                 }
@@ -397,7 +397,7 @@ async fn runtime_rebuilds_sessions_from_rollout_and_resume_works() -> Result<()>
         .await
         .context("session/resume response")?;
     let resume_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_response)?
     .result;
 
@@ -434,7 +434,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -445,7 +445,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
             connection_id,
             serde_json::json!({
                 "id": 12,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "implement rollout persistence for the rust server" }],
@@ -470,7 +470,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
             connection_id,
             serde_json::json!({
                 "id": 13,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": {
                     "session_id": session_id
                 }
@@ -479,7 +479,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
         .await
         .context("session/resume response after completion")?;
     let completed_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_after_completion)?
     .result;
     assert_eq!(
@@ -488,7 +488,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
     );
     assert_eq!(
         completed_result.session.title_state,
-        devo_core::SessionTitleState::Final(devo_core::SessionTitleFinalSource::ModelGenerated)
+        infinitecode_core::SessionTitleState::Final(infinitecode_core::SessionTitleFinalSource::ModelGenerated)
     );
 
     let rename_response = runtime
@@ -496,7 +496,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
             connection_id,
             serde_json::json!({
                 "id": 14,
-                "method": "_devo/session/title/update",
+                "method": "_infinitecode/session/title/update",
                 "params": {
                     "session_id": session_id,
                     "title": "Rollout persistence follow-up"
@@ -506,7 +506,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
         .await
         .context("session/title/update response")?;
     let rename_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionTitleUpdateResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionTitleUpdateResult>,
     >(rename_response)?
     .result;
     assert_eq!(
@@ -515,7 +515,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
     );
     assert_eq!(
         rename_result.session.title_state,
-        devo_core::SessionTitleState::Final(devo_core::SessionTitleFinalSource::UserRename)
+        infinitecode_core::SessionTitleState::Final(infinitecode_core::SessionTitleFinalSource::UserRename)
     );
 
     let rebuilt_runtime = build_runtime(data_root.path())?;
@@ -527,7 +527,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 15,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": {
                     "session_id": session_id
                 }
@@ -536,7 +536,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
         .await
         .context("session/resume response after rebuild")?;
     let rebuilt_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_after_rebuild)?
     .result;
     assert_eq!(
@@ -545,7 +545,7 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
     );
     assert_eq!(
         rebuilt_result.session.title_state,
-        devo_core::SessionTitleState::Final(devo_core::SessionTitleFinalSource::UserRename)
+        infinitecode_core::SessionTitleState::Final(infinitecode_core::SessionTitleFinalSource::UserRename)
     );
     Ok(())
 }
@@ -573,7 +573,7 @@ async fn runtime_assigns_provisional_title_after_first_prompt() -> Result<()> {
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -584,7 +584,7 @@ async fn runtime_assigns_provisional_title_after_first_prompt() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 22,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "investigate why the current session title stays null" }],
@@ -622,9 +622,9 @@ async fn runtime_assigns_provisional_title_after_first_prompt() -> Result<()> {
     assert!(sessions[0].title.is_some());
     assert!(matches!(
         sessions[0].title_state,
-        devo_core::SessionTitleState::Provisional
-            | devo_core::SessionTitleState::Final(
-                devo_core::SessionTitleFinalSource::ModelGenerated
+        infinitecode_core::SessionTitleState::Provisional
+            | infinitecode_core::SessionTitleState::Final(
+                infinitecode_core::SessionTitleFinalSource::ModelGenerated
             )
     ));
     Ok(())
@@ -653,7 +653,7 @@ async fn runtime_skips_invalid_rollout_files_when_loading_sessions() -> Result<(
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -664,7 +664,7 @@ async fn runtime_skips_invalid_rollout_files_when_loading_sessions() -> Result<(
             connection_id,
             serde_json::json!({
                 "id": 32,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "persist the valid session" }],
@@ -743,8 +743,8 @@ async fn resume_normalizes_historical_default_reasoning_effort() -> Result<()> {
             additional_directories: Vec::new(),
             cli_version: "0.1.0".into(),
             title: Some("Historical session".into()),
-            title_state: devo_core::SessionTitleState::Final(
-                devo_core::SessionTitleFinalSource::ExplicitCreate,
+            title_state: infinitecode_core::SessionTitleState::Final(
+                infinitecode_core::SessionTitleFinalSource::ExplicitCreate,
             ),
             sandbox_policy: "workspace-write".into(),
             approval_mode: "on-request".into(),
@@ -760,13 +760,13 @@ async fn resume_normalizes_historical_default_reasoning_effort() -> Result<()> {
             schema_version: 2,
         };
         let turn = TurnRecord {
-            id: devo_protocol::TurnId::new(),
+            id: infinitecode_protocol::TurnId::new(),
             session_id: *session_id,
             sequence: 1,
             started_at: now,
             completed_at: Some(now),
             status: TurnStatus::Completed,
-            kind: devo_core::TurnKind::Regular,
+            kind: infinitecode_core::TurnKind::Regular,
             model: "deepseek-v4-flash".into(),
             model_binding_id: None,
             reasoning_effort_selection,
@@ -823,7 +823,7 @@ async fn resume_normalizes_historical_default_reasoning_effort() -> Result<()> {
                 connection_id,
                 serde_json::json!({
                     "id": 34,
-                    "method": "_devo/session/resume",
+                    "method": "_infinitecode/session/resume",
                     "params": {
                         "session_id": session_id
                     }
@@ -832,7 +832,7 @@ async fn resume_normalizes_historical_default_reasoning_effort() -> Result<()> {
             .await
             .context("session/resume response")?;
         let resume_result = serde_json::from_value::<
-            devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+            infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
         >(resume_response)?
         .result;
 
@@ -858,8 +858,8 @@ async fn resume_normalizes_historical_default_reasoning_effort() -> Result<()> {
 async fn failed_turn_resume_restores_terminal_history_without_prompt_contamination() -> Result<()> {
     let data_root = TempDir::new()?;
     let session_id = SessionId::new();
-    let failed_turn_id = devo_protocol::TurnId::new();
-    let completed_turn_id = devo_protocol::TurnId::new();
+    let failed_turn_id = infinitecode_protocol::TurnId::new();
+    let completed_turn_id = infinitecode_protocol::TurnId::new();
     let now = chrono::Utc::now();
     let rollout_dir = data_root.path().join("sessions/2026/07/14");
     std::fs::create_dir_all(&rollout_dir)?;
@@ -886,8 +886,8 @@ async fn failed_turn_resume_restores_terminal_history_without_prompt_contaminati
         additional_directories: Vec::new(),
         cli_version: "0.1.0".into(),
         title: Some("Failed turn resume".into()),
-        title_state: devo_core::SessionTitleState::Final(
-            devo_core::SessionTitleFinalSource::ExplicitCreate,
+        title_state: infinitecode_core::SessionTitleState::Final(
+            infinitecode_core::SessionTitleFinalSource::ExplicitCreate,
         ),
         sandbox_policy: "workspace-write".into(),
         approval_mode: "on-request".into(),
@@ -909,7 +909,7 @@ async fn failed_turn_resume_restores_terminal_history_without_prompt_contaminati
         started_at: now,
         completed_at: None,
         status: TurnStatus::Running,
-        kind: devo_core::TurnKind::Regular,
+        kind: infinitecode_core::TurnKind::Regular,
         model: "test-model".into(),
         model_binding_id: None,
         reasoning_effort_selection: None,
@@ -943,7 +943,7 @@ async fn failed_turn_resume_restores_terminal_history_without_prompt_contaminati
         ..completed_running.clone()
     };
     let item_record = |turn_id, seq, timestamp, turn_item| ItemRecord {
-        id: devo_core::ItemId::new(),
+        id: infinitecode_core::ItemId::new(),
         session_id,
         turn_id,
         seq,
@@ -1037,23 +1037,23 @@ async fn failed_turn_resume_restores_terminal_history_without_prompt_contaminati
             connection_id,
             serde_json::json!({
                 "id": 35,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": { "session_id": session_id }
             }),
         )
         .await
         .context("session/resume failed turn history")?;
     let resume = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_response)?
     .result;
-    let expected_error = devo_protocol::SessionHistoryItem::new(
+    let expected_error = infinitecode_protocol::SessionHistoryItem::new(
         None,
         SessionHistoryItemKind::Error,
         terminal_error.code.clone(),
         terminal_error.message.clone(),
     );
-    let expected_summary = devo_protocol::SessionHistoryItem {
+    let expected_summary = infinitecode_protocol::SessionHistoryItem {
         tool_call_id: None,
         kind: SessionHistoryItemKind::TurnSummary,
         title: "test-model".to_string(),
@@ -1079,7 +1079,7 @@ async fn failed_turn_resume_restores_terminal_history_without_prompt_contaminati
             connection_id,
             serde_json::json!({
                 "id": 36,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "continue after failure" }],
@@ -1092,7 +1092,7 @@ async fn failed_turn_resume_restores_terminal_history_without_prompt_contaminati
         )
         .await
         .context("turn/start after failed resume")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(turn_response)?;
     wait_for_turn_completed(&mut notifications_rx).await?;
     let requests = provider.requests.lock().expect("lock requests");
@@ -1126,7 +1126,7 @@ async fn runtime_recovers_session_when_middle_rollout_line_is_corrupted() -> Res
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -1137,7 +1137,7 @@ async fn runtime_recovers_session_when_middle_rollout_line_is_corrupted() -> Res
             connection_id,
             serde_json::json!({
                 "id": 42,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "persist this session before corruption" }],
@@ -1189,7 +1189,7 @@ async fn runtime_recovers_session_when_middle_rollout_line_is_corrupted() -> Res
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 43,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": {
                     "session_id": session_id
                 }
@@ -1198,7 +1198,7 @@ async fn runtime_recovers_session_when_middle_rollout_line_is_corrupted() -> Res
         .await
         .context("session/resume response")?;
     let resume_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_response)?
     .result;
 
@@ -1234,7 +1234,7 @@ async fn session_compact_runs_asynchronously_and_emits_lifecycle_events() -> Res
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -1245,7 +1245,7 @@ async fn session_compact_runs_asynchronously_and_emits_lifecycle_events() -> Res
             connection_id,
             serde_json::json!({
                 "id": 52,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "create some history first" }],
@@ -1266,7 +1266,7 @@ async fn session_compact_runs_asynchronously_and_emits_lifecycle_events() -> Res
             connection_id,
             serde_json::json!({
                 "id": 53,
-                "method": "_devo/session/compact",
+                "method": "_infinitecode/session/compact",
                 "params": {
                     "session_id": session_id
                 }
@@ -1275,7 +1275,7 @@ async fn session_compact_runs_asynchronously_and_emits_lifecycle_events() -> Res
         .await
         .context("session/compact response")?;
     let compact_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionCompactResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionCompactResult>,
     >(compact_response)?
     .result;
     assert_eq!(compact_result.session.session_id, session_id);
@@ -1308,7 +1308,7 @@ async fn compacted_session_resume_keeps_full_transcript_after_restart() -> Resul
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -1321,7 +1321,7 @@ async fn compacted_session_resume_keeps_full_transcript_after_restart() -> Resul
                 connection_id,
                 serde_json::json!({
                     "id": 62 + request_id,
-                    "method": "_devo/turn/start",
+                    "method": "_infinitecode/turn/start",
                     "params": {
                         "session_id": session_id,
                         "input": [{ "type": "text", "text": large_prompt }],
@@ -1342,7 +1342,7 @@ async fn compacted_session_resume_keeps_full_transcript_after_restart() -> Resul
             connection_id,
             serde_json::json!({
                 "id": 70,
-                "method": "_devo/session/compact",
+                "method": "_infinitecode/session/compact",
                 "params": {
                     "session_id": session_id
                 }
@@ -1362,7 +1362,7 @@ async fn compacted_session_resume_keeps_full_transcript_after_restart() -> Resul
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 71,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": {
                     "session_id": session_id
                 }
@@ -1371,7 +1371,7 @@ async fn compacted_session_resume_keeps_full_transcript_after_restart() -> Resul
         .await
         .context("session/resume response")?;
     let resume_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_response)?
     .result;
 
@@ -1420,7 +1420,7 @@ async fn compacted_session_next_query_uses_compaction_summary_after_restart() ->
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -1433,7 +1433,7 @@ async fn compacted_session_next_query_uses_compaction_summary_after_restart() ->
                 connection_id,
                 serde_json::json!({
                     "id": 82 + request_id,
-                    "method": "_devo/turn/start",
+                    "method": "_infinitecode/turn/start",
                     "params": {
                         "session_id": session_id,
                         "input": [{ "type": "text", "text": large_prompt }],
@@ -1454,7 +1454,7 @@ async fn compacted_session_next_query_uses_compaction_summary_after_restart() ->
             connection_id,
             serde_json::json!({
                 "id": 90,
-                "method": "_devo/session/compact",
+                "method": "_infinitecode/session/compact",
                 "params": {
                     "session_id": session_id
                 }
@@ -1475,7 +1475,7 @@ async fn compacted_session_next_query_uses_compaction_summary_after_restart() ->
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 90,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": {
                     "session_id": session_id
                 }
@@ -1483,7 +1483,7 @@ async fn compacted_session_next_query_uses_compaction_summary_after_restart() ->
         )
         .await
         .context("session/resume response after restart")?;
-    let _: devo_server::SuccessResponse<devo_server::SessionResumeResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult> =
         serde_json::from_value(resume_response)?;
 
     let _ = rebuilt_runtime
@@ -1491,7 +1491,7 @@ async fn compacted_session_next_query_uses_compaction_summary_after_restart() ->
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 91,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "go on" }],
@@ -1514,14 +1514,14 @@ async fn compacted_session_next_query_uses_compaction_summary_after_restart() ->
     assert!(
         request.messages.iter().any(|message| {
             message.content.iter().any(|content| match content {
-                devo_protocol::RequestContent::Text { text }
-                | devo_protocol::RequestContent::Reasoning { text } => {
+                infinitecode_protocol::RequestContent::Text { text }
+                | infinitecode_protocol::RequestContent::Reasoning { text } => {
                     text.contains("<compaction_summary>")
                 }
-                devo_protocol::RequestContent::ProviderReasoning { .. }
-                | devo_protocol::RequestContent::ToolUse { .. }
-                | devo_protocol::RequestContent::HostedToolUse { .. }
-                | devo_protocol::RequestContent::ToolResult { .. } => false,
+                infinitecode_protocol::RequestContent::ProviderReasoning { .. }
+                | infinitecode_protocol::RequestContent::ToolUse { .. }
+                | infinitecode_protocol::RequestContent::HostedToolUse { .. }
+                | infinitecode_protocol::RequestContent::ToolResult { .. } => false,
             })
         }),
         "expected prompt request to include compaction summary after restart"
@@ -1532,9 +1532,9 @@ async fn compacted_session_next_query_uses_compaction_summary_after_restart() ->
 #[tokio::test]
 async fn configured_request_model_is_used_for_turn_metadata_and_provider_request() -> Result<()> {
     let data_root = TempDir::new()?;
-    std::fs::create_dir_all(data_root.path().join(".devo"))?;
+    std::fs::create_dir_all(data_root.path().join(".infinitecode"))?;
     std::fs::write(
-        data_root.path().join(".devo").join("models.json"),
+        data_root.path().join(".infinitecode").join("models.json"),
         r#"
 [
   {
@@ -1589,7 +1589,7 @@ async fn configured_request_model_is_used_for_turn_metadata_and_provider_request
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -1600,7 +1600,7 @@ async fn configured_request_model_is_used_for_turn_metadata_and_provider_request
             connection_id,
             serde_json::json!({
                 "id": 102,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "use configured request model" }],
@@ -1642,7 +1642,7 @@ fn build_runtime_with_provider(
     provider: Arc<dyn ModelProviderSDK>,
 ) -> Result<Arc<ServerRuntime>> {
     let db_path = data_root.join("test_persistence.db");
-    let db = Arc::new(devo_server::db::Database::open(db_path).expect("open test database"));
+    let db = Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
     Ok(ServerRuntime::new(
         data_root.to_path_buf(),
         ServerRuntimeDependencies::new(
@@ -1672,7 +1672,7 @@ fn build_runtime_with_provider(
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(
                 AppConfigStore::load(data_root.to_path_buf(), None).expect("load app config store"),
@@ -1684,7 +1684,7 @@ fn build_runtime_with_provider(
 async fn initialize_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(4096);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -1710,15 +1710,15 @@ async fn initialize_connection(
     let response: serde_json::Value = initialize_response;
     assert_eq!(
         response["result"]["agentInfo"]["name"],
-        serde_json::json!("devo-server")
+        serde_json::json!("infinitecode-server")
     );
     Ok((connection_id, notifications_rx))
 }
 
 fn decode_acp_session_list_response(
     response: serde_json::Value,
-) -> Result<Vec<devo_server::SessionMetadata>> {
-    let response: devo_server::AcpSuccessResponse<devo_server::AcpListSessionsResult> =
+) -> Result<Vec<infinitecode_server::SessionMetadata>> {
+    let response: infinitecode_server::AcpSuccessResponse<infinitecode_server::AcpListSessionsResult> =
         serde_json::from_value(response)?;
     response
         .result
@@ -1728,14 +1728,14 @@ fn decode_acp_session_list_response(
             session
                 .meta
                 .as_ref()
-                .and_then(|meta| meta.get(devo_server::DEVO_SESSION_META))
+                .and_then(|meta| meta.get(infinitecode_server::INFINITECODE_SESSION_META))
                 .cloned()
                 .map(serde_json::from_value)
                 .transpose()
-                .context("decode Devo session metadata from ACP session/list response")?
+                .context("decode InfiniteCode session metadata from ACP session/list response")?
                 .with_context(|| {
                     format!(
-                        "ACP session/list response missing Devo session metadata for {}",
+                        "ACP session/list response missing InfiniteCode session metadata for {}",
                         session.session_id
                     )
                 })
@@ -1748,11 +1748,11 @@ fn legacy_event_from_acp_notification(value: serde_json::Value) -> serde_json::V
         return value;
     }
     let Ok(notification) =
-        serde_json::from_value::<devo_protocol::AcpSessionNotification>(value["params"].clone())
+        serde_json::from_value::<infinitecode_protocol::AcpSessionNotification>(value["params"].clone())
     else {
         return value;
     };
-    let Some((method, event)) = devo_protocol::original_event_from_acp_notification(&notification)
+    let Some((method, event)) = infinitecode_protocol::original_event_from_acp_notification(&notification)
     else {
         return value;
     };
@@ -1835,7 +1835,7 @@ async fn wait_for_turn_usage_updated(
                 let Some(meta) = value["params"]["update"]["_meta"].as_object() else {
                     continue;
                 };
-                if let Some(payload) = meta.get(DEVO_TURN_USAGE_META) {
+                if let Some(payload) = meta.get(INFINITECODE_TURN_USAGE_META) {
                     return serde_json::from_value(payload.clone())
                         .context("decode ACP turn usage meta payload");
                 }
@@ -1932,7 +1932,7 @@ async fn interrupt_mid_stream_does_not_duplicate_last_item_on_resume() -> Result
         .await
         .context("session/start")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -1943,7 +1943,7 @@ async fn interrupt_mid_stream_does_not_duplicate_last_item_on_resume() -> Result
             connection_id,
             serde_json::json!({
                 "id": 2,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "interrupt me" }],
@@ -1957,7 +1957,7 @@ async fn interrupt_mid_stream_does_not_duplicate_last_item_on_resume() -> Result
         .await
         .context("turn/start")?;
     let turn_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::TurnStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult>,
     >(turn_start_response)?
     .result
     .turn_id()
@@ -1974,7 +1974,7 @@ async fn interrupt_mid_stream_does_not_duplicate_last_item_on_resume() -> Result
             connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/turn/interrupt",
+                "method": "_infinitecode/turn/interrupt",
                 "params": {
                     "session_id": session_id,
                     "turn_id": turn_id,
@@ -1984,7 +1984,7 @@ async fn interrupt_mid_stream_does_not_duplicate_last_item_on_resume() -> Result
         )
         .await
         .context("turn/interrupt")?;
-    let interrupt_result: devo_server::SuccessResponse<devo_server::TurnInterruptResult> =
+    let interrupt_result: infinitecode_server::SuccessResponse<infinitecode_server::TurnInterruptResult> =
         serde_json::from_value(interrupt_response)?;
     assert_eq!(interrupt_result.result.status, TurnStatus::Interrupted);
 
@@ -2003,7 +2003,7 @@ async fn interrupt_mid_stream_does_not_duplicate_last_item_on_resume() -> Result
             rebuilt_cid,
             serde_json::json!({
                 "id": 4,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": {
                     "session_id": session_id
                 }
@@ -2012,7 +2012,7 @@ async fn interrupt_mid_stream_does_not_duplicate_last_item_on_resume() -> Result
         .await
         .context("session/resume")?;
     let resume_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_response)?
     .result;
 
@@ -2087,7 +2087,7 @@ async fn first_usage_update_after_resume_preserves_historical_session_totals() -
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -2098,7 +2098,7 @@ async fn first_usage_update_after_resume_preserves_historical_session_totals() -
             connection_id,
             serde_json::json!({
                 "id": 2,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "persist usage totals" }],
@@ -2111,7 +2111,7 @@ async fn first_usage_update_after_resume_preserves_historical_session_totals() -
         )
         .await
         .context("first turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(first_turn_response)?;
     let first_usage = wait_for_turn_usage_updated(&mut notifications_rx).await?;
     assert_eq!(first_usage.total_input_tokens, 100);
@@ -2126,14 +2126,14 @@ async fn first_usage_update_after_resume_preserves_historical_session_totals() -
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": { "session_id": session_id }
             }),
         )
         .await
         .context("session/resume response")?;
     let resumed = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_response)?
     .result
     .session;
@@ -2154,7 +2154,7 @@ async fn first_usage_update_after_resume_preserves_historical_session_totals() -
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 4,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "post resume usage" }],
@@ -2167,7 +2167,7 @@ async fn first_usage_update_after_resume_preserves_historical_session_totals() -
         )
         .await
         .context("second turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(second_turn_response)?;
     let post_resume_usage = wait_for_turn_usage_updated(&mut rebuilt_notifications_rx).await?;
     assert_eq!(post_resume_usage.total_input_tokens, 200);
@@ -2199,7 +2199,7 @@ async fn rollout_writes_base_instructions_once_across_multiple_turns() -> Result
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -2211,7 +2211,7 @@ async fn rollout_writes_base_instructions_once_across_multiple_turns() -> Result
                 connection_id,
                 serde_json::json!({
                     "id": request_id,
-                    "method": "_devo/turn/start",
+                    "method": "_infinitecode/turn/start",
                     "params": {
                         "session_id": session_id,
                         "input": [{ "type": "text", "text": prompt }],
@@ -2224,13 +2224,13 @@ async fn rollout_writes_base_instructions_once_across_multiple_turns() -> Result
             )
             .await
             .context("turn/start response")?;
-        let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+        let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
             serde_json::from_value(turn_response)?;
         wait_for_turn_completed(&mut notifications_rx).await?;
     }
 
     runtime.refresh_session_index()?;
-    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    let db = infinitecode_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
     let index = db.get_session_index(&session_id)?.expect("indexed session");
     let rollout_path = index.rollout_path.expect("rollout path");
     let rollout = std::fs::read_to_string(&rollout_path)?;
@@ -2256,13 +2256,13 @@ async fn rollout_writes_base_instructions_once_across_multiple_turns() -> Result
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 4,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": { "session_id": session_id }
             }),
         )
         .await
         .context("session/resume response")?;
-    let _: devo_server::SuccessResponse<devo_server::SessionResumeResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult> =
         serde_json::from_value(resume_response)?;
 
     Ok(())
@@ -2291,7 +2291,7 @@ async fn turn_start_persists_session_context_before_turn_completes() -> Result<(
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -2302,7 +2302,7 @@ async fn turn_start_persists_session_context_before_turn_completes() -> Result<(
             connection_id,
             serde_json::json!({
                 "id": 2,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "crash before complete" }],
@@ -2315,13 +2315,13 @@ async fn turn_start_persists_session_context_before_turn_completes() -> Result<(
         )
         .await
         .context("turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(turn_response)?;
 
     // Inspect the rollout before waiting for turn completion to simulate a crash
     // after durable turn-start persistence.
     runtime.refresh_session_index()?;
-    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    let db = infinitecode_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
     let index = db.get_session_index(&session_id)?.expect("indexed session");
     let rollout_path = index.rollout_path.expect("rollout path");
 
@@ -2378,7 +2378,7 @@ async fn lazy_resume_loads_parent_session_from_rollout_on_map_miss() -> Result<(
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -2389,7 +2389,7 @@ async fn lazy_resume_loads_parent_session_from_rollout_on_map_miss() -> Result<(
             connection_id,
             serde_json::json!({
                 "id": 2,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "persist for lazy resume" }],
@@ -2402,7 +2402,7 @@ async fn lazy_resume_loads_parent_session_from_rollout_on_map_miss() -> Result<(
         )
         .await
         .context("turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(turn_start_response)?;
     wait_for_turn_completed(&mut notifications_rx).await?;
 
@@ -2416,14 +2416,14 @@ async fn lazy_resume_loads_parent_session_from_rollout_on_map_miss() -> Result<(
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": { "session_id": session_id }
             }),
         )
         .await
         .context("session/resume response")?;
     let resume_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_response)?
     .result;
     assert_eq!(resume_result.session.session_id, session_id);
@@ -2453,7 +2453,7 @@ async fn lazy_resume_after_compat_backfill_without_refresh_session_index() -> Re
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -2464,7 +2464,7 @@ async fn lazy_resume_after_compat_backfill_without_refresh_session_index() -> Re
             connection_id,
             serde_json::json!({
                 "id": 2,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "persist for compat backfill" }],
@@ -2477,7 +2477,7 @@ async fn lazy_resume_after_compat_backfill_without_refresh_session_index() -> Re
         )
         .await
         .context("turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(turn_start_response)?;
     wait_for_turn_completed(&mut notifications_rx).await?;
 
@@ -2499,14 +2499,14 @@ async fn lazy_resume_after_compat_backfill_without_refresh_session_index() -> Re
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": { "session_id": session_id }
             }),
         )
         .await
         .context("session/resume response")?;
     let resume_result = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_response)?
     .result;
     assert_eq!(resume_result.session.session_id, session_id);
@@ -2536,7 +2536,7 @@ async fn concurrent_lazy_resume_single_actor() -> Result<()> {
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -2547,7 +2547,7 @@ async fn concurrent_lazy_resume_single_actor() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 2,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "persist for concurrent resume" }],
@@ -2560,7 +2560,7 @@ async fn concurrent_lazy_resume_single_actor() -> Result<()> {
         )
         .await
         .context("turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(turn_start_response)?;
     wait_for_turn_completed(&mut notifications_rx).await?;
 
@@ -2573,7 +2573,7 @@ async fn concurrent_lazy_resume_single_actor() -> Result<()> {
         connection_a,
         serde_json::json!({
             "id": 3,
-            "method": "_devo/session/resume",
+            "method": "_infinitecode/session/resume",
             "params": { "session_id": session_id }
         }),
     );
@@ -2581,7 +2581,7 @@ async fn concurrent_lazy_resume_single_actor() -> Result<()> {
         connection_b,
         serde_json::json!({
             "id": 4,
-            "method": "_devo/session/resume",
+            "method": "_infinitecode/session/resume",
             "params": { "session_id": session_id }
         }),
     );
@@ -2589,11 +2589,11 @@ async fn concurrent_lazy_resume_single_actor() -> Result<()> {
     let response_a = response_a.context("first session/resume response")?;
     let response_b = response_b.context("second session/resume response")?;
     let result_a = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(response_a)?
     .result;
     let result_b = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(response_b)?
     .result;
     assert_eq!(result_a.session.session_id, session_id);
@@ -2608,7 +2608,7 @@ async fn lazy_resume_rejects_subagent_session_ids() -> Result<()> {
     let parent_id = SessionId::new();
     let child_id = SessionId::new();
     let now = chrono::Utc::now();
-    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    let db = infinitecode_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
     let mut parent = sample_indexed_session(parent_id, data_root.path(), now, None);
     parent.title = Some("Parent".into());
     db.upsert_session(&parent, Some("/tmp/parent.jsonl".as_ref()))?;
@@ -2624,16 +2624,16 @@ async fn lazy_resume_rejects_subagent_session_ids() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 1,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": { "session_id": child_id }
             }),
         )
         .await
         .context("session/resume response")?;
-    let error = serde_json::from_value::<devo_server::ErrorResponse>(resume_response)?;
+    let error = serde_json::from_value::<infinitecode_server::ErrorResponse>(resume_response)?;
     assert_eq!(
         error.error.code,
-        devo_server::ProtocolErrorCode::InvalidParams
+        infinitecode_server::ProtocolErrorCode::InvalidParams
     );
     assert!(
         error
@@ -2667,7 +2667,7 @@ async fn lazy_resume_fails_when_rollout_file_is_missing() -> Result<()> {
         .await
         .context("session/start response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionStartResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
     >(start_response)?
     .result
     .session
@@ -2678,7 +2678,7 @@ async fn lazy_resume_fails_when_rollout_file_is_missing() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 2,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "create rollout then delete it" }],
@@ -2691,11 +2691,11 @@ async fn lazy_resume_fails_when_rollout_file_is_missing() -> Result<()> {
         )
         .await
         .context("turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(turn_start_response)?;
     wait_for_turn_completed(&mut notifications_rx).await?;
 
-    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    let db = infinitecode_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
     let index = db.get_session_index(&session_id)?.expect("indexed session");
     let rollout_path = index.rollout_path.expect("rollout path");
     std::fs::remove_file(&rollout_path)?;
@@ -2707,16 +2707,16 @@ async fn lazy_resume_fails_when_rollout_file_is_missing() -> Result<()> {
             rebuilt_connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": { "session_id": session_id }
             }),
         )
         .await
         .context("session/resume response")?;
-    let error = serde_json::from_value::<devo_server::ErrorResponse>(resume_response)?;
+    let error = serde_json::from_value::<infinitecode_server::ErrorResponse>(resume_response)?;
     assert_eq!(
         error.error.code,
-        devo_server::ProtocolErrorCode::InternalError
+        infinitecode_server::ProtocolErrorCode::InternalError
     );
     assert!(error.error.message.contains("rollout file is missing"));
     Ok(())
@@ -2727,8 +2727,8 @@ fn sample_indexed_session(
     cwd: &std::path::Path,
     now: chrono::DateTime<chrono::Utc>,
     parent_session_id: Option<SessionId>,
-) -> devo_server::SessionMetadata {
-    devo_server::SessionMetadata {
+) -> infinitecode_server::SessionMetadata {
+    infinitecode_server::SessionMetadata {
         session_id,
         cwd: cwd.to_path_buf(),
         additional_directories: Vec::new(),
@@ -2736,7 +2736,7 @@ fn sample_indexed_session(
         updated_at: now,
         last_activity_at: now,
         title: None,
-        title_state: devo_core::SessionTitleState::Unset,
+        title_state: infinitecode_core::SessionTitleState::Unset,
         parent_session_id,
         agent_path: None,
         agent_nickname: None,
@@ -2754,6 +2754,6 @@ fn sample_indexed_session(
         prompt_token_estimate: 0,
         last_query_usage: None,
         last_query_total_tokens: 0,
-        status: devo_protocol::SessionRuntimeStatus::Idle,
+        status: infinitecode_protocol::SessionRuntimeStatus::Idle,
     }
 }

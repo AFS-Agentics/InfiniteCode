@@ -9,9 +9,9 @@
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
-use devo_protocol::HostedToolDefinition;
-use devo_protocol::ModelRequest;
-use devo_protocol::ResponseContent;
+use infinitecode_protocol::HostedToolDefinition;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ResponseContent;
 use serde_json::Map;
 use serde_json::Value;
 
@@ -516,11 +516,11 @@ fn is_partial_marker(text: &str, marker: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use devo_protocol::HostedToolDefinition;
-    use devo_protocol::HostedWebSearchTool;
-    use devo_protocol::ModelRequest;
-    use devo_protocol::SamplingControls;
-    use devo_protocol::ToolDefinition;
+    use infinitecode_protocol::HostedToolDefinition;
+    use infinitecode_protocol::HostedWebSearchTool;
+    use infinitecode_protocol::ModelRequest;
+    use infinitecode_protocol::SamplingControls;
+    use infinitecode_protocol::ToolDefinition;
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
@@ -532,7 +532,7 @@ mod tests {
         hosted_tools: Vec<HostedToolDefinition>,
     ) -> ModelRequest {
         ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: model.to_string(),
             system: None,
             messages: Vec::new(),

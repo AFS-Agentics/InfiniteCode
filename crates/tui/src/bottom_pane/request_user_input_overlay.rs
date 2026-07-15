@@ -3,11 +3,11 @@ use std::collections::HashMap;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyModifiers;
-use devo_protocol::RequestUserInputAnswer;
-use devo_protocol::RequestUserInputQuestion;
-use devo_protocol::RequestUserInputResponse;
-use devo_protocol::SessionId;
-use devo_protocol::TurnId;
+use infinitecode_protocol::RequestUserInputAnswer;
+use infinitecode_protocol::RequestUserInputQuestion;
+use infinitecode_protocol::RequestUserInputResponse;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::TurnId;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
@@ -332,7 +332,7 @@ fn other_choice() -> QuestionChoice {
 #[cfg(test)]
 mod tests {
     use crossterm::event::KeyModifiers;
-    use devo_protocol::RequestUserInputOption;
+    use infinitecode_protocol::RequestUserInputOption;
     use pretty_assertions::assert_eq;
 
     use super::*;

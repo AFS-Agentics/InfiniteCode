@@ -6,11 +6,11 @@
 
 **Architecture:** Preserve the server-owned `search/*` ranking and pass the complete typed result snapshot through the renderer hook into the mention popover. For deletion, update the connection manager's discovery cache at the same boundary that refills the current pagination window, then invoke that boundary after a confirmed delete.
 
-**Tech Stack:** TypeScript, React, Jotai, Bun tests, Devo Desktop SDK
+**Tech Stack:** TypeScript, React, Jotai, Bun tests, InfiniteCode Desktop SDK
 
 ## Global Constraints
 
-- Work in `/Users/tsiao/Desktop/devo` and preserve all unrelated dirty-worktree changes.
+- Work in `/Users/tsiao/Desktop/infinitecode` and preserve all unrelated dirty-worktree changes.
 - Keep inline Desktop icons consistent with `apps/desktop/AGENTS.md` (`size-3.5 stroke-[1.5]`).
 - Do not stage or commit changes unless the user asks.
 
@@ -30,7 +30,7 @@
 - Test: `apps/desktop/src/renderer/components/chat/mention-popover.test.ts`
 
 **Interfaces:**
-- Consumes: `ReferenceSearchSnapshot.results: ReferenceSearchResult[]` from `@devo-ai/sdk/v2/client`.
+- Consumes: `ReferenceSearchSnapshot.results: ReferenceSearchResult[]` from `@infinitecode-ai/sdk/v2/client`.
 - Produces: `useReferenceSearch(...): { results, isLoading, error }` and mention options for `skill`, `mcp`, `file`, and local `agent` entries.
 
 - [x] **Step 1: Write a failing result-mapping test**

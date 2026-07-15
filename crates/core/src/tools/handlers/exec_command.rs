@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use devo_protocol::SessionId;
+use infinitecode_protocol::SessionId;
 use uuid::Uuid;
 
 use crate::apply_patch::exec_apply_patch;
@@ -603,7 +603,7 @@ fn apply_patch_command(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use devo_tools::contracts::ToolBudgets;
+    use infinitecode_tools::contracts::ToolBudgets;
     use pretty_assertions::assert_eq;
 
     fn test_exec_handler() -> ExecCommandHandler {
@@ -644,7 +644,7 @@ mod tests {
             },
             cancel_token: CancellationToken::new(),
             agent_scope: crate::contracts::ToolAgentScope::Parent,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: None,
@@ -748,7 +748,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn exec_command_streams_progress_before_final_output() {
-        let root = std::env::temp_dir().join(format!("devo-exec-stream-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("infinitecode-exec-stream-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).expect("create temp test dir");
         let handler = test_exec_handler();
 
@@ -845,7 +845,7 @@ mod tests {
 
     #[tokio::test]
     async fn exec_command_rejects_raw_apply_patch_body() {
-        let root = std::env::temp_dir().join(format!("devo-apply-patch-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("infinitecode-apply-patch-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).expect("create temp test dir");
         let handler = test_exec_handler();
         let command = "*** Begin Patch\n*** Add File: file.txt\n+hello\n*** End Patch\n";
@@ -874,7 +874,7 @@ mod tests {
 
     #[tokio::test]
     async fn exec_command_intercepts_apply_patch_heredoc() {
-        let root = std::env::temp_dir().join(format!("devo-apply-patch-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("infinitecode-apply-patch-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).expect("create temp test dir");
         let handler = test_exec_handler();
         let command = "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: file.txt\n+hello\n*** End Patch\nPATCH\n";
@@ -908,7 +908,7 @@ mod tests {
 
     #[tokio::test]
     async fn exec_command_intercepts_apply_patch_after_cd() {
-        let root = std::env::temp_dir().join(format!("devo-apply-patch-{}", Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("infinitecode-apply-patch-{}", Uuid::new_v4()));
         let subdir = root.join("sub");
         std::fs::create_dir_all(&subdir).expect("create temp test dir");
         let handler = test_exec_handler();

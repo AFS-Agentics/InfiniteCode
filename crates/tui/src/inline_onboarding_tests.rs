@@ -7,10 +7,10 @@ use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use crossterm::event::KeyEventState;
 use crossterm::event::KeyModifiers;
-use devo_protocol::Model;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderVendor;
-use devo_protocol::ProviderWireApi;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderVendor;
+use infinitecode_protocol::ProviderWireApi;
 use pretty_assertions::assert_eq;
 use tokio::sync::mpsc;
 
@@ -41,7 +41,7 @@ fn onboarding_widget_with_models(
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, initial_model),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -195,7 +195,7 @@ fn onboarding_completion_appends_header_after_success_record() {
     });
 
     assert_eq!(widget.is_onboarding_active(), false);
-    assert_eq!(widget.placeholder_text(), "Ask Devo");
+    assert_eq!(widget.placeholder_text(), "Ask InfiniteCode");
     assert_eq!(
         widget.current_model().map(|model| model.slug.as_str()),
         Some("deepseek-v4-flash")

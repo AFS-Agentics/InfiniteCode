@@ -3,7 +3,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use devo_tools::ClientTextFileRead;
+use infinitecode_tools::ClientTextFileRead;
 
 use super::file_change_metadata::file_mtime;
 use crate::contracts::{
@@ -253,7 +253,7 @@ mod tests {
                     },
                     cancel_token: CancellationToken::new(),
                     agent_scope: ToolAgentScope::Parent,
-                    collaboration_mode: devo_protocol::CollaborationMode::Build,
+                    collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
                     agent_coordinator: None,
                     client_filesystem: None,
                     client_terminal: None,

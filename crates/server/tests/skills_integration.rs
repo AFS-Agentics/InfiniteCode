@@ -7,8 +7,8 @@ use std::sync::Mutex;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::ProviderVendorCatalog;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::ProviderVendorCatalog;
 use futures::stream;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -18,43 +18,43 @@ use tokio::sync::mpsc;
 use tokio::time::Duration;
 use tokio::time::timeout;
 
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolCallError;
-use devo_core::tools::ToolRegistry;
-use devo_core::tools::ToolResult;
-use devo_core::tools::ToolResultContent;
-use devo_core::tools::json_schema::JsonSchema;
-use devo_core::tools::registry::ToolRegistryBuilder;
-use devo_core::tools::tool_handler::ToolHandler;
-use devo_core::tools::tool_spec::ToolExecutionMode;
-use devo_core::tools::tool_spec::ToolOutputMode;
-use devo_core::tools::tool_spec::ToolSpec;
-use devo_protocol::AcpNewSessionResult;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::RequestContent;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::SingleProviderRouter;
-use devo_server::AcpSuccessResponse;
-use devo_server::ClientTransportKind;
-use devo_server::ErrorResponse;
-use devo_server::ProtocolErrorCode;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
-use devo_server::SkillChangedResult;
-use devo_server::SkillListResult;
-use devo_server::SkillRecord;
-use devo_server::SkillScope;
-use devo_server::SkillSource;
-use devo_server::SuccessResponse;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolCallError;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_core::tools::ToolResult;
+use infinitecode_core::tools::ToolResultContent;
+use infinitecode_core::tools::json_schema::JsonSchema;
+use infinitecode_core::tools::registry::ToolRegistryBuilder;
+use infinitecode_core::tools::tool_handler::ToolHandler;
+use infinitecode_core::tools::tool_spec::ToolExecutionMode;
+use infinitecode_core::tools::tool_spec::ToolOutputMode;
+use infinitecode_core::tools::tool_spec::ToolSpec;
+use infinitecode_protocol::AcpNewSessionResult;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::RequestContent;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_server::AcpSuccessResponse;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::ErrorResponse;
+use infinitecode_server::ProtocolErrorCode;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
+use infinitecode_server::SkillChangedResult;
+use infinitecode_server::SkillListResult;
+use infinitecode_server::SkillRecord;
+use infinitecode_server::SkillScope;
+use infinitecode_server::SkillSource;
+use infinitecode_server::SuccessResponse;
 
 #[derive(Default)]
 struct CapturingProvider {
@@ -112,7 +112,7 @@ fn create_skill(root: &Path, name: &str, content: &str) -> PathBuf {
 }
 
 fn canonical_skill_path(path: &Path) -> PathBuf {
-    devo_core::normalize_canonical_path(
+    infinitecode_core::normalize_canonical_path(
         std::fs::canonicalize(path).expect("canonicalize skill path"),
     )
 }
@@ -152,11 +152,11 @@ fn build_runtime_with_registry(
 ) -> Arc<ServerRuntime> {
     let workspace_skill_roots = workspace_root
         .iter()
-        .map(|root| root.join(".devo").join("skills"))
+        .map(|root| root.join(".infinitecode").join("skills"))
         .collect::<Vec<_>>();
     write_test_config(data_root, &user_skill_root, &workspace_skill_roots);
     let db_path = data_root.join("test_skills.db");
-    let db = Arc::new(devo_server::db::Database::open(db_path).expect("open test database"));
+    let db = Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
     ServerRuntime::new(
         data_root.to_path_buf(),
         ServerRuntimeDependencies::new(
@@ -175,7 +175,7 @@ fn build_runtime_with_registry(
                 include_instructions: Some(true),
                 config: Vec::new(),
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(
                 AppConfigStore::load(data_root.to_path_buf(), workspace_root.as_deref())
@@ -222,7 +222,7 @@ fn toml_path(path: &Path) -> String {
 async fn initialize_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(4096);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -248,7 +248,7 @@ async fn initialize_connection(
     let response: serde_json::Value = initialize_response;
     assert_eq!(
         response["result"]["agentInfo"]["name"],
-        serde_json::json!("devo-server")
+        serde_json::json!("infinitecode-server")
     );
     Ok((connection_id, notifications_rx))
 }
@@ -257,7 +257,7 @@ async fn start_session(
     runtime: &Arc<ServerRuntime>,
     connection_id: u64,
     cwd: &Path,
-) -> Result<devo_core::SessionId> {
+) -> Result<infinitecode_core::SessionId> {
     let response = runtime
         .handle_incoming(
             connection_id,
@@ -281,7 +281,7 @@ async fn start_session(
             connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/session/title/update",
+                "method": "_infinitecode/session/title/update",
                 "params": {
                     "session_id": session_id,
                     "title": "Skills integration"
@@ -290,7 +290,7 @@ async fn start_session(
         )
         .await
         .context("session/title/update response")?;
-    let _: SuccessResponse<devo_server::SessionTitleUpdateResult> =
+    let _: SuccessResponse<infinitecode_server::SessionTitleUpdateResult> =
         serde_json::from_value(title_response.clone())
             .with_context(|| format!("session/title/update response: {title_response}"))?;
     Ok(session_id)
@@ -329,7 +329,7 @@ fn is_original_method(value: &serde_json::Value, method: &str) -> bool {
         || value
             .get("params")
             .and_then(|params| params.get("_meta").or_else(|| params.get("meta")))
-            .and_then(|meta| meta.get("devo/originalMethod"))
+            .and_then(|meta| meta.get("infinitecode/originalMethod"))
             .and_then(serde_json::Value::as_str)
             == Some(method)
 }
@@ -384,7 +384,7 @@ fn original_event(value: &serde_json::Value) -> Option<&serde_json::Value> {
     value
         .get("params")
         .and_then(|params| params.get("_meta").or_else(|| params.get("meta")))
-        .and_then(|meta| meta.get("devo/originalEvent"))
+        .and_then(|meta| meta.get("infinitecode/originalEvent"))
 }
 
 fn user_request_text(request: &ModelRequest) -> Result<String> {
@@ -421,9 +421,9 @@ fn auto_review_registry(calls: Arc<std::sync::atomic::AtomicUsize>) -> Arc<ToolR
         input_schema: JsonSchema::object(std::collections::BTreeMap::new(), None, None),
         output_mode: ToolOutputMode::Text,
         execution_mode: ToolExecutionMode::Mutating,
-        capability_tags: vec![devo_core::tools::ToolCapabilityTag::WriteFiles],
+        capability_tags: vec![infinitecode_core::tools::ToolCapabilityTag::WriteFiles],
         supports_parallel: false,
-        preparation_feedback: devo_core::tools::ToolPreparationFeedback::None,
+        preparation_feedback: infinitecode_core::tools::ToolPreparationFeedback::None,
         display_name: None,
         supports_cancellation: None,
         supports_streaming: None,
@@ -434,14 +434,14 @@ fn auto_review_registry(calls: Arc<std::sync::atomic::AtomicUsize>) -> Arc<ToolR
 async fn update_permissions_to_auto_review(
     runtime: &Arc<ServerRuntime>,
     connection_id: u64,
-    session_id: devo_core::SessionId,
+    session_id: infinitecode_core::SessionId,
 ) -> Result<()> {
     let response = runtime
         .handle_incoming(
             connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/session/permissions/update",
+                "method": "_infinitecode/session/permissions/update",
                 "params": {
                     "session_id": session_id,
                     "preset": "auto-review"
@@ -450,11 +450,11 @@ async fn update_permissions_to_auto_review(
         )
         .await
         .context("session/permissions/update response")?;
-    let result: SuccessResponse<devo_server::SessionPermissionsUpdateResult> =
+    let result: SuccessResponse<infinitecode_server::SessionPermissionsUpdateResult> =
         serde_json::from_value(response)?;
     assert_eq!(
         result.result.preset,
-        devo_protocol::PermissionPreset::AutoReview
+        infinitecode_protocol::PermissionPreset::AutoReview
     );
     Ok(())
 }
@@ -462,14 +462,14 @@ async fn update_permissions_to_auto_review(
 async fn start_auto_review_turn(
     runtime: &Arc<ServerRuntime>,
     connection_id: u64,
-    session_id: devo_core::SessionId,
+    session_id: infinitecode_core::SessionId,
 ) -> Result<()> {
     let response = runtime
         .handle_incoming(
             connection_id,
             serde_json::json!({
                 "id": 4,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [
@@ -485,10 +485,10 @@ async fn start_auto_review_turn(
         )
         .await
         .context("turn/start auto-review response")?;
-    let result: SuccessResponse<devo_server::TurnStartResult> =
+    let result: SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(response.clone())
             .with_context(|| format!("turn/start response: {response}"))?;
-    assert_eq!(result.result.status(), devo_core::TurnStatus::Running);
+    assert_eq!(result.result.status(), infinitecode_core::TurnStatus::Running);
     Ok(())
 }
 
@@ -508,7 +508,7 @@ impl ToolHandler for BlockingReadOnlyTool {
             execution_mode: ToolExecutionMode::ReadOnly,
             capability_tags: vec![],
             supports_parallel: true,
-            preparation_feedback: devo_core::tools::ToolPreparationFeedback::None,
+            preparation_feedback: infinitecode_core::tools::ToolPreparationFeedback::None,
             display_name: None,
             supports_cancellation: None,
             supports_streaming: None,
@@ -517,9 +517,9 @@ impl ToolHandler for BlockingReadOnlyTool {
 
     async fn handle(
         &self,
-        _ctx: devo_core::tools::ToolContext,
+        _ctx: infinitecode_core::tools::ToolContext,
         _input: serde_json::Value,
-        _progress: Option<devo_core::tools::ToolProgressSender>,
+        _progress: Option<infinitecode_core::tools::ToolProgressSender>,
     ) -> std::result::Result<ToolResult, ToolCallError> {
         self.started.notify_one();
         self.release.notified().await;
@@ -545,7 +545,7 @@ impl ToolHandler for RecordingMutatingTool {
             execution_mode: ToolExecutionMode::Mutating,
             capability_tags: vec![],
             supports_parallel: false,
-            preparation_feedback: devo_core::tools::ToolPreparationFeedback::None,
+            preparation_feedback: infinitecode_core::tools::ToolPreparationFeedback::None,
             display_name: None,
             supports_cancellation: None,
             supports_streaming: None,
@@ -554,9 +554,9 @@ impl ToolHandler for RecordingMutatingTool {
 
     async fn handle(
         &self,
-        _ctx: devo_core::tools::ToolContext,
+        _ctx: infinitecode_core::tools::ToolContext,
         _input: serde_json::Value,
-        _progress: Option<devo_core::tools::ToolProgressSender>,
+        _progress: Option<infinitecode_core::tools::ToolProgressSender>,
     ) -> std::result::Result<ToolResult, ToolCallError> {
         self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         Ok(ToolResult::success(
@@ -730,7 +730,7 @@ async fn skills_list_returns_user_and_workspace_skills() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let user_skill_root = temp_dir.path().join("user-skills");
     let workspace_root = temp_dir.path().join("workspace");
-    let workspace_skill_root = workspace_root.join(".devo").join("skills");
+    let workspace_skill_root = workspace_root.join(".infinitecode").join("skills");
 
     let rust_skill_path =
         create_skill(&user_skill_root, "rust-docs", "# Rust Docs\n\nUse rustdoc.");
@@ -753,7 +753,7 @@ async fn skills_list_returns_user_and_workspace_skills() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/skills/list",
+                "method": "_infinitecode/skills/list",
                 "params": {
                     "cwd": workspace_root,
                 }
@@ -809,7 +809,7 @@ async fn skills_changed_rediscovers_new_workspace_skill() -> Result<()> {
     let temp_dir = TempDir::new()?;
     let user_skill_root = temp_dir.path().join("user-skills");
     let workspace_root = temp_dir.path().join("workspace");
-    let workspace_skill_root = workspace_root.join(".devo").join("skills");
+    let workspace_skill_root = workspace_root.join(".infinitecode").join("skills");
 
     let alpha_skill_path = create_skill(&workspace_skill_root, "alpha", "# Alpha\n\nFirst skill.");
 
@@ -826,7 +826,7 @@ async fn skills_changed_rediscovers_new_workspace_skill() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 4,
-                "method": "_devo/skills/changed",
+                "method": "_infinitecode/skills/changed",
                 "params": {
                     "cwd": workspace_root.clone(),
                 }
@@ -863,7 +863,7 @@ async fn skills_changed_rediscovers_new_workspace_skill() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 5,
-                "method": "_devo/skills/changed",
+                "method": "_infinitecode/skills/changed",
                 "params": {
                     "cwd": workspace_root,
                 }
@@ -939,7 +939,7 @@ async fn turn_start_resolves_skill_content_into_model_request() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 6,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [
@@ -956,10 +956,10 @@ async fn turn_start_resolves_skill_content_into_model_request() -> Result<()> {
         )
         .await
         .context("turn/start response")?;
-    let start_result: SuccessResponse<devo_server::TurnStartResult> =
+    let start_result: SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(response.clone())
             .with_context(|| format!("turn/start response: {response}"))?;
-    assert_eq!(start_result.result.status(), devo_core::TurnStatus::Running);
+    assert_eq!(start_result.result.status(), infinitecode_core::TurnStatus::Running);
 
     wait_for_turn_completed(&mut notifications_rx).await?;
 
@@ -999,7 +999,7 @@ async fn turn_start_rejects_missing_skill_references() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 7,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [
@@ -1140,7 +1140,7 @@ async fn turn_steer_injects_resolved_skill_into_next_model_request() -> Result<(
         execution_mode: ToolExecutionMode::ReadOnly,
         capability_tags: vec![],
         supports_parallel: true,
-        preparation_feedback: devo_core::tools::ToolPreparationFeedback::None,
+        preparation_feedback: infinitecode_core::tools::ToolPreparationFeedback::None,
         display_name: None,
         supports_cancellation: None,
         supports_streaming: None,
@@ -1162,7 +1162,7 @@ async fn turn_steer_injects_resolved_skill_into_next_model_request() -> Result<(
             connection_id,
             serde_json::json!({
                 "id": 8,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [
@@ -1178,7 +1178,7 @@ async fn turn_steer_injects_resolved_skill_into_next_model_request() -> Result<(
         )
         .await
         .context("turn/start response for steering test")?;
-    let start_result: SuccessResponse<devo_server::TurnStartResult> =
+    let start_result: SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(response.clone())
             .with_context(|| format!("turn/start response: {response}"))?;
     let start_turn_id = start_result
@@ -1195,7 +1195,7 @@ async fn turn_steer_injects_resolved_skill_into_next_model_request() -> Result<(
             connection_id,
             serde_json::json!({
                 "id": 9,
-                "method": "_devo/turn/steer",
+                "method": "_infinitecode/turn/steer",
                 "params": {
                     "session_id": session_id,
                     "expected_turn_id": start_turn_id,
@@ -1208,12 +1208,12 @@ async fn turn_steer_injects_resolved_skill_into_next_model_request() -> Result<(
         )
         .await
         .context("turn/steer response")?;
-    let steer_result: SuccessResponse<devo_server::TurnSteerResult> =
+    let steer_result: SuccessResponse<infinitecode_server::TurnSteerResult> =
         serde_json::from_value(steer_response)?;
     assert_eq!(steer_result.result.turn_id, start_turn_id);
     assert_eq!(
         steer_result.result.disposition,
-        devo_server::TurnInputDisposition::Steered
+        infinitecode_server::TurnInputDisposition::Steered
     );
 
     release.notify_one();

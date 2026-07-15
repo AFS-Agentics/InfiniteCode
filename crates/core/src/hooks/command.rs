@@ -1,8 +1,8 @@
 use std::process::Stdio;
 use std::time::Duration;
 
-use devo_config::CommandHookConfig;
-use devo_config::HookShell;
+use infinitecode_config::CommandHookConfig;
+use infinitecode_config::HookShell;
 use serde_json::Map;
 use serde_json::Value;
 use tokio::io::AsyncWriteExt;

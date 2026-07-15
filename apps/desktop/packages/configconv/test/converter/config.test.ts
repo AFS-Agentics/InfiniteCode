@@ -5,7 +5,7 @@ import type { ClaudeSettings } from "../../src/types/claude-code"
 describe("convertConfig", () => {
 	test("returns empty config when no settings", () => {
 		const { config, report } = convertConfig({})
-		expect(config.$schema).toBe("https://devo.ai/config.json")
+		expect(config.$schema).toBe("https://infinitecode.ai/config.json")
 		expect(report.skipped.length).toBe(1)
 	})
 

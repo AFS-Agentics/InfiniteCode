@@ -7,8 +7,8 @@ use std::fmt::Write as _;
 use std::path::Path;
 use std::time::Instant;
 
-use devo_protocol::Model;
-use devo_protocol::ProviderWireApi;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ProviderWireApi;
 use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
@@ -538,9 +538,9 @@ mod tests {
     use std::path::PathBuf;
     use std::time::Instant;
 
-    use devo_protocol::PermissionPreset;
-    use devo_protocol::ReasoningCapability;
-    use devo_protocol::ReasoningEffort;
+    use infinitecode_protocol::PermissionPreset;
+    use infinitecode_protocol::ReasoningCapability;
+    use infinitecode_protocol::ReasoningEffort;
     use pretty_assertions::assert_eq;
     use std::hint::black_box;
     use tokio::sync::mpsc;

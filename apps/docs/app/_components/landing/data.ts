@@ -4,9 +4,9 @@ export { localeCookieName, supportedLocales, type Locale } from "@/lib/locale";
 
 export const installCommands = {
   unix:
-    "curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh",
-  windows: "irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex",
-  source: "git clone https://github.com/7df-lab/devo.git\ncd devo\ncargo build --release",
+    "curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh",
+  windows: "irm 'https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1' | iex",
+  source: "git clone https://github.com/AFS-Agentics/InfiniteCode.git\ncd infinitecode\ncargo build --release",
 } as const;
 
 export type InstallId = keyof typeof installCommands;
@@ -25,15 +25,15 @@ export const landingCopy = {
       github: "GitHub",
     },
     hero: {
-      body: "Devo is a lightweight, model-neutral open-source coding agent that runs as a single binary with zero dependencies.",
-      primaryCta: "Install Devo",
+      body: "InfiniteCode is a lightweight, model-neutral open-source coding agent that runs as a single binary with zero dependencies.",
+      primaryCta: "Install InfiniteCode",
       secondaryCta: "Read docs",
     },
     comparison: {
       kicker: "Feature matrix",
       title: "A clearer set of tradeoffs.",
       capabilityLabel: "Capability",
-      products: ["Devo", "Claude Code", "Droid", "OpenCode"],
+      products: ["InfiniteCode", "Claude Code", "Droid", "OpenCode"],
       statusLabels: {
         yes: "Yes",
         partial: "Partial",
@@ -277,7 +277,7 @@ export const landingCopy = {
       {
         eyebrow: "Zero-dependency runtime",
         title: "One binary, less operational drag",
-        body: "Devo keeps the agent runtime lightweight, so teams can start without adding a service, daemon, or dependency chain.",
+        body: "InfiniteCode keeps the agent runtime lightweight, so teams can start without adding a service, daemon, or dependency chain.",
       },
       {
         eyebrow: "Model-neutral by design",
@@ -287,19 +287,19 @@ export const landingCopy = {
       {
         eyebrow: "Long-running tasks",
         title: "/goal keeps large tasks moving",
-        body: "Set a goal once, and Devo can carry context forward until the larger change is complete.",
+        body: "Set a goal once, and InfiniteCode can carry context forward until the larger change is complete.",
       },
     ],
     workflow: {
       kicker: "Beyond coding",
       title: "One agent runtime for downstream engineering work.",
-      body: "Devo can extend into deep research, security audits, test generation, verification, and repository governance, connecting context gathering, execution, and review in one traceable flow.",
-      imageAlt: "Devo command-line visual style",
+      body: "InfiniteCode can extend into deep research, security audits, test generation, verification, and repository governance, connecting context gathering, execution, and review in one traceable flow.",
+      imageAlt: "InfiniteCode command-line visual style",
     },
     enterprise: {
       kicker: "Enterprise",
       title: "Built for enterprise teams from day one.",
-      body: "For organizations running Devo across many repositories, Devo can provide monitoring, analytics, repository quality checks, and security analysis so platform teams can see adoption, efficiency, and risk in one place.",
+      body: "For organizations running InfiniteCode across many repositories, InfiniteCode can provide monitoring, analytics, repository quality checks, and security analysis so platform teams can see adoption, efficiency, and risk in one place.",
       features: [
         {
           title: "Monitoring and analytics",
@@ -318,7 +318,7 @@ export const landingCopy = {
         "Enterprise deployments can include private infrastructure, SSO/SAML, audit logs, policy controls, and custom reporting.",
       dashboard: {
         label: "Enterprise insights",
-        title: "Devo operational overview",
+        title: "InfiniteCode operational overview",
         period: "Last 30 days",
         exportLabel: "Export",
         usageLabels: [
@@ -373,7 +373,7 @@ export const landingCopy = {
       },
     },
     install: {
-      terminalTitle: "devo install",
+      terminalTitle: "infinitecode install",
       tabAria: "Install options",
       copy: "Copy",
       copied: "Copied",
@@ -387,7 +387,7 @@ export const landingCopy = {
       kicker: "Follow the project",
       title: "Open, early, and moving quickly.",
       bodyBeforeEmail:
-        "Devo is moving quickly. For partnerships, enterprise deployments, hiring, or investment conversations, contact",
+        "InfiniteCode is moving quickly. For partnerships, enterprise deployments, hiring, or investment conversations, contact",
       locationLabel: "Location",
       location: "Beijing, China",
       openDocs: "Open docs",
@@ -407,15 +407,15 @@ export const landingCopy = {
       github: "GitHub",
     },
     hero: {
-      body: "Devo 是一个轻量、模型中立的开源编程智能体，单二进制运行无任何依赖。",
-      primaryCta: "安装 Devo",
+      body: "InfiniteCode 是一个轻量、模型中立的开源编程智能体，单二进制运行无任何依赖。",
+      primaryCta: "安装 InfiniteCode",
       secondaryCta: "阅读文档",
     },
     comparison: {
       kicker: "横向对比",
-      title: "Devo 的取舍更清楚。",
+      title: "InfiniteCode 的取舍更清楚。",
       capabilityLabel: "能力",
-      products: ["Devo", "Claude Code", "Droid", "OpenCode"],
+      products: ["InfiniteCode", "Claude Code", "Droid", "OpenCode"],
       statusLabels: {
         yes: "支持",
         partial: "部分",
@@ -669,19 +669,19 @@ export const landingCopy = {
       {
         eyebrow: "长程任务",
         title: "/goal 一口气推进大型任务",
-        body: "设定目标后，Devo 可以持续推进上下文，直到大型改动完整完成。",
+        body: "设定目标后，InfiniteCode 可以持续推进上下文，直到大型改动完整完成。",
       },
     ],
     workflow: {
       kicker: "不止于编程",
       title: "一套 agent runtime，延展到更多工程场景。",
-      body: "Devo 可以用于深度调研、安全审计、测试生成与验证、仓库治理等下游场景，将上下文收集、任务执行和结果复核连接成可追踪的链路。",
-      imageAlt: "Devo 命令行视觉风格",
+      body: "InfiniteCode 可以用于深度调研、安全审计、测试生成与验证、仓库治理等下游场景，将上下文收集、任务执行和结果复核连接成可追踪的链路。",
+      imageAlt: "InfiniteCode 命令行视觉风格",
     },
     enterprise: {
       kicker: "企业级能力",
       title: "从第一天开始为企业用户构建",
-      body: "如果您是企业用户，Devo 可以提供使用监控、效率分析、软件仓库质量评估和安全风险分析，帮助平台团队统一看清采用情况、交付效率和治理风险。",
+      body: "如果您是企业用户，InfiniteCode 可以提供使用监控、效率分析、软件仓库质量评估和安全风险分析，帮助平台团队统一看清采用情况、交付效率和治理风险。",
       features: [
         {
           title: "全面监控与分析",
@@ -700,7 +700,7 @@ export const landingCopy = {
         "企业部署可扩展私有化基础设施、SSO/SAML、审计日志、策略控制和定制化报表。",
       dashboard: {
         label: "企业洞察",
-        title: "Devo 运营总览",
+        title: "InfiniteCode 运营总览",
         period: "过去 30 天",
         exportLabel: "导出",
         usageLabels: [
@@ -755,7 +755,7 @@ export const landingCopy = {
       },
     },
     install: {
-      terminalTitle: "devo install",
+      terminalTitle: "infinitecode install",
       tabAria: "安装选项",
       copy: "复制",
       copied: "已复制",
@@ -769,7 +769,7 @@ export const landingCopy = {
       kicker: "关注项目",
       title: "开放、早期，并且快速迭代。",
       bodyBeforeEmail:
-        "Devo 正在持续迭代。如果你想聊合作、企业部署、招聘或投资，欢迎联系",
+        "InfiniteCode 正在持续迭代。如果你想聊合作、企业部署、招聘或投资，欢迎联系",
       locationLabel: "所在地",
       location: "Beijing, China",
       openDocs: "打开文档",

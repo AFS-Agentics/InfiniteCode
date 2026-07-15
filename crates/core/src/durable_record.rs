@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use devo_protocol::{ItemId, SessionId, TurnId, TurnKind, TurnStatus, TurnUsage};
+use infinitecode_protocol::{ItemId, SessionId, TurnId, TurnKind, TurnStatus, TurnUsage};
 use serde::{Deserialize, Serialize};
 
 // ── DurableRecord Enum ────────────────────────────────────────────────
@@ -184,7 +184,7 @@ pub struct TurnStartedRecord {
     pub model: Option<String>,
     #[serde(default, alias = "thinking", skip_serializing_if = "Option::is_none")]
     pub reasoning_effort_selection: Option<String>,
-    pub reasoning_effort: Option<devo_protocol::ReasoningEffort>,
+    pub reasoning_effort: Option<infinitecode_protocol::ReasoningEffort>,
     pub started_at: DateTime<Utc>,
 }
 
@@ -456,7 +456,7 @@ pub struct UsageRecordedRecord {
     pub canonical_model_slug: String,
     pub provider_id: ProviderId,
     pub invocation_method: InvocationMethod,
-    pub reasoning_effort: Option<devo_protocol::ReasoningEffort>,
+    pub reasoning_effort: Option<infinitecode_protocol::ReasoningEffort>,
     pub metrics: Vec<UsageMetric>,
     pub context_pressure: ContextPressure,
     pub recorded_at: DateTime<Utc>,
@@ -1393,7 +1393,7 @@ mod tests {
             submitted_by_client_id: Some("tui-1".into()),
             model: Some("deepseek-v4-pro".into()),
             reasoning_effort_selection: Some("high".into()),
-            reasoning_effort: Some(devo_protocol::ReasoningEffort::High),
+            reasoning_effort: Some(infinitecode_protocol::ReasoningEffort::High),
             started_at: now(),
         });
         let json = serde_json::to_string(&record).expect("serialize");
@@ -1414,7 +1414,7 @@ mod tests {
             submitted_by_client_id: Some("tui-1".into()),
             model: Some("deepseek-v4-pro".into()),
             reasoning_effort_selection: Some("high".into()),
-            reasoning_effort: Some(devo_protocol::ReasoningEffort::High),
+            reasoning_effort: Some(infinitecode_protocol::ReasoningEffort::High),
             started_at: now(),
         };
         let mut value =
@@ -1885,7 +1885,7 @@ mod tests {
             canonical_model_slug: "claude-sonnet-4-6".into(),
             provider_id: ProviderId::new(),
             invocation_method: InvocationMethod::AnthropicMessages,
-            reasoning_effort: Some(devo_protocol::ReasoningEffort::High),
+            reasoning_effort: Some(infinitecode_protocol::ReasoningEffort::High),
             metrics: vec![
                 UsageMetric {
                     metric_kind: UsageMetricKind::InputTokens,

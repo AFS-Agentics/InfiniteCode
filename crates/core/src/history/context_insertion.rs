@@ -1,4 +1,4 @@
-use devo_protocol::{ContentBlock, Message, Role};
+use infinitecode_protocol::{ContentBlock, Message, Role};
 
 /// Inserts one context-diff message for the next model request without
 /// retroactively splitting provider tool-call adjacency.

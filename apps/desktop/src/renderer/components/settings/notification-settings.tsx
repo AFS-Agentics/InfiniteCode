@@ -4,8 +4,8 @@ import {
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@devo/ui/components/select"
-import { Switch } from "@devo/ui/components/switch"
+} from "@infinitecode/ui/components/select"
+import { Switch } from "@infinitecode/ui/components/switch"
 import { useCallback } from "react"
 import { useSettings } from "../../hooks/use-settings"
 import { SettingsRow } from "./settings-row"
@@ -34,7 +34,7 @@ export function NotificationSettings() {
 			<SettingsSection>
 				<SettingsRow
 					label="Completion notifications"
-					description="Set when Devo alerts you that an agent is finished"
+					description="Set when InfiniteCode alerts you that an agent is finished"
 				>
 					<Select
 						value={notif.completionMode}

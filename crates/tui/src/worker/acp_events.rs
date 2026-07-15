@@ -1,25 +1,25 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use devo_core::SessionId;
-use devo_protocol::AcpContentBlock;
-use devo_protocol::AcpEmbeddedResource;
-use devo_protocol::AcpPlanEntryStatus;
-use devo_protocol::AcpSessionNotification;
-use devo_protocol::AcpSessionUpdate;
-use devo_protocol::AcpToolCallContent;
-use devo_protocol::AcpToolCallStatus;
-use devo_protocol::AcpToolKind;
-use devo_protocol::DEVO_SESSION_META;
-use devo_protocol::DEVO_TURN_USAGE_META;
-use devo_protocol::ItemId;
-use devo_protocol::ServerEvent;
-use devo_protocol::SessionMetadata;
-use devo_protocol::SpawnAgentResult;
-use devo_protocol::TurnMetadata;
-use devo_protocol::TurnStatus;
-use devo_protocol::TurnUsageUpdatedPayload;
-use devo_protocol::original_event_from_acp_notification;
+use infinitecode_core::SessionId;
+use infinitecode_protocol::AcpContentBlock;
+use infinitecode_protocol::AcpEmbeddedResource;
+use infinitecode_protocol::AcpPlanEntryStatus;
+use infinitecode_protocol::AcpSessionNotification;
+use infinitecode_protocol::AcpSessionUpdate;
+use infinitecode_protocol::AcpToolCallContent;
+use infinitecode_protocol::AcpToolCallStatus;
+use infinitecode_protocol::AcpToolKind;
+use infinitecode_protocol::INFINITECODE_SESSION_META;
+use infinitecode_protocol::INFINITECODE_TURN_USAGE_META;
+use infinitecode_protocol::ItemId;
+use infinitecode_protocol::ServerEvent;
+use infinitecode_protocol::SessionMetadata;
+use infinitecode_protocol::SpawnAgentResult;
+use infinitecode_protocol::TurnMetadata;
+use infinitecode_protocol::TurnStatus;
+use infinitecode_protocol::TurnUsageUpdatedPayload;
+use infinitecode_protocol::original_event_from_acp_notification;
 
 use crate::events::PlanStep;
 use crate::events::PlanStepStatus;
@@ -318,7 +318,7 @@ pub(super) fn session_metadata_from_acp_update(
     else {
         return None;
     };
-    serde_json::from_value(meta.get(DEVO_SESSION_META)?.clone()).ok()
+    serde_json::from_value(meta.get(INFINITECODE_SESSION_META)?.clone()).ok()
 }
 
 pub(super) fn spawn_task_message_from_acp_update(update: &AcpSessionUpdate) -> Option<String> {
@@ -592,8 +592,8 @@ fn spawn_agent_result_from_raw_output(
 fn worker_events_from_acp_usage_update(
     used: u64,
     size: u64,
-    cost: Option<devo_protocol::AcpCost>,
-    meta: Option<devo_protocol::AcpMeta>,
+    cost: Option<infinitecode_protocol::AcpCost>,
+    meta: Option<infinitecode_protocol::AcpMeta>,
 ) -> Vec<WorkerEvent> {
     if let Some(payload) = turn_usage_payload_from_acp_meta(meta.as_ref()) {
         return vec![WorkerEvent::UsageUpdated {
@@ -610,9 +610,9 @@ fn worker_events_from_acp_usage_update(
 }
 
 fn turn_usage_payload_from_acp_meta(
-    meta: Option<&devo_protocol::AcpMeta>,
+    meta: Option<&infinitecode_protocol::AcpMeta>,
 ) -> Option<TurnUsageUpdatedPayload> {
-    serde_json::from_value(meta?.get(DEVO_TURN_USAGE_META)?.clone()).ok()
+    serde_json::from_value(meta?.get(INFINITECODE_TURN_USAGE_META)?.clone()).ok()
 }
 
 fn worker_events_from_acp_tool_call(
@@ -964,13 +964,13 @@ fn acp_tool_result_event(
 fn file_change_from_acp_diff(
     old_text: Option<String>,
     new_text: String,
-) -> devo_protocol::protocol::FileChange {
+) -> infinitecode_protocol::protocol::FileChange {
     match old_text {
-        None => devo_protocol::protocol::FileChange::Add { content: new_text },
+        None => infinitecode_protocol::protocol::FileChange::Add { content: new_text },
         Some(old_text) if new_text.is_empty() => {
-            devo_protocol::protocol::FileChange::Delete { content: old_text }
+            infinitecode_protocol::protocol::FileChange::Delete { content: old_text }
         }
-        Some(old_text) => devo_protocol::protocol::FileChange::Update {
+        Some(old_text) => infinitecode_protocol::protocol::FileChange::Update {
             unified_diff: diffy::create_patch(&old_text, &new_text).to_string(),
             old_text: Some(old_text),
             new_text: Some(new_text),

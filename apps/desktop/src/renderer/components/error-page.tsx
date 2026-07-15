@@ -1,4 +1,4 @@
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import { type ErrorComponentProps, useRouter } from "@tanstack/react-router"
 import { AlertTriangleIcon, ChevronDownIcon, RefreshCwIcon } from "lucide-react"
 import { useState } from "react"

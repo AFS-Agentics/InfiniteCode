@@ -8,32 +8,32 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Datelike;
 use chrono::SecondsFormat;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::ItemKind;
-use devo_protocol::Model;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ProviderRetryPhase;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::ServerEvent;
-use devo_protocol::SessionId;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::TurnErrorPayload;
-use devo_protocol::TurnId;
-use devo_protocol::TurnProviderRetryStatusPayload;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderRoute;
-use devo_provider::ProviderRouter;
-use devo_provider::error::ProviderError;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::ItemKind;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ProviderRetryPhase;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::ServerEvent;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::TurnErrorPayload;
+use infinitecode_protocol::TurnId;
+use infinitecode_protocol::TurnProviderRetryStatusPayload;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderRoute;
+use infinitecode_provider::ProviderRouter;
+use infinitecode_provider::error::ProviderError;
 use futures::Stream;
 use futures::stream;
 use pretty_assertions::assert_eq;
@@ -42,9 +42,9 @@ use tokio::sync::mpsc;
 use tokio::time::Duration;
 use tokio::time::timeout;
 
-use devo_server::ClientTransportKind;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
 
 const PROVIDER_ERROR_TEXT: &str = "Internal server error";
 const FAILING_ATTEMPTS: usize = 6;
@@ -214,14 +214,14 @@ async fn exhausted_provider_retries_persist_for_history_but_do_not_enter_context
     assert!(rollout.contains(PROVIDER_ERROR_TEXT));
     let persisted_error = rollout
         .lines()
-        .filter_map(|line| serde_json::from_str::<devo_core::RolloutLine>(line).ok())
+        .filter_map(|line| serde_json::from_str::<infinitecode_core::RolloutLine>(line).ok())
         .find_map(|line| match line {
-            devo_core::RolloutLine::Turn(line) if line.turn.id == failed_turn_id => line.turn.error,
+            infinitecode_core::RolloutLine::Turn(line) if line.turn.id == failed_turn_id => line.turn.error,
             _ => None,
         });
     assert_eq!(
         persisted_error,
-        Some(devo_core::TurnError {
+        Some(infinitecode_core::TurnError {
             code: "PROVIDER_SERVER_ERROR".to_string(),
             message: format!(
                 "model provider error: provider server error (Some(500)): {PROVIDER_ERROR_TEXT}"
@@ -234,14 +234,14 @@ async fn exhausted_provider_retries_persist_for_history_but_do_not_enter_context
             connection_id,
             serde_json::json!({
                 "id": 5,
-                "method": "_devo/session/resume",
+                "method": "_infinitecode/session/resume",
                 "params": { "session_id": session.session_id }
             }),
         )
         .await
         .context("session/resume after failed turn")?;
     let resume = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_server::SessionResumeResult>,
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionResumeResult>,
     >(resume_response)?
     .result;
     let terminal_history = resume
@@ -250,8 +250,8 @@ async fn exhausted_provider_retries_persist_for_history_but_do_not_enter_context
         .filter(|item| {
             matches!(
                 item.kind,
-                devo_protocol::SessionHistoryItemKind::Error
-                    | devo_protocol::SessionHistoryItemKind::TurnSummary
+                infinitecode_protocol::SessionHistoryItemKind::Error
+                    | infinitecode_protocol::SessionHistoryItemKind::TurnSummary
             )
         })
         .cloned()
@@ -264,17 +264,17 @@ async fn exhausted_provider_retries_persist_for_history_but_do_not_enter_context
     assert_eq!(
         terminal_history,
         vec![
-            devo_protocol::SessionHistoryItem::new(
+            infinitecode_protocol::SessionHistoryItem::new(
                 None,
-                devo_protocol::SessionHistoryItemKind::Error,
+                infinitecode_protocol::SessionHistoryItemKind::Error,
                 "PROVIDER_SERVER_ERROR".to_string(),
                 format!(
                     "model provider error: provider server error (Some(500)): {PROVIDER_ERROR_TEXT}"
                 ),
             ),
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: None,
-                kind: devo_protocol::SessionHistoryItemKind::TurnSummary,
+                kind: infinitecode_protocol::SessionHistoryItemKind::TurnSummary,
                 title: failed_turn.model,
                 body: "failed".to_string(),
                 tool_io: None,
@@ -369,7 +369,7 @@ fn build_runtime(
 ) -> Result<Arc<ServerRuntime>> {
     let provider: Arc<dyn ModelProviderSDK> = Arc::new(UnusedProvider);
     let provider_router: Arc<dyn ProviderRouter> = router;
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         data_root.join("provider_failure_reporting.db"),
     )?);
     Ok(ServerRuntime::new(
@@ -389,7 +389,7 @@ fn build_runtime(
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 data_root.to_path_buf(),
@@ -402,7 +402,7 @@ fn build_runtime(
 async fn initialize_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(128);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(128);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -428,7 +428,7 @@ async fn start_session(
     runtime: &Arc<ServerRuntime>,
     connection_id: u64,
     cwd: &std::path::Path,
-) -> Result<devo_server::SessionMetadata> {
+) -> Result<infinitecode_server::SessionMetadata> {
     let response = runtime
         .handle_incoming(
             connection_id,
@@ -445,7 +445,7 @@ async fn start_session(
         )
         .await
         .context("session/start response")?;
-    let response: devo_server::SuccessResponse<devo_server::SessionStartResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult> =
         serde_json::from_value(response)?;
     Ok(response.result.session)
 }
@@ -461,7 +461,7 @@ async fn start_turn(
             connection_id,
             serde_json::json!({
                 "id": id,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "try the provider" }],
@@ -471,7 +471,7 @@ async fn start_turn(
         )
         .await
         .context("turn/start response")?;
-    let response: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(response)?;
     response.result.turn_id().context("turn should start")
 }
@@ -480,11 +480,11 @@ fn original_event(value: &serde_json::Value) -> Option<ServerEvent> {
     if value.get("method") != Some(&serde_json::json!("session/update")) {
         return None;
     }
-    let notification = serde_json::from_value::<devo_protocol::AcpSessionNotification>(
+    let notification = serde_json::from_value::<infinitecode_protocol::AcpSessionNotification>(
         value.get("params")?.clone(),
     )
     .ok()?;
-    devo_protocol::original_event_from_acp_notification(&notification).map(|(_, event)| event)
+    infinitecode_protocol::original_event_from_acp_notification(&notification).map(|(_, event)| event)
 }
 
 async fn wait_for_original_event(
@@ -493,7 +493,7 @@ async fn wait_for_original_event(
 ) -> Result<()> {
     timeout(Duration::from_secs(5), async {
         while let Some(value) = notifications_rx.recv().await {
-            if value["params"]["_meta"]["devo/originalMethod"].as_str() == Some(method) {
+            if value["params"]["_meta"]["infinitecode/originalMethod"].as_str() == Some(method) {
                 return Ok(());
             }
         }
@@ -505,7 +505,7 @@ async fn wait_for_original_event(
 
 fn rollout_path(
     data_root: &std::path::Path,
-    session: &devo_server::SessionMetadata,
+    session: &infinitecode_server::SessionMetadata,
 ) -> std::path::PathBuf {
     let timestamp = session
         .created_at

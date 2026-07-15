@@ -2,7 +2,7 @@
  * Backup module tests.
  *
  * Tests createBackup, listBackups, restore, and deleteBackup using temp directories.
- * We mock the paths module so backups go to a temp dir instead of ~/.config/devo/.
+ * We mock the paths module so backups go to a temp dir instead of ~/.config/infinitecode/.
  */
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises"

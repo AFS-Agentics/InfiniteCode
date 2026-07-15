@@ -473,9 +473,11 @@ function WebSection() {
 							))}
 						</ul>
 						<div className="mt-6">
-							<Button size="sm">
-								<GlobeIcon className="size-4" />
-								Try on Web
+							<Button size="sm" asChild>
+								<a href="https://web-muub0r26l-shahrukh-yousafzais-projects.vercel.app" target="_blank" rel="noreferrer">
+									<GlobeIcon className="size-4" />
+									Try on Web
+								</a>
 							</Button>
 						</div>
 					</div>

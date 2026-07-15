@@ -106,13 +106,13 @@ impl ToolHandler for WebFetchHandler {
             _ => "*/*",
         };
 
-        let proxy_config = devo_network_proxy::NetworkProxyConfig {
+        let proxy_config = infinitecode_network_proxy::NetworkProxyConfig {
             proxy_url: ctx.network_proxy.clone(),
             no_proxy: ctx.network_no_proxy.clone(),
         };
-        let client = devo_network_proxy::apply_proxy_config(
+        let client = infinitecode_network_proxy::apply_proxy_config(
             reqwest::Client::builder()
-                .connect_timeout(devo_provider::timeout::connect_timeout())
+                .connect_timeout(infinitecode_provider::timeout::connect_timeout())
                 .timeout(timeout_duration),
             &proxy_config,
         )

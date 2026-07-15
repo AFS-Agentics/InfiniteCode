@@ -3,21 +3,21 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use chrono::Utc;
-use devo_client::WebSocketServerClient;
-use devo_client::WebSocketServerClientConfig;
-use devo_protocol::AcpAgentCapabilities;
-use devo_protocol::AcpClientCapabilities;
-use devo_protocol::AcpImplementation;
-use devo_protocol::AcpInitializeResult;
-use devo_protocol::AcpNewSessionResult;
-use devo_protocol::AcpSuccessResponse;
-use devo_protocol::InputItem;
-use devo_protocol::SessionId;
-use devo_protocol::SessionStartParams;
-use devo_protocol::TurnId;
-use devo_protocol::TurnStartParams;
-use devo_protocol::TurnStartResult;
-use devo_protocol::TurnStatus;
+use infinitecode_client::WebSocketServerClient;
+use infinitecode_client::WebSocketServerClientConfig;
+use infinitecode_protocol::AcpAgentCapabilities;
+use infinitecode_protocol::AcpClientCapabilities;
+use infinitecode_protocol::AcpImplementation;
+use infinitecode_protocol::AcpInitializeResult;
+use infinitecode_protocol::AcpNewSessionResult;
+use infinitecode_protocol::AcpSuccessResponse;
+use infinitecode_protocol::InputItem;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::SessionStartParams;
+use infinitecode_protocol::TurnId;
+use infinitecode_protocol::TurnStartParams;
+use infinitecode_protocol::TurnStartResult;
+use infinitecode_protocol::TurnStatus;
 use futures::SinkExt;
 use futures::StreamExt;
 use pretty_assertions::assert_eq;
@@ -41,7 +41,7 @@ async fn websocket_client_initializes_sends_requests_and_receives_notifications(
     .await?;
 
     let initialize = client.initialize().await?;
-    assert_eq!(initialize.server_name, "devo-server");
+    assert_eq!(initialize.server_name, "infinitecode-server");
     assert_eq!(
         next_request_method(&mut requests_rx).await?,
         "initialize".to_string()
@@ -83,13 +83,13 @@ async fn websocket_client_initializes_sends_requests_and_receives_notifications(
         .await?;
     assert_eq!(
         next_request_method(&mut requests_rx).await?,
-        "_devo/turn/start".to_string()
+        "_infinitecode/turn/start".to_string()
     );
 
     let notification = timeout(Duration::from_secs(2), client.recv_notification())
         .await?
         .context("notification")?;
-    assert_eq!(notification.method, "_devo/test/event");
+    assert_eq!(notification.method, "_infinitecode/test/event");
     assert_eq!(notification.params, serde_json::json!({ "ok": true }));
 
     client.shutdown().await?;
@@ -129,7 +129,7 @@ async fn run_loopback_server(
                         protocol_version: 1,
                         agent_capabilities: AcpAgentCapabilities::default(),
                         auth_methods: Vec::new(),
-                        agent_info: Some(AcpImplementation::new("devo-server", "test")),
+                        agent_info: Some(AcpImplementation::new("infinitecode-server", "test")),
                         meta: None,
                     },
                 )
@@ -148,7 +148,7 @@ async fn run_loopback_server(
                 )
                 .await?;
             }
-            "_devo/turn/start" => {
+            "_infinitecode/turn/start" => {
                 send_success(
                     &mut socket,
                     id,
@@ -162,7 +162,7 @@ async fn run_loopback_server(
                 socket
                     .send(Message::Text(
                         serde_json::json!({
-                            "method": "_devo/test/event",
+                            "method": "_infinitecode/test/event",
                             "params": { "ok": true }
                         })
                         .to_string()

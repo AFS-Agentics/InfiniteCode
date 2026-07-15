@@ -1,7 +1,7 @@
 "use client"
 
-import { Badge } from "@devo/ui/components/badge"
-import { cn } from "@devo/ui/lib/utils"
+import { Badge } from "@infinitecode/ui/components/badge"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { ArrowRightIcon, MinusIcon, PackageIcon, PlusIcon } from "lucide-react"
 import type { HTMLAttributes } from "react"
 import { createContext, useContext } from "react"

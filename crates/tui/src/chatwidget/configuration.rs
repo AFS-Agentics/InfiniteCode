@@ -3,10 +3,10 @@
 //! Picker construction and selection application live here so configuration UI
 //! changes stay separate from transcript and input handling.
 
-use devo_protocol::Model;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ReasoningEffort;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ReasoningEffort;
 use ratatui::style::Color;
 use ratatui::text::Line;
 
@@ -430,7 +430,7 @@ impl ChatWidget {
         self.set_status_message("Select permissions");
     }
 
-    pub(crate) fn note_permissions_updated(&mut self, preset: devo_protocol::PermissionPreset) {
+    pub(crate) fn note_permissions_updated(&mut self, preset: infinitecode_protocol::PermissionPreset) {
         self.permission_preset = preset;
         let label = permission_preset_label(preset);
         self.add_to_history(history_cell::new_info_event(

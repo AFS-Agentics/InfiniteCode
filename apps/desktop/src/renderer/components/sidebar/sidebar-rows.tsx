@@ -4,7 +4,7 @@ import {
 	ContextMenuItem,
 	ContextMenuSeparator,
 	ContextMenuTrigger,
-} from "@devo/ui/components/context-menu"
+} from "@infinitecode/ui/components/context-menu"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -12,13 +12,13 @@ import {
 	DropdownMenuItem,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
-} from "@devo/ui/components/dropdown-menu"
-import { Input } from "@devo/ui/components/input"
+} from "@infinitecode/ui/components/dropdown-menu"
+import { Input } from "@infinitecode/ui/components/input"
 import {
 	optionMenuIconClass,
 	optionMenuSeparatorClass,
-} from "@devo/ui/components/option-menu-styles"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/option-menu-styles"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { useNavigate } from "@tanstack/react-router"
 import {
 	ArchiveIcon,

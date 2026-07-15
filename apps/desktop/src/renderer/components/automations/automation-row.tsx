@@ -11,8 +11,8 @@ import {
 	ContextMenuItem,
 	ContextMenuSeparator,
 	ContextMenuTrigger,
-} from "@devo/ui/components/context-menu"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
+} from "@infinitecode/ui/components/context-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
 import { CircleIcon, PauseIcon, PencilIcon } from "lucide-react"
 import { memo, useState } from "react"
 import type { Automation } from "../../../preload/api"

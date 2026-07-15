@@ -1,12 +1,12 @@
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
-import { Button } from "@devo/ui/components/button";
+import { Button } from "@infinitecode/ui/components/button";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
-} from "@devo/ui/components/tooltip";
+} from "@infinitecode/ui/components/tooltip";
 import { PanelBottomIcon, PlusIcon, XIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isElectron } from "../services/backend";

@@ -1,6 +1,6 @@
-# devo-tui
+# infinitecode-tui
 
-The interactive terminal UI crate for Devo. It provides a Ratatui-based TUI with a chat-like conversation surface, a rich composer, streaming markdown rendering, tool execution display, syntax-highlighted diffs, and full-screen pager overlays.
+The interactive terminal UI crate for InfiniteCode. It provides a Ratatui-based TUI with a chat-like conversation surface, a rich composer, streaming markdown rendering, tool execution display, syntax-highlighted diffs, and full-screen pager overlays.
 
 ## Architecture Overview
 
@@ -257,7 +257,7 @@ The key idea is that streamed source text and rendered visible lines are related
 
 ### Worker bridge
 
-The TUI is not the LLM server. The worker layer bridges between the UI and `devo-server`.
+The TUI is not the LLM server. The worker layer bridges between the UI and `infinitecode-server`.
 
 The UI emits commands such as “start a user turn,” “interrupt,” “approve this tool call,” or “switch session.” The worker translates those into server RPC calls. Server events are translated back into `WorkerEvent`s that the UI can render.
 
@@ -301,7 +301,7 @@ Most bugs become easier to reason about once the layer is clear.
 
 ### Core UI Widget
 
-[`chatwidget.rs`](/Users/tsiao/Desktop/devo/crates/tui/src/chatwidget.rs) (4200+ lines) is the central widget. It owns:
+[`chatwidget.rs`](/Users/tsiao/Desktop/infinitecode/crates/tui/src/chatwidget.rs) (4200+ lines) is the central widget. It owns:
 
 - The visible transcript (a `VecDeque` of `HistoryCell` entries).
 - The active streaming cell (an `Option<HistoryCell>` that mutates in place during streaming).
@@ -399,7 +399,7 @@ Token delta → MarkdownStreamCollector → StreamCore → queued HistoryCell �
 
 ### Diff Rendering
 
-[`diff_render.rs`](/Users/tsiao/Desktop/devo/crates/tui/src/diff_render.rs) renders unified diffs for `FileChange` entries. Features:
+[`diff_render.rs`](/Users/tsiao/Desktop/infinitecode/crates/tui/src/diff_render.rs) renders unified diffs for `FileChange` entries. Features:
 - Line numbers and gutter signs (`+`/`-`/` `)
 - Syntax highlighting per hunk (preserving parser state across consecutive lines)
 - Theme-aware backgrounds (dark terminal: muted tints; light terminal: GitHub pastels)
@@ -417,7 +417,7 @@ Full-screen overlays rendered in the terminal alternate screen:
 
 ### Worker (Server Bridge)
 
-[`worker.rs`](/Users/tsiao/Desktop/devo/crates/tui/src/worker.rs) (2900+ lines) spawns the `devo-server` as a child process over stdio and bridges TUI commands with server RPC:
+[`worker.rs`](/Users/tsiao/Desktop/infinitecode/crates/tui/src/worker.rs) (2900+ lines) spawns the `infinitecode-server` as a child process over stdio and bridges TUI commands with server RPC:
 
 1. Starts a server process via `StdioServerClient`.
 2. Receives `AppCommand` and selected `AppEvent` requests from the host and translates them into server RPC calls (session start/resume/list, reference search start/update/cancel, turn start/interrupt/steer, approval respond, permission update, etc.).
@@ -432,7 +432,7 @@ Full-screen overlays rendered in the terminal alternate screen:
 | `app_event.rs` | `AppEvent` enum: UI-level events (redraw, exit, submit input, open popups, status updates). |
 | `app_command.rs` | `AppCommand` enum: commands sent to the worker (user turn, steer, approval, session switch, rollback, fork). |
 | `app_event_sender.rs` | Channel sender wrapper for `AppEvent` with deduplication. |
-| `theme.rs` | `Theme` color palette and `ThemeSet` with builtin themes (devo, dark, light, aurora). |
+| `theme.rs` | `Theme` color palette and `ThemeSet` with builtin themes (infinitecode, dark, light, aurora). |
 | `terminal_palette.rs` | Terminal color capability detection. |
 | `style.rs` | Reusable style definitions. |
 | `color.rs` | Color conversion and manipulation. |
@@ -490,4 +490,4 @@ Overlays (Ctrl+T transcript, static pages) enter and exit the alternate screen:
 - **syntect / two-face**: Syntax highlighting
 - **diffy**: Diff computation
 - **arboard**: Clipboard access
-- **devo-server**: Spawned child process that handles LLM communication
+- **infinitecode-server**: Spawned child process that handles LLM communication

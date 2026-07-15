@@ -91,10 +91,10 @@ The following sketch is normative for region order and relative priority. It is 
 ┃ ╚═════╝  ╚══════╝  ╚═══╝   ╚═════╝                         ┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
 ┃ Model      deepseek-v4-pro                Reasoning   high ┃
-┃ Workspace  ~/Desktop/devo                                  ┃
+┃ Workspace  ~/Desktop/infinitecode                                  ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-  Tip: Ready in /Users/username/Desktop/devo
+  Tip: Ready in /Users/username/Desktop/infinitecode
 
 ┃ Fix the parser regression and run the focused tests.
 
@@ -115,7 +115,7 @@ The following sketch is normative for region order and relative priority. It is 
 
 ⠋ Working · ⏱ 12s
 
-┃ Ask Devo
+┃ Ask InfiniteCode
 
   BUILD · deepseek-v4-pro high  ↑0[cached 0 0%]  ↓0  ▱▱▱▱▱▱▱▱▱▱  0%  0/950k
 ```
@@ -146,7 +146,7 @@ Theme mapping:
 The tip line below the header should use bold styling for `Tip:` and normal styling for the tip content.
 
 ```text
-  Tip: Ready in /Users/username/Desktop/devo
+  Tip: Ready in /Users/username/Desktop/infinitecode
 ```
 
 In the rendered TUI, only `Tip:` is bold.
@@ -184,7 +184,7 @@ Example shell composition with transcript content:
 
 ⠋ Working · ⏱ 8s
 
-┃ Ask Devo
+┃ Ask InfiniteCode
 
   BUILD · deepseek-v4-pro high  ↑420[cached 300 71%]  ↓12  ▰▰▱▱▱▱▱▱▱▱  20%  190k/950k
 ```

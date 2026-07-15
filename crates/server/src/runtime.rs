@@ -14,39 +14,39 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio_util::sync::CancellationToken;
 
-use devo_core::ApprovalDecisionItem;
-use devo_core::CommandExecutionItem;
-use devo_core::ItemId;
-use devo_core::Message;
-use devo_core::ResponseItem;
-use devo_core::SessionId;
-use devo_core::SessionTitleFinalSource;
-use devo_core::SessionTitleState;
-use devo_core::TextItem;
-use devo_core::TokenInfo;
-use devo_core::ToolCallItem;
-use devo_core::ToolResultItem;
-use devo_core::TurnId;
-use devo_core::TurnItem;
-use devo_core::TurnStatus;
-use devo_core::TurnUsage;
-use devo_core::Worklog;
-use devo_core::history::compaction::CompactAction;
-use devo_core::history::compaction::CompactionConfig;
-use devo_core::history::compaction::CompactionKind;
-use devo_core::history::compaction::compact_history;
-use devo_core::history::summarizer::DefaultHistorySummarizer;
-use devo_core::message_to_response_items;
-use devo_core::tools::AgentToolCoordinator;
-use devo_core::tools::PermissionChecker;
-use devo_core::tools::ToolCallError;
-use devo_core::tools::ToolPermissionRequest;
-use devo_protocol::{
+use infinitecode_core::ApprovalDecisionItem;
+use infinitecode_core::CommandExecutionItem;
+use infinitecode_core::ItemId;
+use infinitecode_core::Message;
+use infinitecode_core::ResponseItem;
+use infinitecode_core::SessionId;
+use infinitecode_core::SessionTitleFinalSource;
+use infinitecode_core::SessionTitleState;
+use infinitecode_core::TextItem;
+use infinitecode_core::TokenInfo;
+use infinitecode_core::ToolCallItem;
+use infinitecode_core::ToolResultItem;
+use infinitecode_core::TurnId;
+use infinitecode_core::TurnItem;
+use infinitecode_core::TurnStatus;
+use infinitecode_core::TurnUsage;
+use infinitecode_core::Worklog;
+use infinitecode_core::history::compaction::CompactAction;
+use infinitecode_core::history::compaction::CompactionConfig;
+use infinitecode_core::history::compaction::CompactionKind;
+use infinitecode_core::history::compaction::compact_history;
+use infinitecode_core::history::summarizer::DefaultHistorySummarizer;
+use infinitecode_core::message_to_response_items;
+use infinitecode_core::tools::AgentToolCoordinator;
+use infinitecode_core::tools::PermissionChecker;
+use infinitecode_core::tools::ToolCallError;
+use infinitecode_core::tools::ToolPermissionRequest;
+use infinitecode_protocol::{
     SessionDeletedPayload, WorkspaceChangeAttribution, WorkspaceChangeScope, WorkspaceChangeView,
     WorkspaceChangesReadParams, WorkspaceChangesReadResult, WorkspaceChangesUpdatedPayload,
     WorkspaceDiffDetail,
 };
-use devo_safety::PermissionMode;
+use infinitecode_safety::PermissionMode;
 
 use crate::ApprovalDecisionValue;
 use crate::ApprovalScopeValue;
@@ -209,7 +209,7 @@ pub struct ServerRuntime {
     subagent_usage: Mutex<subagent_usage::SubagentUsageState>,
     /// Live client-owned reference search sessions.
     reference_searches:
-        Mutex<HashMap<devo_protocol::ReferenceSearchId, reference_search::ReferenceSearchState>>,
+        Mutex<HashMap<infinitecode_protocol::ReferenceSearchId, reference_search::ReferenceSearchState>>,
     /// Live client-owned shell/process sessions.
     command_exec_manager: command_exec::CommandExecManager,
     code_index_warmup: code_index_warmup::CodeIndexWarmup,
@@ -228,7 +228,7 @@ pub struct ServerRuntime {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TurnInputMode {
     VisibleUserMessage,
-    HiddenGoalContinuation { goal: devo_protocol::ThreadGoal },
+    HiddenGoalContinuation { goal: infinitecode_protocol::ThreadGoal },
 }
 
 const TERMINAL_TURN_STATUS_LIMIT: usize = 1024;
@@ -236,8 +236,8 @@ const TERMINAL_TURN_STATUS_LIMIT: usize = 1024;
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct TerminalTurnSnapshot {
     status: TurnStatus,
-    stop_reason: Option<devo_core::StopReason>,
-    failure_reason: Option<devo_protocol::TurnFailureReason>,
+    stop_reason: Option<infinitecode_core::StopReason>,
+    failure_reason: Option<infinitecode_protocol::TurnFailureReason>,
 }
 
 impl TerminalTurnSnapshot {
@@ -279,8 +279,8 @@ fn requested_model_selection<'a>(
         .or_else(|| session_model_selection(session))
 }
 
-const SUBAGENT_USAGE_PARENT_SESSION_ID_METADATA: &str = "devo_subagent_usage_parent_session_id";
-const SUBAGENT_USAGE_PARENT_TURN_ID_METADATA: &str = "devo_subagent_usage_parent_turn_id";
+const SUBAGENT_USAGE_PARENT_SESSION_ID_METADATA: &str = "infinitecode_subagent_usage_parent_session_id";
+const SUBAGENT_USAGE_PARENT_TURN_ID_METADATA: &str = "infinitecode_subagent_usage_parent_turn_id";
 
 pub(super) fn subagent_usage_owner_pending_metadata(
     parent_session_id: SessionId,
@@ -298,7 +298,7 @@ impl ServerRuntime {
         let goal_durable_store = GoalDurableStore::new(server_home.clone());
         Arc::new_cyclic(|self_weak| Self {
             metadata: InitializeResult {
-                server_name: "devo-server".into(),
+                server_name: "infinitecode-server".into(),
                 server_version: env!("CARGO_PKG_VERSION").into(),
                 platform_family: std::env::consts::FAMILY.into(),
                 platform_os: std::env::consts::OS.into(),
@@ -346,25 +346,25 @@ fn permission_mode_from_approval_policy(policy: &str) -> Option<PermissionMode> 
 }
 
 fn safety_profile_from_protocol(
-    preset: devo_protocol::PermissionPreset,
+    preset: infinitecode_protocol::PermissionPreset,
     cwd: std::path::PathBuf,
     additional_directories: Vec<std::path::PathBuf>,
-) -> devo_safety::RuntimePermissionProfile {
+) -> infinitecode_safety::RuntimePermissionProfile {
     let preset = match preset {
-        devo_protocol::PermissionPreset::ReadOnly => devo_safety::PermissionPreset::ReadOnly,
-        devo_protocol::PermissionPreset::Default => devo_safety::PermissionPreset::Default,
-        devo_protocol::PermissionPreset::AutoReview => devo_safety::PermissionPreset::AutoReview,
-        devo_protocol::PermissionPreset::FullAccess => devo_safety::PermissionPreset::FullAccess,
+        infinitecode_protocol::PermissionPreset::ReadOnly => infinitecode_safety::PermissionPreset::ReadOnly,
+        infinitecode_protocol::PermissionPreset::Default => infinitecode_safety::PermissionPreset::Default,
+        infinitecode_protocol::PermissionPreset::AutoReview => infinitecode_safety::PermissionPreset::AutoReview,
+        infinitecode_protocol::PermissionPreset::FullAccess => infinitecode_safety::PermissionPreset::FullAccess,
     };
-    devo_safety::RuntimePermissionProfile::from_preset(preset, cwd)
+    infinitecode_safety::RuntimePermissionProfile::from_preset(preset, cwd)
         .with_additional_roots(additional_directories)
 }
 
 fn protocol_reviewer_from_safety(
-    reviewer: devo_safety::ApprovalsReviewer,
-) -> devo_protocol::ApprovalsReviewer {
+    reviewer: infinitecode_safety::ApprovalsReviewer,
+) -> infinitecode_protocol::ApprovalsReviewer {
     match reviewer {
-        devo_safety::ApprovalsReviewer::User => devo_protocol::ApprovalsReviewer::User,
-        devo_safety::ApprovalsReviewer::AutoReview => devo_protocol::ApprovalsReviewer::AutoReview,
+        infinitecode_safety::ApprovalsReviewer::User => infinitecode_protocol::ApprovalsReviewer::User,
+        infinitecode_safety::ApprovalsReviewer::AutoReview => infinitecode_protocol::ApprovalsReviewer::AutoReview,
     }
 }

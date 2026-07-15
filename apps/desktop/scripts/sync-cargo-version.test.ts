@@ -9,7 +9,7 @@ import {
 } from "./sync-cargo-version";
 
 async function tempDesktopDir(): Promise<string> {
-	return mkdtemp(join(tmpdir(), "devo-desktop-version-"));
+	return mkdtemp(join(tmpdir(), "infinitecode-desktop-version-"));
 }
 
 describe("desktop Cargo version sync", () => {
@@ -32,8 +32,8 @@ version = "0.1.21"
 			join(desktopDir, "package.json"),
 			`${JSON.stringify(
 				{
-					name: "@devo/desktop",
-					productName: "Devo",
+					name: "@infinitecode/desktop",
+					productName: "InfiniteCode",
 					version: "0.11.0",
 				},
 				null,
@@ -52,8 +52,8 @@ version = "0.1.21"
 			version: "0.1.21",
 		});
 		expect(packageJson).toEqual({
-			name: "@devo/desktop",
-			productName: "Devo",
+			name: "@infinitecode/desktop",
+			productName: "InfiniteCode",
 			version: "0.1.21",
 		});
 	});

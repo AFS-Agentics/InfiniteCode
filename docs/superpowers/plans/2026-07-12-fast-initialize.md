@@ -4,7 +4,7 @@
 
 **Goal:** Make ACP `initialize` complete quickly by preventing repeated synchronous construction of equivalent provider HTTP clients during server bootstrap.
 
-**Architecture:** Add a process-wide cache in `devo-provider` that owns one request client and one streaming client per proxy configuration. Provider adapters continue to own their headers, credentials, and endpoint configuration, while cloning the cached `reqwest::Client` handles so they share connection pools and avoid repeated native TLS initialization.
+**Architecture:** Add a process-wide cache in `infinitecode-provider` that owns one request client and one streaming client per proxy configuration. Provider adapters continue to own their headers, credentials, and endpoint configuration, while cloning the cached `reqwest::Client` handles so they share connection pools and avoid repeated native TLS initialization.
 
 **Tech Stack:** Rust, reqwest, anyhow, Cargo tests.
 
@@ -32,7 +32,7 @@
 
 - [x] **Step 2: Run the test to verify it fails**
 
-  Run `cargo test -p devo-provider http::tests::http_client_cache_reuses_equivalent_clients -- --exact` and confirm the missing cache implementation fails to compile.
+  Run `cargo test -p infinitecode-provider http::tests::http_client_cache_reuses_equivalent_clients -- --exact` and confirm the missing cache implementation fails to compile.
 
 - [x] **Step 3: Implement the minimal cache**
 
@@ -40,7 +40,7 @@
 
 - [x] **Step 4: Run focused provider tests**
 
-  Run the new unit test and `cargo test -p devo-provider --test provider_http`; both must pass, preserving headers and explicit proxy routing.
+  Run the new unit test and `cargo test -p infinitecode-provider --test provider_http`; both must pass, preserving headers and explicit proxy routing.
 
 ### Task 2: Verify startup behavior
 
@@ -48,19 +48,19 @@
 - No additional source changes expected.
 
 **Interfaces:**
-- Consumes: the current multi-provider `~/.devo/config.toml` through an isolated temporary `DEVO_HOME`.
+- Consumes: the current multi-provider `~/.infinitecode/config.toml` through an isolated temporary `INFINITECODE_HOME`.
 - Produces: measured config-load-to-database-open latency below the 10-second ACP response timeout, with `initialize` accepted successfully.
 
 - [x] **Step 1: Build the current binary**
 
-  Run `cargo build -p devo-cli` and allow Rust compilation to finish normally.
+  Run `cargo build -p infinitecode-cli` and allow Rust compilation to finish normally.
 
 - [x] **Step 2: Benchmark isolated startup**
 
-  Copy the current config, auth, and model catalog into a temporary home, send one ACP `initialize` request to `target/debug/devo server --transport stdio`, and compare timestamps between `loaded server config`, `opening database`, and `accepted ACP initialize request`.
+  Copy the current config, auth, and model catalog into a temporary home, send one ACP `initialize` request to `target/debug/infinitecode server --transport stdio`, and compare timestamps between `loaded server config`, `opening database`, and `accepted ACP initialize request`.
 
   Measured result: config-load-to-database-open improved from approximately 12.8 seconds to 435 milliseconds, and ACP `initialize` was accepted at approximately 449 milliseconds.
 
 - [x] **Step 3: Run final checks**
 
-  Run `cargo test -p devo-provider`, `cargo test -p devo-server provider_config`, and `git diff --check`. Confirm no unrelated dirty-tree files changed.
+  Run `cargo test -p infinitecode-provider`, `cargo test -p infinitecode-server provider_config`, and `git diff --check`. Confirm no unrelated dirty-tree files changed.

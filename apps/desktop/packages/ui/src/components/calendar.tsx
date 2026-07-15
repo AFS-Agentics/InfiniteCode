@@ -1,7 +1,7 @@
 "use client"
 
-import { Button, buttonVariants } from "@devo/ui/components/button"
-import { cn } from "@devo/ui/lib/utils"
+import { Button, buttonVariants } from "@infinitecode/ui/components/button"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as React from "react"
 import { type DayButton, DayPicker, getDefaultClassNames, type Locale } from "react-day-picker"

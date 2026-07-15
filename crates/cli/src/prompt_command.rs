@@ -1,24 +1,24 @@
 use anyhow::Result;
 use clap::ValueEnum;
-use devo_core::AgentsMdConfig;
-use devo_core::AppConfig;
-use devo_core::AppConfigLoader;
-use devo_core::EventCallback;
-use devo_core::FileSystemAppConfigLoader;
-use devo_core::ModelCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::QueryEvent;
-use devo_core::TurnConfig;
-use devo_core::default_base_instructions;
-use devo_core::provider_request_model_map_for_binding;
-use devo_core::resolve_enabled_model_binding;
-use devo_core::tools::ToolPlanConfig;
-use devo_core::tools::handlers;
-use devo_mcp::manager::RmcpMcpManager;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderRoute;
-use devo_provider::ProviderRouter;
-use devo_util_paths::find_devo_home;
+use infinitecode_core::AgentsMdConfig;
+use infinitecode_core::AppConfig;
+use infinitecode_core::AppConfigLoader;
+use infinitecode_core::EventCallback;
+use infinitecode_core::FileSystemAppConfigLoader;
+use infinitecode_core::ModelCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::QueryEvent;
+use infinitecode_core::TurnConfig;
+use infinitecode_core::default_base_instructions;
+use infinitecode_core::provider_request_model_map_for_binding;
+use infinitecode_core::resolve_enabled_model_binding;
+use infinitecode_core::tools::ToolPlanConfig;
+use infinitecode_core::tools::handlers;
+use infinitecode_mcp::manager::RmcpMcpManager;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderRoute;
+use infinitecode_provider::ProviderRouter;
+use infinitecode_util_paths::find_infinitecode_home;
 use futures::Stream;
 use serde::Serialize;
 use std::io::Write;
@@ -44,17 +44,17 @@ pub(crate) async fn run_prompt(
             .with_env_filter(tracing_subscriber::EnvFilter::new(level))
             .try_init();
     }
-    use devo_core::SessionConfig;
-    use devo_core::SessionState;
-    use devo_core::tools::ToolRuntime;
+    use infinitecode_core::SessionConfig;
+    use infinitecode_core::SessionState;
+    use infinitecode_core::tools::ToolRuntime;
 
     let cwd = std::env::current_dir()?;
-    let home_dir = find_devo_home()?;
+    let home_dir = find_infinitecode_home()?;
     let app_config = FileSystemAppConfigLoader::new(home_dir.clone())
         .load(Some(cwd.as_path()))
         .unwrap_or_else(|_| AppConfig::default());
     let resolved_provider =
-        devo_server::load_server_provider(&app_config, model_override, &home_dir)?;
+        infinitecode_server::load_server_provider(&app_config, model_override, &home_dir)?;
     let model_catalog = PresetModelCatalog::load_from_config(&home_dir, Some(&cwd))?;
     let turn_config = prompt_turn_config(
         &app_config,
@@ -74,7 +74,7 @@ pub(crate) async fn run_prompt(
         },
         cwd.clone(),
     );
-    session_state.push_message(devo_core::Message::user(input.to_string()));
+    session_state.push_message(infinitecode_core::Message::user(input.to_string()));
 
     let registry = {
         let mcp_manager = std::sync::Arc::new(RmcpMcpManager::new(
@@ -87,21 +87,21 @@ pub(crate) async fn run_prompt(
     };
     let runtime = ToolRuntime::new_with_context(
         std::sync::Arc::clone(&registry),
-        devo_core::tools::PermissionChecker::always_allow(),
-        devo_core::tools::ToolRuntimeContext {
+        infinitecode_core::tools::PermissionChecker::always_allow(),
+        infinitecode_core::tools::ToolRuntimeContext {
             session_id: session_state.id.clone(),
             turn_id: None,
             cwd: cwd.clone(),
-            agent_scope: devo_core::tools::ToolAgentScope::Parent,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            agent_scope: infinitecode_core::tools::ToolAgentScope::Parent,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: None,
-            file_read_ledger: std::sync::Arc::new(devo_core::tools::FileReadLedger::new()),
+            file_read_ledger: std::sync::Arc::new(infinitecode_core::tools::FileReadLedger::new()),
             local_web_search: None,
-            hooks: (!app_config.hooks.is_empty()).then(|| devo_core::HookRuntimeContext {
-                runner: devo_core::HookRunner::new(app_config.hooks.clone()),
-                base: devo_core::HookBaseInput {
+            hooks: (!app_config.hooks.is_empty()).then(|| infinitecode_core::HookRuntimeContext {
+                runner: infinitecode_core::HookRunner::new(app_config.hooks.clone()),
+                base: infinitecode_core::HookBaseInput {
                     session_id: session_state.id.clone(),
                     transcript_path: String::new(),
                     cwd: cwd.clone(),
@@ -119,7 +119,7 @@ pub(crate) async fn run_prompt(
         turn_config.provider_route.clone(),
     ));
 
-    eprintln!("devo [prompt] model={selected_model} sending...");
+    eprintln!("infinitecode [prompt] model={selected_model} sending...");
 
     if output_format == PromptOutputFormat::Jsonl {
         write_jsonl(&PromptJsonlEvent::SessionStarted {
@@ -134,7 +134,7 @@ pub(crate) async fn run_prompt(
     }
 
     let session_id_for_events = session_state.id.clone();
-    let result = devo_core::query(
+    let result = infinitecode_core::query(
         &mut session_state,
         &turn_config,
         provider,
@@ -163,7 +163,7 @@ pub(crate) async fn run_prompt(
                     usage: PromptUsage::from_session(&session_state),
                 })?,
             },
-            None => eprintln!("devo [prompt] empty response"),
+            None => eprintln!("infinitecode [prompt] empty response"),
         },
         Err(e) => {
             if output_format == PromptOutputFormat::Jsonl {
@@ -199,8 +199,8 @@ impl RoutedPromptProvider {
 impl ModelProviderSDK for RoutedPromptProvider {
     async fn completion(
         &self,
-        request: devo_protocol::ModelRequest,
-    ) -> anyhow::Result<devo_protocol::ModelResponse> {
+        request: infinitecode_protocol::ModelRequest,
+    ) -> anyhow::Result<infinitecode_protocol::ModelResponse> {
         self.router
             .complete(self.route.clone(), request)
             .await
@@ -209,9 +209,9 @@ impl ModelProviderSDK for RoutedPromptProvider {
 
     async fn completion_stream(
         &self,
-        request: devo_protocol::ModelRequest,
+        request: infinitecode_protocol::ModelRequest,
     ) -> anyhow::Result<
-        Pin<Box<dyn Stream<Item = anyhow::Result<devo_protocol::StreamEvent>> + Send>>,
+        Pin<Box<dyn Stream<Item = anyhow::Result<infinitecode_protocol::StreamEvent>> + Send>>,
     > {
         self.router
             .stream(self.route.clone(), request)
@@ -234,7 +234,7 @@ fn prompt_turn_config(
         model_catalog
             .get(model_slug)
             .cloned()
-            .unwrap_or_else(|| devo_core::Model {
+            .unwrap_or_else(|| infinitecode_core::Model {
                 slug: model_slug.to_string(),
                 base_instructions: default_base_instructions().to_string(),
                 ..Default::default()
@@ -242,7 +242,7 @@ fn prompt_turn_config(
     };
 
     if let Some(binding) = resolve_enabled_model_binding(&app_config.provider, requested_model) {
-        let provider_request_models = devo_core::ProviderRequestModelMap::new(
+        let provider_request_models = infinitecode_core::ProviderRequestModelMap::new(
             provider_request_model_map_for_binding(&app_config.provider, &binding),
         );
         let reasoning_effort_selection = app_config
@@ -278,7 +278,7 @@ struct PromptUsage {
 }
 
 impl PromptUsage {
-    fn from_session(session: &devo_core::SessionState) -> Self {
+    fn from_session(session: &infinitecode_core::SessionState) -> Self {
         Self {
             input_tokens: session.total_input_tokens,
             output_tokens: session.total_output_tokens,
@@ -349,7 +349,7 @@ enum PromptJsonlEvent<'a> {
         tool_call_id: &'a str,
         tool_name: &'a str,
         input: &'a serde_json::Value,
-        content: &'a devo_core::tools::ToolContent,
+        content: &'a infinitecode_core::tools::ToolContent,
         display_content: &'a Option<String>,
         is_error: bool,
         summary: &'a str,
@@ -377,7 +377,7 @@ enum PromptJsonlEvent<'a> {
     #[serde(rename = "turn.completed")]
     TurnCompleted {
         session_id: &'a str,
-        stop_reason: &'a devo_core::StopReason,
+        stop_reason: &'a infinitecode_core::StopReason,
     },
     #[serde(rename = "turn.failed")]
     TurnFailed {
@@ -413,7 +413,7 @@ struct PromptUsageDelta {
 }
 
 impl PromptUsageDelta {
-    fn new(usage: &devo_protocol::Usage) -> Self {
+    fn new(usage: &infinitecode_protocol::Usage) -> Self {
         Self {
             input_tokens: usage.input_tokens,
             output_tokens: usage.output_tokens,
@@ -437,7 +437,7 @@ fn jsonl_event_callback(
         let session_id = session_id.clone();
         Box::pin(async move {
             if let Err(error) = write_query_event_jsonl(session_id.as_str(), &event) {
-                eprintln!("devo [prompt] failed to write jsonl event: {error}");
+                eprintln!("infinitecode [prompt] failed to write jsonl event: {error}");
             }
         })
     }))
@@ -467,8 +467,8 @@ fn write_query_event_jsonl(session_id: &str, event: &QueryEvent) -> Result<()> {
                 provider: status.provider.as_str(),
                 model: status.model.as_str(),
                 phase: match status.phase {
-                    devo_core::QueryProviderRetryPhase::Scheduled => "scheduled",
-                    devo_core::QueryProviderRetryPhase::Resumed => "resumed",
+                    infinitecode_core::QueryProviderRetryPhase::Scheduled => "scheduled",
+                    infinitecode_core::QueryProviderRetryPhase::Resumed => "resumed",
                 },
                 message: status.message.as_str(),
             })
@@ -492,12 +492,12 @@ fn write_query_event_jsonl(session_id: &str, event: &QueryEvent) -> Result<()> {
             progress,
         } => {
             let delta = match progress {
-                devo_core::tools::ToolProgress::OutputDelta { delta } => Some(delta.as_str()),
-                devo_core::tools::ToolProgress::StatusUpdate { message, .. } => {
+                infinitecode_core::tools::ToolProgress::OutputDelta { delta } => Some(delta.as_str()),
+                infinitecode_core::tools::ToolProgress::StatusUpdate { message, .. } => {
                     Some(message.as_str())
                 }
-                devo_core::tools::ToolProgress::Completion { summary } => Some(summary.as_str()),
-                devo_core::tools::ToolProgress::Terminal { .. } => None,
+                infinitecode_core::tools::ToolProgress::Completion { summary } => Some(summary.as_str()),
+                infinitecode_core::tools::ToolProgress::Terminal { .. } => None,
             };
             if let Some(delta) = delta {
                 write_jsonl(&PromptJsonlEvent::ToolProgress {
@@ -552,30 +552,30 @@ fn write_jsonl<T: Serialize>(value: &T) -> Result<()> {
     write_json(value)
 }
 
-fn latest_assistant_text(messages: &[devo_core::Message]) -> Option<&str> {
+fn latest_assistant_text(messages: &[infinitecode_core::Message]) -> Option<&str> {
     messages.iter().rev().find_map(|message| {
-        if message.role != devo_core::Role::Assistant {
+        if message.role != infinitecode_core::Role::Assistant {
             return None;
         }
         message
             .content
             .iter()
             .find_map(|block| match block {
-                devo_core::ContentBlock::Text { text } => Some(text.as_str()),
-                devo_core::ContentBlock::Reasoning { .. }
-                | devo_core::ContentBlock::ProviderReasoning { .. }
-                | devo_core::ContentBlock::ToolUse { .. }
-                | devo_core::ContentBlock::HostedToolUse { .. }
-                | devo_core::ContentBlock::ToolResult { .. } => None,
+                infinitecode_core::ContentBlock::Text { text } => Some(text.as_str()),
+                infinitecode_core::ContentBlock::Reasoning { .. }
+                | infinitecode_core::ContentBlock::ProviderReasoning { .. }
+                | infinitecode_core::ContentBlock::ToolUse { .. }
+                | infinitecode_core::ContentBlock::HostedToolUse { .. }
+                | infinitecode_core::ContentBlock::ToolResult { .. } => None,
             })
             .or_else(|| {
                 message.content.iter().find_map(|block| match block {
-                    devo_core::ContentBlock::Reasoning { text } => Some(text.as_str()),
-                    devo_core::ContentBlock::Text { .. }
-                    | devo_core::ContentBlock::ProviderReasoning { .. }
-                    | devo_core::ContentBlock::ToolUse { .. }
-                    | devo_core::ContentBlock::HostedToolUse { .. }
-                    | devo_core::ContentBlock::ToolResult { .. } => None,
+                    infinitecode_core::ContentBlock::Reasoning { text } => Some(text.as_str()),
+                    infinitecode_core::ContentBlock::Text { .. }
+                    | infinitecode_core::ContentBlock::ProviderReasoning { .. }
+                    | infinitecode_core::ContentBlock::ToolUse { .. }
+                    | infinitecode_core::ContentBlock::HostedToolUse { .. }
+                    | infinitecode_core::ContentBlock::ToolResult { .. } => None,
                 })
             })
     })
@@ -587,9 +587,9 @@ mod tests {
 
     use super::latest_assistant_text;
     use super::{PromptResult, PromptUsage};
-    use devo_core::ContentBlock;
-    use devo_core::Message;
-    use devo_core::Role;
+    use infinitecode_core::ContentBlock;
+    use infinitecode_core::Message;
+    use infinitecode_core::Role;
 
     #[test]
     fn prompt_result_serializes_completed_json_shape() {

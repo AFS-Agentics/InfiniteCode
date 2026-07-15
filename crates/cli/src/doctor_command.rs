@@ -5,9 +5,9 @@
 //! fix setup issues before launching the interactive runtime.
 
 use anyhow::Result;
-use devo_core::AppConfigLoader;
-use devo_core::FileSystemAppConfigLoader;
-use devo_util_paths::find_devo_home;
+use infinitecode_core::AppConfigLoader;
+use infinitecode_core::FileSystemAppConfigLoader;
+use infinitecode_util_paths::find_infinitecode_home;
 
 pub(crate) async fn run_doctor() -> Result<()> {
     use colored::Colorize;
@@ -33,7 +33,7 @@ pub(crate) async fn run_doctor() -> Result<()> {
     println!();
 
     println!("{} Config home (INFINITECODE_HOME):", "✓".green().bold());
-    match find_devo_home() {
+    match find_infinitecode_home() {
         Ok(home) => {
             println!("  {}", home.display());
         }
@@ -45,7 +45,7 @@ pub(crate) async fn run_doctor() -> Result<()> {
     println!();
 
     println!("{} Config file:", "✓".green().bold());
-    if let Ok(home) = find_devo_home() {
+    if let Ok(home) = find_infinitecode_home() {
         let config_path = home.join("config.toml");
         if config_path.exists() {
             println!("  {} {}", "found".green(), config_path.display());
@@ -74,7 +74,7 @@ pub(crate) async fn run_doctor() -> Result<()> {
     println!();
 
     println!("{} Provider resolution:", "✓".green().bold());
-    match find_devo_home() {
+    match find_infinitecode_home() {
         Ok(home) => {
             let cwd = std::env::current_dir()?;
             let app_config = FileSystemAppConfigLoader::new(home.clone()).load(Some(&cwd))?;
@@ -108,7 +108,7 @@ pub(crate) async fn run_doctor() -> Result<()> {
     println!();
 
     println!("{} Model catalog:", "✓".green().bold());
-    match devo_core::PresetModelCatalog::load() {
+    match infinitecode_core::PresetModelCatalog::load() {
         Ok(catalog) => {
             let count = catalog.into_inner().len();
             println!("  {} builtin models loaded", count);

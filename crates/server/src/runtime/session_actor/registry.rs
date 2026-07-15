@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use devo_core::TurnId;
-use devo_protocol::SessionId;
+use infinitecode_core::TurnId;
+use infinitecode_protocol::SessionId;
 
 use super::state::SpawnSnapshot;
 use crate::runtime::ServerRuntime;
@@ -149,7 +149,7 @@ impl ServerRuntime {
     pub(crate) async fn session_record_snapshot(
         &self,
         session_id: SessionId,
-    ) -> Option<devo_core::SessionRecord> {
+    ) -> Option<infinitecode_core::SessionRecord> {
         if let Some(stream) = self.active_stream_state(session_id).await {
             let stream = stream.lock().await;
             if let Some(inline) = stream.turn_inline.as_ref() {
@@ -184,7 +184,7 @@ impl ServerRuntime {
     pub(crate) async fn session_collaboration_mode(
         &self,
         session_id: SessionId,
-    ) -> Option<devo_protocol::CollaborationMode> {
+    ) -> Option<infinitecode_protocol::CollaborationMode> {
         if let Some(stream) = self.active_stream_state(session_id).await {
             let stream = stream.lock().await;
             if let Some(inline) = stream.turn_inline.as_ref() {

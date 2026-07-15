@@ -1,4 +1,4 @@
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { useAtomValue } from "jotai"
 import {
 	CheckCircle2Icon,

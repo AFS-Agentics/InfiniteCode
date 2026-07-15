@@ -1,4 +1,4 @@
-use devo_protocol::ModelRequest;
+use infinitecode_protocol::ModelRequest;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -121,7 +121,7 @@ fn is_rate_limit_kind(kind: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use devo_protocol::ModelProfileKey;
+    use infinitecode_protocol::ModelProfileKey;
     use pretty_assertions::assert_eq;
     use serde_json::json;
 

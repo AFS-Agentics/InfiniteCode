@@ -2,19 +2,19 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use chrono::Utc;
-use devo_core::DurableRecord;
-use devo_core::GoalBudgetAccountedRecord;
-use devo_core::GoalClearedRecord;
-use devo_core::GoalContextSnapshotRecordedRecord;
-use devo_core::GoalCreatedRecord;
-use devo_core::GoalProgressRecordedRecord;
-use devo_core::GoalProgressType;
-use devo_core::GoalStatusChangedRecord;
-use devo_core::JsonlSessionStore;
-use devo_core::SessionStore;
-use devo_core::StoreErrorCode;
-use devo_protocol::SessionId;
-use devo_protocol::TurnId;
+use infinitecode_core::DurableRecord;
+use infinitecode_core::GoalBudgetAccountedRecord;
+use infinitecode_core::GoalClearedRecord;
+use infinitecode_core::GoalContextSnapshotRecordedRecord;
+use infinitecode_core::GoalCreatedRecord;
+use infinitecode_core::GoalProgressRecordedRecord;
+use infinitecode_core::GoalProgressType;
+use infinitecode_core::GoalStatusChangedRecord;
+use infinitecode_core::JsonlSessionStore;
+use infinitecode_core::SessionStore;
+use infinitecode_core::StoreErrorCode;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::TurnId;
 
 use crate::goal::Goal;
 use crate::goal::GoalBudget;
@@ -87,7 +87,7 @@ impl GoalDurableStore {
             goal_id: goal.durable_goal_id,
             session_id: goal.session_id,
             turn_id,
-            budget_delta: devo_core::GoalBudget {
+            budget_delta: infinitecode_core::GoalBudget {
                 max_turns: (turn_delta > 0).then_some(turn_delta),
                 max_tokens: (token_delta > 0).then_some(token_delta),
                 max_duration_seconds: (duration_delta_seconds > 0)
@@ -122,7 +122,7 @@ impl GoalDurableStore {
     pub(crate) async fn append_goal_cleared(
         &self,
         session_id: SessionId,
-        goal_id: devo_core::GoalId,
+        goal_id: infinitecode_core::GoalId,
         reason: Option<String>,
     ) -> Result<()> {
         let record = DurableRecord::GoalCleared(GoalClearedRecord {
@@ -179,17 +179,17 @@ impl GoalDurableStore {
                         goal.status =
                             goal_status_from_durable(record.new_status, record.reason.as_deref());
                         match record.new_status {
-                            devo_core::GoalStatus::Completed => {
+                            infinitecode_core::GoalStatus::Completed => {
                                 goal.verification_summary = record.reason;
                             }
-                            devo_core::GoalStatus::Paused
-                            | devo_core::GoalStatus::Blocked
-                            | devo_core::GoalStatus::Failed => {
+                            infinitecode_core::GoalStatus::Paused
+                            | infinitecode_core::GoalStatus::Blocked
+                            | infinitecode_core::GoalStatus::Failed => {
                                 goal.blocker_summary = record.reason;
                             }
-                            devo_core::GoalStatus::Active
-                            | devo_core::GoalStatus::Canceled
-                            | devo_core::GoalStatus::Cleared => {}
+                            infinitecode_core::GoalStatus::Active
+                            | infinitecode_core::GoalStatus::Canceled
+                            | infinitecode_core::GoalStatus::Cleared => {}
                         }
                         goal.updated_at = record.changed_at;
                     }
@@ -270,18 +270,18 @@ impl GoalDurableStore {
     }
 }
 
-fn durable_budget_from_goal(budget: &GoalBudget) -> Option<devo_core::GoalBudget> {
+fn durable_budget_from_goal(budget: &GoalBudget) -> Option<infinitecode_core::GoalBudget> {
     (budget.max_turns.is_some()
         || budget.max_tokens.is_some()
         || budget.max_duration_seconds.is_some())
-    .then_some(devo_core::GoalBudget {
+    .then_some(infinitecode_core::GoalBudget {
         max_turns: budget.max_turns,
         max_tokens: budget.max_tokens,
         max_duration_seconds: budget.max_duration_seconds,
     })
 }
 
-fn goal_budget_from_durable(budget: Option<devo_core::GoalBudget>) -> GoalBudget {
+fn goal_budget_from_durable(budget: Option<infinitecode_core::GoalBudget>) -> GoalBudget {
     let Some(budget) = budget else {
         return GoalBudget::default();
     };
@@ -292,8 +292,8 @@ fn goal_budget_from_durable(budget: Option<devo_core::GoalBudget>) -> GoalBudget
     }
 }
 
-fn remaining_budget(goal: &Goal) -> devo_core::GoalBudget {
-    devo_core::GoalBudget {
+fn remaining_budget(goal: &Goal) -> infinitecode_core::GoalBudget {
+    infinitecode_core::GoalBudget {
         max_turns: goal
             .budget
             .max_turns
@@ -309,31 +309,31 @@ fn remaining_budget(goal: &Goal) -> devo_core::GoalBudget {
     }
 }
 
-fn durable_status_from_goal(status: GoalStatus) -> devo_core::GoalStatus {
+fn durable_status_from_goal(status: GoalStatus) -> infinitecode_core::GoalStatus {
     match status {
-        GoalStatus::Active => devo_core::GoalStatus::Active,
-        GoalStatus::Paused => devo_core::GoalStatus::Paused,
-        GoalStatus::BudgetLimited => devo_core::GoalStatus::Blocked,
-        GoalStatus::Completed => devo_core::GoalStatus::Completed,
-        GoalStatus::Failed => devo_core::GoalStatus::Failed,
-        GoalStatus::Blocked => devo_core::GoalStatus::Blocked,
-        GoalStatus::Canceled => devo_core::GoalStatus::Canceled,
-        GoalStatus::Cleared => devo_core::GoalStatus::Cleared,
+        GoalStatus::Active => infinitecode_core::GoalStatus::Active,
+        GoalStatus::Paused => infinitecode_core::GoalStatus::Paused,
+        GoalStatus::BudgetLimited => infinitecode_core::GoalStatus::Blocked,
+        GoalStatus::Completed => infinitecode_core::GoalStatus::Completed,
+        GoalStatus::Failed => infinitecode_core::GoalStatus::Failed,
+        GoalStatus::Blocked => infinitecode_core::GoalStatus::Blocked,
+        GoalStatus::Canceled => infinitecode_core::GoalStatus::Canceled,
+        GoalStatus::Cleared => infinitecode_core::GoalStatus::Cleared,
     }
 }
 
-fn goal_status_from_durable(status: devo_core::GoalStatus, reason: Option<&str>) -> GoalStatus {
+fn goal_status_from_durable(status: infinitecode_core::GoalStatus, reason: Option<&str>) -> GoalStatus {
     match status {
-        devo_core::GoalStatus::Active => GoalStatus::Active,
-        devo_core::GoalStatus::Paused => GoalStatus::Paused,
-        devo_core::GoalStatus::Completed => GoalStatus::Completed,
-        devo_core::GoalStatus::Failed => GoalStatus::Failed,
-        devo_core::GoalStatus::Blocked if reason == Some("budget_limited") => {
+        infinitecode_core::GoalStatus::Active => GoalStatus::Active,
+        infinitecode_core::GoalStatus::Paused => GoalStatus::Paused,
+        infinitecode_core::GoalStatus::Completed => GoalStatus::Completed,
+        infinitecode_core::GoalStatus::Failed => GoalStatus::Failed,
+        infinitecode_core::GoalStatus::Blocked if reason == Some("budget_limited") => {
             GoalStatus::BudgetLimited
         }
-        devo_core::GoalStatus::Blocked => GoalStatus::Blocked,
-        devo_core::GoalStatus::Canceled => GoalStatus::Canceled,
-        devo_core::GoalStatus::Cleared => GoalStatus::Cleared,
+        infinitecode_core::GoalStatus::Blocked => GoalStatus::Blocked,
+        infinitecode_core::GoalStatus::Canceled => GoalStatus::Canceled,
+        infinitecode_core::GoalStatus::Cleared => GoalStatus::Cleared,
     }
 }
 
@@ -358,7 +358,7 @@ mod tests {
     use tempfile::TempDir;
 
     fn active_goal(session_id: SessionId) -> Goal {
-        Goal::from_create_params(devo_protocol::GoalCreateParams {
+        Goal::from_create_params(infinitecode_protocol::GoalCreateParams {
             session_id,
             objective: "finish durable goals".to_string(),
             token_budget: Some(100),

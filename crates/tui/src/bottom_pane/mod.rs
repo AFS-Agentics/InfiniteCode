@@ -5,12 +5,12 @@ use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use crossterm::event::KeyModifiers;
-use devo_protocol::CollaborationMode;
-use devo_protocol::ReferenceSearchSnapshot;
-use devo_protocol::RequestUserInputQuestion;
-use devo_protocol::SessionId;
-use devo_protocol::TurnId;
-use devo_protocol::user_input::TextElement;
+use infinitecode_protocol::CollaborationMode;
+use infinitecode_protocol::ReferenceSearchSnapshot;
+use infinitecode_protocol::RequestUserInputQuestion;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::TurnId;
+use infinitecode_protocol::user_input::TextElement;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
@@ -119,7 +119,7 @@ fn escaped_bang_submission(
             continue;
         }
         adjusted.push(
-            element.map_range(|range| devo_protocol::user_input::Utf8ByteSpan {
+            element.map_range(|range| infinitecode_protocol::user_input::Utf8ByteSpan {
                 start: range.start.saturating_sub(1),
                 end: range.end.saturating_sub(1),
             }),

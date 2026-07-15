@@ -8,30 +8,30 @@ import {
 	CommandItem,
 	CommandList,
 	CommandSeparator,
-} from "@devo/ui/components/command"
+} from "@infinitecode/ui/components/command"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
-} from "@devo/ui/components/dropdown-menu"
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@devo/ui/components/hover-card"
+} from "@infinitecode/ui/components/dropdown-menu"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@infinitecode/ui/components/hover-card"
 import {
 	InputGroup,
 	InputGroupAddon,
 	InputGroupButton,
 	InputGroupTextarea,
-} from "@devo/ui/components/input-group"
+} from "@infinitecode/ui/components/input-group"
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@devo/ui/components/select"
-import { Spinner } from "@devo/ui/components/spinner"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/select"
+import { Spinner } from "@infinitecode/ui/components/spinner"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { ChatStatus, FileUIPart, SourceDocumentUIPart } from "ai"
 import { CornerDownLeftIcon, ImageIcon, PlusIcon, SquareIcon, XIcon } from "lucide-react"
 import { nanoid } from "nanoid"

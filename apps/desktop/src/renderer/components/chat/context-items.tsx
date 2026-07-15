@@ -1,10 +1,10 @@
 /**
  * Context items display — reference/agent mention chips shown above the input.
  *
- * Inspired by Devo TUI's context-items.tsx pattern.
+ * Inspired by InfiniteCode TUI's context-items.tsx pattern.
  * Shows removable chips for each tracked @ mention.
  */
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { BrainIcon, FileIcon, PlugIcon, SparklesIcon, XIcon } from "lucide-react"
 import { memo } from "react"
 import { getMentionKey, getMentionMarker, type PromptMention } from "./prompt-mentions"

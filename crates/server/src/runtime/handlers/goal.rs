@@ -3,12 +3,12 @@
 //! Implements L3-BEH-SERVER-004 client protocol surface.
 #![allow(dead_code)]
 
-use devo_protocol::GoalCreateParams;
-use devo_protocol::GoalSetParams;
-use devo_protocol::SessionId;
-use devo_protocol::ThreadGoalStatus;
-use devo_protocol::validate_thread_goal_objective;
-use devo_protocol::validate_thread_goal_token_budget;
+use infinitecode_protocol::GoalCreateParams;
+use infinitecode_protocol::GoalSetParams;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::ThreadGoalStatus;
+use infinitecode_protocol::validate_thread_goal_objective;
+use infinitecode_protocol::validate_thread_goal_token_budget;
 use serde::{Deserialize, Serialize};
 
 use crate::goal::{Goal, GoalAction, GoalError, GoalMutation, GoalStatus};
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn goal_projection_from_goal() {
-        let durable_goal_id = devo_core::GoalId::new();
+        let durable_goal_id = infinitecode_core::GoalId::new();
         let goal = Goal {
             goal_id: GoalId::from_durable(durable_goal_id),
             durable_goal_id,

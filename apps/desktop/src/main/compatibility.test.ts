@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { satisfies } from "semver"
-import { checkDevoProgram, INFINITECODE_COMPAT } from "./compatibility"
+import { checkInfiniteCodeProgram, INFINITECODE_COMPAT } from "./compatibility"
 
 describe("INFINITECODE_COMPAT", () => {
 	test("supports 0.1.21 as the minimum CLI version", () => {
@@ -10,9 +10,9 @@ describe("INFINITECODE_COMPAT", () => {
 	})
 })
 
-describe("checkDevoProgram", () => {
+describe("checkInfiniteCodeProgram", () => {
 	test("checks an explicit bundled runtime path without consulting PATH", async () => {
-		const result = await checkDevoProgram({
+		const result = await checkInfiniteCodeProgram({
 			program: "/Applications/InfiniteCode.app/Contents/Resources/runtime/bin/infinitecode",
 			env: { PATH: "/usr/bin" },
 			execFile: (_cmd, _args, _options, callback) => {

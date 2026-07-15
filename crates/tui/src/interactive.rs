@@ -4,12 +4,12 @@
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyModifiers;
-use devo_core::AppConfigLoader;
-use devo_core::FileSystemAppConfigLoader;
-use devo_protocol::Model;
-use devo_protocol::ModelCatalog;
-use devo_protocol::ProviderWireApi;
-use devo_util_paths::find_devo_home;
+use infinitecode_core::AppConfigLoader;
+use infinitecode_core::FileSystemAppConfigLoader;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelCatalog;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_util_paths::find_infinitecode_home;
 use futures::StreamExt;
 use std::path::Path;
 use std::sync::OnceLock;
@@ -108,7 +108,7 @@ fn normalized_display_name(
 
 #[derive(Debug, Default)]
 struct InteractiveLoopState {
-    session_id: Option<devo_core::SessionId>,
+    session_id: Option<infinitecode_core::SessionId>,
     onboarding_completed: bool,
     turn_count: usize,
     total_input_tokens: usize,
@@ -243,8 +243,8 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
         server_log_level: config.server_log_level.clone(),
         reasoning_effort_selection: initial_session.reasoning_effort_selection.clone(),
         permission_preset: initial_session.permission_preset,
-        client_capabilities: devo_protocol::AcpClientCapabilities {
-            fs: devo_protocol::AcpFileSystemCapabilities {
+        client_capabilities: infinitecode_protocol::AcpClientCapabilities {
+            fs: infinitecode_protocol::AcpFileSystemCapabilities {
                 read_text_file: false,
                 write_text_file: false,
                 meta: None,
@@ -263,7 +263,7 @@ pub async fn run_interactive_tui(config: InteractiveTuiConfig) -> Result<AppExit
     let available_models = available_models_with_saved_metadata(&config);
 
     let cwd = initial_session.cwd.clone();
-    let project_config_key = devo_core::project_config_key(&cwd);
+    let project_config_key = infinitecode_core::project_config_key(&cwd);
 
     let model = resolve_initial_model(&initial_session, &available_models);
     let request_model = initial_session
@@ -917,7 +917,7 @@ fn handle_worker_event(
             ..
         } => {
             loop_state.session_switch_pending = false;
-            loop_state.session_id = devo_core::SessionId::try_from(session_id.as_str()).ok();
+            loop_state.session_id = infinitecode_core::SessionId::try_from(session_id.as_str()).ok();
             loop_state.total_input_tokens = *total_input_tokens;
             loop_state.total_output_tokens = *total_output_tokens;
             loop_state.total_tokens = *total_tokens;
@@ -1104,7 +1104,7 @@ fn handle_app_command(
                 worker.list_skills()?;
                 chat_widget.set_status_message("Loading skills");
             } else if command == "mcp list" {
-                match find_devo_home()
+                match find_infinitecode_home()
                     .map_err(anyhow::Error::from)
                     .and_then(|config_home| {
                         FileSystemAppConfigLoader::new(config_home)
@@ -1389,7 +1389,7 @@ mod tests {
 
     #[test]
     fn session_activated_updates_loop_state_session_id() {
-        let session_id = devo_core::SessionId::new();
+        let session_id = infinitecode_core::SessionId::new();
         let mut loop_state = InteractiveLoopState::default();
         let worker_event = WorkerEvent::SessionActivated { session_id };
 

@@ -10,76 +10,76 @@ use anyhow::Context;
 use anyhow::Result;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
-use devo_client::{ClientEvent, client_event_from_notification};
+use infinitecode_client::{ClientEvent, client_event_from_notification};
 use tokio::sync::mpsc;
 use tokio::task::JoinError;
 use tokio::task::JoinHandle;
 
-use devo_core::PermissionPreset;
-use devo_core::ProviderWireApi;
-use devo_core::ReasoningEffort;
-use devo_core::SessionId;
-use devo_core::TurnId;
-use devo_core::TurnStatus;
-use devo_protocol::ACP_SESSION_UPDATE_METHOD;
-use devo_protocol::AgentListParams;
-use devo_protocol::AgentToolPolicy;
-use devo_protocol::CloseAgentParams;
-use devo_protocol::CommandExecExitedPayload;
-use devo_protocol::CommandExecOutputDeltaPayload;
-use devo_protocol::CommandExecParams;
-use devo_protocol::CommandExecProgram;
-use devo_protocol::GoalClearParams;
-use devo_protocol::GoalSetParams;
-use devo_protocol::GoalStatusParams;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderValidateParams;
-use devo_protocol::ProviderVendor;
-use devo_protocol::ProviderVendorListParams;
-use devo_protocol::ProviderVendorUpsertParams;
-use devo_protocol::ReferenceSearchCancelParams;
-use devo_protocol::ReferenceSearchId;
-use devo_protocol::ReferenceSearchSnapshot;
-use devo_protocol::ReferenceSearchStartParams;
-use devo_protocol::ReferenceSearchUpdateParams;
-use devo_protocol::SessionHistoryMetadata;
-use devo_protocol::SessionPlanStepStatus;
-use devo_protocol::SpawnAgentParams;
-use devo_protocol::ThreadGoalStatus;
-use devo_protocol::TurnFailedPayload;
-use devo_server::ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD;
-use devo_server::ApprovalDecisionPayload;
-use devo_server::ApprovalRequestPayload;
-use devo_server::ApprovalResponseParams;
-use devo_server::CollaborationMode;
-use devo_server::CommandExecutionPayload;
-use devo_server::InputItem;
-use devo_server::ItemEnvelope;
-use devo_server::ItemEventPayload;
-use devo_server::ItemKind;
-use devo_server::RequestUserInputRespondParams;
-use devo_server::ServerEvent;
-use devo_server::SessionCompactParams;
-use devo_server::SessionHistoryItem;
-use devo_server::SessionHistoryItemKind;
-use devo_server::SessionResumeParams;
-use devo_server::SessionRollbackMode;
-use devo_server::SessionRollbackParams;
-use devo_server::SessionStartParams;
-use devo_server::SessionTitleUpdateParams;
-use devo_server::SkillListParams;
-use devo_server::SkillSetEnabledParams;
-use devo_server::SkillSource;
-use devo_server::StdioServerClient;
-use devo_server::StdioServerClientConfig;
-use devo_server::ToolCallPayload;
-use devo_server::ToolResultPayload;
-use devo_server::TurnEventPayload;
-use devo_server::TurnExecutionMode;
-use devo_server::TurnInterruptParams;
-use devo_server::TurnStartParams;
-use devo_server::TurnStartResult;
-use devo_server::TurnSteerParams;
+use infinitecode_core::PermissionPreset;
+use infinitecode_core::ProviderWireApi;
+use infinitecode_core::ReasoningEffort;
+use infinitecode_core::SessionId;
+use infinitecode_core::TurnId;
+use infinitecode_core::TurnStatus;
+use infinitecode_protocol::ACP_SESSION_UPDATE_METHOD;
+use infinitecode_protocol::AgentListParams;
+use infinitecode_protocol::AgentToolPolicy;
+use infinitecode_protocol::CloseAgentParams;
+use infinitecode_protocol::CommandExecExitedPayload;
+use infinitecode_protocol::CommandExecOutputDeltaPayload;
+use infinitecode_protocol::CommandExecParams;
+use infinitecode_protocol::CommandExecProgram;
+use infinitecode_protocol::GoalClearParams;
+use infinitecode_protocol::GoalSetParams;
+use infinitecode_protocol::GoalStatusParams;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderValidateParams;
+use infinitecode_protocol::ProviderVendor;
+use infinitecode_protocol::ProviderVendorListParams;
+use infinitecode_protocol::ProviderVendorUpsertParams;
+use infinitecode_protocol::ReferenceSearchCancelParams;
+use infinitecode_protocol::ReferenceSearchId;
+use infinitecode_protocol::ReferenceSearchSnapshot;
+use infinitecode_protocol::ReferenceSearchStartParams;
+use infinitecode_protocol::ReferenceSearchUpdateParams;
+use infinitecode_protocol::SessionHistoryMetadata;
+use infinitecode_protocol::SessionPlanStepStatus;
+use infinitecode_protocol::SpawnAgentParams;
+use infinitecode_protocol::ThreadGoalStatus;
+use infinitecode_protocol::TurnFailedPayload;
+use infinitecode_server::ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD;
+use infinitecode_server::ApprovalDecisionPayload;
+use infinitecode_server::ApprovalRequestPayload;
+use infinitecode_server::ApprovalResponseParams;
+use infinitecode_server::CollaborationMode;
+use infinitecode_server::CommandExecutionPayload;
+use infinitecode_server::InputItem;
+use infinitecode_server::ItemEnvelope;
+use infinitecode_server::ItemEventPayload;
+use infinitecode_server::ItemKind;
+use infinitecode_server::RequestUserInputRespondParams;
+use infinitecode_server::ServerEvent;
+use infinitecode_server::SessionCompactParams;
+use infinitecode_server::SessionHistoryItem;
+use infinitecode_server::SessionHistoryItemKind;
+use infinitecode_server::SessionResumeParams;
+use infinitecode_server::SessionRollbackMode;
+use infinitecode_server::SessionRollbackParams;
+use infinitecode_server::SessionStartParams;
+use infinitecode_server::SessionTitleUpdateParams;
+use infinitecode_server::SkillListParams;
+use infinitecode_server::SkillSetEnabledParams;
+use infinitecode_server::SkillSource;
+use infinitecode_server::StdioServerClient;
+use infinitecode_server::StdioServerClientConfig;
+use infinitecode_server::ToolCallPayload;
+use infinitecode_server::ToolResultPayload;
+use infinitecode_server::TurnEventPayload;
+use infinitecode_server::TurnExecutionMode;
+use infinitecode_server::TurnInterruptParams;
+use infinitecode_server::TurnStartParams;
+use infinitecode_server::TurnStartResult;
+use infinitecode_server::TurnSteerParams;
 
 use crate::app_command::GoalObjectiveMode;
 use crate::app_command::InputHistoryDirection;
@@ -116,7 +116,7 @@ use acp_events::worker_events_from_acp_session_notification_with_terminal_state;
 const WORKER_SHUTDOWN_GRACE: Duration = Duration::from_millis(100);
 const WORKER_ABORT_JOIN_TIMEOUT: Duration = Duration::from_millis(500);
 
-fn active_agent_label_from_session(session: &devo_server::SessionMetadata) -> Option<String> {
+fn active_agent_label_from_session(session: &infinitecode_server::SessionMetadata) -> Option<String> {
     session
         .agent_nickname
         .as_ref()
@@ -127,7 +127,7 @@ fn active_agent_label_from_session(session: &devo_server::SessionMetadata) -> Op
 /// Prefer exact persisted latest-query usage, then the replayed prompt estimate.
 /// Aggregate turn usage and the legacy scalar are intentionally excluded because
 /// neither identifies the latest model query reliably for historical sessions.
-fn last_query_tokens_from_resume(session: &devo_server::SessionMetadata) -> (usize, usize) {
+fn last_query_tokens_from_resume(session: &infinitecode_server::SessionMetadata) -> (usize, usize) {
     if let Some(usage) = session.last_query_usage.as_ref() {
         return (usage.display_total_tokens(), usage.input_tokens as usize);
     }
@@ -168,7 +168,7 @@ fn should_apply_terminal_turn_usage_fallback(
 }
 
 async fn maybe_discover_spawned_subagent_from_acp_update(
-    update: &devo_protocol::AcpSessionUpdate,
+    update: &infinitecode_protocol::AcpSessionUpdate,
     client: &mut StdioServerClient,
     parent_session_id: SessionId,
     child_agent_sessions: &mut HashSet<SessionId>,
@@ -236,7 +236,7 @@ pub(crate) struct QueryWorkerConfig {
     /// Permission preset to apply to the server session when it exists.
     pub(crate) permission_preset: PermissionPreset,
     /// Agent client capabilities to advertise to the server session.
-    pub(crate) client_capabilities: devo_protocol::AcpClientCapabilities,
+    pub(crate) client_capabilities: infinitecode_protocol::AcpClientCapabilities,
 }
 
 /// TODO: Should we extract the OperationCommand to the `protocol` crate? Since it can be shareable.
@@ -351,17 +351,17 @@ enum OperationCommand {
         session_id: SessionId,
         turn_id: TurnId,
         approval_id: String,
-        decision: devo_server::ApprovalDecisionValue,
-        scope: devo_server::ApprovalScopeValue,
+        decision: infinitecode_server::ApprovalDecisionValue,
+        scope: infinitecode_server::ApprovalScopeValue,
     },
     RequestUserInputRespond {
         session_id: SessionId,
         turn_id: TurnId,
         request_id: String,
-        response: devo_protocol::RequestUserInputResponse,
+        response: infinitecode_protocol::RequestUserInputResponse,
     },
     UpdatePermissions {
-        preset: devo_protocol::PermissionPreset,
+        preset: infinitecode_protocol::PermissionPreset,
     },
     /// Browse persisted input history via the server/runtime session state.
     BrowseInputHistory(InputHistoryDirection),
@@ -401,7 +401,7 @@ fn next_shell_command_exec_start(
             tool_use_id: process_id.clone(),
             command: command.clone(),
             input: Some(input),
-            source: devo_protocol::protocol::ExecCommandSource::UserShell,
+            source: infinitecode_protocol::protocol::ExecCommandSource::UserShell,
             command_actions: Vec::new(),
         },
         params: CommandExecParams {
@@ -722,8 +722,8 @@ impl QueryWorkerHandle {
         session_id: SessionId,
         turn_id: TurnId,
         approval_id: String,
-        decision: devo_server::ApprovalDecisionValue,
-        scope: devo_server::ApprovalScopeValue,
+        decision: infinitecode_server::ApprovalDecisionValue,
+        scope: infinitecode_server::ApprovalScopeValue,
     ) -> Result<()> {
         self.command_tx
             .send(OperationCommand::ApprovalRespond {
@@ -741,7 +741,7 @@ impl QueryWorkerHandle {
         session_id: SessionId,
         turn_id: TurnId,
         request_id: String,
-        response: devo_protocol::RequestUserInputResponse,
+        response: infinitecode_protocol::RequestUserInputResponse,
     ) -> Result<()> {
         self.command_tx
             .send(OperationCommand::RequestUserInputRespond {
@@ -753,7 +753,7 @@ impl QueryWorkerHandle {
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
     }
 
-    pub(crate) fn update_permissions(&self, preset: devo_protocol::PermissionPreset) -> Result<()> {
+    pub(crate) fn update_permissions(&self, preset: infinitecode_protocol::PermissionPreset) -> Result<()> {
         self.command_tx
             .send(OperationCommand::UpdatePermissions { preset })
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
@@ -949,7 +949,7 @@ async fn run_worker_inner(
                         )
                         .await?;
 
-                        // Start the turn via `_devo/turn/start`. The bundled server implements
+                        // Start the turn via `_infinitecode/turn/start`. The bundled server implements
                         // this extension; streaming and completion arrive as server
                         // notifications (`turn/started`, item deltas, `turn/completed`, etc.).
                         let start_result = client.turn_start(TurnStartParams {
@@ -1030,7 +1030,7 @@ async fn run_worker_inner(
                         input_history_cursor = None;
                         if let Some(active_session_id) = session_id {
                             let _ = client
-                                .session_metadata_update(devo_server::SessionMetadataUpdateParams {
+                                .session_metadata_update(infinitecode_server::SessionMetadataUpdateParams {
                                     session_id: active_session_id,
                                     model: Some(model.clone()),
                                     model_binding_id: model_binding_id.clone(),
@@ -1043,7 +1043,7 @@ async fn run_worker_inner(
                         reasoning_effort_selection = next_reasoning_effort_selection;
                         if let Some(active_session_id) = session_id {
                             let _ = client
-                                .session_metadata_update(devo_server::SessionMetadataUpdateParams {
+                                .session_metadata_update(infinitecode_server::SessionMetadataUpdateParams {
                                     session_id: active_session_id,
                                     model: Some(model.clone()),
                                     model_binding_id: model_binding_id.clone(),
@@ -1848,7 +1848,7 @@ async fn run_worker_inner(
                             }
                         }
                         match client
-                            .session_fork(devo_server::SessionForkParams {
+                            .session_fork(infinitecode_server::SessionForkParams {
                                 session_id: active_session_id,
                                 title: None,
                                 cwd: None,
@@ -2226,7 +2226,7 @@ async fn run_worker_inner(
                         let method = notification.method;
                         let params = notification.params;
                         let normalized_event = client_event_from_notification(
-                            &devo_client::ServerNotificationMessage {
+                            &infinitecode_client::ServerNotificationMessage {
                                 method: method.clone(),
                                 params: params.clone(),
                             },
@@ -2863,7 +2863,7 @@ fn assistant_token_log_preview(text: &str) -> Option<String> {
 fn assistant_token_logging_enabled() -> bool {
     static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
     *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
-        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+        std::env::var("INFINITECODE_LOG_ASSISTANT_TOKEN_TEXT")
             .ok()
             .is_some_and(|value| {
                 matches!(
@@ -2877,7 +2877,7 @@ fn assistant_token_logging_enabled() -> bool {
 fn assistant_token_log_max_chars() -> usize {
     static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
     *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
-        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+        std::env::var("INFINITECODE_ASSISTANT_TOKEN_LOG_MAX_CHARS")
             .ok()
             .and_then(|value| value.parse::<usize>().ok())
             .filter(|value| *value > 0)
@@ -3033,7 +3033,7 @@ fn is_stale_turn_interrupt_error(error: &anyhow::Error) -> bool {
         || message.contains("turn does not exist")
 }
 
-fn should_pause_goal_before_session_leave(goal: Option<&devo_protocol::ThreadGoal>) -> bool {
+fn should_pause_goal_before_session_leave(goal: Option<&infinitecode_protocol::ThreadGoal>) -> bool {
     goal.is_some_and(|goal| {
         matches!(
             goal.status,
@@ -3054,7 +3054,7 @@ async fn apply_session_permissions(
     preset: PermissionPreset,
 ) -> Result<()> {
     client
-        .session_permissions_update(devo_server::SessionPermissionsUpdateParams {
+        .session_permissions_update(infinitecode_server::SessionPermissionsUpdateParams {
             session_id,
             preset,
         })
@@ -3125,7 +3125,7 @@ async fn emit_reference_search_update(
 }
 
 fn emit_skills_list_result(
-    skills: Vec<devo_server::SkillRecord>,
+    skills: Vec<infinitecode_server::SkillRecord>,
     event_tx: &mpsc::UnboundedSender<WorkerEvent>,
     show_in_transcript: bool,
 ) {
@@ -3142,7 +3142,7 @@ fn emit_skills_list_result(
     });
 }
 
-fn render_skill_list_body(skills: &[devo_server::SkillRecord]) -> String {
+fn render_skill_list_body(skills: &[infinitecode_server::SkillRecord]) -> String {
     if skills.is_empty() {
         return "_No skills found._".to_string();
     }
@@ -3164,7 +3164,7 @@ fn render_skill_list_body(skills: &[devo_server::SkillRecord]) -> String {
         .join("\n\n")
 }
 
-fn skill_metadata_from_record(skill: &devo_server::SkillRecord) -> SkillMetadata {
+fn skill_metadata_from_record(skill: &infinitecode_server::SkillRecord) -> SkillMetadata {
     SkillMetadata {
         name: skill.name.clone(),
         description: skill.description.clone(),
@@ -3374,7 +3374,7 @@ pub(crate) fn handle_completed_item(
             payload,
             ..
         } => {
-            let Ok(payload) = serde_json::from_value::<devo_server::FileChangePayload>(payload)
+            let Ok(payload) = serde_json::from_value::<infinitecode_server::FileChangePayload>(payload)
             else {
                 return;
             };
@@ -3883,7 +3883,7 @@ fn summarize_tool_call_update(payload: &ToolCallPayload) -> String {
             .command_actions
             .iter()
             .find_map(|action| match action {
-                devo_protocol::parse_command::ParsedCommand::Read { cmd, .. }
+                infinitecode_protocol::parse_command::ParsedCommand::Read { cmd, .. }
                     if !cmd.is_empty() =>
                 {
                     Some(cmd.clone())
@@ -3899,7 +3899,7 @@ fn summarize_tool_call_update(payload: &ToolCallPayload) -> String {
             .command_actions
             .iter()
             .find_map(|action| match action {
-                devo_protocol::parse_command::ParsedCommand::ListFiles { cmd, .. }
+                infinitecode_protocol::parse_command::ParsedCommand::ListFiles { cmd, .. }
                     if !cmd.is_empty() =>
                 {
                     Some(cmd.clone())
@@ -3915,7 +3915,7 @@ fn summarize_tool_call_update(payload: &ToolCallPayload) -> String {
 fn read_command_action_from_parameters(
     command: &str,
     input: &serde_json::Value,
-) -> Option<devo_protocol::parse_command::ParsedCommand> {
+) -> Option<infinitecode_protocol::parse_command::ParsedCommand> {
     let path = input
         .get("filePath")
         .or_else(|| input.get("path"))
@@ -3936,7 +3936,7 @@ fn read_command_action_from_parameters(
         (None, Some(limit)) => name.push_str(&format!(" L:1-{limit}")),
         (None, None) => {}
     }
-    Some(devo_protocol::parse_command::ParsedCommand::Read {
+    Some(infinitecode_protocol::parse_command::ParsedCommand::Read {
         cmd: command.to_string(),
         name,
         path: PathBuf::from(path),
@@ -3946,7 +3946,7 @@ fn read_command_action_from_parameters(
 fn find_command_action_from_parameters(
     command: &str,
     input: &serde_json::Value,
-) -> Option<devo_protocol::parse_command::ParsedCommand> {
+) -> Option<infinitecode_protocol::parse_command::ParsedCommand> {
     let pattern = input
         .get("pattern")
         .and_then(serde_json::Value::as_str)
@@ -3956,7 +3956,7 @@ fn find_command_action_from_parameters(
         Some(path) => format!("{pattern} in {path}"),
         None => pattern.to_string(),
     };
-    Some(devo_protocol::parse_command::ParsedCommand::ListFiles {
+    Some(infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
         cmd: command.to_string(),
         path: Some(display),
     })
@@ -3964,14 +3964,14 @@ fn find_command_action_from_parameters(
 
 fn tool_call_started_actions(
     payload: &ToolCallPayload,
-) -> Vec<devo_protocol::parse_command::ParsedCommand> {
+) -> Vec<infinitecode_protocol::parse_command::ParsedCommand> {
     if !payload.command_actions.is_empty() {
         return payload.command_actions.clone();
     }
     if payload.tool_name == "read" {
         return vec![
             read_command_action_from_parameters("read", &payload.parameters).unwrap_or_else(|| {
-                devo_protocol::parse_command::ParsedCommand::Read {
+                infinitecode_protocol::parse_command::ParsedCommand::Read {
                     cmd: String::new(),
                     name: String::new(),
                     path: PathBuf::new(),
@@ -3983,7 +3983,7 @@ fn tool_call_started_actions(
         let command = payload.tool_name.as_str();
         return vec![
             find_command_action_from_parameters(command, &payload.parameters).unwrap_or_else(
-                || devo_protocol::parse_command::ParsedCommand::ListFiles {
+                || infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                     cmd: command.to_string(),
                     path: Some(command.to_string()),
                 },
@@ -4001,7 +4001,7 @@ fn tool_call_started_actions(
 fn tool_call_updated_actions(
     payload: &ToolCallPayload,
     summary: &str,
-) -> Vec<devo_protocol::parse_command::ParsedCommand> {
+) -> Vec<infinitecode_protocol::parse_command::ParsedCommand> {
     if !payload.command_actions.is_empty() {
         return payload.command_actions.clone();
     }
@@ -4022,7 +4022,7 @@ fn tool_call_updated_actions(
 fn code_search_command_action_from_parameters(
     command: &str,
     input: &serde_json::Value,
-) -> Option<devo_protocol::parse_command::ParsedCommand> {
+) -> Option<infinitecode_protocol::parse_command::ParsedCommand> {
     match input
         .get("operation")
         .and_then(serde_json::Value::as_str)
@@ -4038,7 +4038,7 @@ fn code_search_command_action_from_parameters(
                 .and_then(serde_json::Value::as_u64)
                 .map(|line| line.to_string())
                 .unwrap_or_else(|| "?".to_string());
-            Some(devo_protocol::parse_command::ParsedCommand::Search {
+            Some(infinitecode_protocol::parse_command::ParsedCommand::Search {
                 cmd: command.to_string(),
                 query: Some(format!("related {path}:{line}")),
                 path: Some(path.to_string()),
@@ -4049,7 +4049,7 @@ fn code_search_command_action_from_parameters(
                 .get("query")
                 .and_then(serde_json::Value::as_str)
                 .filter(|query| !query.is_empty())?;
-            Some(devo_protocol::parse_command::ParsedCommand::Search {
+            Some(infinitecode_protocol::parse_command::ParsedCommand::Search {
                 cmd: command.to_string(),
                 query: Some(query.to_string()),
                 path: input
@@ -4307,21 +4307,21 @@ fn patch_event_from_tool_result(payload: &ToolResultPayload) -> Option<WorkerEve
             .and_then(serde_json::Value::as_u64)
             .unwrap_or(0);
         let change = match kind {
-            "add" => devo_protocol::protocol::FileChange::Add {
+            "add" => infinitecode_protocol::protocol::FileChange::Add {
                 content: file
                     .get("content")
                     .and_then(serde_json::Value::as_str)
                     .map(ToOwned::to_owned)
                     .unwrap_or_else(|| "\n".repeat(additions as usize)),
             },
-            "delete" => devo_protocol::protocol::FileChange::Delete {
+            "delete" => infinitecode_protocol::protocol::FileChange::Delete {
                 content: file
                     .get("content")
                     .and_then(serde_json::Value::as_str)
                     .map(ToOwned::to_owned)
                     .unwrap_or_else(|| "\n".repeat(deletions as usize)),
             },
-            "update" | "move" => devo_protocol::protocol::FileChange::Update {
+            "update" | "move" => infinitecode_protocol::protocol::FileChange::Update {
                 unified_diff: file
                     .get("diff")
                     .or_else(|| file.get("patch"))
@@ -4454,14 +4454,14 @@ mod tests {
     use std::path::PathBuf;
     use std::time::Duration;
 
-    use devo_core::SessionId;
-    use devo_core::SessionTitleState;
-    use devo_server::CommandExecutionPayload;
-    use devo_server::SessionMetadata;
-    use devo_server::SessionRuntimeStatus;
-    use devo_server::SkillRecord;
-    use devo_server::SkillScope;
-    use devo_server::SkillSource;
+    use infinitecode_core::SessionId;
+    use infinitecode_core::SessionTitleState;
+    use infinitecode_server::CommandExecutionPayload;
+    use infinitecode_server::SessionMetadata;
+    use infinitecode_server::SessionRuntimeStatus;
+    use infinitecode_server::SkillRecord;
+    use infinitecode_server::SkillScope;
+    use infinitecode_server::SkillSource;
 
     use super::QueryWorkerHandle;
     use super::ShellCommandExecStart;
@@ -4491,21 +4491,21 @@ mod tests {
     use crate::events::TranscriptItem;
     use crate::events::TranscriptItemKind;
     use crate::events::WorkerEvent;
-    use devo_core::ItemId;
-    use devo_core::TurnId;
-    use devo_protocol::DEVO_SESSION_META;
-    use devo_protocol::DEVO_TURN_USAGE_META;
-    use devo_protocol::SessionHistoryMetadata;
-    use devo_protocol::SessionPlanStepStatus;
-    use devo_protocol::ThreadGoal;
-    use devo_protocol::ThreadGoalStatus;
-    use devo_server::ItemEnvelope;
-    use devo_server::ItemEventPayload;
-    use devo_server::ItemKind;
-    use devo_server::SessionHistoryItem;
-    use devo_server::SessionHistoryItemKind;
-    use devo_server::ToolCallPayload;
-    use devo_server::ToolResultPayload;
+    use infinitecode_core::ItemId;
+    use infinitecode_core::TurnId;
+    use infinitecode_protocol::INFINITECODE_SESSION_META;
+    use infinitecode_protocol::INFINITECODE_TURN_USAGE_META;
+    use infinitecode_protocol::SessionHistoryMetadata;
+    use infinitecode_protocol::SessionPlanStepStatus;
+    use infinitecode_protocol::ThreadGoal;
+    use infinitecode_protocol::ThreadGoalStatus;
+    use infinitecode_server::ItemEnvelope;
+    use infinitecode_server::ItemEventPayload;
+    use infinitecode_server::ItemKind;
+    use infinitecode_server::SessionHistoryItem;
+    use infinitecode_server::SessionHistoryItemKind;
+    use infinitecode_server::ToolCallPayload;
+    use infinitecode_server::ToolResultPayload;
 
     #[tokio::test]
     async fn worker_shutdown_aborts_unresponsive_task() {
@@ -4557,14 +4557,14 @@ mod tests {
                             "cmd": "pwd",
                             "cwd": PathBuf::from("/tmp/project"),
                         })),
-                        source: devo_protocol::protocol::ExecCommandSource::UserShell,
+                        source: infinitecode_protocol::protocol::ExecCommandSource::UserShell,
                         command_actions: Vec::new(),
                     },
-                    params: devo_protocol::CommandExecParams {
+                    params: infinitecode_protocol::CommandExecParams {
                         session_id: Some(session_id),
                         process_id: "user-shell-1".to_string(),
                         cwd: Some(PathBuf::from("/tmp/project")),
-                        program: devo_protocol::CommandExecProgram::OneShot {
+                        program: infinitecode_protocol::CommandExecProgram::OneShot {
                             command: "pwd".to_string(),
                         },
                         size: None,
@@ -4579,14 +4579,14 @@ mod tests {
                             "cmd": "whoami",
                             "cwd": PathBuf::from("/tmp/project"),
                         })),
-                        source: devo_protocol::protocol::ExecCommandSource::UserShell,
+                        source: infinitecode_protocol::protocol::ExecCommandSource::UserShell,
                         command_actions: Vec::new(),
                     },
-                    params: devo_protocol::CommandExecParams {
+                    params: infinitecode_protocol::CommandExecParams {
                         session_id: None,
                         process_id: "user-shell-2".to_string(),
                         cwd: Some(PathBuf::from("/tmp/project")),
-                        program: devo_protocol::CommandExecProgram::OneShot {
+                        program: infinitecode_protocol::CommandExecProgram::OneShot {
                             command: "whoami".to_string(),
                         },
                         size: None,
@@ -4757,7 +4757,7 @@ mod tests {
     #[test]
     fn render_skill_list_body_preserves_windows_dot_directory_separators() {
         let skill_path =
-            PathBuf::from(r"C:\Users\lenovo\.devo\skills\.system\skill-installer\SKILL.md");
+            PathBuf::from(r"C:\Users\lenovo\.infinitecode\skills\.system\skill-installer\SKILL.md");
         let body = render_skill_list_body(&[SkillRecord {
             id: skill_path.display().to_string(),
             name: "skill-installer".to_string(),
@@ -4789,7 +4789,7 @@ mod tests {
                 "- skill-installer - Install Codex skills".to_string(),
                 "  enabled: yes".to_string(),
                 "  source: system".to_string(),
-                r"  path: C:\Users\lenovo\.devo\skills\.system\skill-installer\SKILL.md"
+                r"  path: C:\Users\lenovo\.infinitecode\skills\.system\skill-installer\SKILL.md"
                     .to_string(),
             ]
         );
@@ -4800,7 +4800,7 @@ mod tests {
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         handle_completed_item(
             ItemEventPayload {
-                context: devo_server::EventContext {
+                context: infinitecode_server::EventContext {
                     session_id: SessionId::new(),
                     turn_id: None,
                     item_id: None,
@@ -4849,7 +4849,7 @@ mod tests {
 
         assert_eq!(
             tool_call_started_actions(&payload),
-            vec![devo_protocol::parse_command::ParsedCommand::Read {
+            vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
                 cmd: String::new(),
                 name: String::new(),
                 path: PathBuf::new(),
@@ -4872,7 +4872,7 @@ mod tests {
 
         assert_eq!(
             tool_call_started_actions(&payload),
-            vec![devo_protocol::parse_command::ParsedCommand::Read {
+            vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
                 cmd: "read".to_string(),
                 name: "crates/core/src/query.rs L:10-14".to_string(),
                 path: PathBuf::from("crates/core/src/query.rs"),
@@ -4899,7 +4899,7 @@ mod tests {
                 tool_use_id: "call-1".to_string(),
                 summary: "Code-Search \"live tool feedback\" in crates".to_string(),
                 preparing: false,
-                parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+                parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
                     cmd: "code_search".to_string(),
                     query: Some("live tool feedback".to_string()),
                     path: Some("crates".to_string()),
@@ -4973,7 +4973,7 @@ mod tests {
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         handle_completed_item(
             ItemEventPayload {
-                context: devo_server::EventContext {
+                context: infinitecode_server::EventContext {
                     session_id: SessionId::new(),
                     turn_id: None,
                     item_id: None,
@@ -4986,7 +4986,7 @@ mod tests {
                         tool_call_id: "call-1".to_string(),
                         tool_name: "read".to_string(),
                         parameters: serde_json::json!({}),
-                        command_actions: vec![devo_protocol::parse_command::ParsedCommand::Read {
+                        command_actions: vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
                             cmd: "read crates/tui/src/mod.rs".to_string(),
                             name: "mod.rs".to_string(),
                             path: PathBuf::from("crates/tui/src/mod.rs"),
@@ -5011,7 +5011,7 @@ mod tests {
             WorkerEvent::ToolCallUpdated {
                 tool_use_id: "call-1".to_string(),
                 summary: "read crates/tui/src/mod.rs".to_string(),
-                parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::Read {
+                parsed_commands: vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
                     cmd: "read crates/tui/src/mod.rs".to_string(),
                     name: "mod.rs".to_string(),
                     path: PathBuf::from("crates/tui/src/mod.rs"),
@@ -5025,7 +5025,7 @@ mod tests {
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         handle_completed_item(
             ItemEventPayload {
-                context: devo_server::EventContext {
+                context: infinitecode_server::EventContext {
                     session_id: SessionId::new(),
                     turn_id: None,
                     item_id: None,
@@ -5065,7 +5065,7 @@ mod tests {
             WorkerEvent::ToolCallUpdated {
                 tool_use_id: "call-1".to_string(),
                 summary: "List crates".to_string(),
-                parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::ListFiles {
+                parsed_commands: vec![infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                     cmd: "List crates".to_string(),
                     path: Some("**/Cargo.toml in crates".to_string()),
                 }],
@@ -5078,7 +5078,7 @@ mod tests {
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         handle_completed_item(
             ItemEventPayload {
-                context: devo_server::EventContext {
+                context: infinitecode_server::EventContext {
                     session_id: SessionId::new(),
                     turn_id: None,
                     item_id: None,
@@ -5121,7 +5121,7 @@ mod tests {
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         handle_completed_item(
             ItemEventPayload {
-                context: devo_server::EventContext {
+                context: infinitecode_server::EventContext {
                     session_id: SessionId::new(),
                     turn_id: None,
                     item_id: None,
@@ -5299,10 +5299,10 @@ mod tests {
                 Some(session_id),
             ),
             vec![WorkerEvent::AcpAvailableCommandsUpdated {
-                commands: vec![devo_protocol::AcpAvailableCommand {
+                commands: vec![infinitecode_protocol::AcpAvailableCommand {
                     name: "explain".to_string(),
                     description: "Explain current context".to_string(),
-                    input: Some(devo_protocol::AcpAvailableCommandInput {
+                    input: Some(infinitecode_protocol::AcpAvailableCommandInput {
                         hint: "optional focus".to_string(),
                         meta: None,
                     }),
@@ -5378,12 +5378,12 @@ mod tests {
     }
 
     #[test]
-    fn acp_usage_update_with_devo_meta_emits_legacy_usage_update() {
+    fn acp_usage_update_with_infinitecode_meta_emits_legacy_usage_update() {
         let session_id = SessionId::new();
-        let turn_usage = devo_protocol::TurnUsageUpdatedPayload {
+        let turn_usage = infinitecode_protocol::TurnUsageUpdatedPayload {
             session_id,
             turn_id: TurnId::new(),
-            usage: devo_protocol::TurnUsage {
+            usage: infinitecode_protocol::TurnUsage {
                 input_tokens: 7,
                 output_tokens: 2,
                 cache_creation_input_tokens: None,
@@ -5400,7 +5400,7 @@ mod tests {
         };
         let mut meta = serde_json::Map::new();
         meta.insert(
-            DEVO_TURN_USAGE_META.to_string(),
+            INFINITECODE_TURN_USAGE_META.to_string(),
             serde_json::to_value(turn_usage).expect("serialize turn usage payload"),
         );
 
@@ -5571,7 +5571,7 @@ mod tests {
         let mut changes = HashMap::new();
         changes.insert(
             PathBuf::from("foo.txt"),
-            devo_protocol::protocol::FileChange::Add {
+            infinitecode_protocol::protocol::FileChange::Add {
                 content: "hello\n".to_string(),
             },
         );
@@ -5739,7 +5739,7 @@ mod tests {
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         handle_completed_item(
             ItemEventPayload {
-                context: devo_server::EventContext {
+                context: infinitecode_server::EventContext {
                     session_id: SessionId::new(),
                     turn_id: None,
                     item_id: None,
@@ -5789,7 +5789,7 @@ mod tests {
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         handle_completed_item(
             ItemEventPayload {
-                context: devo_server::EventContext {
+                context: infinitecode_server::EventContext {
                     session_id: SessionId::new(),
                     turn_id: None,
                     item_id: None,
@@ -5839,7 +5839,7 @@ mod tests {
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         handle_completed_item(
             ItemEventPayload {
-                context: devo_server::EventContext {
+                context: infinitecode_server::EventContext {
                     session_id: SessionId::new(),
                     turn_id: None,
                     item_id: None,
@@ -5894,7 +5894,7 @@ mod tests {
         let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
         handle_completed_item(
             ItemEventPayload {
-                context: devo_server::EventContext {
+                context: infinitecode_server::EventContext {
                     session_id: SessionId::new(),
                     turn_id: None,
                     item_id: None,
@@ -5937,7 +5937,7 @@ mod tests {
             panic!("expected patch applied event");
         };
         assert_eq!(tool_use_id, "call-1");
-        let devo_protocol::protocol::FileChange::Update { unified_diff, .. } = changes
+        let infinitecode_protocol::protocol::FileChange::Update { unified_diff, .. } = changes
             .get(&std::path::PathBuf::from("update.txt"))
             .expect("update change")
         else {
@@ -5953,8 +5953,8 @@ mod tests {
             tool_call_id: "call-1".to_string(),
             tool_name: "read".to_string(),
             command: "read crates/tui/src/chatwidget.rs".to_string(),
-            source: devo_protocol::protocol::ExecCommandSource::Agent,
-            command_actions: vec![devo_protocol::parse_command::ParsedCommand::Read {
+            source: infinitecode_protocol::protocol::ExecCommandSource::Agent,
+            command_actions: vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
                 cmd: "read crates/tui/src/chatwidget.rs".to_string(),
                 name: "chatwidget.rs".to_string(),
                 path: PathBuf::from("crates/tui/src/chatwidget.rs"),
@@ -5978,7 +5978,7 @@ mod tests {
                 tool_use_id: payload.tool_call_id,
                 command: payload.command,
                 input: payload.input,
-                source: devo_protocol::protocol::ExecCommandSource::Agent,
+                source: infinitecode_protocol::protocol::ExecCommandSource::Agent,
                 command_actions: payload.command_actions,
             }
         );
@@ -6020,10 +6020,10 @@ mod tests {
 
     #[test]
     fn last_query_tokens_from_resume_prefers_session_last_query_usage() {
-        use devo_protocol::TurnKind;
-        use devo_protocol::TurnMetadata;
-        use devo_protocol::TurnStatus;
-        use devo_protocol::TurnUsage;
+        use infinitecode_protocol::TurnKind;
+        use infinitecode_protocol::TurnMetadata;
+        use infinitecode_protocol::TurnStatus;
+        use infinitecode_protocol::TurnUsage;
 
         let session_id = SessionId::new();
         let mut session = test_session_metadata(session_id, None);
@@ -6075,7 +6075,7 @@ mod tests {
 
     #[test]
     fn usage_update_state_keeps_latest_total_for_terminal_event_without_usage() {
-        use devo_protocol::TurnUsage;
+        use infinitecode_protocol::TurnUsage;
 
         let mut last_query_total_tokens = 42usize;
         let has_authoritative_usage_totals = false;
@@ -6139,7 +6139,7 @@ mod tests {
         let child = SessionId::new();
         let mut meta = serde_json::Map::new();
         meta.insert(
-            DEVO_SESSION_META.to_string(),
+            INFINITECODE_SESSION_META.to_string(),
             serde_json::to_value(test_session_metadata(child, Some(parent)))
                 .expect("serialize session metadata"),
         );
@@ -6213,13 +6213,13 @@ mod tests {
 
     #[test]
     fn child_acp_turn_completed_routes_to_subagent_monitor_turn_finished() {
-        use devo_protocol::DEVO_ORIGINAL_EVENT_META;
-        use devo_protocol::DEVO_ORIGINAL_METHOD_META;
-        use devo_protocol::ServerEvent;
-        use devo_protocol::TurnEventPayload;
-        use devo_protocol::TurnKind;
-        use devo_protocol::TurnMetadata;
-        use devo_protocol::TurnStatus;
+        use infinitecode_protocol::INFINITECODE_ORIGINAL_EVENT_META;
+        use infinitecode_protocol::INFINITECODE_ORIGINAL_METHOD_META;
+        use infinitecode_protocol::ServerEvent;
+        use infinitecode_protocol::TurnEventPayload;
+        use infinitecode_protocol::TurnKind;
+        use infinitecode_protocol::TurnMetadata;
+        use infinitecode_protocol::TurnStatus;
 
         let child = SessionId::new();
         let turn = TurnMetadata {
@@ -6246,11 +6246,11 @@ mod tests {
         });
         let mut meta = serde_json::Map::new();
         meta.insert(
-            DEVO_ORIGINAL_METHOD_META.to_string(),
+            INFINITECODE_ORIGINAL_METHOD_META.to_string(),
             serde_json::json!("turn/completed"),
         );
         meta.insert(
-            DEVO_ORIGINAL_EVENT_META.to_string(),
+            INFINITECODE_ORIGINAL_EVENT_META.to_string(),
             serde_json::to_value(original_event).expect("serialize turn completed"),
         );
         let notification = super::parse_acp_session_notification(&serde_json::json!({
@@ -6286,11 +6286,11 @@ mod tests {
 
     #[test]
     fn child_unwrapped_turn_completed_routes_to_subagent_monitor_turn_finished() {
-        use devo_protocol::ServerEvent;
-        use devo_protocol::TurnEventPayload;
-        use devo_protocol::TurnKind;
-        use devo_protocol::TurnMetadata;
-        use devo_protocol::TurnStatus;
+        use infinitecode_protocol::ServerEvent;
+        use infinitecode_protocol::TurnEventPayload;
+        use infinitecode_protocol::TurnKind;
+        use infinitecode_protocol::TurnMetadata;
+        use infinitecode_protocol::TurnStatus;
 
         let child = SessionId::new();
         let turn = TurnMetadata {
@@ -6659,7 +6659,7 @@ mod tests {
             tool_io: None,
             metadata: Some(SessionHistoryMetadata::PlanUpdate {
                 explanation: Some("Do work".to_string()),
-                steps: vec![devo_protocol::SessionPlanStep {
+                steps: vec![infinitecode_protocol::SessionPlanStep {
                     text: "Inspect".to_string(),
                     status: SessionPlanStepStatus::Completed,
                 }],
@@ -6695,7 +6695,7 @@ mod tests {
                 tool_io: None,
                 metadata: Some(SessionHistoryMetadata::PlanUpdate {
                     explanation: Some("Do work".to_string()),
-                    steps: vec![devo_protocol::SessionPlanStep {
+                    steps: vec![infinitecode_protocol::SessionPlanStep {
                         text: "Inspect".to_string(),
                         status: SessionPlanStepStatus::Completed,
                     }],

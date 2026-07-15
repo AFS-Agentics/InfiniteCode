@@ -19,8 +19,8 @@ const AGENT_NAME_NOUNS: &[&str] = &[
 impl ServerRuntime {
     async fn spawn_agent_inner(
         self: &Arc<Self>,
-        params: devo_protocol::SpawnAgentParams,
-    ) -> Result<devo_protocol::SpawnAgentResult, ToolCallError> {
+        params: infinitecode_protocol::SpawnAgentParams,
+    ) -> Result<infinitecode_protocol::SpawnAgentResult, ToolCallError> {
         let parent_session_id = params.session_id;
         let child_session_id = SessionId::new();
         let now = Utc::now();
@@ -190,7 +190,7 @@ impl ServerRuntime {
             next_item_seq: 1,
             first_user_input: Some(params.message.clone()),
             tool_registry: parent_tool_registry,
-            file_read_ledger: std::sync::Arc::new(devo_core::tools::FileReadLedger::new()),
+            file_read_ledger: std::sync::Arc::new(infinitecode_core::tools::FileReadLedger::new()),
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
             session_context_recorded: false,
@@ -332,8 +332,8 @@ impl ServerRuntime {
             }
         });
 
-        Ok(devo_protocol::SpawnAgentResult {
-            task_id: devo_protocol::TaskId::from(child_session_id),
+        Ok(infinitecode_protocol::SpawnAgentResult {
+            task_id: infinitecode_protocol::TaskId::from(child_session_id),
             child_session_id,
             agent_path,
             agent_nickname: nickname,
@@ -426,8 +426,8 @@ impl ServerRuntime {
         }
 
         if let Some(active_turn) = reservation.active_turn.clone() {
-            let item = devo_protocol::PendingInputItem::new(
-                devo_protocol::PendingInputKind::UserText { text: input_text },
+            let item = infinitecode_protocol::PendingInputItem::new(
+                infinitecode_protocol::PendingInputKind::UserText { text: input_text },
                 queued_metadata,
                 Utc::now(),
             );
@@ -469,7 +469,7 @@ impl ServerRuntime {
             session_id,
             sequence,
             status: TurnStatus::Running,
-            kind: devo_core::TurnKind::Regular,
+            kind: infinitecode_core::TurnKind::Regular,
             model: turn_config.model.slug.clone(),
             model_binding_id: turn_config.model_binding_id.clone(),
             reasoning_effort_selection: turn_config.reasoning_effort_selection.clone(),
@@ -524,7 +524,7 @@ impl ServerRuntime {
                     display_input,
                     input: input_text,
                     input_messages: Vec::new(),
-                    collaboration_mode: devo_protocol::CollaborationMode::Build,
+                    collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
                     input_mode: TurnInputMode::VisibleUserMessage,
                 })
                 .await;
@@ -567,7 +567,7 @@ impl ServerRuntime {
         content: String,
     ) -> Result<AgentRoute, ToolCallError> {
         let route = self.resolve_agent_route(from_session_id, target).await?;
-        let message = devo_protocol::AgentMailboxMessage {
+        let message = infinitecode_protocol::AgentMailboxMessage {
             message_id: String::new(),
             from_session_id,
             to_session_id: route.to_session_id,
@@ -670,7 +670,7 @@ impl ServerRuntime {
         &self,
         parent_session_id: SessionId,
         target: &str,
-    ) -> Result<devo_protocol::AgentInfo, ToolCallError> {
+    ) -> Result<infinitecode_protocol::AgentInfo, ToolCallError> {
         Ok(self
             .resolve_child_agent(parent_session_id, target)
             .await?
@@ -883,12 +883,12 @@ impl ServerRuntime {
             return;
         };
         let buffer = self.output_buffer(parent_session_id).await;
-        let output_event = devo_protocol::AgentOutputEvent {
+        let output_event = infinitecode_protocol::AgentOutputEvent {
             sequence: 0,
             child_session_id,
             agent_path,
             turn_id: payload.context.turn_id,
-            kind: devo_protocol::AgentOutputEventKind::AssistantMessage,
+            kind: infinitecode_protocol::AgentOutputEventKind::AssistantMessage,
             text: Some(payload.delta.clone()),
             status: None,
             created_at: Utc::now(),
@@ -935,12 +935,12 @@ impl ServerRuntime {
         };
         self.output_buffer(parent_session_id)
             .await
-            .push(devo_protocol::AgentOutputEvent {
+            .push(infinitecode_protocol::AgentOutputEvent {
                 sequence: 0,
                 child_session_id,
                 agent_path,
                 turn_id: Some(turn_id),
-                kind: devo_protocol::AgentOutputEventKind::Status,
+                kind: infinitecode_protocol::AgentOutputEventKind::Status,
                 text,
                 status: Some(status.as_str().to_string()),
                 created_at: Utc::now(),

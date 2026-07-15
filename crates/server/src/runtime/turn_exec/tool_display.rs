@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use devo_core::ItemId;
-use devo_core::tools::tool_spec::ToolPreparationFeedback;
+use infinitecode_core::ItemId;
+use infinitecode_core::tools::tool_spec::ToolPreparationFeedback;
 
 use super::types::{PendingToolCall, ToolDisplayKind, ToolStartItem};
 use crate::{CommandExecutionPayload, FileChangePayload, ItemKind, ToolCallPayload};
@@ -43,7 +43,7 @@ fn tool_start_item(
     input: &serde_json::Value,
     display_kind: ToolDisplayKind,
     preparation_feedback: ToolPreparationFeedback,
-    command_actions: Vec<devo_protocol::parse_command::ParsedCommand>,
+    command_actions: Vec<infinitecode_protocol::parse_command::ParsedCommand>,
 ) -> ToolStartItem {
     let item_kind = tool_start_item_kind(tool_name, display_kind, preparation_feedback);
     let payload = match item_kind {
@@ -67,7 +67,7 @@ fn tool_start_item(
             tool_name: tool_name.to_string(),
             command: command.to_string(),
             input: Some(input.clone()),
-            source: devo_protocol::protocol::ExecCommandSource::Agent,
+            source: infinitecode_protocol::protocol::ExecCommandSource::Agent,
             command_actions,
             output: None,
             is_error: false,
@@ -202,7 +202,7 @@ pub(super) fn command_actions_from_tool_input(
     tool_name: &str,
     command: &str,
     input: &serde_json::Value,
-) -> Vec<devo_protocol::parse_command::ParsedCommand> {
+) -> Vec<infinitecode_protocol::parse_command::ParsedCommand> {
     crate::tool_actions::exploration_actions_from_tool_input(tool_name, command, input)
 }
 
@@ -248,7 +248,7 @@ pub(super) fn command_actions_from_tool_result(
     command: &str,
     input: &serde_json::Value,
     summary: &str,
-) -> Vec<devo_protocol::parse_command::ParsedCommand> {
+) -> Vec<infinitecode_protocol::parse_command::ParsedCommand> {
     let actions = command_actions_from_tool_input(tool_name, command, input);
     if !actions.is_empty() {
         return actions;
@@ -283,7 +283,7 @@ pub(super) fn user_shell_command_payload(
     tool_call_id: &str,
     command: &str,
     input: serde_json::Value,
-    command_actions: Vec<devo_protocol::parse_command::ParsedCommand>,
+    command_actions: Vec<infinitecode_protocol::parse_command::ParsedCommand>,
     output: Option<serde_json::Value>,
     is_error: bool,
 ) -> CommandExecutionPayload {
@@ -292,7 +292,7 @@ pub(super) fn user_shell_command_payload(
         tool_name: "exec_command".to_string(),
         command: command.to_string(),
         input: Some(input),
-        source: devo_protocol::protocol::ExecCommandSource::UserShell,
+        source: infinitecode_protocol::protocol::ExecCommandSource::UserShell,
         command_actions,
         output,
         is_error,
@@ -311,8 +311,8 @@ const AGENT_COORDINATION_TOOL_NAMES: &[&str] = &[
 ];
 
 pub(super) fn without_agent_coordination_tools(
-    registry: &devo_core::tools::ToolRegistry,
-) -> devo_core::tools::ToolRegistry {
+    registry: &infinitecode_core::tools::ToolRegistry,
+) -> infinitecode_core::tools::ToolRegistry {
     let names = registry
         .tool_definitions()
         .into_iter()
@@ -329,8 +329,8 @@ pub(super) fn without_agent_coordination_tools(
 
 #[cfg(test)]
 mod tests {
-    use devo_core::{ToolCallItem, TurnItem};
-    use devo_protocol::SessionHistoryMetadata;
+    use infinitecode_core::{ToolCallItem, TurnItem};
+    use infinitecode_protocol::SessionHistoryMetadata;
     use pretty_assertions::assert_eq;
 
     use super::command_actions_from_tool_input;

@@ -2,10 +2,10 @@
 
 use std::path::PathBuf;
 
-use devo_core::PresetModelCatalog;
-use devo_protocol::Model;
-use devo_protocol::PermissionPreset;
-use devo_protocol::ProviderWireApi;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::PermissionPreset;
+use infinitecode_protocol::ProviderWireApi;
 use pretty_assertions::assert_eq;
 use tokio::sync::mpsc;
 

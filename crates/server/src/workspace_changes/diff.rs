@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use devo_core::ChangeSetCoverage;
-use devo_protocol::{
+use infinitecode_core::ChangeSetCoverage;
+use infinitecode_protocol::{
     WorkspaceChangeAttribution, WorkspaceChangeCoverage, WorkspaceChangeScope,
     WorkspaceChangeSetStatus, WorkspaceChangeStats, WorkspaceChangeView, WorkspaceChangeViewStatus,
     WorkspaceChangedFile, WorkspaceChangedFileStatus, WorkspaceDiffDetail,
@@ -10,7 +10,7 @@ use devo_protocol::{
 pub(super) struct DiffViewInput {
     pub scope: WorkspaceChangeScope,
     pub workspace_root: PathBuf,
-    pub base: Option<devo_protocol::WorkspaceChangeBase>,
+    pub base: Option<infinitecode_protocol::WorkspaceChangeBase>,
     pub attribution: WorkspaceChangeAttribution,
     pub coverage: WorkspaceChangeCoverage,
     pub change_set_status: WorkspaceChangeSetStatus,

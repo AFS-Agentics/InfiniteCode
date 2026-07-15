@@ -5,13 +5,13 @@
 Run unit tests for skill protocol types:
 
 ```bash
-cargo test --package devo-server skills_integration
+cargo test --package infinitecode-server skills_integration
 ```
 
 Run protocol contract tests:
 
 ```bash
-cargo test --package devo-server protocol_contract
+cargo test --package infinitecode-server protocol_contract
 ```
 
 ## Manual Testing

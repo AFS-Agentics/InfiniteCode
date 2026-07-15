@@ -4,29 +4,29 @@ use std::sync::Mutex;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::Model;
-use devo_protocol::ModelProfileKey;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ReasoningCapability;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::SessionId;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderRoute;
-use devo_provider::ProviderRouter;
-use devo_provider::error::ProviderError;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelProfileKey;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ReasoningCapability;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderRoute;
+use infinitecode_provider::ProviderRouter;
+use infinitecode_provider::error::ProviderError;
 use futures::Stream;
 use futures::stream;
 use pretty_assertions::assert_eq;
@@ -35,9 +35,9 @@ use tokio::sync::mpsc;
 use tokio::time::Duration;
 use tokio::time::timeout;
 
-use devo_server::ClientTransportKind;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RecordedRequest {
@@ -268,7 +268,7 @@ async fn explicit_binding_controls_route_request_model_and_catalog_profile() -> 
     )
     .await?
     .context("turn/start response")?;
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(response)?;
 
     wait_for_notification_value(&mut notifications_rx, "turn/completed").await?;
@@ -333,12 +333,12 @@ async fn turn_start_rejects_invalid_explicit_bindings() -> Result<()> {
     )
     .await?
     .context("turn/start response")?;
-    let error: devo_server::ErrorResponse = serde_json::from_value(response)?;
+    let error: infinitecode_server::ErrorResponse = serde_json::from_value(response)?;
 
     assert_eq!(
         error.error,
-        devo_server::ProtocolError {
-            code: devo_server::ProtocolErrorCode::InvalidParams,
+        infinitecode_server::ProtocolError {
+            code: infinitecode_server::ProtocolErrorCode::InvalidParams,
             message: "model binding `missing-binding` does not exist".to_string(),
             data: serde_json::json!({}),
         }
@@ -355,11 +355,11 @@ async fn turn_start_rejects_invalid_explicit_bindings() -> Result<()> {
     )
     .await?
     .context("turn/start response")?;
-    let error: devo_server::ErrorResponse = serde_json::from_value(response)?;
+    let error: infinitecode_server::ErrorResponse = serde_json::from_value(response)?;
     assert_eq!(
         error.error,
-        devo_server::ProtocolError {
-            code: devo_server::ProtocolErrorCode::InvalidParams,
+        infinitecode_server::ProtocolError {
+            code: infinitecode_server::ProtocolErrorCode::InvalidParams,
             message: "model binding `glm-disabled` is disabled".to_string(),
             data: serde_json::json!({}),
         }
@@ -376,11 +376,11 @@ async fn turn_start_rejects_invalid_explicit_bindings() -> Result<()> {
     )
     .await?
     .context("turn/start response")?;
-    let error: devo_server::ErrorResponse = serde_json::from_value(response)?;
+    let error: infinitecode_server::ErrorResponse = serde_json::from_value(response)?;
     assert_eq!(
         error.error,
-        devo_server::ProtocolError {
-            code: devo_server::ProtocolErrorCode::InvalidParams,
+        infinitecode_server::ProtocolError {
+            code: infinitecode_server::ProtocolErrorCode::InvalidParams,
             message:
                 "model binding `glm-disabled-provider` references disabled provider `disabled-zai`"
                     .to_string(),
@@ -559,7 +559,7 @@ fn build_runtime_with_models(
 ) -> Result<Arc<ServerRuntime>> {
     let provider: Arc<dyn ModelProviderSDK> = Arc::new(UnusedProvider);
     let provider_router: Arc<dyn ProviderRouter> = router;
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         data_root.join("provider_routing.db"),
     )?);
     Ok(ServerRuntime::new(
@@ -575,7 +575,7 @@ fn build_runtime_with_models(
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 data_root.to_path_buf(),
@@ -588,7 +588,7 @@ fn build_runtime_with_models(
 async fn initialize_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(128);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(128);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -614,7 +614,7 @@ async fn initialize_connection(
     let response: serde_json::Value = initialize_response;
     assert_eq!(
         response["result"]["agentInfo"]["name"],
-        serde_json::json!("devo-server")
+        serde_json::json!("infinitecode-server")
     );
     Ok((connection_id, notifications_rx))
 }
@@ -659,7 +659,7 @@ async fn start_session_with_binding(
         .await
         .context("session/start response")?;
     let response_value = response.clone();
-    let response: devo_server::SuccessResponse<devo_server::SessionStartResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult> =
         serde_json::from_value(response)
             .with_context(|| format!("decode session/start response: {response_value}"))?;
     Ok(response.result.session.session_id)
@@ -676,7 +676,7 @@ async fn update_session_model(
             connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/session/metadata/update",
+                "method": "_infinitecode/session/metadata/update",
                 "params": {
                     "session_id": session_id,
                     "model": model,
@@ -688,7 +688,7 @@ async fn update_session_model(
         .await
         .context("session/metadata/update response")?;
     let response_value = response.clone();
-    let _: devo_server::SuccessResponse<devo_server::SessionMetadataUpdateResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::SessionMetadataUpdateResult> =
         serde_json::from_value(response).with_context(|| {
             format!("decode session/metadata/update response: {response_value}")
         })?;
@@ -712,7 +712,7 @@ async fn start_turn(
     .await?
     .context("turn/start response")?;
     let response_value = response.clone();
-    let _: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let _: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(response)
             .with_context(|| format!("decode turn/start response: {response_value}"))?;
     Ok(())
@@ -732,7 +732,7 @@ async fn send_turn_start(
             connection_id,
             serde_json::json!({
                 "id": id,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "use the selected provider" }],
@@ -780,7 +780,7 @@ async fn wait_for_complete_request(router: &RecordingRouter) -> Result<()> {
 
 fn has_original_method(value: &serde_json::Value, method: &str) -> bool {
     value.get("method") == Some(&serde_json::json!("session/update"))
-        && value["params"]["_meta"]["devo/originalMethod"].as_str() == Some(method)
+        && value["params"]["_meta"]["infinitecode/originalMethod"].as_str() == Some(method)
 }
 
 fn model_response(text: &str) -> ModelResponse {

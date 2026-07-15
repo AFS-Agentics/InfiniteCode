@@ -1,5 +1,5 @@
-use devo_protocol::ModelProfileKey;
-use devo_protocol::RequestRole;
+use infinitecode_protocol::ModelProfileKey;
+use infinitecode_protocol::RequestRole;
 
 /// Transport variants used to resolve OpenAI-family capabilities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

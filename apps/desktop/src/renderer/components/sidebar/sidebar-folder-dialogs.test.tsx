@@ -8,16 +8,16 @@ import {
 
 const project: SidebarProject = {
 	id: "project-1",
-	slug: "devo-1",
-	name: "devo",
-	directory: "/Users/tester/devo",
+	slug: "infinitecode-1",
+	name: "infinitecode",
+	directory: "/Users/tester/infinitecode",
 	agentCount: 0,
 	lastActiveAt: 0,
 	hasActiveAgent: false,
 }
 
 describe("sidebar folder dialogs", () => {
-	test("explains remove only affects Devo Desktop and not disk", () => {
+	test("explains remove only affects InfiniteCode Desktop and not disk", () => {
 		const markup = renderToStaticMarkup(
 			<FolderRemoveDialogBody
 				project={project}
@@ -29,7 +29,7 @@ describe("sidebar folder dialogs", () => {
 		)
 
 		expect({
-			title: markup.includes("Remove folder from Devo Desktop"),
+			title: markup.includes("Remove folder from InfiniteCode Desktop"),
 			desktopOnly: markup.includes("only removes it from the Desktop sidebar"),
 			notDisk: markup.includes("does not delete anything from disk"),
 		}).toEqual({
@@ -39,7 +39,7 @@ describe("sidebar folder dialogs", () => {
 		})
 	})
 
-	test("asks whether to remove missing folders from Devo Desktop", () => {
+	test("asks whether to remove missing folders from InfiniteCode Desktop", () => {
 		const markup = renderToStaticMarkup(
 			<MissingFolderDialogBody
 				project={project}
@@ -52,7 +52,7 @@ describe("sidebar folder dialogs", () => {
 
 		expect({
 			title: markup.includes("Folder no longer exists"),
-			removeQuestion: markup.includes("Remove it from Devo Desktop"),
+			removeQuestion: markup.includes("Remove it from InfiniteCode Desktop"),
 		}).toEqual({
 			title: true,
 			removeQuestion: true,

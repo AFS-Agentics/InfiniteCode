@@ -4,16 +4,16 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-use devo_protocol::PermissionPreset;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderVendor;
+use infinitecode_protocol::PermissionPreset;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderVendor;
 use serde::Deserialize;
 use serde::Serialize;
 
-use devo_util_git::get_git_repo_root;
-use devo_util_paths::APP_CONFIG_DIR_NAME;
-use devo_util_paths::APP_CONFIG_FILE_NAME;
-use devo_util_paths::FileSystemConfigPathResolver;
+use infinitecode_util_git::get_git_repo_root;
+use infinitecode_util_paths::APP_CONFIG_DIR_NAME;
+use infinitecode_util_paths::APP_CONFIG_FILE_NAME;
+use infinitecode_util_paths::FileSystemConfigPathResolver;
 
 use crate::AUTH_CONFIG_FILE_NAME;
 use crate::AppConfigError;
@@ -58,7 +58,7 @@ pub struct AppConfig {
     pub experimental: ExperimentalConfig,
     /// Preferred backend for storing MCP OAuth credentials.
     /// keyring: Use an OS-specific keyring service.
-    /// file: Use a file in the Devo home directory.
+    /// file: Use a file in the InfiniteCode home directory.
     /// auto (default): Use the OS-specific keyring service if available, otherwise use a file.
     #[serde(default)]
     pub mcp_oauth_credentials_store: Option<OAuthCredentialsStoreMode>,
@@ -119,7 +119,7 @@ pub enum SummaryModelSelection {
 /// priority order:
 ///
 /// 1. command-line startup arguments
-/// 2. `<workspace>/.devo/config.toml` for the currently opened project
+/// 2. `<workspace>/.infinitecode/config.toml` for the currently opened project
 /// 3. the user config file under the configured config directory
 ///
 /// When the same field appears in multiple sources, the higher-priority source
@@ -151,7 +151,7 @@ impl Default for AppConfig {
                 redact_secrets_in_logs: true,
                 file: LoggingFileConfig {
                     directory: None,
-                    filename_prefix: "devo".into(),
+                    filename_prefix: "infinitecode".into(),
                     rotation: LogRotation::Daily,
                     max_files: 14,
                 },

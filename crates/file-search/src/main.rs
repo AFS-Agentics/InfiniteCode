@@ -3,10 +3,10 @@ use std::io::Write as _;
 use std::path::Path;
 
 use clap::Parser;
-use devo_file_search::Cli;
-use devo_file_search::FileMatch;
-use devo_file_search::Reporter;
-use devo_file_search::run_main;
+use infinitecode_file_search::Cli;
+use infinitecode_file_search::FileMatch;
+use infinitecode_file_search::Reporter;
+use infinitecode_file_search::run_main;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

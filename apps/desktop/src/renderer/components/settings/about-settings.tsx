@@ -1,4 +1,4 @@
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import { DownloadIcon, Loader2Icon } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useUpdater } from "../../hooks/use-updater"

@@ -1,10 +1,10 @@
 /**
  * Differ module.
  *
- * Compares Claude Code scan results against current Devo configuration
+ * Compares Claude Code scan results against current InfiniteCode configuration
  * to show what's different and what a migration would change.
  */
-import type { DevoConfig } from "../types/devo"
+import type { InfiniteCodeConfig } from "../types/infinitecode"
 import type { MigrationReport } from "../types/report"
 import { createEmptyReport } from "../types/report"
 import type { ScanResult } from "../types/scan-result"
@@ -15,7 +15,7 @@ export interface DiffResult {
 	/** Items that exist in CC but not in OC */
 	onlyInClaudeCode: DiffItem[]
 	/** Items that exist in OC but not in CC */
-	onlyInDevo: DiffItem[]
+	onlyInInfiniteCode: DiffItem[]
 	/** Items that exist in both but differ */
 	different: DiffItem[]
 	/** Items that match between CC and OC */
@@ -32,7 +32,7 @@ export interface DiffItem {
 }
 
 /**
- * Compare Claude Code scan results against current Devo configuration.
+ * Compare Claude Code scan results against current InfiniteCode configuration.
  *
  * @param scanResult - Output from `scan()`
  * @returns Diff showing what's different between CC and OC configs
@@ -40,15 +40,15 @@ export interface DiffItem {
 export async function diff(scanResult: ScanResult): Promise<DiffResult> {
 	const result: DiffResult = {
 		onlyInClaudeCode: [],
-		onlyInDevo: [],
+		onlyInInfiniteCode: [],
 		different: [],
 		matching: [],
 		report: createEmptyReport(),
 	}
 
-	// Load current Devo global config
+	// Load current InfiniteCode global config
 	const ocConfigPath = paths.ocGlobalConfigPath()
-	const ocConfig = await safeReadJson<Partial<DevoConfig>>(ocConfigPath)
+	const ocConfig = await safeReadJson<Partial<InfiniteCodeConfig>>(ocConfigPath)
 
 	// ─── Compare model ───────────────────────────────────────────────
 	if (scanResult.global.settings?.model) {
@@ -83,7 +83,7 @@ export async function diff(scanResult: ScanResult): Promise<DiffResult> {
 	// ─── Compare MCP servers ─────────────────────────────────────────
 	for (const project of scanResult.projects) {
 		// Load project-level OC config
-		const projectOcConfig = await safeReadJson<Partial<DevoConfig>>(
+		const projectOcConfig = await safeReadJson<Partial<InfiniteCodeConfig>>(
 			paths.ocProjectConfigPath(project.path),
 		)
 
@@ -122,7 +122,7 @@ export async function diff(scanResult: ScanResult): Promise<DiffResult> {
 		// In OC but not CC
 		for (const name of ocMcpNames) {
 			if (!ccMcpNames.has(name)) {
-				result.onlyInDevo.push({
+				result.onlyInInfiniteCode.push({
 					category: "mcp",
 					key: name,
 					openCodeValue: projectOcConfig?.mcp?.[name],
@@ -212,12 +212,12 @@ export async function diff(scanResult: ScanResult): Promise<DiffResult> {
 	const report = result.report
 	if (result.onlyInClaudeCode.length > 0) {
 		report.manualActions.push(
-			`${result.onlyInClaudeCode.length} item(s) exist in Claude Code but not Devo. Run \`configconv migrate\` to convert them.`,
+			`${result.onlyInClaudeCode.length} item(s) exist in Claude Code but not InfiniteCode. Run \`configconv migrate\` to convert them.`,
 		)
 	}
 	if (result.different.length > 0) {
 		report.warnings.push(
-			`${result.different.length} item(s) differ between Claude Code and Devo configs.`,
+			`${result.different.length} item(s) differ between Claude Code and InfiniteCode configs.`,
 		)
 	}
 	if (result.matching.length > 0) {

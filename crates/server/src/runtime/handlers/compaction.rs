@@ -74,7 +74,7 @@ impl ServerRuntime {
         .await;
         self.run_session_hook(
             session_id,
-            devo_core::HookEvent::PreCompact,
+            infinitecode_core::HookEvent::PreCompact,
             serde_json::Map::from_iter([
                 ("trigger".to_string(), serde_json::json!("manual")),
                 ("custom_instructions".to_string(), serde_json::Value::Null),
@@ -216,7 +216,7 @@ impl ServerRuntime {
                     .map(|t| t.turn_id)
                     .or_else(|| runtime_session.active_turn.as_ref().map(|t| t.turn_id))
                 {
-                    let item_id = devo_core::ItemId::new();
+                    let item_id = infinitecode_core::ItemId::new();
                     let item_seq = runtime_session.next_item_seq;
                     runtime_session.loaded_item_count += 1;
                     runtime_session.next_item_seq += 1;
@@ -260,7 +260,7 @@ impl ServerRuntime {
                     };
                     if let Some(record) = runtime_session.record.clone() {
                         runtime_session.latest_compaction_snapshot =
-                            Some(devo_core::CompactionSnapshotLine {
+                            Some(infinitecode_core::CompactionSnapshotLine {
                                 timestamp: Utc::now(),
                                 session_id,
                                 turn_id,
@@ -270,7 +270,7 @@ impl ServerRuntime {
                         runtime_session.persisted_turn_items.push(
                             crate::execution::PersistedTurnItem {
                                 turn_id,
-                                turn_kind: devo_core::TurnKind::ManualCompaction,
+                                turn_kind: infinitecode_core::TurnKind::ManualCompaction,
                                 item_id,
                                 turn_item: summary_turn_item.clone(),
                             },
@@ -316,7 +316,7 @@ impl ServerRuntime {
                         .await;
                     self.run_session_hook(
                         session_id,
-                        devo_core::HookEvent::PostCompact,
+                        infinitecode_core::HookEvent::PostCompact,
                         serde_json::Map::from_iter([
                             ("trigger".to_string(), serde_json::json!("manual")),
                             (
@@ -493,12 +493,12 @@ impl ServerRuntime {
             .and_then(|item| match item {
                 ResponseItem::Message(message) => {
                     message.content.iter().find_map(|block| match block {
-                        devo_core::ContentBlock::Text { text } => Some(text.clone()),
-                        devo_core::ContentBlock::Reasoning { .. }
-                        | devo_core::ContentBlock::ProviderReasoning { .. }
-                        | devo_core::ContentBlock::ToolUse { .. }
-                        | devo_core::ContentBlock::HostedToolUse { .. }
-                        | devo_core::ContentBlock::ToolResult { .. } => None,
+                        infinitecode_core::ContentBlock::Text { text } => Some(text.clone()),
+                        infinitecode_core::ContentBlock::Reasoning { .. }
+                        | infinitecode_core::ContentBlock::ProviderReasoning { .. }
+                        | infinitecode_core::ContentBlock::ToolUse { .. }
+                        | infinitecode_core::ContentBlock::HostedToolUse { .. }
+                        | infinitecode_core::ContentBlock::ToolResult { .. } => None,
                     })
                 }
                 ResponseItem::Reason { text } => Some(text.clone()),
@@ -522,7 +522,7 @@ mod tests {
         let command_output = serde_json::Value::String("ok".to_string());
         let persisted_turn_items = vec![crate::execution::PersistedTurnItem {
             turn_id: TurnId::new(),
-            turn_kind: devo_core::TurnKind::Regular,
+            turn_kind: infinitecode_core::TurnKind::Regular,
             item_id: command_item_id,
             turn_item: TurnItem::CommandExecution(CommandExecutionItem {
                 tool_call_id: "call-1".to_string(),

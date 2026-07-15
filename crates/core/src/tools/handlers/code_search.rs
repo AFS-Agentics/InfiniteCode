@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use devo_code_search::{
+use infinitecode_code_search::{
     CodeSearchError, CodeSearchOperation, CodeSearchService, ContentFilter, DEFAULT_TOP_K,
     RelatedRequest, SearchFilters, SearchOutput, SearchRequest,
 };
@@ -25,7 +25,7 @@ impl CodeSearchHandler {
         Self::with_service(Arc::new(CodeSearchService::production()))
     }
 
-    pub fn new_with_network_proxy(network_proxy: devo_network_proxy::NetworkProxyConfig) -> Self {
+    pub fn new_with_network_proxy(network_proxy: infinitecode_network_proxy::NetworkProxyConfig) -> Self {
         Self::with_service(Arc::new(CodeSearchService::production_with_network_proxy(
             network_proxy,
         )))
@@ -266,7 +266,7 @@ fn display_output(output: &SearchOutput, output_limit_bytes: usize) -> String {
 mod tests {
     use std::fs;
 
-    use devo_code_search::HashEmbeddingProvider;
+    use infinitecode_code_search::HashEmbeddingProvider;
     use pretty_assertions::assert_eq;
     use tokio_util::sync::CancellationToken;
 
@@ -287,7 +287,7 @@ mod tests {
             },
             cancel_token: CancellationToken::new(),
             agent_scope: crate::contracts::ToolAgentScope::Parent,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: None,

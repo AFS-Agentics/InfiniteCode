@@ -244,7 +244,7 @@ export interface InfiniteCodeCheckResult {
 }
 
 /** Supported migration source providers. */
-export type MigrationProvider = "claude-code" | "cursor" | "devo" | "opencode"
+export type MigrationProvider = "claude-code" | "cursor" | "infinitecode" | "opencode"
 
 /** Detection result for a single provider. */
 export interface ProviderDetection {

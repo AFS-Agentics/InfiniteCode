@@ -2,15 +2,15 @@
 description = "RMCP-backed MCP runtime adapter"
 edition.workspace = true
 license.workspace = true
-name = "devo-mcp"
+name = "infinitecode-mcp"
 version.workspace = true
 
 [dependencies]
 async-trait = { workspace = true }
 chrono = { workspace = true }
-devo-config = { workspace = true }
-devo-core = { workspace = true }
-devo-rmcp-client = { workspace = true }
+infinitecode-config = { workspace = true }
+infinitecode-core = { workspace = true }
+infinitecode-rmcp-client = { workspace = true }
 rmcp = { workspace = true, features = [
     "client",
     "macros",

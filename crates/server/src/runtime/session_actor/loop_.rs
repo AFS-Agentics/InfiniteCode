@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use chrono::Utc;
-use devo_core::SessionTitleFinalSource;
-use devo_core::SessionTitleState;
-use devo_core::TurnConfig;
-use devo_core::TurnStatus;
-use devo_protocol::ApprovalScopeValue;
+use infinitecode_core::SessionTitleFinalSource;
+use infinitecode_core::SessionTitleState;
+use infinitecode_core::TurnConfig;
+use infinitecode_core::TurnStatus;
+use infinitecode_protocol::ApprovalScopeValue;
 use tokio::sync::mpsc;
 
 use super::commands::SessionCommand;
@@ -144,8 +144,8 @@ pub(super) async fn run_session_actor(
                 let pending_texts: Vec<String> = queue
                     .iter()
                     .filter_map(|item| match &item.kind {
-                        devo_core::PendingInputKind::UserText { text } => Some(text.clone()),
-                        devo_core::PendingInputKind::UserInput { display_text, .. } => {
+                        infinitecode_core::PendingInputKind::UserText { text } => Some(text.clone()),
+                        infinitecode_core::PendingInputKind::UserInput { display_text, .. } => {
                             Some(display_text.clone())
                         }
                         _ => None,
@@ -443,8 +443,8 @@ pub(super) async fn run_session_actor(
                     .expect("pending turn queue mutex should not be poisoned")
                     .iter()
                     .filter_map(|item| match &item.kind {
-                        devo_core::PendingInputKind::UserText { text } => Some(text.clone()),
-                        devo_core::PendingInputKind::UserInput { display_text, .. } => {
+                        infinitecode_core::PendingInputKind::UserText { text } => Some(text.clone()),
+                        infinitecode_core::PendingInputKind::UserInput { display_text, .. } => {
                             Some(display_text.clone())
                         }
                         _ => None,
@@ -538,10 +538,10 @@ fn ensure_session_context_locked(state: &mut SessionActorState, turn_config: &Tu
     if state.core.session_context.is_some() {
         return;
     }
-    let agents_md_manager = devo_core::AgentsMdManager::new(state.core.config.agents_md.clone());
+    let agents_md_manager = infinitecode_core::AgentsMdManager::new(state.core.config.agents_md.clone());
     let locked_agents_snapshot =
-        devo_core::load_workspace_instructions(&state.core.cwd, &agents_md_manager);
-    state.core.session_context = Some(devo_core::SessionContext::capture(
+        infinitecode_core::load_workspace_instructions(&state.core.cwd, &agents_md_manager);
+    state.core.session_context = Some(infinitecode_core::SessionContext::capture(
         &turn_config.model,
         turn_config.reasoning_effort_selection.as_deref(),
         &state.core.cwd,
@@ -551,10 +551,10 @@ fn ensure_session_context_locked(state: &mut SessionActorState, turn_config: &Tu
 }
 
 fn pop_queued_turn_input_data(
-    item: devo_protocol::PendingInputItem,
+    item: infinitecode_protocol::PendingInputItem,
 ) -> Option<QueuedTurnInputData> {
     match item.kind {
-        devo_core::PendingInputKind::UserText { text } => Some(QueuedTurnInputData {
+        infinitecode_core::PendingInputKind::UserText { text } => Some(QueuedTurnInputData {
             queued_input_id: item.id,
             display_input: text.clone(),
             input_text: text,
@@ -565,7 +565,7 @@ fn pop_queued_turn_input_data(
                 item.metadata.as_ref(),
             ),
         }),
-        devo_core::PendingInputKind::UserInput {
+        infinitecode_core::PendingInputKind::UserInput {
             display_text,
             prompt_text,
             prompt_messages,
@@ -587,7 +587,7 @@ fn pop_queued_turn_input_data(
 
 fn collaboration_mode_from_pending_metadata(
     metadata: Option<&serde_json::Value>,
-) -> devo_protocol::CollaborationMode {
+) -> infinitecode_protocol::CollaborationMode {
     metadata
         .and_then(|metadata| {
             metadata
@@ -618,13 +618,13 @@ fn model_selection_from_pending_metadata(metadata: Option<&serde_json::Value>) -
 
 fn subagent_usage_owner_from_pending_metadata(
     metadata: Option<&serde_json::Value>,
-) -> Option<(devo_protocol::SessionId, Option<devo_core::TurnId>)> {
+) -> Option<(infinitecode_protocol::SessionId, Option<infinitecode_core::TurnId>)> {
     let parent_session_id =
-        string_field_from_pending_metadata(metadata, "devo_subagent_usage_parent_session_id")
-            .and_then(|value| devo_protocol::SessionId::try_from(value).ok())?;
+        string_field_from_pending_metadata(metadata, "infinitecode_subagent_usage_parent_session_id")
+            .and_then(|value| infinitecode_protocol::SessionId::try_from(value).ok())?;
     let parent_turn_id =
-        string_field_from_pending_metadata(metadata, "devo_subagent_usage_parent_turn_id")
-            .and_then(|value| devo_core::TurnId::try_from(value).ok());
+        string_field_from_pending_metadata(metadata, "infinitecode_subagent_usage_parent_turn_id")
+            .and_then(|value| infinitecode_core::TurnId::try_from(value).ok());
     Some((parent_session_id, parent_turn_id))
 }
 
@@ -677,8 +677,8 @@ fn apply_approval_scope_to_state(
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
-    use devo_protocol::PendingInputItem;
-    use devo_protocol::PendingInputKind;
+    use infinitecode_protocol::PendingInputItem;
+    use infinitecode_protocol::PendingInputKind;
     use pretty_assertions::assert_eq;
 
     use super::QueuedTurnInputData;
@@ -704,7 +704,7 @@ mod tests {
                 display_input: "queued prompt".to_string(),
                 input_text: "queued prompt".to_string(),
                 input_messages: Vec::new(),
-                collaboration_mode: devo_protocol::CollaborationMode::default(),
+                collaboration_mode: infinitecode_protocol::CollaborationMode::default(),
                 model_selection: None,
                 subagent_usage_owner: None,
             }

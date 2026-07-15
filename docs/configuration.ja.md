@@ -2,15 +2,15 @@
 
 [English](./configuration.md) | [简体中文](./configuration.zh-Hans.md) | [繁體中文](./configuration.zh-Hant.md) | [日本語](./configuration.ja.md) | [Русский](./configuration.ru.md)
 
-`devo onboard` が推奨されるセットアップ方法です。手動で設定する場合、Devo は次の順序で設定をマージします:
+`infinitecode onboard` が推奨されるセットアップ方法です。手動で設定する場合、InfiniteCode は次の順序で設定をマージします:
 
 1. 組み込みデフォルト
-2. `DEVO_HOME/config.toml` - ユーザーレベル設定。デフォルトでは macOS/Linux で
-   `~/.devo/config.toml`、Windows で `C:\Users\yourname\.devo\config.toml`
-3. `<workspace>/.devo/config.toml` - プロジェクトレベル設定
+2. `INFINITECODE_HOME/config.toml` - ユーザーレベル設定。デフォルトでは macOS/Linux で
+   `~/.infinitecode/config.toml`、Windows で `C:\Users\yourname\.infinitecode\config.toml`
+3. `<workspace>/.infinitecode/config.toml` - プロジェクトレベル設定
 4. CLI flags
 
-認証情報は `DEVO_HOME/auth.json` に分離して保存されます。
+認証情報は `INFINITECODE_HOME/auth.json` に分離して保存されます。
 `config.toml` には API key を直接保存せず、credential id を参照させてください。
 
 最小構成:
@@ -38,7 +38,7 @@ default_reasoning_effort = "high"
 
 重要な分離は次のとおりです:
 
-- `model_slug` は `models.json` から Devo のローカルモデルメタデータを選択します。
+- `model_slug` は `models.json` から InfiniteCode のローカルモデルメタデータを選択します。
 - `provider` は設定済みの接続レコードを選択します。
 - `request_model` はプロバイダーへ送信される、そのプロバイダー固有のモデル文字列です。
 - `invocation_method` はプロバイダープロトコルを選択します。例:
@@ -53,13 +53,13 @@ default_reasoning_effort = "high"
 
 ユーザーレベルのモデルカタログ:
 
-- macOS/Linux: `~/.devo/models.json`
-- Windows: `C:\Users\yourname\.devo\models.json`
+- macOS/Linux: `~/.infinitecode/models.json`
+- Windows: `C:\Users\yourname\.infinitecode\models.json`
 
-プロジェクトレベルの上書きは `<workspace>/.devo/models.json` に配置できます。
+プロジェクトレベルの上書きは `<workspace>/.infinitecode/models.json` に配置できます。
 `models.json` の `provider` は、そのモデルのデフォルト wire API メタデータです。
 実際のエンドポイントは引き続き `config.toml` の `provider` フィールドで選択されます。
-`base_instructions` を省略した場合、Devo は組み込みのデフォルト base instructions に
+`base_instructions` を省略した場合、InfiniteCode は組み込みのデフォルト base instructions に
 フォールバックします。明示的な空文字列（`""`）は、そのモデルに base instructions が
 ないことを意味します。
 
@@ -78,7 +78,7 @@ default_reasoning_effort = "high"
     "effective_context_window_percent": 95,
     "max_tokens": 4096,
     "input_modalities": ["text"],
-    "base_instructions": "You are Devo, a coding agent. Help the user edit and understand code."
+    "base_instructions": "You are InfiniteCode, a coding agent. Help the user edit and understand code."
   }
 ]
 ```

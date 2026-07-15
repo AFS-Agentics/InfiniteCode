@@ -28,7 +28,7 @@ pub(crate) fn write_test_config(
     listen: &[&str],
     openai_base_url: &str,
 ) -> Result<()> {
-    let config_dir = home_dir.path().join(".devo");
+    let config_dir = home_dir.path().join(".infinitecode");
     std::fs::create_dir_all(&config_dir)?;
     let listen_entries = listen
         .iter()
@@ -443,7 +443,7 @@ pub(crate) async fn build_test_mcp_server_binary() -> Result<PathBuf> {
         .arg("--manifest-path")
         .arg(&manifest)
         .arg("-p")
-        .arg("devo-rmcp-client")
+        .arg("infinitecode-rmcp-client")
         .arg("--bin")
         .arg("test_stdio_server")
         .status()
@@ -581,14 +581,14 @@ async fn parse_stdio_json_line(
     })
 }
 
-pub(crate) fn devo_command() -> Result<Command> {
-    if let Some(binary_path) = std::env::var_os("CARGO_BIN_EXE_devo").map(PathBuf::from)
+pub(crate) fn infinitecode_command() -> Result<Command> {
+    if let Some(binary_path) = std::env::var_os("CARGO_BIN_EXE_infinitecode").map(PathBuf::from)
         && binary_path.is_file()
     {
         return Ok(Command::new(binary_path));
     }
 
-    let binary_path = devo_binary_path()?;
+    let binary_path = infinitecode_binary_path()?;
     if binary_path.is_file() {
         return Ok(Command::new(binary_path));
     }
@@ -602,16 +602,16 @@ pub(crate) fn devo_command() -> Result<Command> {
         .arg("run")
         .arg("--quiet")
         .arg("-p")
-        .arg("devo-cli")
+        .arg("infinitecode-cli")
         .arg("--bin")
-        .arg("devo")
+        .arg("infinitecode")
         .arg("--");
     Ok(command)
 }
 
-fn devo_binary_path() -> Result<PathBuf> {
+fn infinitecode_binary_path() -> Result<PathBuf> {
     let workspace = workspace_root()?;
-    let mut binary = workspace.join("target").join("debug").join("devo");
+    let mut binary = workspace.join("target").join("debug").join("infinitecode");
     if cfg!(windows) {
         binary.set_extension("exe");
     }

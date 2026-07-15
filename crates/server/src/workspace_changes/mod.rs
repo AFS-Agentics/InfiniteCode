@@ -3,14 +3,14 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use chrono::Utc;
-use devo_core::{
+use infinitecode_core::{
     ChangeSetCoverage, ChangeSetStatus, TurnWorkspaceChangeRecordedRecord,
     TurnWorkspaceCheckpointRecordedRecord,
 };
-use devo_protocol::{
+use infinitecode_protocol::{
     SessionId, TurnId, WorkspaceChangeSetStatus, WorkspaceChangeView, WorkspaceDiffDetail,
 };
-use devo_util_git::get_git_repo_root;
+use infinitecode_util_git::get_git_repo_root;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -284,7 +284,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::process::Command;
 
-    use devo_protocol::{
+    use infinitecode_protocol::{
         WorkspaceChangeCoverage, WorkspaceChangeSetStatus, WorkspaceChangeViewStatus,
         WorkspaceChangedFileStatus, WorkspaceDiffDetail,
     };

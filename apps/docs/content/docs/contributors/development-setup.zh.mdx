@@ -1,13 +1,13 @@
 ---
 title: 开发环境
-description: 作为贡献者在本地构建和运行 Devo。
+description: 作为贡献者在本地构建和运行 InfiniteCode。
 ---
 
-本页覆盖修改 Devo 代码和文档所需的本地环境。
+本页覆盖修改 InfiniteCode 代码和文档所需的本地环境。
 
 ## 工具链
 
-Devo 是一个 Rust workspace 加一个 Next.js docs app。
+InfiniteCode 是一个 Rust workspace 加一个 Next.js docs app。
 
 | Area | Toolchain |
 | --- | --- |
@@ -27,20 +27,20 @@ cargo build
 从源码运行 CLI：
 
 ```bash
-cargo run -p devo-cli -- --help
-cargo run -p devo-cli
+cargo run -p infinitecode-cli -- --help
+cargo run -p infinitecode-cli
 ```
 
 运行聚焦 package test：
 
 ```bash
-cargo test -p devo-config
+cargo test -p infinitecode-config
 ```
 
 格式化变更过的 Rust package：
 
 ```bash
-cargo fmt --package devo-config
+cargo fmt --package infinitecode-config
 ```
 
 如果 Rust command 因另一个 Rust command 持有 build lock 而变慢，让它完成。不要因为 cargo 进程在等待就 kill 它。
@@ -77,20 +77,20 @@ npm run build
 
 ## 本地测试配置
 
-测试 config migration 或 onboarding 时使用独立 `DEVO_HOME`：
+测试 config migration 或 onboarding 时使用独立 `INFINITECODE_HOME`：
 
 ```bash
-mkdir -p /tmp/devo-dev-home
-DEVO_HOME=/tmp/devo-dev-home cargo run -p devo-cli -- onboard
+mkdir -p /tmp/infinitecode-dev-home
+INFINITECODE_HOME=/tmp/infinitecode-dev-home cargo run -p infinitecode-cli -- onboard
 ```
 
-设置 `DEVO_HOME` 时，它必须指向已经存在的目录。
+设置 `INFINITECODE_HOME` 时，它必须指向已经存在的目录。
 
 ## 仓库约定
 
 遵循 `AGENTS.md` 中的仓库约定：
 
-- crate names 使用 `devo-` 前缀；
+- crate names 使用 `infinitecode-` 前缀；
 - 优先使用 inline `format!` arguments；
 - 当 clippy 会提示时折叠 nested `if` statements；
 - 尽量让 match expressions exhaustive；

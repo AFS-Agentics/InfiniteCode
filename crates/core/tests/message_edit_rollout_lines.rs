@@ -1,5 +1,5 @@
 use chrono::Utc;
-use devo_core::{
+use infinitecode_core::{
     ContentPart, EditId, EditState, FileRestoreOutcome, ItemId, MessageEditRecordedLine,
     MessageEditRecordedRecord, RestoreFileStatus, RestoreId, RolloutLine, SessionId, TurnId,
     TurnSupersededLine, TurnSupersededRecord, TurnWorkspaceRestoreCompletedLine,

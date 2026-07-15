@@ -318,7 +318,7 @@ pub enum FileChange {
 }
 
 /// Context/compaction display token usage, not the canonical provider response
-/// usage shape. Provider/model usage is represented by `devo_protocol::Usage`.
+/// usage shape. Provider/model usage is represented by `infinitecode_protocol::Usage`.
 #[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, TS, Default, PartialEq, Eq)]
 pub struct TokenUsage {
     pub input_tokens: i64,

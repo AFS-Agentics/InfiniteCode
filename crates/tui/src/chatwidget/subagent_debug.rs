@@ -2,8 +2,8 @@
 
 use std::time::Duration;
 
-use devo_core::ItemId;
-use devo_core::SessionId;
+use infinitecode_core::ItemId;
+use infinitecode_core::SessionId;
 
 use crate::app_event::AppEvent;
 use crate::app_event::SubagentDebugStep;
@@ -16,8 +16,8 @@ use crate::events::TextItemKind;
 
 use super::ChatWidget;
 
-const ENV_NAME: &str = "DEVO_TUI_DEBUG_SCENARIO";
-const LEGACY_ENV_NAME: &str = "DEVO_TUI_DEBUG_SUBAGENTS";
+const ENV_NAME: &str = "INFINITECODE_TUI_DEBUG_SCENARIO";
+const LEGACY_ENV_NAME: &str = "INFINITECODE_TUI_DEBUG_SUBAGENTS";
 
 #[derive(Clone, Copy, Debug)]
 enum DebugScenario {
@@ -73,7 +73,7 @@ impl ChatWidget {
         };
         if legacy {
             tracing::warn!(
-                target: "devo_tui::subagent",
+                target: "infinitecode_tui::subagent",
                 env = LEGACY_ENV_NAME,
                 replacement = ENV_NAME,
                 "legacy TUI subagent debug scenario env var is deprecated"
@@ -84,7 +84,7 @@ impl ChatWidget {
             DebugScenarioParse::Scenario(scenario) => scenario,
             DebugScenarioParse::Unknown => {
                 tracing::warn!(
-                    target: "devo_tui::subagent",
+                    target: "infinitecode_tui::subagent",
                     env = env_name,
                     value = %raw,
                     "unknown TUI debug scenario"
@@ -95,7 +95,7 @@ impl ChatWidget {
 
         let tx = self.app_event_tx.clone();
         tracing::info!(
-            target: "devo_tui::subagent",
+            target: "infinitecode_tui::subagent",
             env = env_name,
             scenario = scenario.name(),
             "starting TUI debug scenario"
@@ -107,7 +107,7 @@ impl ChatWidget {
 
     pub(crate) fn apply_subagent_debug_step(&mut self, step: SubagentDebugStep) {
         tracing::debug!(
-            target: "devo_tui::subagent",
+            target: "infinitecode_tui::subagent",
             step = debug_step_name(&step),
             "applying TUI subagent debug step"
         );

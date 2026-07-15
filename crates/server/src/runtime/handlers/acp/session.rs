@@ -220,7 +220,7 @@ impl ServerRuntime {
             };
         let mut meta = serde_json::Map::new();
         meta.insert(
-            DEVO_SESSION_META.to_string(),
+            INFINITECODE_SESSION_META.to_string(),
             serde_json::to_value(&legacy.result.session).expect("serialize session metadata"),
         );
         self.subscribe_connection_to_session(connection_id, legacy.result.session.session_id, None)
@@ -312,11 +312,11 @@ impl ServerRuntime {
         legacy.result.session = updated_summary;
         let mut meta = serde_json::Map::new();
         meta.insert(
-            DEVO_SESSION_META.to_string(),
+            INFINITECODE_SESSION_META.to_string(),
             serde_json::to_value(&legacy.result.session).expect("serialize session metadata"),
         );
         meta.insert(
-            DEVO_SESSION_RESUME_META.to_string(),
+            INFINITECODE_SESSION_RESUME_META.to_string(),
             serde_json::to_value(&legacy.result).expect("serialize session resume result"),
         );
         self.subscribe_connection_to_session(connection_id, params.session_id, None)

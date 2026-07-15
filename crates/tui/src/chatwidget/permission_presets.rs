@@ -3,7 +3,7 @@
 //! The chat widget owns the selected permission preset, while this module keeps
 //! the label and picker-item mapping out of the main conversation surface.
 
-use devo_protocol::PermissionPreset;
+use infinitecode_protocol::PermissionPreset;
 
 use crate::app_command::AppCommand;
 use crate::app_event::AppEvent;

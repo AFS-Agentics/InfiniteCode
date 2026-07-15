@@ -1,4 +1,4 @@
-//! Core-facing skill catalog wrapper backed by `devo-skills`.
+//! Core-facing skill catalog wrapper backed by `infinitecode-skills`.
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -6,17 +6,17 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
-pub use devo_skills::SkillDependencies;
-pub use devo_skills::SkillInterface;
-pub use devo_skills::SkillScope;
-pub use devo_skills::SkillsManager;
-pub use devo_skills::SkillsRuntimeConfig;
-pub use devo_skills::build_available_skills;
-pub use devo_skills::build_skill_injections;
-pub use devo_skills::collect_explicit_skill_mentions;
-pub use devo_skills::default_skill_metadata_budget;
-pub use devo_skills::normalize_canonical_path;
-pub use devo_skills::render_available_skills_body;
+pub use infinitecode_skills::SkillDependencies;
+pub use infinitecode_skills::SkillInterface;
+pub use infinitecode_skills::SkillScope;
+pub use infinitecode_skills::SkillsManager;
+pub use infinitecode_skills::SkillsRuntimeConfig;
+pub use infinitecode_skills::build_available_skills;
+pub use infinitecode_skills::build_skill_injections;
+pub use infinitecode_skills::collect_explicit_skill_mentions;
+pub use infinitecode_skills::default_skill_metadata_budget;
+pub use infinitecode_skills::normalize_canonical_path;
+pub use infinitecode_skills::render_available_skills_body;
 
 use crate::SkillsConfig;
 
@@ -104,21 +104,21 @@ pub struct FileSystemSkillCatalog {
 
 impl FileSystemSkillCatalog {
     pub fn new(config: SkillsConfig) -> Self {
-        let devo_home = devo_util_paths::find_devo_home()
+        let infinitecode_home = infinitecode_util_paths::find_infinitecode_home()
             .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        Self::with_devo_home(config, devo_home, cwd, vec![".git".to_string()])
+        Self::with_infinitecode_home(config, infinitecode_home, cwd, vec![".git".to_string()])
     }
 
-    pub fn with_devo_home(
+    pub fn with_infinitecode_home(
         config: SkillsConfig,
-        devo_home: PathBuf,
+        infinitecode_home: PathBuf,
         default_workspace_root: PathBuf,
         project_root_markers: Vec<String>,
     ) -> Self {
         let runtime_config = skills_runtime_config(config, project_root_markers);
         Self {
-            manager: SkillsManager::new(devo_home, runtime_config),
+            manager: SkillsManager::new(infinitecode_home, runtime_config),
             default_workspace_root,
         }
     }
@@ -127,13 +127,13 @@ impl FileSystemSkillCatalog {
         &self,
         workspace_root: Option<&Path>,
         force_reload: bool,
-    ) -> devo_skills::SkillLoadOutcome {
+    ) -> infinitecode_skills::SkillLoadOutcome {
         let root = workspace_root.unwrap_or(self.default_workspace_root.as_path());
         self.manager.skills_for_cwd(root, force_reload)
     }
 
     fn record_from_skill(
-        skill: &devo_skills::SkillMetadata,
+        skill: &infinitecode_skills::SkillMetadata,
         enabled: bool,
         workspace_root: Option<&Path>,
     ) -> SkillRecord {
@@ -153,15 +153,15 @@ impl FileSystemSkillCatalog {
     }
 
     fn find_skill(
-        outcome: &devo_skills::SkillLoadOutcome,
+        outcome: &infinitecode_skills::SkillLoadOutcome,
         selector: &SkillSelector,
-    ) -> Result<devo_skills::SkillMetadata, SkillError> {
+    ) -> Result<infinitecode_skills::SkillMetadata, SkillError> {
         if let Some(path) = selector
             .path
             .as_ref()
             .filter(|path| !path.as_os_str().is_empty())
         {
-            let path = devo_skills::model::canonicalize_for_identity(path);
+            let path = infinitecode_skills::model::canonicalize_for_identity(path);
             return outcome
                 .skills
                 .iter()
@@ -283,7 +283,7 @@ fn skills_runtime_config(
         workspace_roots: config.workspace_roots,
         include_instructions: config.include_instructions.unwrap_or(true),
         bundled_enabled: config.bundled.unwrap_or_default().enabled,
-        config_rules: devo_skills::config_rules::SkillConfigRules::from_entries(
+        config_rules: infinitecode_skills::config_rules::SkillConfigRules::from_entries(
             config
                 .config
                 .into_iter()
@@ -293,7 +293,7 @@ fn skills_runtime_config(
     }
 }
 
-fn skill_source(skill: &devo_skills::SkillMetadata, workspace_root: Option<&Path>) -> SkillSource {
+fn skill_source(skill: &infinitecode_skills::SkillMetadata, workspace_root: Option<&Path>) -> SkillSource {
     match skill.scope {
         SkillScope::Repo => SkillSource::Workspace {
             cwd: workspace_root.map(Path::to_path_buf).unwrap_or_default(),

@@ -1,6 +1,6 @@
 use anyhow::Context;
 use anyhow::Result;
-use devo_network_proxy::NetworkProxyConfig;
+use infinitecode_network_proxy::NetworkProxyConfig;
 use reqwest::Client;
 use reqwest::RequestBuilder;
 use reqwest::Response;
@@ -104,7 +104,7 @@ impl ProviderHttpOptions {
             let builder = Client::builder()
                 .connect_timeout(crate::timeout::connect_timeout())
                 .timeout(crate::timeout::request_timeout());
-            devo_network_proxy::apply_proxy_config(builder, &self.network_proxy)?
+            infinitecode_network_proxy::apply_proxy_config(builder, &self.network_proxy)?
                 .build()
                 .context("failed to build provider HTTP client")
         })
@@ -115,7 +115,7 @@ impl ProviderHttpOptions {
     pub(crate) fn build_streaming_client(&self) -> Result<Client> {
         cached_http_client(HttpClientKind::Streaming, &self.network_proxy, || {
             let builder = Client::builder().connect_timeout(crate::timeout::connect_timeout());
-            devo_network_proxy::apply_proxy_config(builder, &self.network_proxy)?
+            infinitecode_network_proxy::apply_proxy_config(builder, &self.network_proxy)?
                 .build()
                 .context("failed to build provider streaming HTTP client")
         })
@@ -299,7 +299,7 @@ mod tests {
     fn custom_headers_parse_json_object_string() {
         let options = ProviderHttpOptions::from_raw(
             None,
-            Some(r#"{"X-Devo":"yes","Authorization":"custom"}"#.to_string()),
+            Some(r#"{"X-InfiniteCode":"yes","Authorization":"custom"}"#.to_string()),
         )
         .expect("parse options");
         let request = options
@@ -310,8 +310,8 @@ mod tests {
         assert_eq!(
             request
                 .headers()
-                .get("x-devo")
-                .expect("x-devo header")
+                .get("x-infinitecode")
+                .expect("x-infinitecode header")
                 .to_str()
                 .expect("header value"),
             "yes"

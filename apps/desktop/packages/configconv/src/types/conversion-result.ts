@@ -1,7 +1,7 @@
 /**
  * Types for the converter output.
  */
-import type { DevoConfig } from "./devo"
+import type { InfiniteCodeConfig } from "./infinitecode"
 import type { MigrationReport } from "./report"
 
 export type MigrationCategory =
@@ -29,10 +29,10 @@ export interface ConvertOptions {
 }
 
 export interface ConversionResult {
-	/** Global devo.json config to write */
-	globalConfig: Partial<DevoConfig>
-	/** Per-project devo.json configs */
-	projectConfigs: Map<string, Partial<DevoConfig>>
+	/** Global infinitecode.json config to write */
+	globalConfig: Partial<InfiniteCodeConfig>
+	/** Per-project infinitecode.json configs */
+	projectConfigs: Map<string, Partial<InfiniteCodeConfig>>
 	/** Agent files to write: target path -> markdown content */
 	agents: Map<string, string>
 	/** Command files to write: target path -> markdown content */

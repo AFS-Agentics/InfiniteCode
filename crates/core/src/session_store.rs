@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use devo_protocol::SessionId;
+use infinitecode_protocol::SessionId;
 use serde::{Deserialize, Serialize};
 
 use crate::durable_record::DurableRecord;

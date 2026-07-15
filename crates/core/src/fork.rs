@@ -5,7 +5,7 @@
 
 use chrono::Utc;
 
-use devo_protocol::{SessionId, TurnId};
+use infinitecode_protocol::{SessionId, TurnId};
 
 use crate::durable_record::{
     DurableRecord, ForkCreator, ForkOrigin, InheritedHistorySegmentDescriptor, ParentAvailability,

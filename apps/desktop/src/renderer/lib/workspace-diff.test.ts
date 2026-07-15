@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { WorkspaceChangeView } from "@devo-ai/sdk/v2/client"
+import type { WorkspaceChangeView } from "@infinitecode-ai/sdk/v2/client"
 import { workspacePatchFilesFromView } from "./workspace-diff"
 
 describe("workspacePatchFilesFromView", () => {

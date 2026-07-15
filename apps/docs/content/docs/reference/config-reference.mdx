@@ -1,6 +1,6 @@
 ---
 title: Config Reference
-description: Reference Devo config fields after user-facing guides are stable.
+description: Reference InfiniteCode config fields after user-facing guides are stable.
 ---
 
 This page lists the main config files and fields. For guided setup, start with
@@ -11,26 +11,26 @@ and [Model Bindings](../configuration/model-bindings).
 
 | File | Purpose |
 | --- | --- |
-| `<DEVO_HOME>/config.toml` | User-level Devo config. |
-| `<DEVO_HOME>/auth.json` | User-level secrets and credentials. |
-| `<workspace>/.devo/config.toml` | Workspace-level config overlay. |
+| `<INFINITECODE_HOME>/config.toml` | User-level InfiniteCode config. |
+| `<INFINITECODE_HOME>/auth.json` | User-level secrets and credentials. |
+| `<workspace>/.infinitecode/config.toml` | Workspace-level config overlay. |
 
-Default `DEVO_HOME` paths:
+Default `INFINITECODE_HOME` paths:
 
 | Platform | Default |
 | --- | --- |
-| macOS/Linux | `~/.devo` |
-| Windows | `C:/Users/your-username/.devo` |
+| macOS/Linux | `~/.infinitecode` |
+| Windows | `C:/Users/your-username/.infinitecode` |
 
-If `DEVO_HOME` is set, it must point to an existing directory.
+If `INFINITECODE_HOME` is set, it must point to an existing directory.
 
 ## Precedence
 
 Effective config is resolved in this order, highest priority first:
 
 1. command-line startup arguments;
-2. `<workspace>/.devo/config.toml`;
-3. `<DEVO_HOME>/config.toml`;
+2. `<workspace>/.infinitecode/config.toml`;
+3. `<INFINITECODE_HOME>/config.toml`;
 4. built-in defaults.
 
 `auth.json` is user-scoped and is not intended to be committed to a repository.
@@ -98,7 +98,7 @@ Desktop-managed runtime process. They do not modify `config.toml`.
 | `logout` | bool | Advertises and supports ACP `logout` when auth is enabled. Defaults to `true`. |
 
 When enabled, auth state is per connection and gates both ACP methods and legacy
-Devo server methods.
+InfiniteCode server methods.
 
 ## `[defaults]`
 

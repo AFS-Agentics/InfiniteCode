@@ -2,7 +2,7 @@
  * Standalone Vite config for browser-mode development (no Electron).
  * Usage: bun run dev:web (or `vite --config src/renderer/vite.web.config.ts`)
  *
- * In this mode, the Devo Bun server (apps/server) must be running
+ * In this mode, the InfiniteCode Bun server (apps/server) must be running
  * on port 3100 to handle filesystem operations and process management.
  */
 
@@ -22,10 +22,10 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@": __dirname,
-			"@devo/ui": path.resolve(__dirname, "../../packages/ui/src"),
-			"@devo-ai/sdk/v2/client": path.resolve(
+			"@infinitecode/ui": path.resolve(__dirname, "../../packages/ui/src"),
+			"@infinitecode-ai/sdk/v2/client": path.resolve(
 				__dirname,
-				"../../packages/devo-ai-sdk/src/v2/client.ts",
+				"../../packages/infinitecode-ai-sdk/src/v2/client.ts",
 			),
 		},
 	},

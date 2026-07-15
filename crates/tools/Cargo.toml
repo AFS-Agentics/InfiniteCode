@@ -2,11 +2,11 @@
 description = "Tool contracts shared by core, server, and clients"
 edition.workspace = true
 license.workspace = true
-name = "devo-tools"
+name = "infinitecode-tools"
 version.workspace = true
 
 [dependencies]
-devo-protocol = { workspace = true }
+infinitecode-protocol = { workspace = true }
 
 async-trait = { workspace = true }
 serde = { workspace = true }

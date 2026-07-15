@@ -7,7 +7,7 @@ use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 
 use acp_session_setup::STDIO_SERVER_STARTUP_TIMEOUT;
-use acp_session_setup::devo_command;
+use acp_session_setup::infinitecode_command;
 use acp_session_setup::read_stdio_json;
 use acp_session_setup::read_stdio_json_until;
 use acp_session_setup::write_stdio_json;
@@ -22,9 +22,9 @@ async fn stdio_model_config_returns_cold_start_model_options_without_creating_se
     write_test_config(&home_dir, &["stdio://"], "http://127.0.0.1:1")?;
 
     let cwd = home_dir.path().join("workspace");
-    std::fs::create_dir_all(cwd.join(".devo"))?;
+    std::fs::create_dir_all(cwd.join(".infinitecode"))?;
     std::fs::write(
-        cwd.join(".devo").join("models.json"),
+        cwd.join(".infinitecode").join("models.json"),
         serde_json::to_string(&serde_json::json!([
             {
                 "slug": "test-model",
@@ -162,17 +162,17 @@ async fn spawn_initialized_stdio_server(
     tokio::io::Lines<AsyncBufReader<tokio::process::ChildStdout>>,
     AsyncBufReader<tokio::process::ChildStderr>,
 )> {
-    let mut command = devo_command()?;
+    let mut command = infinitecode_command()?;
     let mut child = command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", home_dir.path().join(".devo"))
+        .env("INFINITECODE_HOME", home_dir.path().join(".infinitecode"))
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn devo child process in server mode")?;
+        .context("spawn infinitecode child process in server mode")?;
 
     let mut stdin = child.stdin.take().context("capture child stdin")?;
     let stdout = child.stdout.take().context("capture child stdout")?;

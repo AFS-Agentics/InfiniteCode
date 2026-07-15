@@ -1,21 +1,21 @@
 #!/bin/sh
-# install.sh — Download and install the latest devo binary for Linux / macOS.
+# install.sh — Download and install the latest infinitecode binary for Linux / macOS.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh -s -- --version v0.1.2
+#   curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh -s -- --version v0.1.2
 
 set -eu
 
-APP="devo"
-REPO="7df-lab/devo"
+APP="infinitecode"
+REPO="AFS-Agentics/InfiniteCode"
 RG_APP="rg"
 RG_REPO="BurntSushi/ripgrep"
 CODE_SEARCH_MODEL_REPO="minishlab/potion-code-16M"
 CODE_SEARCH_MODEL_DIR_NAME="minishlab--potion-code-16M"
 CODE_SEARCH_MODEL_FILES="tokenizer.json model.safetensors config.json"
 CODE_SEARCH_LOCAL_MODELS_DIR="local-models"
-INSTALL_DIR_DEFAULT="${HOME}/.devo/bin"
+INSTALL_DIR_DEFAULT="${HOME}/.infinitecode/bin"
 
 MUTED="$(printf '\033[0;2m')"
 RED="$(printf '\033[0;31m')"
@@ -26,13 +26,13 @@ requested_version="${VERSION:-}"
 binary_path=""
 no_modify_path="false"
 offline_mode="false"
-install_code_search_model="${DEVO_INSTALL_CODE_SEARCH_MODEL:-}"
-install_dir="${DEVO_INSTALL_DIR:-$INSTALL_DIR_DEFAULT}"
+install_code_search_model="${INFINITECODE_INSTALL_CODE_SEARCH_MODEL:-}"
+install_dir="${INFINITECODE_INSTALL_DIR:-$INSTALL_DIR_DEFAULT}"
 skip_app_install="false"
 
 usage() {
     cat <<EOF
-devo Installer
+infinitecode Installer
 
 Usage: install.sh [options]
 
@@ -48,17 +48,17 @@ Options:
 
 Environment:
     VERSION                 Same as --version
-    DEVO_INSTALL_DIR        Same as --install-dir
-    DEVO_SKIP_RG_INSTALL=1 Skip installing the ripgrep sidecar
-    DEVO_INSTALL_CODE_SEARCH_MODEL=1
+    INFINITECODE_INSTALL_DIR        Same as --install-dir
+    INFINITECODE_SKIP_RG_INSTALL=1 Skip installing the ripgrep sidecar
+    INFINITECODE_INSTALL_CODE_SEARCH_MODEL=1
                             Download the local Hugging Face model used by code_search
 
 Examples:
-    curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
-    curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh -s -- --version v0.1.2
-    curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh -s -- --install-code-search-model
+    curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh
+    curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh -s -- --version v0.1.2
+    curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh -s -- --install-code-search-model
     sh ./install.sh --offline
-    ./install.sh --binary ./target/release/devo
+    ./install.sh --binary ./target/release/infinitecode
 EOF
 }
 
@@ -345,7 +345,7 @@ ensure_path_in_profile() {
 
     {
         printf '\n'
-        printf '# added by devo installer\n'
+        printf '# added by infinitecode installer\n'
         printf '%s\n' "$path_line"
     } >> "$profile"
 }
@@ -358,7 +358,7 @@ print_path_hint() {
     fi
 
     if [ "$no_modify_path" = "true" ]; then
-        print_message warning "Add ${target_install_dir} to your PATH to run devo from any terminal:"
+        print_message warning "Add ${target_install_dir} to your PATH to run infinitecode from any terminal:"
         if [ "${SHELL##*/}" = "fish" ]; then
             print_message info "  fish_add_path ${target_install_dir}"
         else
@@ -385,7 +385,7 @@ print_path_hint() {
     fi
 }
 
-existing_devo_path() {
+existing_infinitecode_path() {
     if [ -x "${install_dir}/${APP}" ]; then
         printf '%s\n' "${install_dir}/${APP}"
         return 0
@@ -394,7 +394,7 @@ existing_devo_path() {
     command -v "$APP" 2>/dev/null || return 1
 }
 
-normalize_devo_version_output() {
+normalize_infinitecode_version_output() {
     raw_version="$1"
 
     for part in $raw_version; do
@@ -417,18 +417,18 @@ normalize_devo_version_output() {
     fi
 }
 
-installed_devo_version() {
+installed_infinitecode_version() {
     installed_path="$1"
     raw_version="$("$installed_path" --version 2>/dev/null || printf '')"
-    normalize_devo_version_output "$raw_version"
+    normalize_infinitecode_version_output "$raw_version"
 }
 
 print_version_transition() {
     target_version="$1"
-    installed_path="$(existing_devo_path || true)"
+    installed_path="$(existing_infinitecode_path || true)"
 
     if [ -n "$installed_path" ]; then
-        current_version="$(installed_devo_version "$installed_path")"
+        current_version="$(installed_infinitecode_version "$installed_path")"
     else
         current_version="not installed"
     fi
@@ -438,18 +438,18 @@ print_version_transition() {
 
 check_version() {
     expected_version="$1"
-    installed_path="$(existing_devo_path || true)"
+    installed_path="$(existing_infinitecode_path || true)"
 
     if [ -z "$installed_path" ]; then
         return
     fi
 
-    installed_version="$(installed_devo_version "$installed_path")"
+    installed_version="$(installed_infinitecode_version "$installed_path")"
 
     if [ "$installed_version" = "$expected_version" ]; then
         print_message info "${MUTED}${APP} ${NC}${expected_version}${MUTED} is already installed at ${NC}${installed_path}"
         skip_app_install="true"
-        if [ "${DEVO_SKIP_RG_INSTALL:-}" = "1" ] || [ -x "${install_dir}/${RG_APP}" ]; then
+        if [ "${INFINITECODE_SKIP_RG_INSTALL:-}" = "1" ] || [ -x "${install_dir}/${RG_APP}" ]; then
             if ! should_install_code_search_model; then
                 exit 0
             fi
@@ -530,8 +530,8 @@ download_and_install() {
 }
 
 install_ripgrep_sidecar() {
-    if [ "${DEVO_SKIP_RG_INSTALL:-}" = "1" ]; then
-        print_message warning "Skipping ripgrep sidecar install because DEVO_SKIP_RG_INSTALL=1."
+    if [ "${INFINITECODE_SKIP_RG_INSTALL:-}" = "1" ]; then
+        print_message warning "Skipping ripgrep sidecar install because INFINITECODE_SKIP_RG_INSTALL=1."
         return
     fi
 
@@ -568,8 +568,8 @@ install_ripgrep_sidecar() {
 }
 
 code_search_model_dir() {
-    devo_home="${DEVO_HOME:-$HOME/.devo}"
-    printf '%s\n' "${devo_home}/${CODE_SEARCH_LOCAL_MODELS_DIR}/${CODE_SEARCH_MODEL_DIR_NAME}"
+    infinitecode_home="${INFINITECODE_HOME:-$HOME/.infinitecode}"
+    printf '%s\n' "${infinitecode_home}/${CODE_SEARCH_LOCAL_MODELS_DIR}/${CODE_SEARCH_MODEL_DIR_NAME}"
 }
 
 code_search_model_files_present() {
@@ -647,7 +647,7 @@ find_offline_file() {
     return 1
 }
 
-install_offline_devo() {
+install_offline_infinitecode() {
     asset_dir="$1"
     target="$2"
 
@@ -665,7 +665,7 @@ install_offline_devo() {
 
     archive_path="$(find_offline_file "$asset_dir" "${APP}-*-${target}.tar.gz" || true)"
     if [ -z "$archive_path" ]; then
-        die "Offline devo asset not found. Place ${APP}-*-${target}.tar.gz or ${APP} next to install.sh."
+        die "Offline infinitecode asset not found. Place ${APP}-*-${target}.tar.gz or ${APP} next to install.sh."
     fi
 
     require_command tar "Error: 'tar' is required but not installed."
@@ -689,8 +689,8 @@ install_offline_devo() {
 install_offline_ripgrep_sidecar() {
     asset_dir="$1"
 
-    if [ "${DEVO_SKIP_RG_INSTALL:-}" = "1" ]; then
-        print_message warning "Skipping ripgrep sidecar install because DEVO_SKIP_RG_INSTALL=1."
+    if [ "${INFINITECODE_SKIP_RG_INSTALL:-}" = "1" ]; then
+        print_message warning "Skipping ripgrep sidecar install because INFINITECODE_SKIP_RG_INSTALL=1."
         return
     fi
 
@@ -774,7 +774,7 @@ main() {
         asset_dir="$(installer_asset_dir)"
         print_message info "${MUTED}Offline asset directory: ${NC}${asset_dir}"
         target="$(detect_target)"
-        install_offline_devo "$asset_dir" "$target"
+        install_offline_infinitecode "$asset_dir" "$target"
         install_offline_ripgrep_sidecar "$asset_dir"
         install_offline_code_search_model_files "$asset_dir"
     elif [ -n "$binary_path" ]; then
@@ -815,7 +815,7 @@ main() {
     print_message info "${MUTED}${APP} is ready.${NC}"
     print_message info ""
     print_message info "  cd <project>    ${MUTED}# open your workspace${NC}"
-    print_message info "  devo onboard    ${MUTED}# first-run setup${NC}"
+    print_message info "  infinitecode onboard    ${MUTED}# first-run setup${NC}"
     print_message info ""
     print_message info "${MUTED}Docs: ${NC}https://github.com/${REPO}#readme"
 }

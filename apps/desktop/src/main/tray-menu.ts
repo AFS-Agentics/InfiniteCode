@@ -1,5 +1,5 @@
 import type { MenuItemConstructorOptions } from "electron"
-import type { Project, Session } from "@devo-ai/sdk/v2/client"
+import type { Project, Session } from "@infinitecode-ai/sdk/v2/client"
 import type { SessionState } from "./notification-watcher"
 
 const MAX_RUNNING_INLINE = 3

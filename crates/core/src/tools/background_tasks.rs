@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use devo_protocol::{
+use infinitecode_protocol::{
     AwaitTaskResult, CommandTaskMetadata, SessionId, TaskId, TaskInfo, TaskKind, TaskState,
 };
 use tokio::sync::{Mutex, Notify};

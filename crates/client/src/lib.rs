@@ -1,4 +1,4 @@
-//! Client-side transport API for talking to a Devo server.
+//! Client-side transport API for talking to a InfiniteCode server.
 //!
 //! Protocol logic (JSON-RPC routing, pending response maps, ACP client handlers)
 //! lives in `client_core`. [`stdio::StdioServerClient`] and

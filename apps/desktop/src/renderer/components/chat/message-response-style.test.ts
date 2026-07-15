@@ -14,7 +14,7 @@ const rendererCssSource = readFileSync(new URL("../../index.css", import.meta.ur
 describe("MessageResponse markdown surfaces", () => {
 	test("uses desktop dark theme surfaces for streamdown markdown cells", () => {
 		expect({
-			responseClass: messageSource.includes("devo-message-response"),
+			responseClass: messageSource.includes("infinitecode-message-response"),
 			codeBlockSurface: rendererCssSource.includes('[data-streamdown="code-block"]'),
 			codeBlockBodySurface: rendererCssSource.includes('[data-streamdown="code-block-body"]'),
 			tableHeaderSurface: rendererCssSource.includes('[data-streamdown="table-header"]'),

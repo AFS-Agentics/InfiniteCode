@@ -1,9 +1,9 @@
 "use client"
 
-import { Label } from "@devo/ui/components/label"
-import { Separator } from "@devo/ui/components/separator"
+import { Label } from "@infinitecode/ui/components/label"
+import { Separator } from "@infinitecode/ui/components/separator"
 
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { cva, type VariantProps } from "class-variance-authority"
 import { useMemo } from "react"
 

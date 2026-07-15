@@ -4,7 +4,7 @@ use std::path::Path;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use devo_protocol::ProviderVendor;
+use infinitecode_protocol::ProviderVendor;
 use toml::Value;
 
 use crate::ProviderConfigError;

@@ -1,7 +1,7 @@
 /**
  * Session history converter (opt-in, P2 priority).
  *
- * Converts Claude Code JSONL session transcripts to Devo's JSON storage format.
+ * Converts Claude Code JSONL session transcripts to InfiniteCode's JSON storage format.
  */
 
 import { createHash } from "node:crypto"
@@ -22,7 +22,7 @@ import type { HistoryScanResult } from "../types/scan-result"
 import { readJsonl } from "../utils/fs"
 
 /**
- * Convert Claude Code session history to Devo format.
+ * Convert Claude Code session history to InfiniteCode format.
  */
 export async function convertHistory(history: HistoryScanResult): Promise<{
 	sessions: ConvertedSession[]
@@ -110,7 +110,7 @@ export async function convertHistory(history: HistoryScanResult): Promise<{
 }
 
 /**
- * Convert Claude Code session lines to Devo message format.
+ * Convert Claude Code session lines to InfiniteCode message format.
  *
  * Each line has `type: "user"|"assistant"` at the top level and
  * the actual Anthropic API message nested under `message`.

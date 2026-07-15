@@ -8,7 +8,7 @@
 
 /** Popular providers shown prominently in onboarding and settings, in display order */
 export const POPULAR_PROVIDER_IDS = [
-	"devo",
+	"infinitecode",
 	"anthropic",
 	"openai",
 	"google",
@@ -19,17 +19,17 @@ export const POPULAR_PROVIDER_IDS = [
 ] as const
 
 // ============================================================
-// Devo Zen
+// InfiniteCode Zen
 // ============================================================
 
-/** The provider ID for Devo Zen (always auto-loads, free tier available) */
-export const ZEN_PROVIDER_ID = "devo"
+/** The provider ID for InfiniteCode Zen (always auto-loads, free tier available) */
+export const ZEN_PROVIDER_ID = "infinitecode"
 
-/** URL to sign up for an Devo Zen API key */
-export const ZEN_SIGNUP_URL = "https://devo.ai/zen/"
+/** URL to sign up for an InfiniteCode Zen API key */
+export const ZEN_SIGNUP_URL = "https://infinitecode.ai/zen/"
 
-/** URL to Devo Zen documentation */
-export const ZEN_DOCS_URL = "https://devo.ai/docs/zen"
+/** URL to InfiniteCode Zen documentation */
+export const ZEN_DOCS_URL = "https://infinitecode.ai/docs/zen"
 
 // ============================================================
 // Provider key signup URLs
@@ -37,7 +37,7 @@ export const ZEN_DOCS_URL = "https://devo.ai/docs/zen"
 
 /** External URLs for getting API keys from popular providers */
 export const PROVIDER_KEY_URLS: Record<string, { label: string; url: string }> = {
-	devo: { label: "Get API key", url: "https://devo.ai/zen/" },
+	infinitecode: { label: "Get API key", url: "https://infinitecode.ai/zen/" },
 	anthropic: { label: "Get API key", url: "https://console.anthropic.com/settings/keys" },
 	openai: { label: "Get API key", url: "https://platform.openai.com/api-keys" },
 	google: { label: "Get API key", url: "https://aistudio.google.com/apikey" },
@@ -114,7 +114,7 @@ interface ModelWithCost {
  * Heuristic: detect whether a provider is connected via a subscription plan
  * (e.g. Claude Pro/Max) by checking if ALL model costs are zeroed out.
  *
- * The Devo auth plugins zero out costs for subscription-based OAuth
+ * The InfiniteCode auth plugins zero out costs for subscription-based OAuth
  * connections (Anthropic Pro/Max, OpenAI ChatGPT Pro/Plus). The `source`
  * field from the server is unreliable for this distinction, so we use
  * model costs instead.

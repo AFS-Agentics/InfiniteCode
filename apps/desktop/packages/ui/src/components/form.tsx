@@ -1,5 +1,5 @@
-import { Label } from "@devo/ui/components/label"
-import { cn } from "@devo/ui/lib/utils"
+import { Label } from "@infinitecode/ui/components/label"
+import { cn } from "@infinitecode/ui/lib/utils"
 import * as React from "react"
 import {
 	Controller,

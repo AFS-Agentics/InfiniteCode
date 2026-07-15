@@ -1,7 +1,7 @@
 "use client"
 
 import { Slider as SliderPrimitive } from "@base-ui/react/slider"
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import * as React from "react"
 
 function Slider({

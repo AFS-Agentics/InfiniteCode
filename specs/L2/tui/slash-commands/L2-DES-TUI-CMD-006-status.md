@@ -31,7 +31,7 @@ Define the TUI behavior for `/status`, which displays current session configurat
 ┃ Status
   model       deepseek-v4-pro
   reasoning   high
-  workspace   ~/Desktop/devo
+  workspace   ~/Desktop/infinitecode
   mode        BUILD
   tokens      ↑420[cached 300 71%] ↓12
   context     ▰▰▱▱▱▱▱▱▱▱ 20% 190k/950k

@@ -9,7 +9,7 @@ description: 理解命令分发和终端 UI 生命周期。
 
 Binary 从 `crates/cli/src/main.rs` 启动。
 
-`devo_arg0::run_as` 包装 async CLI runner，使同一个 binary 可以支持普通 `devo` 执行和 server-style entrypoints。`Cli` parser 定义：
+`infinitecode_arg0::run_as` 包装 async CLI runner，使同一个 binary 可以支持普通 `infinitecode` 执行和 server-style entrypoints。`Cli` parser 定义：
 
 | Surface | Source behavior |
 | --- | --- |
@@ -30,14 +30,14 @@ Interactive startup 实现在 `crates/cli/src/agent_command.rs`。
 路径：
 
 1. 解析当前工作目录。
-2. 解析 `DEVO_HOME`。
+2. 解析 `INFINITECODE_HOME`。
 3. 加载 preset model catalog。
 4. 加载当前工作区的 effective app config。
 5. 解析 project permission preset。
 6. 决定是否显示 onboarding。
 7. 解析 provider settings，或使用 onboarding fallback model。
 8. 将存储的 model bindings 转换成 TUI `SavedModelEntry` values。
-9. 调用 `devo_tui::run_interactive_tui`。
+9. 调用 `infinitecode_tui::run_interactive_tui`。
 
 TUI 接收 `InitialTuiSession`：
 

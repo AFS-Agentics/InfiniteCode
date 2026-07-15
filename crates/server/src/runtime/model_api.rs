@@ -1,13 +1,13 @@
-use devo_core::ModelCatalogEntry;
-use devo_core::ModelCatalogParams;
-use devo_core::ModelCatalogResult;
-use devo_core::ModelConfigParams;
-use devo_core::ModelConfigResult;
-use devo_core::ModelConfigSetParams;
-use devo_core::ModelSavedEntry;
-use devo_core::ModelSavedParams;
-use devo_core::ModelSavedResult;
-use devo_core::ProviderWireApi;
+use infinitecode_core::ModelCatalogEntry;
+use infinitecode_core::ModelCatalogParams;
+use infinitecode_core::ModelCatalogResult;
+use infinitecode_core::ModelConfigParams;
+use infinitecode_core::ModelConfigResult;
+use infinitecode_core::ModelConfigSetParams;
+use infinitecode_core::ModelSavedEntry;
+use infinitecode_core::ModelSavedParams;
+use infinitecode_core::ModelSavedResult;
+use infinitecode_core::ProviderWireApi;
 
 use crate::runtime::handlers::acp_config_options::{
     ACP_MODEL_CONFIG_ID, ACP_REASONING_EFFORT_CONFIG_ID, select_options_contain_value,
@@ -119,7 +119,7 @@ impl ServerRuntime {
 
         let config_options = self.acp_model_config_options_for_context(&runtime_context);
         let Some(config_option) = config_options.iter().find(|option| match option {
-            devo_core::AcpSessionConfigOption::Select { id, .. } => id == &params.config_id,
+            infinitecode_core::AcpSessionConfigOption::Select { id, .. } => id == &params.config_id,
         }) else {
             return self.error_response(
                 request_id,
@@ -128,7 +128,7 @@ impl ServerRuntime {
             );
         };
         let value_is_allowed = match config_option {
-            devo_core::AcpSessionConfigOption::Select { options, .. } => {
+            infinitecode_core::AcpSessionConfigOption::Select { options, .. } => {
                 select_options_contain_value(options, &params.value)
             }
         };

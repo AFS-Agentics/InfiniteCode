@@ -1,7 +1,7 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { cn } from "@infinitecode/ui/lib/utils"
 import Ansi from "ansi-to-react"
 import { CheckIcon, CopyIcon, TerminalIcon, Trash2Icon } from "lucide-react"
 import type { ComponentProps, HTMLAttributes } from "react"

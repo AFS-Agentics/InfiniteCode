@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use devo_protocol::{
-    ACP_SESSION_UPDATE_METHOD, AcpSessionNotification, AcpSessionUpdate, DEVO_TURN_USAGE_META,
+use infinitecode_protocol::{
+    ACP_SESSION_UPDATE_METHOD, AcpSessionNotification, AcpSessionUpdate, INFINITECODE_TURN_USAGE_META,
     ServerEvent, SessionCompactionFailedPayload, SessionEventPayload, TurnEventPayload,
     TurnFailedPayload, TurnUsageUpdatedPayload,
 };
@@ -31,10 +31,10 @@ pub fn client_event_from_notification(
         if let AcpSessionUpdate::UsageUpdate { meta, .. } = acp_notification.update
             && let Some(payload) = meta
                 .as_ref()
-                .and_then(|meta| meta.get(DEVO_TURN_USAGE_META))
+                .and_then(|meta| meta.get(INFINITECODE_TURN_USAGE_META))
         {
             return Ok(Some(ClientEvent::TurnUsageUpdated(
-                serde_json::from_value(payload.clone()).context("decode Devo usage metadata")?,
+                serde_json::from_value(payload.clone()).context("decode InfiniteCode usage metadata")?,
             )));
         }
         return Ok(None);
@@ -64,14 +64,14 @@ pub fn client_event_from_notification(
 
 #[cfg(test)]
 mod tests {
-    use devo_protocol::{SessionId, TurnId, TurnUsage, TurnUsageUpdatedPayload};
+    use infinitecode_protocol::{SessionId, TurnId, TurnUsage, TurnUsageUpdatedPayload};
 
     use super::ClientEvent;
     use super::client_event_from_notification;
     use crate::ServerNotificationMessage;
 
     #[test]
-    fn client_event_usage_normalizes_devo_notification() {
+    fn client_event_usage_normalizes_infinitecode_notification() {
         let session_id = SessionId::new();
         let turn_id = TurnId::new();
         let payload = TurnUsageUpdatedPayload {
@@ -94,7 +94,7 @@ mod tests {
         };
         let notification = ServerNotificationMessage {
             method: "turn/usage/updated".to_string(),
-            params: serde_json::to_value(devo_protocol::ServerEvent::TurnUsageUpdated(
+            params: serde_json::to_value(infinitecode_protocol::ServerEvent::TurnUsageUpdated(
                 payload.clone(),
             ))
             .expect("serialize usage event"),
@@ -129,7 +129,7 @@ mod tests {
             context_window: Some(200_000),
         };
         let notification = ServerNotificationMessage {
-            method: devo_protocol::ACP_SESSION_UPDATE_METHOD.to_string(),
+            method: infinitecode_protocol::ACP_SESSION_UPDATE_METHOD.to_string(),
             params: serde_json::json!({
                 "sessionId": session_id,
                 "update": {
@@ -137,7 +137,7 @@ mod tests {
                     "used": 1_380,
                     "size": 200_000,
                     "_meta": {
-                        "devo/turnUsage": payload,
+                        "infinitecode/turnUsage": payload,
                     },
                 },
             }),

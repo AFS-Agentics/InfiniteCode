@@ -10,7 +10,7 @@ interface DefaultSourcePathOptions {
 }
 
 interface StageRuntimeOptions extends DefaultSourcePathOptions {
-	devoBin?: string
+	infinitecodeBin?: string
 	desktopDir: string
 	hostArch?: NodeJS.Architecture
 	hostPlatform?: NodeJS.Platform
@@ -36,19 +36,19 @@ export function platformForTargetTriple(
 	return fallback
 }
 
-export function defaultDevoSourcePath({
+export function defaultInfiniteCodeSourcePath({
 	repoRoot,
 	targetTriple,
 	platform = process.platform,
 }: DefaultSourcePathOptions): string {
 	const targetParts = targetTriple ? ["target", targetTriple, "release"] : ["target", "release"]
-	return join(repoRoot, ...targetParts, runtimeBinaryName("devo", platformForTargetTriple(targetTriple, platform)))
+	return join(repoRoot, ...targetParts, runtimeBinaryName("infinitecode", platformForTargetTriple(targetTriple, platform)))
 }
 
 export function stageRuntime(options: StageRuntimeOptions): void {
-	const devoSource = options.devoBin ?? defaultDevoSourcePath(options)
+	const infinitecodeSource = options.infinitecodeBin ?? defaultInfiniteCodeSourcePath(options)
 	const targetPlatform = platformForTargetTriple(options.targetTriple, options.platform ?? process.platform)
-	const rgOverride = options.rgBin ?? optionalPath(process.env.DEVO_DESKTOP_RUNTIME_RG_BIN)
+	const rgOverride = options.rgBin ?? optionalPath(process.env.INFINITECODE_DESKTOP_RUNTIME_RG_BIN)
 
 	if (
 		!rgOverride &&
@@ -60,19 +60,19 @@ export function stageRuntime(options: StageRuntimeOptions): void {
 		})
 	) {
 		throw new Error(
-			`ripgrep sidecar for cross-target ${options.targetTriple} must be passed with --rg-bin or DEVO_DESKTOP_RUNTIME_RG_BIN`,
+			`ripgrep sidecar for cross-target ${options.targetTriple} must be passed with --rg-bin or INFINITECODE_DESKTOP_RUNTIME_RG_BIN`,
 		)
 	}
 
 	const rgSource =
 		rgOverride ??
 		findExecutable(runtimeBinaryName("rg", targetPlatform), [
-			join(homedir(), ".devo", "bin"),
+			join(homedir(), ".infinitecode", "bin"),
 			...(process.env.PATH ?? "").split(delimiter),
 		])
 
-	if (!existsSync(devoSource)) {
-		throw new Error(`Devo runtime binary not found at ${devoSource}`)
+	if (!existsSync(infinitecodeSource)) {
+		throw new Error(`InfiniteCode runtime binary not found at ${infinitecodeSource}`)
 	}
 	if (!rgSource || !existsSync(rgSource)) {
 		throw new Error("ripgrep sidecar not found. Install rg or pass --rg-bin <path>.")
@@ -82,12 +82,12 @@ export function stageRuntime(options: StageRuntimeOptions): void {
 	rmSync(runtimeBinDir, { recursive: true, force: true })
 	mkdirSync(runtimeBinDir, { recursive: true })
 
-	const devoDest = join(runtimeBinDir, runtimeBinaryName("devo", targetPlatform))
+	const infinitecodeDest = join(runtimeBinDir, runtimeBinaryName("infinitecode", targetPlatform))
 	const rgDest = join(runtimeBinDir, runtimeBinaryName("rg", targetPlatform))
-	copyExecutable(devoSource, devoDest, targetPlatform)
+	copyExecutable(infinitecodeSource, infinitecodeDest, targetPlatform)
 	copyExecutable(rgSource, rgDest, targetPlatform)
 
-	console.log(`Prepared Desktop runtime: ${devoDest}`)
+	console.log(`Prepared Desktop runtime: ${infinitecodeDest}`)
 	console.log(`Prepared ripgrep sidecar: ${rgDest}`)
 }
 
@@ -140,7 +140,7 @@ if (import.meta.main) {
 		repoRoot,
 		targetTriple: argValue("--target"),
 		platform: process.platform,
-		devoBin: argValue("--devo-bin") ?? optionalPath(process.env.DEVO_DESKTOP_RUNTIME_DEVO_BIN),
+		infinitecodeBin: argValue("--infinitecode-bin") ?? optionalPath(process.env.INFINITECODE_DESKTOP_RUNTIME_DEVO_BIN),
 		rgBin: argValue("--rg-bin"),
 	})
 }

@@ -186,7 +186,7 @@ export async function stashAndCheckout(directory: string, branch: string): Promi
 		const needsStash = !status.isClean()
 
 		if (needsStash) {
-			await git.stash(["push", "-m", `devo: auto-stash before switching to ${branch}`])
+			await git.stash(["push", "-m", `infinitecode: auto-stash before switching to ${branch}`])
 		}
 
 		// Now checkout
@@ -333,7 +333,7 @@ export async function createBranch(
 /**
  * Applies a raw diff string to a target directory using `git apply`.
  * Used for remote worktree apply-to-local, where the diff is fetched
- * from the Devo session.diff API.
+ * from the InfiniteCode session.diff API.
  */
 export async function applyDiffTextToLocal(
 	localDir: string,
@@ -345,7 +345,7 @@ export async function applyDiffTextToLocal(
 
 	const os = await import("node:os")
 	const fs = await import("node:fs/promises")
-	const tmpFile = path.join(os.tmpdir(), `devo-remote-patch-${Date.now()}.patch`)
+	const tmpFile = path.join(os.tmpdir(), `infinitecode-remote-patch-${Date.now()}.patch`)
 
 	try {
 		await fs.writeFile(tmpFile, diffText)
@@ -402,7 +402,7 @@ export async function applyChangesToLocal(
 		// Write diff to a temp file, then apply it to the local directory
 		const os = await import("node:os")
 		const fs = await import("node:fs/promises")
-		const tmpFile = path.join(os.tmpdir(), `devo-patch-${Date.now()}.patch`)
+		const tmpFile = path.join(os.tmpdir(), `infinitecode-patch-${Date.now()}.patch`)
 		await fs.writeFile(tmpFile, diff)
 
 		const localGit = getGit(localDir)

@@ -10,8 +10,8 @@ read [Runtime Flow](./runtime-flow).
 
 The binary starts in `crates/cli/src/main.rs`.
 
-`devo_arg0::run_as` wraps the async CLI runner so the same binary can support
-normal `devo` execution and server-style entrypoints. The `Cli` parser defines:
+`infinitecode_arg0::run_as` wraps the async CLI runner so the same binary can support
+normal `infinitecode` execution and server-style entrypoints. The `Cli` parser defines:
 
 | Surface | Source behavior |
 | --- | --- |
@@ -32,14 +32,14 @@ Interactive startup is implemented in `crates/cli/src/agent_command.rs`.
 The path:
 
 1. Resolve current working directory.
-2. Resolve `DEVO_HOME`.
+2. Resolve `INFINITECODE_HOME`.
 3. Load the preset model catalog.
 4. Load effective app config for the current workspace.
 5. Resolve project permission preset.
 6. Decide whether onboarding should be shown.
 7. Resolve provider settings or use an onboarding fallback model.
 8. Convert stored model bindings into TUI `SavedModelEntry` values.
-9. Call `devo_tui::run_interactive_tui`.
+9. Call `infinitecode_tui::run_interactive_tui`.
 
 The TUI receives an `InitialTuiSession` with:
 

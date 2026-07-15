@@ -4,7 +4,7 @@ use std::ffi::OsStr;
 use std::path::Path;
 use std::path::PathBuf;
 
-use devo_util_paths::absolute_path::AbsolutePathBuf;
+use infinitecode_util_paths::absolute_path::AbsolutePathBuf;
 use futures::future::join_all;
 use schemars::JsonSchema;
 use serde::Deserialize;

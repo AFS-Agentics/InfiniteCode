@@ -3,11 +3,11 @@
  *
  * Shows a file tree of what will be created/modified, a diff preview of
  * selected files, and executes the migration with backup on confirmation.
- * Supports all migration providers (Claude Code, Cursor, Devo, OpenCode).
+ * Supports all migration providers (Claude Code, Cursor, InfiniteCode, OpenCode).
  */
 
-import { Button } from "@devo/ui/components/button"
-import { Spinner } from "@devo/ui/components/spinner"
+import { Button } from "@infinitecode/ui/components/button"
+import { Spinner } from "@infinitecode/ui/components/spinner"
 import {
 	AlertTriangleIcon,
 	ArrowLeftIcon,
@@ -45,7 +45,7 @@ interface MigrationPreviewStepProps {
 const PROVIDER_LABELS: Record<MigrationProvider, string> = {
 	"claude-code": "Claude Code",
 	cursor: "Cursor",
-	devo: "InfiniteCode",
+	infinitecode: "InfiniteCode",
 	opencode: "OpenCode",
 }
 
@@ -232,7 +232,7 @@ export function MigrationPreviewStep({
 
 				{/* Backup notice */}
 				<p className="text-center text-xs text-muted-foreground/60">
-					A backup will be saved to ~/.config/devo/backups/ before any changes.
+					A backup will be saved to ~/.config/infinitecode/backups/ before any changes.
 				</p>
 
 				{/* Actions */}

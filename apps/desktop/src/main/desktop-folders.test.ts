@@ -12,7 +12,7 @@ let rootDir = ""
 
 describe("desktop folders", () => {
 	beforeEach(async () => {
-		rootDir = await mkdtemp(path.join(tmpdir(), "devo-desktop-folders-"))
+		rootDir = await mkdtemp(path.join(tmpdir(), "infinitecode-desktop-folders-"))
 	})
 
 	afterEach(async () => {

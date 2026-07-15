@@ -1,22 +1,22 @@
 /**
- * Automation executor -- runs agent sessions via the Devo SDK.
+ * Automation executor -- runs agent sessions via the InfiniteCode SDK.
  *
  * Given an automation config and workspace directory, the executor:
  * 1. Creates a worktree (if useWorktree is enabled)
- * 2. Creates an Devo session with the appropriate permission ruleset
+ * 2. Creates an InfiniteCode session with the appropriate permission ruleset
  * 3. Sends the automation prompt (with memory file context)
  * 4. Monitors ACP events until session goes idle or times out
  * 5. Captures results (summary, branch, diffs) and updates the run record
  * 6. Auto-archives if the agent reports nothing actionable
  *
- * Modeled after Devo's `run` CLI (packages/devo/src/cli/cmd/run.ts).
+ * Modeled after InfiniteCode's `run` CLI (packages/infinitecode/src/cli/cmd/run.ts).
  */
 
 import fs from "node:fs"
 import path from "node:path"
-import type { DevoClient, PermissionRuleset } from "@devo-ai/sdk/v2/client"
+import type { InfiniteCodeClient, PermissionRuleset } from "@infinitecode-ai/sdk/v2/client"
 import { createLogger } from "../logger"
-import { createAutomationClient } from "./devo-client"
+import { createAutomationClient } from "./infinitecode-client"
 import { getConfigDir } from "./paths"
 import type { AutomationConfig, PermissionPreset } from "./types"
 
@@ -105,7 +105,7 @@ function buildPermissionRuleset(preset: PermissionPreset): PermissionRuleset {
 
 /**
  * Returns the path to the automation's memory file.
- * Lives at ~/.config/devo/automations/<id>/memory.md
+ * Lives at ~/.config/infinitecode/automations/<id>/memory.md
  */
 function getMemoryFilePath(automationId: string): string {
 	return path.join(getConfigDir(), "automations", automationId, "memory.md")
@@ -169,7 +169,7 @@ export interface ExecutionResult {
  * Returns collected text output and error information.
  */
 async function monitorSession(
-	client: DevoClient,
+	client: InfiniteCodeClient,
 	sessionId: string,
 	timeoutMs: number,
 	signal: AbortSignal,
@@ -306,7 +306,7 @@ function parseActionable(text: string): boolean {
 
 /**
  * Parses a model string in "providerID/modelID" format into the object
- * shape expected by the Devo SDK. Returns undefined if the string
+ * shape expected by the InfiniteCode SDK. Returns undefined if the string
  * is empty or malformed.
  */
 function parseModelRef(modelStr: string): { providerID: string; modelID: string } | undefined {
@@ -324,7 +324,7 @@ function parseModelRef(modelStr: string): { providerID: string; modelID: string 
 // ============================================================
 
 /**
- * Callback fired as soon as the Devo session is created, before the
+ * Callback fired as soon as the InfiniteCode session is created, before the
  * prompt is sent and monitoring begins. This allows the caller to persist
  * the sessionId immediately so the renderer can show the live session.
  */
@@ -349,7 +349,7 @@ export async function executeRun(
 ): Promise<ExecutionResult> {
 	const client = createAutomationClient(workspace)
 	if (!client) {
-		log.error("Cannot execute run: no Devo server running", {
+		log.error("Cannot execute run: no InfiniteCode server running", {
 			automationId: config.id,
 			workspace,
 		})
@@ -360,7 +360,7 @@ export async function executeRun(
 			summary: "",
 			hasActionable: false,
 			branch: null,
-			error: "No Devo server running",
+			error: "No InfiniteCode server running",
 		}
 	}
 

@@ -1,7 +1,7 @@
 /**
- * @devo/configconv -- Universal agent configuration converter.
+ * @infinitecode/configconv -- Universal agent configuration converter.
  *
- * Supports converting between Claude Code, Devo, and Cursor formats
+ * Supports converting between Claude Code, InfiniteCode, and Cursor formats
  * using a hub-and-spoke architecture with a canonical intermediate representation.
  *
  * Primary API:
@@ -15,7 +15,7 @@
  * Format-specific scanners:
  *   scan()            -> ScanResult           Claude Code scanner
  *   scanCursor()      -> CursorScanResult     Cursor scanner
- *   scanDevo()    -> DevoScanResult   Devo scanner
+ *   scanInfiniteCode()    -> InfiniteCodeScanResult   InfiniteCode scanner
  *
  * Backup/restore:
  *   createBackup()  -> string | undefined
@@ -31,11 +31,11 @@
 // ─── From-canonical converters ───────────────────────────────
 export { canonicalToClaudeCode } from "./converter/from-canonical/to-claude-code"
 export { canonicalToCursor } from "./converter/from-canonical/to-cursor"
-export { canonicalToDevo } from "./converter/from-canonical/to-devo"
+export { canonicalToInfiniteCode } from "./converter/from-canonical/to-infinitecode"
 // ─── To-canonical converters ─────────────────────────────────
 export { claudeCodeToCanonical } from "./converter/to-canonical/claude-code"
 export { cursorToCanonical } from "./converter/to-canonical/cursor"
-export { openCodeToCanonical } from "./converter/to-canonical/devo"
+export { openCodeToCanonical } from "./converter/to-canonical/infinitecode"
 export type { AnyScanResult } from "./converter/universal"
 export {
 	formatName,
@@ -91,10 +91,10 @@ export { writeHistorySessions, writeHistorySessionsDetailed } from "./writer/his
 
 export type {
 	CursorScanOptions,
-	DevoScanOptions,
+	InfiniteCodeScanOptions,
 	UniversalScanOptions,
 } from "./scanner"
-export { scan, scanCursor, scanFormat, scanDevo, scanOpenCode } from "./scanner"
+export { scan, scanCursor, scanFormat, scanInfiniteCode, scanOpenCode } from "./scanner"
 
 // ============================================================
 // Canonical types (format-agnostic)
@@ -178,17 +178,17 @@ export type {
 } from "./types/cursor"
 export { determineCursorRuleMode } from "./types/cursor"
 
-// ─── Devo types ──────────────────────────────────────────
+// ─── InfiniteCode types ──────────────────────────────────────────
 export type {
-	DevoAgentConfig,
-	DevoAgentFrontmatter,
-	DevoCommandFrontmatter,
-	DevoConfig,
-	DevoMcpLocal,
-	DevoMcpRemote,
-	DevoPermission,
-	DevoPermissionAction,
-} from "./types/devo"
+	InfiniteCodeAgentConfig,
+	InfiniteCodeAgentFrontmatter,
+	InfiniteCodeCommandFrontmatter,
+	InfiniteCodeConfig,
+	InfiniteCodeMcpLocal,
+	InfiniteCodeMcpRemote,
+	InfiniteCodePermission,
+	InfiniteCodePermissionAction,
+} from "./types/infinitecode"
 
 // ─── OpenCode types ────────────────────────────────────────
 export type {

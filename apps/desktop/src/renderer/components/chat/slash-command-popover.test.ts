@@ -89,7 +89,7 @@ describe("Desktop slash command composer", () => {
 			rendersPopover: newChatSource.includes("<SlashCommandPopover"),
 			allowsPopoverOverflow:
 				newChatSource.includes("data-popover-open") &&
-				desktopChromeSource.includes('.devo-composer-shell[data-popover-open="true"]') &&
+				desktopChromeSource.includes('.infinitecode-composer-shell[data-popover-open="true"]') &&
 				desktopChromeSource.includes("overflow: visible"),
 		}).toEqual({
 			importsPopover: true,

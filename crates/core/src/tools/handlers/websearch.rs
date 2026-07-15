@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use devo_config::LocalWebSearchProviderKind;
-use devo_config::ResolvedLocalWebSearchConfig;
+use infinitecode_config::LocalWebSearchProviderKind;
+use infinitecode_config::ResolvedLocalWebSearchConfig;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -12,7 +12,7 @@ use crate::tool_handler::ToolHandler;
 use crate::tool_spec::{ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, ToolSpec};
 use crate::tools::websearch_prompt::web_search_prompt;
 
-const LOCAL_CONFIG_KEY: &str = "__devo_local_web_search";
+const LOCAL_CONFIG_KEY: &str = "__infinitecode_local_web_search";
 const DEFAULT_EXA_BASE_URL: &str = "https://api.exa.ai/search";
 const DEFAULT_TAVILY_BASE_URL: &str = "https://api.tavily.com/search";
 const DEFAULT_MAX_RESULTS: u32 = 5;
@@ -132,11 +132,11 @@ async fn search_exa(
     network_no_proxy: Option<String>,
 ) -> Result<String, ToolCallError> {
     let url = config.base_url.as_deref().unwrap_or(DEFAULT_EXA_BASE_URL);
-    let proxy_config = devo_network_proxy::NetworkProxyConfig {
+    let proxy_config = infinitecode_network_proxy::NetworkProxyConfig {
         proxy_url: network_proxy,
         no_proxy: network_no_proxy,
     };
-    let client = devo_network_proxy::build_client_config(&proxy_config).map_err(|error| {
+    let client = infinitecode_network_proxy::build_client_config(&proxy_config).map_err(|error| {
         ToolCallError::ExecutionFailed(format!("Failed to create HTTP client: {error}"))
     })?;
     let response = client
@@ -167,11 +167,11 @@ async fn search_tavily(
         .base_url
         .as_deref()
         .unwrap_or(DEFAULT_TAVILY_BASE_URL);
-    let proxy_config = devo_network_proxy::NetworkProxyConfig {
+    let proxy_config = infinitecode_network_proxy::NetworkProxyConfig {
         proxy_url: network_proxy,
         no_proxy: network_no_proxy,
     };
-    let client = devo_network_proxy::build_client_config(&proxy_config).map_err(|error| {
+    let client = infinitecode_network_proxy::build_client_config(&proxy_config).map_err(|error| {
         ToolCallError::ExecutionFailed(format!("Failed to create HTTP client: {error}"))
     })?;
     let response = client

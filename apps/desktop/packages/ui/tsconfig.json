@@ -14,7 +14,7 @@
 		"noUnusedLocals": true,
 		"noUnusedParameters": true,
 		"paths": {
-			"@devo/ui/*": ["./src/*"]
+			"@infinitecode/ui/*": ["./src/*"]
 		}
 	},
 	"include": ["src/**/*.ts", "src/**/*.tsx"],

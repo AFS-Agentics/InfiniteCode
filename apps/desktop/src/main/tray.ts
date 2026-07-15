@@ -13,7 +13,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { createDevoClient, type Project, type Session } from "@devo-ai/sdk/v2/client"
+import { createInfiniteCodeClient, type Project, type Session } from "@infinitecode-ai/sdk/v2/client"
 import { app, type BrowserWindow, Menu, nativeImage, Tray } from "electron"
 import { createLogger } from "./logger"
 import {
@@ -22,7 +22,7 @@ import {
 	onStateChanged,
 	type SessionState,
 } from "./notification-watcher"
-import { getAcpTransport, getServerUrl, onServerReady } from "./devo-manager"
+import { getAcpTransport, getServerUrl, onServerReady } from "./infinitecode-manager"
 import { buildCodexStyleTrayMenuTemplate, type DiscoveryCache } from "./tray-menu"
 
 const log = createLogger("tray")
@@ -261,7 +261,7 @@ async function refreshDiscovery(): Promise<void> {
 
 async function refreshDiscoveryForServer(): Promise<void> {
 	try {
-		const client = createDevoClient({ transport: getAcpTransport() })
+		const client = createInfiniteCodeClient({ transport: getAcpTransport() })
 		const [projectsResult, sessionsResult] = await Promise.all([
 			client.project.list(),
 			client.session.list({ roots: true }),

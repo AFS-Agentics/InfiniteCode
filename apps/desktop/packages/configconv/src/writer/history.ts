@@ -2,14 +2,14 @@
  * History session writer.
  *
  * Writes converted chat sessions (from any source: Claude Code, Cursor, etc.)
- * to the Devo storage format.
+ * to the InfiniteCode storage format.
  *
- * As of Devo v1.2.0, storage uses a single SQLite database (devo.db)
+ * As of InfiniteCode v1.2.0, storage uses a single SQLite database (infinitecode.db)
  * instead of the previous flat-file layout. This writer supports both:
- *   - SQLite mode (default, v1.2.0+): writes to ~/.local/share/devo/devo.db
- *   - Legacy flat-file mode: writes JSON files to ~/.local/share/devo/storage/
+ *   - SQLite mode (default, v1.2.0+): writes to ~/.local/share/infinitecode/infinitecode.db
+ *   - Legacy flat-file mode: writes JSON files to ~/.local/share/infinitecode/storage/
  *
- * SQLite schema (from devo.db):
+ * SQLite schema (from infinitecode.db):
  *   project(id, worktree, vcs, name, ..., time_created, time_updated, sandboxes, commands)
  *   session(id, project_id, parent_id, slug, directory, title, version, ..., time_created, time_updated)
  *   message(id, session_id, time_created, time_updated, data TEXT)
@@ -73,7 +73,7 @@ export interface HistoryWriteOptions {
 }
 
 /**
- * Write converted sessions to Devo storage with deduplication.
+ * Write converted sessions to InfiniteCode storage with deduplication.
  *
  * Checks for existing sessions and skips duplicates.
  * Returns both files written and duplicates skipped.
@@ -283,7 +283,7 @@ function openWritableDatabase(dbPath: string): SqliteDatabase {
 		// biome-ignore lint/suspicious/noExplicitAny: bun:sqlite is not typed in Node
 		const BunDatabase = (require as any)("bun:sqlite").Database
 		const raw = new BunDatabase(dbPath)
-		raw.exec(DEVO_SCHEMA)
+		raw.exec(INFINITECODE_SCHEMA)
 		return wrapRawDb(raw)
 	}
 
@@ -291,13 +291,13 @@ function openWritableDatabase(dbPath: string): SqliteDatabase {
 		// biome-ignore lint/suspicious/noExplicitAny: node:sqlite may not exist
 		const { DatabaseSync } = (require as any)("node:sqlite")
 		const raw = new DatabaseSync(dbPath)
-		raw.exec(DEVO_SCHEMA)
+		raw.exec(INFINITECODE_SCHEMA)
 		return wrapRawDb(raw)
 	} catch {
 		// biome-ignore lint/suspicious/noExplicitAny: better-sqlite3 may not be available
 		const BetterDatabase = (require as any)("better-sqlite3")
 		const raw = new BetterDatabase(dbPath)
-		raw.exec(DEVO_SCHEMA)
+		raw.exec(INFINITECODE_SCHEMA)
 		return wrapRawDb(raw)
 	}
 }
@@ -327,7 +327,7 @@ function wrapRawDb(raw: any): SqliteDatabase {
 	}
 }
 
-const DEVO_SCHEMA = `
+const INFINITECODE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS project (
 	id TEXT PRIMARY KEY,
 	worktree TEXT NOT NULL,
@@ -391,8 +391,8 @@ CREATE TABLE IF NOT EXISTS part (
 /**
  * Legacy flat-file writer for backward compatibility.
  *
- * Devo storage layout (pre-v1.2.0):
- *   ~/.local/share/devo/storage/
+ * InfiniteCode storage layout (pre-v1.2.0):
+ *   ~/.local/share/infinitecode/storage/
  *     project/<projectId>.json         - Project metadata
  *     session/<projectId>/<sessionId>.json - Session metadata
  *     message/<sessionId>/<messageId>.json - Message metadata

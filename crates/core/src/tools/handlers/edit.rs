@@ -4,8 +4,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use devo_tools::ClientTextFileRead;
-use devo_tools::ClientTextFileWrite;
+use infinitecode_tools::ClientTextFileRead;
+use infinitecode_tools::ClientTextFileWrite;
 use tracing::info;
 
 use super::file_change_metadata::write_tool_result;
@@ -258,7 +258,7 @@ mod tests {
     use super::*;
     use crate::contracts::{ToolAgentScope, ToolBudgets, ToolTerminalStatus};
     use crate::invocation::ToolCallId;
-    use devo_tools::FileReadLedger;
+    use infinitecode_tools::FileReadLedger;
 
     fn ctx(root: &Path, ledger: Arc<FileReadLedger>) -> ToolContext {
         ToolContext {
@@ -272,7 +272,7 @@ mod tests {
             },
             cancel_token: CancellationToken::new(),
             agent_scope: ToolAgentScope::Parent,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: None,

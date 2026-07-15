@@ -1,6 +1,6 @@
-# devo-network-proxy
+# infinitecode-network-proxy
 
-`devo-network-proxy` provides small reqwest helpers for Devo local tools.
+`infinitecode-network-proxy` provides small reqwest helpers for InfiniteCode local tools.
 
 The helper applies proxy settings in this order:
 

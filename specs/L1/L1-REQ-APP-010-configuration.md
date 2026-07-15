@@ -25,7 +25,7 @@ Users need control over modes, permissions, tools, integrations, interface behav
 
 Model and reasoning defaults are configured through onboarding and supported model-selection workflows, rather than requiring a separate generic settings screen for reasoning effort changes.
 
-Configuration is loaded from a user-scoped configuration file and, when present, a project-scoped configuration file. The project-scoped configuration file at `project_directory/.dev/config.toml` takes precedence over the user-scoped configuration file. The user-scoped configuration file is `C:\Users\username\.devo\config.toml` on Windows and `~/.devo/config.toml` on macOS or Linux.
+Configuration is loaded from a user-scoped configuration file and, when present, a project-scoped configuration file. The project-scoped configuration file at `project_directory/.dev/config.toml` takes precedence over the user-scoped configuration file. The user-scoped configuration file is `C:\Users\username\.infinitecode\config.toml` on Windows and `~/.infinitecode/config.toml` on macOS or Linux.
 
 ## User / Business Requirement
 
@@ -47,8 +47,8 @@ The program must provide persistent application-level configuration for core use
 - Configuration information entered during onboarding must be persistently saved to a configuration file.
 - Onboarding-created model, provider, provider-specific model name, model display name, invocation method, and reasoning effort configuration must be restorable in later launches.
 - The program must support a project-scoped configuration file at `project_directory/.dev/config.toml`.
-- The program must support a user-scoped configuration file at `C:\Users\username\.devo\config.toml` on Windows.
-- The program must support a user-scoped configuration file at `~/.devo/config.toml` on macOS and Linux.
+- The program must support a user-scoped configuration file at `C:\Users\username\.infinitecode\config.toml` on Windows.
+- The program must support a user-scoped configuration file at `~/.infinitecode/config.toml` on macOS and Linux.
 - When both project-scoped and user-scoped configuration files exist, project-scoped configuration must take precedence over user-scoped configuration for overlapping settings.
 - When configuration is persisted, the program must make the persistence target deterministic so the user can understand whether the saved value is project-scoped or user-scoped.
 - The program must not require a separate generic settings screen as the post-onboarding path for changing model reasoning effort.

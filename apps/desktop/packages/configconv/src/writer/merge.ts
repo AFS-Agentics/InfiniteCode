@@ -1,15 +1,15 @@
 /**
- * Deep merge utilities for combining Devo configs.
+ * Deep merge utilities for combining InfiniteCode configs.
  *
  * When writing converted config to disk, we often need to merge with an existing
- * devo.json rather than overwrite it. This module implements merge strategies.
+ * infinitecode.json rather than overwrite it. This module implements merge strategies.
  */
-import type { DevoConfig } from "../types/devo"
+import type { InfiniteCodeConfig } from "../types/infinitecode"
 
 export type MergeStrategy = "preserve-existing" | "overwrite" | "merge"
 
 /**
- * Deep merge two Devo configs according to the given strategy.
+ * Deep merge two InfiniteCode configs according to the given strategy.
  *
  * @param existing - Current config on disk (target)
  * @param incoming - Converted config from cc2oc (source)
@@ -17,10 +17,10 @@ export type MergeStrategy = "preserve-existing" | "overwrite" | "merge"
  * @returns Merged config
  */
 export function mergeConfigs(
-	existing: Partial<DevoConfig>,
-	incoming: Partial<DevoConfig>,
+	existing: Partial<InfiniteCodeConfig>,
+	incoming: Partial<InfiniteCodeConfig>,
 	strategy: MergeStrategy = "preserve-existing",
-): Partial<DevoConfig> {
+): Partial<InfiniteCodeConfig> {
 	if (strategy === "overwrite") {
 		return { ...existing, ...incoming }
 	}
@@ -38,13 +38,13 @@ export function mergeConfigs(
  * For nested objects (mcp, agent, provider), merge at the key level.
  */
 function preserveMerge(
-	existing: Partial<DevoConfig>,
-	incoming: Partial<DevoConfig>,
-): Partial<DevoConfig> {
+	existing: Partial<InfiniteCodeConfig>,
+	incoming: Partial<InfiniteCodeConfig>,
+): Partial<InfiniteCodeConfig> {
 	const result = { ...existing }
 
 	for (const [key, value] of Object.entries(incoming)) {
-		const k = key as keyof DevoConfig
+		const k = key as keyof InfiniteCodeConfig
 		const existingVal = result[k]
 
 		if (existingVal === undefined) {
@@ -67,9 +67,9 @@ function preserveMerge(
  * Deep merge: recursively merge objects, with existing values taking precedence.
  */
 function deepMerge(
-	existing: Partial<DevoConfig>,
-	incoming: Partial<DevoConfig>,
-): Partial<DevoConfig> {
+	existing: Partial<InfiniteCodeConfig>,
+	incoming: Partial<InfiniteCodeConfig>,
+): Partial<InfiniteCodeConfig> {
 	const result = { ...existing }
 
 	for (const [key, value] of Object.entries(incoming)) {

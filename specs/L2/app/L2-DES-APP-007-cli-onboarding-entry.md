@@ -33,7 +33,7 @@ The TUI onboarding screens remain defined by `L2-DES-TUI-001`. This document def
 The CLI should provide an explicit onboarding argument:
 
 ```text
-devo --onboard
+infinitecode --onboard
 ```
 
 Behavior:

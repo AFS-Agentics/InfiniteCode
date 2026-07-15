@@ -8,9 +8,9 @@ import {
 	CommandList,
 	CommandSeparator,
 	CommandShortcut,
-} from "@devo/ui/components/command"
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@devo/ui/components/dialog"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/command"
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@infinitecode/ui/components/dialog"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { ComponentProps, ReactNode } from "react"
 
 export type ModelSelectorProps = ComponentProps<typeof Dialog>
@@ -108,7 +108,7 @@ export type ModelSelectorLogoProps = Omit<ComponentProps<"img">, "src" | "alt"> 
 		| "azure"
 		| "baseten"
 		| "huggingface"
-		| "devo"
+		| "infinitecode"
 		| "fastrouter"
 		| "google"
 		| "google-vertex"

@@ -1,7 +1,7 @@
 //! Normalization helpers for provider request messages.
 //!
 //! Some providers require tool results to appear immediately after the assistant
-//! tool-use message that requested them. Devo can inject user-role context
+//! tool-use message that requested them. InfiniteCode can inject user-role context
 //! messages between those records, so this pass groups the required tool results
 //! first while preserving the remaining user content after them.
 

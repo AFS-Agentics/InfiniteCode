@@ -708,7 +708,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn list_directory_command_uses_ls_in_search_directory_on_unix() {
-        let search_directory = Path::new("/tmp/devo-file-search");
+        let search_directory = Path::new("/tmp/infinitecode-file-search");
         let command = list_directory_std_command(search_directory);
         let args = command.get_args().collect::<Vec<_>>();
 
@@ -720,7 +720,7 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn list_directory_command_uses_dir_in_search_directory_on_windows() {
-        let search_directory = Path::new(r"C:\devo-file-search");
+        let search_directory = Path::new(r"C:\infinitecode-file-search");
         let command = list_directory_std_command(search_directory);
         let args = command.get_args().collect::<Vec<_>>();
 

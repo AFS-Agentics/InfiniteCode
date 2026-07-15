@@ -528,12 +528,12 @@ export interface ContextUsage {
 /** Default buffer reserved for output tokens before compaction. */
 const COMPACTION_BUFFER = 20_000
 
-/** Maximum output tokens Devo will request (capped at this value). */
+/** Maximum output tokens InfiniteCode will request (capped at this value). */
 const OUTPUT_TOKEN_MAX = 32_000
 
 /**
  * Compute the compaction threshold for a model, mirroring the logic from
- * devo's `SessionCompaction.isOverflow`. Returns the usable token count
+ * infinitecode's `SessionCompaction.isOverflow`. Returns the usable token count
  * above which compaction will be triggered.
  *
  * @param limit - The model's token limits
@@ -555,7 +555,7 @@ export interface ModelLimitInfo {
 	output: number
 }
 
-/** Compaction config from the Devo server, used to compute accurate thresholds. */
+/** Compaction config from the InfiniteCode server, used to compute accurate thresholds. */
 export interface CompactionOptions {
 	/** Whether auto-compaction is enabled (default: true) */
 	auto?: boolean
@@ -634,7 +634,7 @@ export interface ContextBreakdownSegment {
 	percent: number
 }
 
-/** Rough estimate: ~4 chars per token (same heuristic as devo). */
+/** Rough estimate: ~4 chars per token (same heuristic as infinitecode). */
 const estimateTokens = (chars: number) => Math.ceil(chars / 4)
 
 /**

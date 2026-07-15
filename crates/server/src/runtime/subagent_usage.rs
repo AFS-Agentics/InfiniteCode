@@ -95,9 +95,9 @@ pub(crate) struct ParentUsageSnapshot {
 
 /// How a usage sample should update turn accounting.
 ///
-/// Provider streams emit partial [`UsageDelta`](devo_core::QueryEvent::UsageDelta)
+/// Provider streams emit partial [`UsageDelta`](infinitecode_core::QueryEvent::UsageDelta)
 /// values (often `output_tokens = 0` at message start) and a final
-/// [`Usage`](devo_core::QueryEvent::Usage) per model call. Tool-use turns run
+/// [`Usage`](infinitecode_core::QueryEvent::Usage) per model call. Tool-use turns run
 /// multiple model calls; completed legs must accumulate while in-flight samples
 /// may only replace the current leg.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

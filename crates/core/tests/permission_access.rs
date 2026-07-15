@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use devo_core::{
+use infinitecode_core::{
     AccessMode, FsPolicyEntry, NetworkPolicy, PermissionProfile, can_read, can_write,
     resolve_access,
 };

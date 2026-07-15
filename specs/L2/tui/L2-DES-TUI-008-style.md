@@ -19,7 +19,7 @@ Define the visual style system for the TUI: color tokens, symbols, spacing, anim
 
 The TUI should feel like a polished terminal-native work surface: compact, readable, responsive, and visually rich without becoming decorative noise. Existing TUI design documents define layout and behavior. This document defines the shared visual grammar those documents should use.
 
-The style system must be product-owned. It should not depend on another application's theme names, renderer internals, or copied implementation symbols. Devo may learn from mature terminal interfaces, but the resulting design must be expressed as Devo configuration, Devo theme tokens, and Devo component contracts.
+The style system must be product-owned. It should not depend on another application's theme names, renderer internals, or copied implementation symbols. InfiniteCode may learn from mature terminal interfaces, but the resulting design must be expressed as InfiniteCode configuration, InfiniteCode theme tokens, and InfiniteCode component contracts.
 
 ## Source Requirements
 
@@ -83,10 +83,10 @@ Model output must not be allowed to render arbitrary UI components directly. If 
 
 Themes should expose semantic tokens. Component code should request tokens by role, not by hex color.
 
-### Devo Dark
+### InfiniteCode Dark
 
 ```yaml
-name: "devo-dark"
+name: "infinitecode-dark"
 appearance: "dark"
 
 core:
@@ -156,10 +156,10 @@ terminal:
   cursor: "#d75f00"
 ```
 
-### Devo Light
+### InfiniteCode Light
 
 ```yaml
-name: "devo-light"
+name: "infinitecode-light"
 appearance: "light"
 
 core:
@@ -231,7 +231,7 @@ terminal:
 
 ## Theme Management
 
-The default built-in themes are `devo-dark` and `devo-light`. `devo-dark` should be the default unless user or workspace configuration selects another theme.
+The default built-in themes are `infinitecode-dark` and `infinitecode-light`. `infinitecode-dark` should be the default unless user or workspace configuration selects another theme.
 
 Theme selection is user-facing through `/theme` and durable through the `[tui]` section of `config.toml`.
 
@@ -339,7 +339,7 @@ Rules:
 ### Composer Band
 
 - Background uses `surface.inputBand`.
-- Empty hint `Ask Devo` uses `text.muted`.
+- Empty hint `Ask InfiniteCode` uses `text.muted`.
 - User input uses `text.primary`.
 - Prompt marker `┃` uses the active input mode color: `mode.build`, `mode.plan`, or `mode.shell`.
 - Matched slash command token uses `core.primary`.
@@ -452,10 +452,10 @@ Rules:
 ┃ ╚═════╝  ╚══════╝  ╚═══╝   ╚═════╝                        ┃
 ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
 ┃ Model      deepseek-v4-pro                Reasoning   high ┃
-┃ Workspace  ~/Desktop/devo                                  ┃
+┃ Workspace  ~/Desktop/infinitecode                                  ┃
 ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
 
-  Tip: Ready in /Users/username/Desktop/devo
+  Tip: Ready in /Users/username/Desktop/infinitecode
 
 ┃ Refactor the parser in three steps:
 ┃ 1. isolate quoted-value parsing
@@ -476,7 +476,7 @@ Rules:
 
 ⠋ Working · ⏱ 12s
 
-┃ Ask Devo
+┃ Ask InfiniteCode
 
   BUILD · deepseek-v4-pro high  ↑420[cached 300 71%]  ↓12  ▰▰▱▱▱▱▱▱▱▱  20%  190k/950k
 ```
@@ -507,7 +507,7 @@ Rules:
 
 | Revision | Date | Author | Change Type | Notes |
 |---:|---|---|---|---|
-| 1 | 2026-05-26 | Assistant | Initial | Initial Devo TUI style system, replacing raw external design notes with semantic tokens, symbols, component style contracts, accessibility rules, and a polished example frame. |
+| 1 | 2026-05-26 | Assistant | Initial | Initial InfiniteCode TUI style system, replacing raw external design notes with semantic tokens, symbols, component style contracts, accessibility rules, and a polished example frame. |
 | 2 | 2026-05-26 | Assistant | Minor | Added a direct Plan cell style example and linked detailed Plan behavior back to `L2-DES-TUI-004`. |
 | 3 | 2026-05-26 | Human | Refinement | Defined navigable-list marker semantics: `>` for focused row and `●` for currently enabled option. |
 | 4 | 2026-05-27 | Human | Refinement | Added the `⏱` symbol before elapsed time in live active-work indicators. |

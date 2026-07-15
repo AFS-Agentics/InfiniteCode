@@ -1,14 +1,14 @@
 use std::path::PathBuf;
 
-use devo_protocol::ApprovalDecisionValue;
-use devo_protocol::ApprovalScopeValue;
-use devo_protocol::CollaborationMode;
-use devo_protocol::InputItem;
-use devo_protocol::RequestUserInputResponse;
-use devo_protocol::SessionId;
-use devo_protocol::ThreadGoalStatus;
-use devo_protocol::TurnId;
-use devo_protocol::TurnStartParams;
+use infinitecode_protocol::ApprovalDecisionValue;
+use infinitecode_protocol::ApprovalScopeValue;
+use infinitecode_protocol::CollaborationMode;
+use infinitecode_protocol::InputItem;
+use infinitecode_protocol::RequestUserInputResponse;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::ThreadGoalStatus;
+use infinitecode_protocol::TurnId;
+use infinitecode_protocol::TurnStartParams;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -92,7 +92,7 @@ pub(crate) enum AppCommand {
         response: RequestUserInputResponse,
     },
     UpdatePermissions {
-        preset: devo_protocol::PermissionPreset,
+        preset: infinitecode_protocol::PermissionPreset,
     },
     BrowseInputHistory {
         direction: InputHistoryDirection,
@@ -160,7 +160,7 @@ pub(crate) enum AppCommandView<'a> {
         response: &'a RequestUserInputResponse,
     },
     UpdatePermissions {
-        preset: devo_protocol::PermissionPreset,
+        preset: infinitecode_protocol::PermissionPreset,
     },
     OverrideTurnContext {
         cwd: &'a Option<PathBuf>,
@@ -464,7 +464,7 @@ impl AppCommand {
             approval_policy: approval_policy.clone(),
             cwd: cwd.clone(),
             collaboration_mode: *collaboration_mode,
-            execution_mode: devo_server::TurnExecutionMode::Regular,
+            execution_mode: infinitecode_server::TurnExecutionMode::Regular,
         })
     }
 }

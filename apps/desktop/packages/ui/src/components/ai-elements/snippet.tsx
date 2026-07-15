@@ -6,8 +6,8 @@ import {
 	InputGroupButton,
 	InputGroupInput,
 	InputGroupText,
-} from "@devo/ui/components/input-group"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/input-group"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { CheckIcon, CopyIcon } from "lucide-react"
 import type { ComponentProps } from "react"
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"

@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::find_devo_home;
+use crate::find_infinitecode_home;
 
 /// The fixed directory name used for user-level and project-level config folders.
 pub const APP_CONFIG_DIR_NAME: &str = ".infinitecode";
@@ -48,7 +48,7 @@ pub fn current_user_config_file() -> Result<PathBuf, ConfigPathError> {
 /// Filesystem-backed config-path resolver for the local host process.
 #[derive(Debug, Clone)]
 pub struct FileSystemConfigPathResolver {
-    /// The resolved user-level config directory (for example `~/.devo`).
+    /// The resolved user-level config directory (for example `~/.infinitecode`).
     user_config_dir: PathBuf,
 }
 
@@ -60,7 +60,7 @@ impl FileSystemConfigPathResolver {
 
     pub fn from_env() -> Result<Self, ConfigPathError> {
         let user_config_dir =
-            find_devo_home().map_err(|_| ConfigPathError::HomeDirectoryUnavailable)?;
+            find_infinitecode_home().map_err(|_| ConfigPathError::HomeDirectoryUnavailable)?;
         Ok(Self::new(user_config_dir))
     }
 

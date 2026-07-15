@@ -1,6 +1,6 @@
 ---
 title: Model Resolution
-description: Understand how Devo selects the active model binding.
+description: Understand how InfiniteCode selects the active model binding.
 ---
 
 Model resolution is the process that turns a user request like `/model
@@ -8,19 +8,19 @@ deepseek-v4-pro` into a concrete provider, model name, wire API, and credential.
 
 ## Resolution Order
 
-When a requested model value is present, Devo checks enabled model bindings in
+When a requested model value is present, InfiniteCode checks enabled model bindings in
 this order:
 
 1. binding id equals the requested value;
 2. `model_slug` equals the requested value;
 3. `request_model` equals the requested value.
 
-When no requested model value is present, Devo checks:
+When no requested model value is present, InfiniteCode checks:
 
 1. `[defaults].model_binding`, if it names an enabled binding;
 2. the first enabled binding in config.
 
-The resolved binding gives Devo:
+The resolved binding gives InfiniteCode:
 
 - binding id;
 - model slug;
@@ -44,15 +44,15 @@ models. `/model <value>` applies the value directly.
 ## Enabled Versus Configured
 
 Runtime turn selection only uses enabled bindings. Disabled bindings can still
-be visible to configuration validation so Devo can explain that a selected
+be visible to configuration validation so InfiniteCode can explain that a selected
 binding is disabled instead of silently selecting a different model.
 
-Providers are checked too. If a binding points to a disabled provider, Devo
+Providers are checked too. If a binding points to a disabled provider, InfiniteCode
 reports that the provider is disabled.
 
 ## Provider Settings
 
-After a binding resolves, Devo resolves provider settings:
+After a binding resolves, InfiniteCode resolves provider settings:
 
 1. find the provider named by the binding;
 2. confirm the provider is enabled;
@@ -63,15 +63,15 @@ After a binding resolves, Devo resolves provider settings:
 6. merge provider base URL, headers, selected model name, reasoning effort selection,
    context settings, and HTTP proxy settings.
 
-If no provider can be resolved, Devo reports:
+If no provider can be resolved, InfiniteCode reports:
 
 ```text
-No provider configured. Run `devo onboard` to complete setup.
+No provider configured. Run `infinitecode onboard` to complete setup.
 ```
 
 ## Reasoning Effort Selection
 
-The active reasoning effort selection can come from config or model selection. Devo
+The active reasoning effort selection can come from config or model selection. InfiniteCode
 stores it as a user-facing value such as `disabled`, `enabled`, `high`, or
 `max`, then resolves it into provider-specific request fields for the selected
 wire API.
@@ -81,7 +81,7 @@ turn selection is present.
 
 ## Request Model Map
 
-For models with variants, Devo builds a provider request model map scoped to the
+For models with variants, InfiniteCode builds a provider request model map scoped to the
 selected provider. This prevents another provider with the same local slug from
 changing the wire model name for the active provider.
 

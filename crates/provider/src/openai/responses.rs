@@ -2,7 +2,7 @@ use std::{collections::HashMap, pin::Pin};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use devo_protocol::{
+use infinitecode_protocol::{
     ModelRequest, ModelResponse, RequestContent, ResponseContent, ResponseExtra, ResponseMetadata,
     StopReason, StreamEvent, Usage,
 };
@@ -985,21 +985,21 @@ fn responses_stream_tool_content(
 
 #[cfg(test)]
 mod tests {
-    use devo_protocol::{
+    use infinitecode_protocol::{
         ModelRequest, RequestContent, RequestMessage, SamplingControls, ToolDefinition,
     };
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
     use super::parse_response;
-    use devo_protocol::{ResponseContent, ResponseExtra};
+    use infinitecode_protocol::{ResponseContent, ResponseExtra};
 
     use crate::openai::responses::build_request;
 
     #[test]
     fn debug_request_body_includes_reasoning_and_tools() {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::CatalogSlug("gpt-5.4".to_string()),
+            model_slug: infinitecode_protocol::ModelProfileKey::CatalogSlug("gpt-5.4".to_string()),
             model: "gpt-5.4".to_string(),
             system: Some("You are helpful.".to_string()),
             messages: vec![RequestMessage {
@@ -1022,7 +1022,7 @@ mod tests {
                 top_k: Some(12),
             },
             request_thinking: Some("medium".to_string()),
-            reasoning_effort: Some(devo_protocol::ReasoningEffort::Medium),
+            reasoning_effort: Some(infinitecode_protocol::ReasoningEffort::Medium),
             extra_body: None,
         };
 
@@ -1041,7 +1041,7 @@ mod tests {
     #[test]
     fn build_request_omits_unsupported_hosted_tool_history() {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::CatalogSlug("gpt-5.4".to_string()),
+            model_slug: infinitecode_protocol::ModelProfileKey::CatalogSlug("gpt-5.4".to_string()),
             model: "gpt-5.4".to_string(),
             system: None,
             messages: vec![

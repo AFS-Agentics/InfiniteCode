@@ -417,7 +417,7 @@ mod tests {
     fn context(client_terminal: Arc<dyn ClientTerminal>) -> ToolContext {
         ToolContext {
             tool_call_id: ToolCallId("call-1".to_string()),
-            session_id: devo_protocol::SessionId::new().to_string(),
+            session_id: infinitecode_protocol::SessionId::new().to_string(),
             turn_id: None,
             workspace_root: std::env::current_dir().expect("current dir"),
             budgets: ToolBudgets {
@@ -426,7 +426,7 @@ mod tests {
             },
             cancel_token: CancellationToken::new(),
             agent_scope: ToolAgentScope::Parent,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: Some(client_terminal),

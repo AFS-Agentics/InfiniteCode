@@ -1,13 +1,13 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
-} from "@devo/ui/components/collapsible"
-import { useControllableState } from "@devo/ui/hooks/use-controllable-state"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/collapsible"
+import { useControllableState } from "@infinitecode/ui/hooks/use-controllable-state"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { AlertTriangleIcon, CheckIcon, ChevronDownIcon, CopyIcon } from "lucide-react"
 import type { ComponentProps } from "react"
 import {

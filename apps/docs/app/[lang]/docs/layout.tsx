@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import { RootProvider } from "fumadocs-ui/provider/next";
 import { DocsLanguageSwitch } from "@/app/_components/docs-language-switch";
-import { DevoWord } from "@/app/_components/landing/devo-word";
+import { InfiniteCodeWord } from "@/app/_components/landing/infinitecode-word";
 import {
   docsI18nProvider,
   isLocalizedDocsLanguage,
@@ -32,7 +32,7 @@ export default async function Layout({
         tree={source.getPageTree(lang)}
         nav={{
           title: (
-            <DevoWord
+            <InfiniteCodeWord
               className="text-sm font-semibold"
               iconClassName="h-5 w-5 rounded-full bg-[#070a0f] p-0.5"
               key="docs-brand"

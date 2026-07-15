@@ -2,10 +2,10 @@
  * Command file converter.
  *
  * Claude Code: .claude/commands/*.md with {name, description}
- * Devo: .devo/commands/*.md with {description, agent, subtask}
+ * InfiniteCode: .infinitecode/commands/*.md with {description, agent, subtask}
  */
 
-import type { DevoCommandFrontmatter } from "../types/devo"
+import type { InfiniteCodeCommandFrontmatter } from "../types/infinitecode"
 import type { MigrationReport } from "../types/report"
 import { createEmptyReport } from "../types/report"
 import type { CommandFile } from "../types/scan-result"
@@ -18,7 +18,7 @@ export interface CommandConversionResult {
 }
 
 /**
- * Convert Claude Code command definitions to Devo format.
+ * Convert Claude Code command definitions to InfiniteCode format.
  */
 export function convertCommands(commands: CommandFile[]): CommandConversionResult {
 	const result = new Map<string, string>()
@@ -45,7 +45,7 @@ export function convertCommands(commands: CommandFile[]): CommandConversionResul
 
 function convertSingleCommand(cmd: CommandFile): string {
 	const fm = cmd.frontmatter
-	const ocFm: DevoCommandFrontmatter = {}
+	const ocFm: InfiniteCodeCommandFrontmatter = {}
 
 	// Description
 	ocFm.description = (fm.description as string) ?? cmd.name
@@ -57,7 +57,7 @@ function convertSingleCommand(cmd: CommandFile): string {
 	ocFm.subtask = false
 
 	// Check if the command body uses shell execution patterns
-	// that might benefit from the !`command` syntax in Devo
+	// that might benefit from the !`command` syntax in InfiniteCode
 	if (cmd.body.includes("```bash") || cmd.body.includes("```sh")) {
 		// Note in frontmatter isn't needed, but we could flag in report
 	}

@@ -52,29 +52,29 @@ colored = "2"
 crossbeam-channel = "0.5.15"
 crossterm = { version = "0.28", features = ["event-stream"] }
 derive_more = "2"
-devo-arg0 = { path = "crates/arg0" }
-devo-client = { path = "crates/client" }
-devo-code-search = { path = "crates/code-search" }
-devo-config = { path = "crates/config" }
-devo-core = { path = "crates/core" }
-devo-file-search = { path = "crates/file-search" }
-devo-keyring-store = { path = "crates/keyring-store" }
-devo-mcp = { path = "crates/mcp" }
-devo-network-proxy = { path = "crates/network-proxy" }
-devo-protocol = { path = "crates/protocol" }
-devo-provider = { path = "crates/provider" }
-devo-rmcp-client = { path = "crates/rmcp-client" }
-devo-safety = { path = "crates/safety" }
-devo-server = { path = "crates/server" }
-devo-skills = { path = "crates/skills" }
-devo-tasks = { path = "crates/tasks" }
-devo-tools = { path = "crates/tools" }
-devo-tui = { path = "crates/tui" }
-devo-util-fuzzy = { path = "crates/utils/fuzzy" }
-devo-util-git = { path = "crates/utils/git" }
-devo-util-paths = { path = "crates/utils/paths" }
-devo-util-process = { path = "crates/utils/process" }
-devo-util-shell-command = { path = "crates/utils/shell-command" }
+infinitecode-arg0 = { path = "crates/arg0" }
+infinitecode-client = { path = "crates/client" }
+infinitecode-code-search = { path = "crates/code-search" }
+infinitecode-config = { path = "crates/config" }
+infinitecode-core = { path = "crates/core" }
+infinitecode-file-search = { path = "crates/file-search" }
+infinitecode-keyring-store = { path = "crates/keyring-store" }
+infinitecode-mcp = { path = "crates/mcp" }
+infinitecode-network-proxy = { path = "crates/network-proxy" }
+infinitecode-protocol = { path = "crates/protocol" }
+infinitecode-provider = { path = "crates/provider" }
+infinitecode-rmcp-client = { path = "crates/rmcp-client" }
+infinitecode-safety = { path = "crates/safety" }
+infinitecode-server = { path = "crates/server" }
+infinitecode-skills = { path = "crates/skills" }
+infinitecode-tasks = { path = "crates/tasks" }
+infinitecode-tools = { path = "crates/tools" }
+infinitecode-tui = { path = "crates/tui" }
+infinitecode-util-fuzzy = { path = "crates/utils/fuzzy" }
+infinitecode-util-git = { path = "crates/utils/git" }
+infinitecode-util-paths = { path = "crates/utils/paths" }
+infinitecode-util-process = { path = "crates/utils/process" }
+infinitecode-util-shell-command = { path = "crates/utils/shell-command" }
 diffy = "0.4.2"
 dirs = "6"
 fs2 = "0.4"

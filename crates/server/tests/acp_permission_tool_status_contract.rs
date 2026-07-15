@@ -10,44 +10,44 @@ use std::time::Instant;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolCallError;
-use devo_core::tools::ToolHandler;
-use devo_core::tools::ToolRegistry;
-use devo_core::tools::ToolRegistryBuilder;
-use devo_core::tools::ToolResult;
-use devo_core::tools::ToolResultContent;
-use devo_core::tools::json_schema::JsonSchema;
-use devo_core::tools::tool_spec::ToolExecutionMode;
-use devo_core::tools::tool_spec::ToolOutputMode;
-use devo_core::tools::tool_spec::ToolSpec;
-use devo_protocol::AcpEmptyResult;
-use devo_protocol::AcpNewSessionResult;
-use devo_protocol::AcpPromptResult;
-use devo_protocol::AcpSessionNotification;
-use devo_protocol::AcpSessionUpdate;
-use devo_protocol::AcpStopReason;
-use devo_protocol::AcpToolCallStatus;
-use devo_protocol::Model;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::SessionId;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::SingleProviderRouter;
-use devo_server::AcpSuccessResponse;
-use devo_server::ClientTransportKind;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolCallError;
+use infinitecode_core::tools::ToolHandler;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_core::tools::ToolRegistryBuilder;
+use infinitecode_core::tools::ToolResult;
+use infinitecode_core::tools::ToolResultContent;
+use infinitecode_core::tools::json_schema::JsonSchema;
+use infinitecode_core::tools::tool_spec::ToolExecutionMode;
+use infinitecode_core::tools::tool_spec::ToolOutputMode;
+use infinitecode_core::tools::tool_spec::ToolSpec;
+use infinitecode_protocol::AcpEmptyResult;
+use infinitecode_protocol::AcpNewSessionResult;
+use infinitecode_protocol::AcpPromptResult;
+use infinitecode_protocol::AcpSessionNotification;
+use infinitecode_protocol::AcpSessionUpdate;
+use infinitecode_protocol::AcpStopReason;
+use infinitecode_protocol::AcpToolCallStatus;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_server::AcpSuccessResponse;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
 use futures::Stream;
 use futures::stream;
 use pretty_assertions::assert_eq;
@@ -315,9 +315,9 @@ impl ToolHandler for ApprovalTool {
 
     async fn handle(
         &self,
-        _ctx: devo_core::tools::ToolContext,
+        _ctx: infinitecode_core::tools::ToolContext,
         _input: serde_json::Value,
-        _progress: Option<devo_core::tools::ToolProgressSender>,
+        _progress: Option<infinitecode_core::tools::ToolProgressSender>,
     ) -> std::result::Result<ToolResult, ToolCallError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         Ok(ToolResult::success(
@@ -343,7 +343,7 @@ fn approval_tool_spec() -> ToolSpec {
         execution_mode: ToolExecutionMode::Mutating,
         capability_tags: vec![],
         supports_parallel: false,
-        preparation_feedback: devo_core::tools::ToolPreparationFeedback::None,
+        preparation_feedback: infinitecode_core::tools::ToolPreparationFeedback::None,
         display_name: None,
         supports_cancellation: None,
         supports_streaming: None,
@@ -533,7 +533,7 @@ fn build_runtime(
     provider: Arc<dyn ModelProviderSDK>,
     registry: Arc<ToolRegistry>,
 ) -> Result<Arc<ServerRuntime>> {
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         data_root.join("acp_permission_tool_status_contract.db"),
     )?);
     Ok(ServerRuntime::new(
@@ -553,7 +553,7 @@ fn build_runtime(
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 data_root.to_path_buf(),
@@ -566,7 +566,7 @@ fn build_runtime(
 async fn initialize_acp_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(4096);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;

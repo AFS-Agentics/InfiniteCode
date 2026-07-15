@@ -1,8 +1,8 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { Spinner } from "@devo/ui/components/spinner"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { Spinner } from "@infinitecode/ui/components/spinner"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { MicIcon, SquareIcon } from "lucide-react"
 import type { ComponentProps } from "react"
 import { useCallback, useEffect, useRef, useState } from "react"

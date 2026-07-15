@@ -1,8 +1,8 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { ButtonGroup, ButtonGroupText } from "@devo/ui/components/button-group"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { ButtonGroup, ButtonGroupText } from "@infinitecode/ui/components/button-group"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { Experimental_SpeechResult as SpeechResult } from "ai"
 import {
 	MediaControlBar,

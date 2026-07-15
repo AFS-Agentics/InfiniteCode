@@ -1,27 +1,27 @@
 ---
 title: First Task
-description: Run a practical first coding task with Devo.
+description: Run a practical first coding task with InfiniteCode.
 ---
 
 Use the first task to prove three things:
 
-1. Devo is running in the repository you intended.
+1. InfiniteCode is running in the repository you intended.
 2. The model can read and reason about the project.
-3. Devo can make a small scoped change and run the right checks.
+3. InfiniteCode can make a small scoped change and run the right checks.
 
 Start with read-only context. Move to edits only after the answer matches the
 repository.
 
 ## Start In A Repository
 
-Open a repository before launching Devo:
+Open a repository before launching InfiniteCode:
 
 ```bash
 cd /path/to/your/repo
-devo
+infinitecode
 ```
 
-Devo uses the current working directory as the session workspace. If you launch
+InfiniteCode uses the current working directory as the session workspace. If you launch
 it from the wrong directory, file search, context, and validation commands will
 all point at the wrong project.
 
@@ -56,7 +56,7 @@ When you already know the file, attach it with `@`:
 Review @apps/web/content/docs/get-started/install.mdx for missing install paths. Do not edit yet.
 ```
 
-Use `@` when you want Devo to inspect specific context instead of searching
+Use `@` when you want InfiniteCode to inspect specific context instead of searching
 from scratch.
 
 ## Ask For One Scoped Change
@@ -76,11 +76,11 @@ Avoid broad first prompts such as:
 Improve the docs.
 ```
 
-That gives Devo too much freedom before you have verified the setup.
+That gives InfiniteCode too much freedom before you have verified the setup.
 
 ## Run Validation
 
-Ask Devo to run the relevant checks:
+Ask InfiniteCode to run the relevant checks:
 
 ```text
 Run the docs lint and build checks for this change.
@@ -95,7 +95,7 @@ If you know the exact command, use `!`:
 For Rust changes, prefer package-scoped checks first:
 
 ```text
-!cargo test -p devo-tui status_indicator -- --nocapture
+!cargo test -p infinitecode-tui status_indicator -- --nocapture
 ```
 
 Then broaden only when the change touches shared behavior.
@@ -108,14 +108,14 @@ Inspect the working tree:
 !git status --short
 ```
 
-Ask Devo to summarize the diff:
+Ask InfiniteCode to summarize the diff:
 
 ```text
 Summarize the docs changes and call out anything unrelated.
 ```
 
 If unrelated files changed, do not stage them until you understand why they are
-dirty. Devo should work with the existing worktree and avoid reverting unrelated
+dirty. InfiniteCode should work with the existing worktree and avoid reverting unrelated
 changes.
 
 ## Continue Or Stop
@@ -125,7 +125,7 @@ After the first task:
 - Continue with another small scoped change if the setup behaved correctly.
 - Fix provider, model, working-directory, or permission issues before expanding
   scope.
-- Use [@ Fuzzy File Search](/docs/using-devo/fuzzy-file-search) for known files.
-- Use [! Shell Mode](/docs/using-devo/shell-mode) for exact commands.
+- Use [@ Fuzzy File Search](/docs/using-infinitecode/fuzzy-file-search) for known files.
+- Use [! Shell Mode](/docs/using-infinitecode/shell-mode) for exact commands.
 - Use [Architecture Overview](/docs/contributors/architecture-overview) before
   changing runtime code.

@@ -6,43 +6,43 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::AcpAuthMethod;
-use devo_protocol::AcpAvailableCommand;
-use devo_protocol::AcpContentBlock;
-use devo_protocol::AcpLoadSessionResult;
-use devo_protocol::AcpLogoutCapabilities;
-use devo_protocol::AcpNewSessionResult;
-use devo_protocol::AcpPromptResult;
-use devo_protocol::AcpResumeSessionResult;
-use devo_protocol::AcpSessionNotification;
-use devo_protocol::AcpSessionUpdate;
-use devo_protocol::AcpStopReason;
-use devo_protocol::Model;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::SessionId;
-use devo_protocol::SessionMetadata;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::SingleProviderRouter;
-use devo_server::AcpErrorResponse;
-use devo_server::AcpInitializeResult;
-use devo_server::AcpListSessionsResult;
-use devo_server::AcpSuccessResponse;
-use devo_server::ClientTransportKind;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::AcpAuthMethod;
+use infinitecode_protocol::AcpAvailableCommand;
+use infinitecode_protocol::AcpContentBlock;
+use infinitecode_protocol::AcpLoadSessionResult;
+use infinitecode_protocol::AcpLogoutCapabilities;
+use infinitecode_protocol::AcpNewSessionResult;
+use infinitecode_protocol::AcpPromptResult;
+use infinitecode_protocol::AcpResumeSessionResult;
+use infinitecode_protocol::AcpSessionNotification;
+use infinitecode_protocol::AcpSessionUpdate;
+use infinitecode_protocol::AcpStopReason;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::SessionMetadata;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_server::AcpErrorResponse;
+use infinitecode_server::AcpInitializeResult;
+use infinitecode_server::AcpListSessionsResult;
+use infinitecode_server::AcpSuccessResponse;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
 use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
@@ -177,7 +177,7 @@ async fn acp_session_list_orders_by_last_activity_not_metadata_update() -> Resul
             connection_id,
             serde_json::json!({
                 "id": 12,
-                "method": "_devo/session/title/update",
+                "method": "_infinitecode/session/title/update",
                 "params": {
                     "session_id": first_id,
                     "title": "Metadata-only rename"
@@ -359,14 +359,14 @@ async fn acp_session_load_replays_history_and_rejects_relative_roots() -> Result
     )
     .await?;
 
-    assert_legacy_session_method_removed(&runtime, connection_id, 25, "_devo/session/start")
+    assert_legacy_session_method_removed(&runtime, connection_id, 25, "_infinitecode/session/start")
         .await?;
-    assert_legacy_session_method_removed(&runtime, connection_id, 26, "_devo/session/list").await?;
+    assert_legacy_session_method_removed(&runtime, connection_id, 26, "_infinitecode/session/list").await?;
     Ok(())
 }
 
 #[tokio::test]
-async fn acp_session_prompt_streams_session_updates_without_devo_subscriptions() -> Result<()> {
+async fn acp_session_prompt_streams_session_updates_without_infinitecode_subscriptions() -> Result<()> {
     let data_root = TempDir::new()?;
     let runtime = build_runtime(data_root.path())?;
     let (connection_id, mut notifications_rx, _) =
@@ -574,7 +574,7 @@ async fn acp_session_additional_directories_roundtrip_new_load_and_resume() -> R
     let new_session: AcpSuccessResponse<AcpNewSessionResult> =
         serde_json::from_value(new_response)?;
     assert_eq!(
-        decode_devo_session_meta(&new_session.result.meta)?.additional_directories,
+        decode_infinitecode_session_meta(&new_session.result.meta)?.additional_directories,
         vec![first_root.clone()]
     );
     let session_id = new_session.result.session_id;
@@ -624,7 +624,7 @@ async fn acp_session_additional_directories_roundtrip_new_load_and_resume() -> R
     let resumed: AcpSuccessResponse<AcpResumeSessionResult> =
         serde_json::from_value(resume_response)?;
     assert_eq!(
-        decode_devo_session_meta(&resumed.result.meta)?.additional_directories,
+        decode_infinitecode_session_meta(&resumed.result.meta)?.additional_directories,
         vec![resume_root.clone()]
     );
     let listed = list_acp_sessions(&runtime, connection_id, 18, Some(&cwd), None).await?;
@@ -769,7 +769,7 @@ logout = true
         initialize
             .meta
             .as_ref()
-            .is_some_and(|meta| !meta.contains_key("devo/serverHome"))
+            .is_some_and(|meta| !meta.contains_key("infinitecode/serverHome"))
     );
     let cwd = data_root.path().join("repo");
     std::fs::create_dir_all(&cwd)?;
@@ -883,7 +883,7 @@ logout = true
 async fn legacy_initialize_params_are_rejected() -> Result<()> {
     let data_root = TempDir::new()?;
     let runtime = build_runtime(data_root.path())?;
-    let (notifications_tx, _notifications_rx) = devo_server::test_outbound_channel(4096);
+    let (notifications_tx, _notifications_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -913,7 +913,7 @@ async fn legacy_initialize_params_are_rejected() -> Result<()> {
 
 fn build_runtime(data_root: &Path) -> Result<Arc<ServerRuntime>> {
     let provider: Arc<dyn ModelProviderSDK> = Arc::new(SingleReplyProvider);
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         data_root.join("acp_session_lifecycle.db"),
     )?);
     Ok(ServerRuntime::new(
@@ -933,7 +933,7 @@ fn build_runtime(data_root: &Path) -> Result<Arc<ServerRuntime>> {
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 data_root.to_path_buf(),
@@ -961,7 +961,7 @@ async fn initialize_acp_connection_with_transport(
     runtime: &Arc<ServerRuntime>,
     transport: ClientTransportKind,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>, AcpInitializeResult)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(4096);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(transport, notifications_tx)
         .await;
@@ -1301,7 +1301,7 @@ async fn acp_session_list_includes_live_actor_missing_from_database() -> Result<
     std::fs::create_dir_all(&cwd)?;
     let session_id = create_acp_session(&runtime, connection_id, &cwd, 10).await?;
 
-    let db = devo_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
+    let db = infinitecode_server::db::Database::open(data_root.path().join("test_persistence.db"))?;
     db.delete_session(&session_id)?;
 
     let result = list_acp_sessions(&runtime, connection_id, 11, None, None).await?;
@@ -1309,8 +1309,8 @@ async fn acp_session_list_includes_live_actor_missing_from_database() -> Result<
         .sessions
         .iter()
         .filter_map(|session| session.meta.as_ref())
-        .filter_map(|meta| meta.get(devo_server::DEVO_SESSION_META))
-        .map(|value| serde_json::from_value::<devo_server::SessionMetadata>(value.clone()))
+        .filter_map(|meta| meta.get(infinitecode_server::INFINITECODE_SESSION_META))
+        .map(|value| serde_json::from_value::<infinitecode_server::SessionMetadata>(value.clone()))
         .collect::<Result<Vec<_>, _>>()?;
     assert_eq!(
         listed
@@ -1408,13 +1408,13 @@ async fn assert_legacy_session_method_removed(
     Ok(())
 }
 
-fn decode_devo_session_meta(meta: &Option<devo_protocol::AcpMeta>) -> Result<SessionMetadata> {
+fn decode_infinitecode_session_meta(meta: &Option<infinitecode_protocol::AcpMeta>) -> Result<SessionMetadata> {
     let session = meta
         .as_ref()
-        .and_then(|meta| meta.get(devo_protocol::DEVO_SESSION_META))
+        .and_then(|meta| meta.get(infinitecode_protocol::INFINITECODE_SESSION_META))
         .cloned()
-        .context("missing Devo session metadata")?;
-    serde_json::from_value(session).context("decode Devo session metadata")
+        .context("missing InfiniteCode session metadata")?;
+    serde_json::from_value(session).context("decode InfiniteCode session metadata")
 }
 
 fn path_value(path: &Path) -> String {

@@ -41,12 +41,12 @@ The program should compute an effective configuration from available configurati
 
 Configuration source priority is field-level:
 
-1. Workspace-scoped configuration: `<workspace>/.devo/config.toml`
+1. Workspace-scoped configuration: `<workspace>/.infinitecode/config.toml`
 2. User-scoped configuration:
-   - Windows: `C:\Users\username\.devo\config.toml`
-   - Windows credentials: `C:\Users\username\.devo\auth.json`
-   - macOS and Linux: `~/.devo/config.toml`
-   - macOS and Linux credentials: `~/.devo/auth.json`
+   - Windows: `C:\Users\username\.infinitecode\config.toml`
+   - Windows credentials: `C:\Users\username\.infinitecode\auth.json`
+   - macOS and Linux: `~/.infinitecode/config.toml`
+   - macOS and Linux credentials: `~/.infinitecode/auth.json`
 
 Credential material exists only in user-scoped `auth.json`; the workspace configuration directory must not contain an `auth.json`.
 
@@ -103,7 +103,7 @@ The program should persist onboarding output before normal model invocation begi
 
 Until a dedicated target selector is specified, the default persistence target should be deterministic:
 
-- If onboarding runs with an active workspace directory, persist non-secret configuration to `<workspace>/.devo/config.toml`.
+- If onboarding runs with an active workspace directory, persist non-secret configuration to `<workspace>/.infinitecode/config.toml`.
 - If onboarding runs without an active workspace directory, persist to the user-scoped configuration file for the current operating system.
 
 When the persistence target affects visibility or sharing, the program should make the target understandable to the user through confirmation, inspection, or error output. Credential persistence always writes to the user-scoped `auth.json`, not to the workspace directory or any `config.toml`.
@@ -171,4 +171,4 @@ Rules:
 | 1 | 2026-05-25 | Human | Refinement | Linked configuration precedence to the concrete `config.toml` schema design. |
 | 1 | 2026-05-25 | Human | Refinement | Moved durable credential material from configuration records into companion `auth.json` files. |
 | 1 | 2026-05-26 | Human | Refinement | Added model display name to onboarding-created durable model binding configuration. |
-| 2 | 2026-05-27 | Human | Refinement | Moved workspace config to `<workspace>/.devo/config.toml`, made credential storage user-scoped only, and clarified field-level workspace-over-user merge behavior. |
+| 2 | 2026-05-27 | Human | Refinement | Moved workspace config to `<workspace>/.infinitecode/config.toml`, made credential storage user-scoped only, and clarified field-level workspace-over-user merge behavior. |

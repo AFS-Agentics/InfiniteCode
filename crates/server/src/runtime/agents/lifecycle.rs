@@ -7,9 +7,9 @@ impl ServerRuntime {
         };
         context
             .runner
-            .run(devo_core::HookInput::new(
+            .run(infinitecode_core::HookInput::new(
                 &context.base,
-                devo_core::HookEvent::SubagentStart,
+                infinitecode_core::HookEvent::SubagentStart,
                 subagent_hook_extra(&context.base, /*stop_hook_active*/ None),
             ))
             .await;
@@ -40,12 +40,12 @@ impl ServerRuntime {
         Self::run_subagent_stop_hook_with_context(context).await;
     }
 
-    async fn run_subagent_stop_hook_with_context(context: devo_core::HookRuntimeContext) {
+    async fn run_subagent_stop_hook_with_context(context: infinitecode_core::HookRuntimeContext) {
         context
             .runner
-            .run(devo_core::HookInput::new(
+            .run(infinitecode_core::HookInput::new(
                 &context.base,
-                devo_core::HookEvent::SubagentStop,
+                infinitecode_core::HookEvent::SubagentStop,
                 subagent_hook_extra(&context.base, Some(false)),
             ))
             .await;
@@ -99,7 +99,7 @@ impl ServerRuntime {
 }
 
 fn subagent_hook_extra(
-    base: &devo_core::HookBaseInput,
+    base: &infinitecode_core::HookBaseInput,
     stop_hook_active: Option<bool>,
 ) -> serde_json::Map<String, serde_json::Value> {
     let agent_id = base
@@ -136,23 +136,23 @@ mod tests {
 
     use anyhow::Result;
     use async_trait::async_trait;
-    use devo_core::AppConfigStore;
-    use devo_core::BundledSkillsConfig;
-    use devo_core::FileSystemSkillCatalog;
-    use devo_core::PresetModelCatalog;
-    use devo_core::ProviderVendorCatalog;
-    use devo_core::SkillsConfig;
-    use devo_core::tools::AgentToolCoordinator;
-    use devo_core::tools::ToolRegistry;
-    use devo_protocol::AgentInfo;
-    use devo_protocol::AgentListParams;
-    use devo_protocol::ModelRequest;
-    use devo_protocol::ModelResponse;
-    use devo_protocol::StreamEvent;
-    use devo_protocol::SuccessResponse;
-    use devo_protocol::WaitAgentParams;
-    use devo_provider::ModelProviderSDK;
-    use devo_provider::SingleProviderRouter;
+    use infinitecode_core::AppConfigStore;
+    use infinitecode_core::BundledSkillsConfig;
+    use infinitecode_core::FileSystemSkillCatalog;
+    use infinitecode_core::PresetModelCatalog;
+    use infinitecode_core::ProviderVendorCatalog;
+    use infinitecode_core::SkillsConfig;
+    use infinitecode_core::tools::AgentToolCoordinator;
+    use infinitecode_core::tools::ToolRegistry;
+    use infinitecode_protocol::AgentInfo;
+    use infinitecode_protocol::AgentListParams;
+    use infinitecode_protocol::ModelRequest;
+    use infinitecode_protocol::ModelResponse;
+    use infinitecode_protocol::StreamEvent;
+    use infinitecode_protocol::SuccessResponse;
+    use infinitecode_protocol::WaitAgentParams;
+    use infinitecode_provider::ModelProviderSDK;
+    use infinitecode_provider::SingleProviderRouter;
     use pretty_assertions::assert_eq;
     use tempfile::TempDir;
 
@@ -194,7 +194,7 @@ mod tests {
                     bundled: Some(BundledSkillsConfig { enabled: false }),
                     ..SkillsConfig::default()
                 })),
-                devo_core::AgentsMdConfig::default(),
+                infinitecode_core::AgentsMdConfig::default(),
                 db,
                 Arc::new(std::sync::Mutex::new(
                     AppConfigStore::load(data_root.to_path_buf(), None)
@@ -276,11 +276,11 @@ mod tests {
             .await?;
         assert_eq!(
             wait_result.events,
-            vec![devo_protocol::ParentAgentOutputEvent {
+            vec![infinitecode_protocol::ParentAgentOutputEvent {
                 sequence: 1,
                 agent_path: "root/review".to_string(),
                 agent_nickname: "review".to_string(),
-                kind: devo_protocol::AgentOutputEventKind::Status,
+                kind: infinitecode_protocol::AgentOutputEventKind::Status,
                 text: Some("failed to start child agent: rollout append failed".to_string()),
                 status: Some("failed".to_string()),
             }]

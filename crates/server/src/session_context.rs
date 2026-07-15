@@ -6,48 +6,48 @@ use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
 use anyhow::Context;
-use devo_core::AUTH_CONFIG_FILE_NAME;
-use devo_core::AgentsMdConfig;
-use devo_core::AppConfig;
-use devo_core::AppConfigStore;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::Model;
-use devo_core::ModelCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderRequestModelMap;
-use devo_core::ResolvedSkill;
-use devo_core::ResolvedWebFetchConfig;
-use devo_core::ResolvedWebSearchConfig;
-use devo_core::SessionConfig;
-use devo_core::SessionId;
-use devo_core::SessionState;
-use devo_core::SkillCatalog;
-use devo_core::SkillError;
-use devo_core::SkillSelector;
-use devo_core::TurnConfig;
-use devo_core::WebFetchConfig;
-use devo_core::WebSearchConfig;
-use devo_core::default_base_instructions;
-use devo_core::normalize_canonical_path;
-use devo_core::provider_request_model_map_for_binding;
-use devo_core::read_user_auth_config;
-use devo_core::resolve_enabled_model_binding;
-use devo_core::resolve_web_fetch_config;
-use devo_core::resolve_web_search_config;
-use devo_core::tools::ToolPlanConfig;
-use devo_core::tools::ToolRegistry;
-use devo_core::tools::handlers;
-use devo_mcp::manager::RmcpMcpManager;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::SkillDependencies as ProtocolSkillDependencies;
-use devo_protocol::SkillInterface as ProtocolSkillInterface;
-use devo_protocol::SkillScope as ProtocolSkillScope;
-use devo_protocol::SkillToolDependency as ProtocolSkillToolDependency;
-use devo_protocol::StreamEvent;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderRoute;
-use devo_provider::ProviderRouter;
+use infinitecode_core::AUTH_CONFIG_FILE_NAME;
+use infinitecode_core::AgentsMdConfig;
+use infinitecode_core::AppConfig;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::Model;
+use infinitecode_core::ModelCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderRequestModelMap;
+use infinitecode_core::ResolvedSkill;
+use infinitecode_core::ResolvedWebFetchConfig;
+use infinitecode_core::ResolvedWebSearchConfig;
+use infinitecode_core::SessionConfig;
+use infinitecode_core::SessionId;
+use infinitecode_core::SessionState;
+use infinitecode_core::SkillCatalog;
+use infinitecode_core::SkillError;
+use infinitecode_core::SkillSelector;
+use infinitecode_core::TurnConfig;
+use infinitecode_core::WebFetchConfig;
+use infinitecode_core::WebSearchConfig;
+use infinitecode_core::default_base_instructions;
+use infinitecode_core::normalize_canonical_path;
+use infinitecode_core::provider_request_model_map_for_binding;
+use infinitecode_core::read_user_auth_config;
+use infinitecode_core::resolve_enabled_model_binding;
+use infinitecode_core::resolve_web_fetch_config;
+use infinitecode_core::resolve_web_search_config;
+use infinitecode_core::tools::ToolPlanConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_core::tools::handlers;
+use infinitecode_mcp::manager::RmcpMcpManager;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::SkillDependencies as ProtocolSkillDependencies;
+use infinitecode_protocol::SkillInterface as ProtocolSkillInterface;
+use infinitecode_protocol::SkillScope as ProtocolSkillScope;
+use infinitecode_protocol::SkillToolDependency as ProtocolSkillToolDependency;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderRoute;
+use infinitecode_provider::ProviderRouter;
 use futures::Stream;
 
 use crate::InputItem;
@@ -189,7 +189,7 @@ impl SessionRuntimeContext {
             .map(Path::to_path_buf)
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
         let skill_catalog = Arc::new(StdMutex::new(
-            Box::new(FileSystemSkillCatalog::with_devo_home(
+            Box::new(FileSystemSkillCatalog::with_infinitecode_home(
                 config.skills.clone(),
                 user_config_dir,
                 skill_workspace_root,
@@ -219,7 +219,7 @@ impl SessionRuntimeContext {
         ))
     }
 
-    pub(crate) fn hook_runner(&self) -> Option<devo_core::HookRunner> {
+    pub(crate) fn hook_runner(&self) -> Option<infinitecode_core::HookRunner> {
         let hooks = {
             let config_store = self
                 .config_store
@@ -227,7 +227,7 @@ impl SessionRuntimeContext {
                 .expect("app config store mutex should not be poisoned");
             config_store.effective_config().hooks.clone()
         };
-        (!hooks.is_empty()).then(|| devo_core::HookRunner::new(hooks))
+        (!hooks.is_empty()).then(|| infinitecode_core::HookRunner::new(hooks))
     }
 
     pub(crate) fn new_session_state(
@@ -236,8 +236,8 @@ impl SessionRuntimeContext {
         cwd: PathBuf,
         additional_directories: Vec<PathBuf>,
     ) -> SessionState {
-        let permission_profile = devo_safety::RuntimePermissionProfile::from_preset(
-            devo_safety::PermissionPreset::Default,
+        let permission_profile = infinitecode_safety::RuntimePermissionProfile::from_preset(
+            infinitecode_safety::PermissionPreset::Default,
             cwd.clone(),
         )
         .with_additional_roots(additional_directories);
@@ -553,7 +553,7 @@ pub(crate) struct ResolvedInput {
     pub(crate) prompt_messages: Vec<String>,
 }
 
-fn core_skill_record_to_protocol(record: devo_core::CoreSkillRecord) -> SkillRecord {
+fn core_skill_record_to_protocol(record: infinitecode_core::CoreSkillRecord) -> SkillRecord {
     SkillRecord {
         id: record.id.0.to_string(),
         name: record.name,
@@ -591,25 +591,25 @@ fn core_skill_record_to_protocol(record: devo_core::CoreSkillRecord) -> SkillRec
     }
 }
 
-fn core_skill_source_to_protocol(source: devo_core::CoreSkillSource) -> crate::SkillSource {
+fn core_skill_source_to_protocol(source: infinitecode_core::CoreSkillSource) -> crate::SkillSource {
     match source {
-        devo_core::CoreSkillSource::User => crate::SkillSource::User,
-        devo_core::CoreSkillSource::Workspace { cwd } => crate::SkillSource::Workspace { cwd },
-        devo_core::CoreSkillSource::Plugin { plugin_id } => {
+        infinitecode_core::CoreSkillSource::User => crate::SkillSource::User,
+        infinitecode_core::CoreSkillSource::Workspace { cwd } => crate::SkillSource::Workspace { cwd },
+        infinitecode_core::CoreSkillSource::Plugin { plugin_id } => {
             crate::SkillSource::Plugin { plugin_id }
         }
-        devo_core::CoreSkillSource::System => crate::SkillSource::System,
-        devo_core::CoreSkillSource::Admin => crate::SkillSource::Admin,
+        infinitecode_core::CoreSkillSource::System => crate::SkillSource::System,
+        infinitecode_core::CoreSkillSource::Admin => crate::SkillSource::Admin,
     }
 }
 
-fn core_skill_scope_to_protocol(scope: devo_core::CoreSkillScope) -> ProtocolSkillScope {
+fn core_skill_scope_to_protocol(scope: infinitecode_core::CoreSkillScope) -> ProtocolSkillScope {
     match scope {
-        devo_core::CoreSkillScope::Repo => ProtocolSkillScope::Repo,
-        devo_core::CoreSkillScope::User => ProtocolSkillScope::User,
-        devo_core::CoreSkillScope::System => ProtocolSkillScope::System,
-        devo_core::CoreSkillScope::Admin => ProtocolSkillScope::Admin,
-        devo_core::CoreSkillScope::Plugin => ProtocolSkillScope::Plugin,
+        infinitecode_core::CoreSkillScope::Repo => ProtocolSkillScope::Repo,
+        infinitecode_core::CoreSkillScope::User => ProtocolSkillScope::User,
+        infinitecode_core::CoreSkillScope::System => ProtocolSkillScope::System,
+        infinitecode_core::CoreSkillScope::Admin => ProtocolSkillScope::Admin,
+        infinitecode_core::CoreSkillScope::Plugin => ProtocolSkillScope::Plugin,
     }
 }
 

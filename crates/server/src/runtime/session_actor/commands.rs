@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use devo_core::SessionTitleState;
-use devo_core::TurnId;
-use devo_protocol::ApprovalScopeValue;
-use devo_protocol::CollaborationMode;
-use devo_protocol::PendingInputItem;
-use devo_protocol::ThreadGoal;
+use infinitecode_core::SessionTitleState;
+use infinitecode_core::TurnId;
+use infinitecode_protocol::ApprovalScopeValue;
+use infinitecode_protocol::CollaborationMode;
+use infinitecode_protocol::PendingInputItem;
+use infinitecode_protocol::ThreadGoal;
 use tokio::sync::oneshot;
 
 use super::snapshots::{
@@ -21,7 +21,7 @@ use crate::runtime::turn_exec::ExecuteTurnRequest;
 use crate::session::SessionHistoryItem;
 use crate::session::SessionMetadata;
 use crate::turn::TurnMetadata;
-use devo_core::TurnConfig;
+use infinitecode_core::TurnConfig;
 
 pub(crate) enum SessionCommand {
     ExecuteTurn {
@@ -42,7 +42,7 @@ pub(crate) enum SessionCommand {
         reply: oneshot::Sender<CollaborationMode>,
     },
     GetParentSessionId {
-        reply: oneshot::Sender<Option<devo_protocol::SessionId>>,
+        reply: oneshot::Sender<Option<infinitecode_protocol::SessionId>>,
     },
     GetTurnReservationSnapshot {
         reply: oneshot::Sender<TurnReservationSnapshot>,
@@ -71,14 +71,14 @@ pub(crate) enum SessionCommand {
         item: PendingInputItem,
     },
     RemoveQueuedTurnInput {
-        queued_input_id: devo_core::PendingInputId,
+        queued_input_id: infinitecode_core::PendingInputId,
         reply: oneshot::Sender<bool>,
     },
     GetActiveTurnId {
         reply: oneshot::Sender<Option<TurnId>>,
     },
     GetRecord {
-        reply: oneshot::Sender<Option<devo_core::SessionRecord>>,
+        reply: oneshot::Sender<Option<infinitecode_core::SessionRecord>>,
     },
     PreparePersistItem {
         turn_id: TurnId,
@@ -138,7 +138,7 @@ pub(crate) enum SessionCommand {
         reply: oneshot::Sender<TurnMetadata>,
     },
     UpdateCorePermissionMode {
-        permission_mode: devo_safety::PermissionMode,
+        permission_mode: infinitecode_safety::PermissionMode,
     },
     SetActiveGoal {
         goal: Option<ThreadGoal>,
@@ -167,7 +167,7 @@ pub(crate) enum SessionCommand {
         reply: oneshot::Sender<SessionMetadata>,
     },
     ApplyPermissionProfile {
-        profile: devo_safety::RuntimePermissionProfile,
+        profile: infinitecode_safety::RuntimePermissionProfile,
         reply: oneshot::Sender<()>,
     },
     SetSessionTitleUserRename {
@@ -175,7 +175,7 @@ pub(crate) enum SessionCommand {
         reply: oneshot::Sender<SessionMetadata>,
     },
     SetToolRegistry {
-        tool_registry: Option<Arc<devo_core::tools::ToolRegistry>>,
+        tool_registry: Option<Arc<infinitecode_core::tools::ToolRegistry>>,
         reply: oneshot::Sender<()>,
     },
     GetResumeSnapshot {

@@ -1,6 +1,6 @@
-import { Button } from "@devo/ui/components/button"
-import { Dialog, DialogContent } from "@devo/ui/components/dialog"
-import { Input } from "@devo/ui/components/input"
+import { Button } from "@infinitecode/ui/components/button"
+import { Dialog, DialogContent } from "@infinitecode/ui/components/dialog"
+import { Input } from "@infinitecode/ui/components/input"
 import { AlertTriangleIcon, FolderPlusIcon, Loader2Icon, TrashIcon } from "lucide-react"
 import type { SidebarProject } from "../../lib/types"
 
@@ -52,12 +52,12 @@ export function FolderRemoveDialogBody({
 			<div className="flex flex-col gap-2">
 				<h2 className="flex items-center gap-2 text-lg font-semibold">
 					<AlertTriangleIcon className="size-5 text-destructive" />
-					Remove folder from Devo Desktop
+					Remove folder from InfiniteCode Desktop
 				</h2>
 				<p className="text-sm text-muted-foreground">
 					Remove{" "}
 					<span className="font-medium text-foreground">{project?.name || "this folder"}</span>{" "}
-					from Devo Desktop? This only removes it from the Desktop sidebar and does not
+					from InfiniteCode Desktop? This only removes it from the Desktop sidebar and does not
 					delete anything from disk.
 				</p>
 			</div>
@@ -135,7 +135,7 @@ export function MissingFolderDialogBody({
 				</h2>
 				<p className="text-sm text-muted-foreground">
 					<span className="font-medium text-foreground">{project?.name || "This folder"}</span>{" "}
-					cannot be found on disk. Remove it from Devo Desktop?
+					cannot be found on disk. Remove it from InfiniteCode Desktop?
 				</p>
 			</div>
 			{error && (

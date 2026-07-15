@@ -1,6 +1,6 @@
-import type { ProviderVendor } from "@devo-ai/sdk/v2/client"
-import { Badge } from "@devo/ui/components/badge"
-import { Button } from "@devo/ui/components/button"
+import type { ProviderVendor } from "@infinitecode-ai/sdk/v2/client"
+import { Badge } from "@infinitecode/ui/components/badge"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Empty,
 	EmptyContent,
@@ -8,11 +8,11 @@ import {
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
-} from "@devo/ui/components/empty"
-import { Skeleton } from "@devo/ui/components/skeleton"
+} from "@infinitecode/ui/components/empty"
+import { Skeleton } from "@infinitecode/ui/components/skeleton"
 import { AlertCircleIcon, PencilIcon, PlugZapIcon, PlusIcon, RefreshCwIcon } from "lucide-react"
 import { useCallback, useState } from "react"
-import { useProviderVendors } from "../../hooks/use-devo-data"
+import { useProviderVendors } from "../../hooks/use-infinitecode-data"
 import { ProviderIcon } from "./provider-icon"
 import { ProviderVendorDialog } from "./provider-vendor-dialog"
 import { SettingsSection } from "./settings-section"
@@ -136,7 +136,7 @@ function ProviderSettingsHeader({ onAddProvider }: { onAddProvider: () => void }
 				<p className="mt-1 text-sm text-muted-foreground">
 					Connect AI providers to use their models.{" "}
 					<a
-						href="https://devo.ai/docs/providers/"
+						href="https://infinitecode.ai/docs/providers/"
 						target="_blank"
 						rel="noopener noreferrer"
 						className="text-primary hover:underline"

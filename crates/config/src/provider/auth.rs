@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use devo_util_paths::current_user_config_file;
+use infinitecode_util_paths::current_user_config_file;
 
 use crate::ProviderConfigError;
 

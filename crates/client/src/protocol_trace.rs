@@ -1,6 +1,6 @@
 //! Wire-level protocol trace for stdio transport.
 //!
-//! When enabled via `DEVO_PROTOCOL_TRACE=1`, every NDJSON line sent to or
+//! When enabled via `INFINITECODE_PROTOCOL_TRACE=1`, every NDJSON line sent to or
 //! received from the server child process is recorded to a structured NDJSONL
 //! file. Each record carries a monotonic sequence number, UTC timestamp,
 //! direction, byte count, and the raw JSON payload as it appeared on the wire.
@@ -47,14 +47,14 @@ pub(crate) struct ProtocolTrace {
 }
 
 impl ProtocolTrace {
-    /// Reads `DEVO_PROTOCOL_TRACE` and (optionally) `DEVO_PROTOCOL_TRACE_FILE`
+    /// Reads `INFINITECODE_PROTOCOL_TRACE` and (optionally) `INFINITECODE_PROTOCOL_TRACE_FILE`
     /// from the environment. Returns `None` when tracing is disabled or when the
     /// trace file cannot be created.
     ///
     /// Called once during [`StdioServerClient::spawn`]; the result is cloned
     /// into the writer and reader tasks.
     pub(crate) fn from_env() -> Option<Self> {
-        let enabled = std::env::var("DEVO_PROTOCOL_TRACE")
+        let enabled = std::env::var("INFINITECODE_PROTOCOL_TRACE")
             .ok()
             .filter(|v| !v.is_empty())
             .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
@@ -120,7 +120,7 @@ impl ProtocolTrace {
 }
 
 fn resolve_trace_path() -> PathBuf {
-    if let Ok(explicit) = std::env::var("DEVO_PROTOCOL_TRACE_FILE")
+    if let Ok(explicit) = std::env::var("INFINITECODE_PROTOCOL_TRACE_FILE")
         && !explicit.is_empty()
     {
         let path = PathBuf::from(&explicit);
@@ -130,11 +130,11 @@ fn resolve_trace_path() -> PathBuf {
         return path;
     }
 
-    let base = devo_util_paths::find_devo_home()
+    let base = infinitecode_util_paths::find_infinitecode_home()
         .map(|home| home.join("traces"))
         .unwrap_or_else(|_| {
             let mut tmp = std::env::temp_dir();
-            tmp.push("devo-traces");
+            tmp.push("infinitecode-traces");
             tmp
         });
     let _ = fs::create_dir_all(&base);
@@ -152,10 +152,10 @@ mod tests {
 
     #[test]
     fn from_env_returns_none_when_not_set() {
-        // DEVO_PROTOCOL_TRACE is not set in the test environment by default.
+        // INFINITECODE_PROTOCOL_TRACE is not set in the test environment by default.
         // We cannot safely call remove_var, but the CI/test environment does
         // not set this variable, so from_env should return None.
-        if std::env::var("DEVO_PROTOCOL_TRACE").is_err() {
+        if std::env::var("INFINITECODE_PROTOCOL_TRACE").is_err() {
             assert!(ProtocolTrace::from_env().is_none());
         }
     }

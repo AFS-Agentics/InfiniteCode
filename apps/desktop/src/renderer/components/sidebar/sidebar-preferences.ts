@@ -5,6 +5,6 @@ import {
 } from "./sidebar-data"
 
 export const sidebarPreferencesAtom = atomWithStorage<SidebarPreferences>(
-	"devo:sidebarPreferences",
+	"infinitecode:sidebarPreferences",
 	DEFAULT_SIDEBAR_PREFERENCES,
 )

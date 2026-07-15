@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use devo_core::{ItemId, SessionId, TextItem, TurnId, TurnItem};
+use infinitecode_core::{ItemId, SessionId, TextItem, TurnId, TurnItem};
 
 use super::super::ServerRuntime;
 use super::super::proposed_plan::ProposedPlanSegment;

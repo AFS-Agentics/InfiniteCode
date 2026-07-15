@@ -2,7 +2,7 @@ use ratatui::style::Color;
 use ratatui::style::Style;
 use ratatui::text::Span;
 
-use devo_protocol::CollaborationMode;
+use infinitecode_protocol::CollaborationMode;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) enum InputMode {

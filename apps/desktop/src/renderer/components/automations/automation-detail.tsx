@@ -8,9 +8,9 @@
  * Rendered at /automations/:automationId
  */
 
-import { Badge } from "@devo/ui/components/badge"
-import { Button } from "@devo/ui/components/button"
-import { Separator } from "@devo/ui/components/separator"
+import { Badge } from "@infinitecode/ui/components/badge"
+import { Button } from "@infinitecode/ui/components/button"
+import { Separator } from "@infinitecode/ui/components/separator"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import {
 	CalendarIcon,

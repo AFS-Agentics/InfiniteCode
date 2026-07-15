@@ -1,5 +1,4 @@
 {
-	"rootDirectory": "apps/website",
 	"github": {
 		"silent": true,
 		"autoJobCancelation": true

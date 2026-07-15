@@ -3,7 +3,7 @@ import { atomFamily } from "jotai-family"
 import type {
 	Agent,
 	AgentStatus,
-	DevoProject,
+	InfiniteCodeProject,
 	SessionStatus,
 	SidebarProject,
 } from "../../lib/types"
@@ -180,7 +180,7 @@ export function sortSidebarProjectsForDefaultList(
  * A "sandbox" is a worktree directory that belongs to a parent project.
  * These should not appear as top-level projects in the sidebar.
  */
-function buildSandboxDirSet(projects: DevoProject[]): Set<string> {
+function buildSandboxDirSet(projects: InfiniteCodeProject[]): Set<string> {
 	const sandboxDirs = new Set<string>()
 	for (const project of projects) {
 		if (project.sandboxes) {
@@ -196,7 +196,7 @@ function buildSandboxDirSet(projects: DevoProject[]): Set<string> {
  * Builds a map from sandbox directory -> parent project worktree directory.
  * Used to remap sessions running in a sandbox back to their parent project.
  */
-function buildSandboxToParentMap(projects: DevoProject[]): Map<string, string> {
+function buildSandboxToParentMap(projects: InfiniteCodeProject[]): Map<string, string> {
 	const map = new Map<string, string>()
 	for (const project of projects) {
 		if (!project.worktree || !project.sandboxes) continue
@@ -211,7 +211,7 @@ function buildSandboxToParentMap(projects: DevoProject[]): Map<string, string> {
  * Builds a map from parent project directory -> set of its sandbox directories.
  * Used by projectSessionIdsFamily to include sandbox sessions under the parent.
  */
-function buildParentToSandboxesMap(projects: DevoProject[]): Map<string, Set<string>> {
+function buildParentToSandboxesMap(projects: InfiniteCodeProject[]): Map<string, Set<string>> {
 	const map = new Map<string, Set<string>>()
 	for (const project of projects) {
 		if (!project.worktree || !project.sandboxes?.length) continue
@@ -225,7 +225,7 @@ function collectAllProjects(
 	desktopFolders: readonly DesktopFolder[],
 	discovery: {
 		loaded: boolean
-		projects: DevoProject[]
+		projects: InfiniteCodeProject[]
 	},
 ): ProjectEntry[] {
 	const entries: ProjectEntry[] = []

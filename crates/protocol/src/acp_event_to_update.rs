@@ -15,14 +15,14 @@ use crate::ToolResultPayload;
 use crate::TurnPlanStepPayload;
 use crate::acp::ACP_SESSION_UPDATE_METHOD;
 use crate::acp::AcpMeta;
-use crate::acp::DEVO_ACTIVITY_AT_META;
-use crate::acp::DEVO_ITEM_ID_META;
-use crate::acp::DEVO_ORIGINAL_EVENT_META;
-use crate::acp::DEVO_ORIGINAL_METHOD_META;
-use crate::acp::DEVO_SESSION_META;
-use crate::acp::DEVO_TURN_ID_META;
-use crate::acp::DEVO_TURN_USAGE_META;
-use crate::acp::devo_extension_method;
+use crate::acp::INFINITECODE_ACTIVITY_AT_META;
+use crate::acp::INFINITECODE_ITEM_ID_META;
+use crate::acp::INFINITECODE_ORIGINAL_EVENT_META;
+use crate::acp::INFINITECODE_ORIGINAL_METHOD_META;
+use crate::acp::INFINITECODE_SESSION_META;
+use crate::acp::INFINITECODE_TURN_ID_META;
+use crate::acp::INFINITECODE_TURN_USAGE_META;
+use crate::acp::infinitecode_extension_method;
 use crate::acp_content::*;
 use crate::acp_session_update::*;
 
@@ -32,8 +32,8 @@ pub fn acp_notification_from_server_event(
 ) -> (String, serde_json::Value) {
     let Some(session_id) = event.session_id() else {
         return (
-            devo_extension_method(method),
-            serde_json::to_value(event).expect("serialize devo extension event"),
+            infinitecode_extension_method(method),
+            serde_json::to_value(event).expect("serialize infinitecode extension event"),
         );
     };
     let (update, meta) = if let Some(update) = acp_update_from_server_event(event) {
@@ -71,11 +71,11 @@ pub fn acp_notification_from_server_event(
 fn original_event_meta(method: &str, event: &ServerEvent) -> AcpMeta {
     let mut meta = AcpMeta::new();
     meta.insert(
-        DEVO_ORIGINAL_METHOD_META.to_string(),
+        INFINITECODE_ORIGINAL_METHOD_META.to_string(),
         serde_json::Value::String(method.to_string()),
     );
     meta.insert(
-        DEVO_ORIGINAL_EVENT_META.to_string(),
+        INFINITECODE_ORIGINAL_EVENT_META.to_string(),
         serde_json::to_value(event).expect("serialize original server event"),
     );
     meta
@@ -104,8 +104,8 @@ pub fn original_event_from_acp_notification(
     notification: &AcpSessionNotification,
 ) -> Option<(String, ServerEvent)> {
     let meta = notification.meta.as_ref()?;
-    let method = meta.get(DEVO_ORIGINAL_METHOD_META)?.as_str()?.to_string();
-    let event = serde_json::from_value(meta.get(DEVO_ORIGINAL_EVENT_META)?.clone()).ok()?;
+    let method = meta.get(INFINITECODE_ORIGINAL_METHOD_META)?.as_str()?.to_string();
+    let event = serde_json::from_value(meta.get(INFINITECODE_ORIGINAL_EVENT_META)?.clone()).ok()?;
     Some((method, event))
 }
 
@@ -113,13 +113,13 @@ fn acp_meta_from_context(context: &EventContext) -> Option<AcpMeta> {
     let mut meta = AcpMeta::new();
     if let Some(turn_id) = &context.turn_id {
         meta.insert(
-            DEVO_TURN_ID_META.to_string(),
+            INFINITECODE_TURN_ID_META.to_string(),
             serde_json::Value::String(turn_id.to_string()),
         );
     }
     if let Some(item_id) = &context.item_id {
         meta.insert(
-            DEVO_ITEM_ID_META.to_string(),
+            INFINITECODE_ITEM_ID_META.to_string(),
             serde_json::Value::String(item_id.to_string()),
         );
     }
@@ -128,7 +128,7 @@ fn acp_meta_from_context(context: &EventContext) -> Option<AcpMeta> {
 
 fn add_activity_at(meta: &mut AcpMeta) {
     meta.insert(
-        DEVO_ACTIVITY_AT_META.to_string(),
+        INFINITECODE_ACTIVITY_AT_META.to_string(),
         serde_json::Value::String(Utc::now().to_rfc3339()),
     );
 }
@@ -142,7 +142,7 @@ fn acp_activity_meta_from_context(context: &EventContext) -> AcpMeta {
 fn acp_activity_meta_from_turn_id(turn_id: &crate::TurnId) -> AcpMeta {
     let mut meta = AcpMeta::new();
     meta.insert(
-        DEVO_TURN_ID_META.to_string(),
+        INFINITECODE_TURN_ID_META.to_string(),
         serde_json::Value::String(turn_id.to_string()),
     );
     add_activity_at(&mut meta);
@@ -155,7 +155,7 @@ pub(crate) fn acp_update_from_server_event(event: &ServerEvent) -> Option<AcpSes
         | ServerEvent::SessionTitleUpdated(SessionEventPayload { session }) => {
             let mut meta = AcpMeta::new();
             meta.insert(
-                DEVO_SESSION_META.to_string(),
+                INFINITECODE_SESSION_META.to_string(),
                 serde_json::to_value(session).expect("serialize session metadata"),
             );
             Some(AcpSessionUpdate::SessionInfoUpdate {
@@ -176,7 +176,7 @@ pub(crate) fn acp_update_from_server_event(event: &ServerEvent) -> Option<AcpSes
             let used = (payload.total_input_tokens + payload.total_output_tokens) as u64;
             let mut meta = AcpMeta::new();
             meta.insert(
-                DEVO_TURN_USAGE_META.to_string(),
+                INFINITECODE_TURN_USAGE_META.to_string(),
                 serde_json::to_value(payload).expect("serialize turn usage payload"),
             );
             Some(AcpSessionUpdate::UsageUpdate {

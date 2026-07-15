@@ -5,7 +5,7 @@
 //! missing, disabled, and unsupported provider/binding states for user-facing
 //! errors.
 
-use devo_util_paths::current_user_config_file;
+use infinitecode_util_paths::current_user_config_file;
 
 use crate::ProviderConfigError;
 
@@ -23,7 +23,7 @@ pub struct ResolvedModelBinding {
     pub model_slug: String,
     pub request_model: String,
     pub provider_id: String,
-    pub invocation_method: devo_protocol::ProviderWireApi,
+    pub invocation_method: infinitecode_protocol::ProviderWireApi,
     pub default_reasoning_effort: Option<String>,
     pub enabled: bool,
 }
@@ -147,7 +147,7 @@ pub fn resolve_provider_settings_from_config_and_auth(
     }
 
     Err(ProviderConfigError::Validation {
-        message: "No provider configured. Run `devo onboard` to complete setup.".to_string(),
+        message: "No provider configured. Run `infinitecode onboard` to complete setup.".to_string(),
     })
 }
 

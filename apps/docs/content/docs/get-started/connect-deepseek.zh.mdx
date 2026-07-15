@@ -3,7 +3,7 @@ title: 连接 DeepSeek
 description: 将 DeepSeek 官方 API 配置为第一个模型提供商。
 ---
 
-第一次配置 Devo provider 时，优先选 DeepSeek 官方 API 的 Anthropic 兼容路径。它使用 DeepSeek 的 Anthropic API 格式，并允许 Devo 通过模型提供商路由 provider-hosted `web_search` 和 `web_fetch`，不必先配置单独的第三方搜索服务。
+第一次配置 InfiniteCode provider 时，优先选 DeepSeek 官方 API 的 Anthropic 兼容路径。它使用 DeepSeek 的 Anthropic API 格式，并允许 InfiniteCode 通过模型提供商路由 provider-hosted `web_search` 和 `web_fetch`，不必先配置单独的第三方搜索服务。
 
 只有在明确需要 OpenAI Chat Completions 兼容性时，才使用 OpenAI 兼容路径。该路径可能需要另外配置本地或第三方 web search。
 
@@ -30,11 +30,11 @@ DeepSeek 在官方文档中发布当前 base URL 和模型名称：
 
 ## 推荐：Anthropic 兼容 DeepSeek
 
-在希望使用 Devo 的仓库中运行 onboarding：
+在希望使用 InfiniteCode 的仓库中运行 onboarding：
 
 ```bash
 cd /path/to/your/repo
-devo onboard
+infinitecode onboard
 ```
 
 onboarding 询问提供商信息时，选择 Anthropic 兼容提供商方法：
@@ -46,30 +46,30 @@ onboarding 询问提供商信息时，选择 Anthropic 兼容提供商方法：
 | API key | 你的 DeepSeek API key |
 | Model name | 当前 DeepSeek 模型名称，例如 `deepseek-v4-pro` 或 `deepseek-v4-flash` |
 
-如果 onboarding 提供验证，保持启用。验证会确认 Devo 能用所选 base URL、API key 和模型名称访问提供商。
+如果 onboarding 提供验证，保持启用。验证会确认 InfiniteCode 能用所选 base URL、API key 和模型名称访问提供商。
 
-onboarding 完成后，在同一个仓库启动 Devo：
+onboarding 完成后，在同一个仓库启动 InfiniteCode：
 
 ```bash
-devo
+infinitecode
 ```
 
 ## 手动 Anthropic 兼容配置
 
-多数情况下用 `devo onboard`。手动配置用于机器预置，或用于审查 Devo 会保存什么。
+多数情况下用 `infinitecode onboard`。手动配置用于机器预置，或用于审查 InfiniteCode 会保存什么。
 
 把提供商和模型绑定配置写入：
 
 ```text
-<DEVO_HOME>/config.toml
+<INFINITECODE_HOME>/config.toml
 ```
 
-如果未设置 `DEVO_HOME`，Devo 使用默认用户配置目录：
+如果未设置 `INFINITECODE_HOME`，InfiniteCode 使用默认用户配置目录：
 
-| 平台 | 默认 `DEVO_HOME` |
+| 平台 | 默认 `INFINITECODE_HOME` |
 | --- | --- |
-| macOS/Linux | `~/.devo` |
-| Windows | `C:/Users/your-username/.devo` |
+| macOS/Linux | `~/.infinitecode` |
+| Windows | `C:/Users/your-username/.infinitecode` |
 
 ```toml
 [defaults]
@@ -101,7 +101,7 @@ default_reasoning_effort = "high"
 把 API key 存入：
 
 ```text
-<DEVO_HOME>/auth.json
+<INFINITECODE_HOME>/auth.json
 ```
 
 ```json
@@ -123,7 +123,7 @@ default_reasoning_effort = "high"
 | `base_url` | DeepSeek Anthropic 格式端点。 |
 | `credential` | `auth.json` 中 API key 的 id。 |
 | `wire_apis` | 该 provider entry 支持的协议。 |
-| `model_slug` | Devo 本地模型元数据 id。 |
+| `model_slug` | InfiniteCode 本地模型元数据 id。 |
 | `request_model` | 发给 DeepSeek 的模型字符串。 |
 | `invocation_method` | 此 binding 使用的协议。 |
 
@@ -163,20 +163,20 @@ invocation_method = "openai_chat_completions"
 default_reasoning_effort = "high"
 ```
 
-这条路径能让 Devo 调用 DeepSeek，但不提供 provider-hosted search。若 OpenAI 兼容 DeepSeek 也需要 web search，应配置 Devo 的本地或第三方 `web_search` 路径。
+这条路径能让 InfiniteCode 调用 DeepSeek，但不提供 provider-hosted search。若 OpenAI 兼容 DeepSeek 也需要 web search，应配置 InfiniteCode 的本地或第三方 `web_search` 路径。
 
 ## 检查配置
 
 运行：
 
 ```bash
-devo doctor
+infinitecode doctor
 ```
 
 然后启动交互会话：
 
 ```bash
-devo
+infinitecode
 ```
 
 发送第一条只读 prompt，同时检查仓库上下文和 provider 访问：

@@ -10,29 +10,29 @@ use pretty_assertions::assert_eq;
 
 use super::RoutedPromptProvider;
 use super::prompt_turn_config;
-use devo_core::AppConfig;
-use devo_core::Model;
-use devo_core::ModelBindingConfig;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderConfigSection;
-use devo_core::ProviderDefaultsConfig;
-use devo_core::ProviderVendorConfig;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderRoute;
-use devo_provider::ProviderRouter;
-use devo_provider::error::ProviderError;
+use infinitecode_core::AppConfig;
+use infinitecode_core::Model;
+use infinitecode_core::ModelBindingConfig;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderConfigSection;
+use infinitecode_core::ProviderDefaultsConfig;
+use infinitecode_core::ProviderVendorConfig;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderRoute;
+use infinitecode_provider::ProviderRouter;
+use infinitecode_provider::error::ProviderError;
 
 fn model_request(model: &str) -> ModelRequest {
     ModelRequest {
-        model_slug: devo_protocol::ModelProfileKey::Generic,
+        model_slug: infinitecode_protocol::ModelProfileKey::Generic,
         model: model.to_string(),
         system: None,
         messages: Vec::new(),

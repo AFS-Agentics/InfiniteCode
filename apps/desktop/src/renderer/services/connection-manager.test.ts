@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import type { DevoClient } from "@devo-ai/sdk/v2/client"
+import type { InfiniteCodeClient } from "@infinitecode-ai/sdk/v2/client"
 import type { Event, Session } from "../lib/types"
 import { partsFamily, partStorageKey } from "../atoms/parts"
 import { projectPaginationFamily, sessionFamily, upsertSessionAtom } from "../atoms/sessions"
@@ -46,7 +46,7 @@ class FakeEventStream {
 
 const streams = new Map<string, FakeEventStream>()
 let activeManager: typeof import("./connection-manager") | null = null
-let listSessionsImpl: (client: DevoClient, options?: unknown) => Promise<Session[]> = async () => []
+let listSessionsImpl: (client: InfiniteCodeClient, options?: unknown) => Promise<Session[]> = async () => []
 let getSessionStatusesImpl: () => Promise<Record<string, { type: string }>> = async () => ({})
 
 function streamFor(directory: string): FakeEventStream {
@@ -58,16 +58,16 @@ function streamFor(directory: string): FakeEventStream {
 	return stream
 }
 
-mock.module("./devo", () => ({
+mock.module("./infinitecode", () => ({
 	connectToServer: (_url: string, options?: { directory?: string }) =>
-		({ directory: options?.directory ?? "__base__" }) as unknown as DevoClient,
+		({ directory: options?.directory ?? "__base__" }) as unknown as InfiniteCodeClient,
 	disposeAllInstances: () => {},
 	getSession: async () => null,
 	getSessionStatuses: async () => getSessionStatusesImpl(),
 	listProjects: async () => [],
 	projectsFromSessions: (sessions: Session[]) => sessions,
-	listSessions: async (client: DevoClient, options?: unknown) => listSessionsImpl(client, options),
-	subscribeToGlobalEvents: async (client: DevoClient) =>
+	listSessions: async (client: InfiniteCodeClient, options?: unknown) => listSessionsImpl(client, options),
+	subscribeToGlobalEvents: async (client: InfiniteCodeClient) =>
 		streamFor(((client as unknown as { directory?: string }).directory) ?? "__base__"),
 }))
 
@@ -106,7 +106,7 @@ describe("connection manager project event bridge", () => {
 
 		const manager = await import(`./connection-manager?case=${Date.now()}`)
 		activeManager = manager
-		await manager.connectToDevo("devo://stdio")
+		await manager.connectToInfiniteCode("infinitecode://stdio")
 		expect(manager.getProjectClient(directory)).not.toBeNull()
 
 		streamFor(directory).push({
@@ -133,7 +133,7 @@ describe("connection manager project event bridge", () => {
 
 		const manager = await import(`./connection-manager?case=${Date.now()}`)
 		activeManager = manager
-		await manager.connectToDevo("devo://stdio")
+		await manager.connectToInfiniteCode("infinitecode://stdio")
 		expect(manager.getProjectClient(directory)).not.toBeNull()
 
 		streamFor(directory).push({
@@ -180,7 +180,7 @@ describe("connection manager project event bridge", () => {
 
 		const manager = await import(`./connection-manager?case=${Date.now()}`)
 		activeManager = manager
-		await manager.connectToDevo("devo://stdio")
+		await manager.connectToInfiniteCode("infinitecode://stdio")
 		await manager.loadProjectSessions(directory)
 
 		expect(appStore.get(sessionFamily(session.id))?.status).toEqual({ type: "busy" })
@@ -198,7 +198,7 @@ describe("connection manager project event bridge", () => {
 
 		const manager = await import(`./connection-manager?case=${Date.now()}`)
 		activeManager = manager
-		await manager.connectToDevo("devo://stdio")
+		await manager.connectToInfiniteCode("infinitecode://stdio")
 		await manager.loadAllProjects()
 		await manager.loadProjectSessions(directory, undefined, { limit: 5, roots: true })
 

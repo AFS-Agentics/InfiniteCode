@@ -7,18 +7,18 @@ import {
 	SearchableListPopoverSearch,
 	SearchableListPopoverTrigger,
 	useSearchableListPopoverSearch,
-} from "@devo/ui/components/searchable-list-popover"
+} from "@infinitecode/ui/components/searchable-list-popover"
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@devo/ui/components/select"
-import { Separator } from "@devo/ui/components/separator"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
-import { useIsMobile } from "@devo/ui/hooks/use-mobile"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/select"
+import { Separator } from "@infinitecode/ui/components/separator"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
+import { useIsMobile } from "@infinitecode/ui/hooks/use-mobile"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { useAtomValue } from "jotai"
 import {
 	ChevronDownIcon,
@@ -35,13 +35,13 @@ import type {
 	SdkAgent,
 	SdkProvider,
 	VcsData,
-} from "../../hooks/use-devo-data"
+} from "../../hooks/use-infinitecode-data"
 import {
 	getModelCurrentVariant,
 	getModelVariants,
 	modelAllowsDefaultVariant,
 	parseModelRef,
-} from "../../hooks/use-devo-data"
+} from "../../hooks/use-infinitecode-data"
 import {
 	computeContextUsage,
 	formatPercentage,
@@ -468,7 +468,7 @@ export function VariantSelector({
 // ============================================================
 
 export interface PromptToolbarProps {
-	/** Available agents from Devo */
+	/** Available agents from InfiniteCode */
 	agents: SdkAgent[]
 	/** Currently selected agent name */
 	selectedAgent: string | null
@@ -581,7 +581,7 @@ interface StatusBarProps {
 	sessionId?: string
 	/** Provider data for context limit lookup */
 	providers?: ProvidersData | null
-	/** Compaction config from Devo for accurate threshold calculation */
+	/** Compaction config from InfiniteCode for accurate threshold calculation */
 	compaction?: CompactionConfig
 }
 

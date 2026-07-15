@@ -1,8 +1,8 @@
 import type { Message, Part } from "../../lib/types"
 import { getStreamingPartsForSession } from "../streaming"
 
-const DEVO_ITEM_KIND_META = "devo/itemKind"
-const DEVO_RESEARCH_ARTIFACT_TITLE_META = "devo/researchArtifactTitle"
+const INFINITECODE_ITEM_KIND_META = "infinitecode/itemKind"
+const INFINITECODE_RESEARCH_ARTIFACT_TITLE_META = "infinitecode/researchArtifactTitle"
 
 // ============================================================
 // Types — wrappers around SDK Message + Part
@@ -19,7 +19,7 @@ export interface ChatMessageEntry {
  */
 export interface ChatTurn {
 	id: string
-	/** Protocol turn id when available (`Message.turnID` / `devo/turnId`). */
+	/** Protocol turn id when available (`Message.turnID` / `infinitecode/turnId`). */
 	turnId?: string
 	userMessage: ChatMessageEntry
 	assistantMessages: ChatMessageEntry[]
@@ -33,7 +33,7 @@ function messageProtocolTurnId(entry: ChatMessageEntry): string | undefined {
 	}
 	const direct = info.turnID ?? info.turnId
 	if (typeof direct === "string" && direct.length > 0) return direct
-	const metaTurnId = info.metadata?.["devo/turnId"]
+	const metaTurnId = info.metadata?.["infinitecode/turnId"]
 	return typeof metaTurnId === "string" && metaTurnId.length > 0 ? metaTurnId : undefined
 }
 
@@ -62,9 +62,9 @@ function messageFingerprint(entry: ChatMessageEntry): string {
 			textLen += part.text.length
 			if (part.type === "text") {
 				const metadata = (part as { metadata?: Record<string, unknown> }).metadata
-				if (metadata?.[DEVO_ITEM_KIND_META] === "research_artifact") {
+				if (metadata?.[INFINITECODE_ITEM_KIND_META] === "research_artifact") {
 					textMetadataSegments.push(
-						`${part.id}:${metadata[DEVO_ITEM_KIND_META]}:${metadata[DEVO_RESEARCH_ARTIFACT_TITLE_META] ?? ""}`,
+						`${part.id}:${metadata[INFINITECODE_ITEM_KIND_META]}:${metadata[INFINITECODE_RESEARCH_ARTIFACT_TITLE_META] ?? ""}`,
 					)
 				}
 			}

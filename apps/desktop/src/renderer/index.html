@@ -9,14 +9,14 @@
     <style>
       /* Splash screen styles -- inlined so they render before any JS loads. */
       html {
-        --devo-startup-background: #181818;
-        background: var(--devo-startup-background);
+        --infinitecode-startup-background: #181818;
+        background: var(--infinitecode-startup-background);
       }
       html.light {
-        --devo-startup-background: #ffffff;
+        --infinitecode-startup-background: #ffffff;
       }
       body {
-        background: var(--devo-startup-background);
+        background: var(--infinitecode-startup-background);
       }
       #splash {
         position: fixed;
@@ -24,7 +24,7 @@
         z-index: 99999;
         display: flex;
         flex-direction: column;
-        background: var(--devo-startup-background);
+        background: var(--infinitecode-startup-background);
         transition: opacity 300ms ease-out;
         /* Allow dragging the window from the splash on macOS */
         -webkit-app-region: drag;
@@ -53,7 +53,7 @@
         color: rgba(255, 255, 255, 0.4);
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       }
-      .devo-splash-brand {
+      .infinitecode-splash-brand {
         display: inline-flex;
         align-items: center;
         gap: 10px;
@@ -65,7 +65,7 @@
         line-height: 1.2;
         white-space: nowrap;
       }
-      .devo-splash-brand-mark-frame {
+      .infinitecode-splash-brand-mark-frame {
         display: inline-flex;
         width: 64px;
         height: 64px;
@@ -73,74 +73,74 @@
         align-items: center;
         justify-content: center;
       }
-      .devo-splash-brand-mark {
+      .infinitecode-splash-brand-mark {
         width: 64px;
         height: 64px;
         flex-shrink: 0;
       }
-      .devo-brand-mark-attention {
-        animation: devo-brand-mark-attention 1.45s cubic-bezier(0.18, 0.82, 0.22, 1)
+      .infinitecode-brand-mark-attention {
+        animation: infinitecode-brand-mark-attention 1.45s cubic-bezier(0.18, 0.82, 0.22, 1)
           both;
         transform-origin: center;
       }
-      .devo-brand-word {
+      .infinitecode-brand-word {
         display: inline-grid;
         height: 1.2em;
         line-height: 1.2;
         overflow: hidden;
       }
-      .devo-brand-word-track {
+      .infinitecode-brand-word-track {
         display: flex;
         flex-direction: column;
         transform: translateY(-2.4em);
       }
-      .devo-brand-word-track > span {
+      .infinitecode-brand-word-track > span {
         height: 1.2em;
       }
-      .devo-brand-word-attention .devo-brand-word-track {
-        animation: devo-brand-word-carousel 1.05s cubic-bezier(0.18, 0.82, 0.22, 1)
+      .infinitecode-brand-word-attention .infinitecode-brand-word-track {
+        animation: infinitecode-brand-word-carousel 1.05s cubic-bezier(0.18, 0.82, 0.22, 1)
           both;
       }
-      #splash .devo-loading-dots {
-        --devo-loading-dot-idle: color-mix(in srgb, #60a5fa 18%, rgb(176 174 173));
-        --devo-loading-dot-active: #60a5fa;
+      #splash .infinitecode-loading-dots {
+        --infinitecode-loading-dot-idle: color-mix(in srgb, #60a5fa 18%, rgb(176 174 173));
+        --infinitecode-loading-dot-active: #60a5fa;
         display: flex;
         align-items: center;
         gap: 7px;
         margin-top: 32px;
       }
-      #splash .devo-loading-dots span {
+      #splash .infinitecode-loading-dots span {
         width: 7px;
         height: 7px;
         border-radius: 50%;
-        background: var(--devo-loading-dot-idle);
-        animation: devo-loading-dot 1.16s ease-in-out infinite;
+        background: var(--infinitecode-loading-dot-idle);
+        animation: infinitecode-loading-dot 1.16s ease-in-out infinite;
         opacity: 0.45;
         transform: scale(0.86);
       }
-      #splash .devo-loading-dots span:nth-child(2) { animation-delay: 160ms; }
-      #splash .devo-loading-dots span:nth-child(3) { animation-delay: 320ms; }
-      @keyframes devo-loading-dot {
+      #splash .infinitecode-loading-dots span:nth-child(2) { animation-delay: 160ms; }
+      #splash .infinitecode-loading-dots span:nth-child(3) { animation-delay: 320ms; }
+      @keyframes infinitecode-loading-dot {
         0%, 100% {
-          background: var(--devo-loading-dot-idle);
+          background: var(--infinitecode-loading-dot-idle);
           box-shadow: 0 0 0 rgb(96 165 250 / 0);
           opacity: 0.45;
           transform: translateY(0) scale(0.86);
         }
         28% {
-          background: var(--devo-loading-dot-active);
+          background: var(--infinitecode-loading-dot-active);
           box-shadow: 0 0 12px rgb(96 165 250 / 0.5);
           opacity: 1;
           transform: translateY(-1px) scale(1.18);
         }
         56% {
-          background: var(--devo-loading-dot-idle);
+          background: var(--infinitecode-loading-dot-idle);
           box-shadow: 0 0 0 rgb(96 165 250 / 0);
           opacity: 0.55;
           transform: translateY(0) scale(0.92);
         }
       }
-      @keyframes devo-brand-mark-attention {
+      @keyframes infinitecode-brand-mark-attention {
         0% {
           transform: rotate(0deg) scale(1);
         }
@@ -157,7 +157,7 @@
           transform: rotate(360deg) scale(1);
         }
       }
-      @keyframes devo-brand-word-carousel {
+      @keyframes infinitecode-brand-word-carousel {
         0% {
           filter: blur(1.5px);
           opacity: 0.58;
@@ -178,8 +178,8 @@
         }
       }
       @media (prefers-reduced-motion: reduce) {
-        .devo-brand-mark-attention,
-        .devo-brand-word-attention .devo-brand-word-track {
+        .infinitecode-brand-mark-attention,
+        .infinitecode-brand-word-attention .infinitecode-brand-word-track {
           animation: none;
         }
       }
@@ -190,8 +190,8 @@
       // Prevent flash of wrong color scheme before React hydrates.
       // Reads from the same localStorage keys used by Jotai atomWithStorage.
       try {
-        var scheme = JSON.parse(localStorage.getItem('devo:colorScheme') || '"dark"');
-        var themeId = JSON.parse(localStorage.getItem('devo:theme') || '"default"');
+        var scheme = JSON.parse(localStorage.getItem('infinitecode:colorScheme') || '"dark"');
+        var themeId = JSON.parse(localStorage.getItem('infinitecode:theme') || '"default"');
         var cls = scheme;
         if (scheme === 'system') {
           cls = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -211,7 +211,7 @@
       // Toggle via Command Palette (Cmd+K > "React Scan"). Only active in dev
       // since production React builds don't expose the DevTools hook.
       try {
-        if (localStorage.getItem('devo:reactScan') === 'true') {
+        if (localStorage.getItem('infinitecode:reactScan') === 'true') {
           document.write('<script src="https://unpkg.com/react-scan/dist/auto.global.js"><\/script>');
         }
       } catch (e) {}
@@ -221,7 +221,7 @@
     <div id="splash">
       <div class="splash-body">
       <img src="/logo.png" alt="InfiniteCode" class="splash-logo-img" />
-      <div class="devo-loading-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="infinitecode-loading-dots" aria-hidden="true"><span></span><span></span><span></span></div>
       </div>
       <p class="splash-copyright">© 2026 AFS Agentics</p>
     </div>

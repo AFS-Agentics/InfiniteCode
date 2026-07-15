@@ -15,7 +15,7 @@ use crate::durable_record::{
     ContentPart, DurableRecord, InvocationId, Mention, ModelBindingId, ProviderId,
 };
 use crate::session_store::SessionStore;
-use devo_protocol::{
+use infinitecode_protocol::{
     ItemId, ModelCatalog, ReasoningEffort, SessionId, ToolDefinition, TurnId, TurnKind, TurnStatus,
     TurnUsage,
 };
@@ -668,7 +668,7 @@ pub async fn consume_provider_event(
         ProviderEvent::LlmRequestStarted => {
             client_events.push(TurnClientEvent::TurnStatusChanged {
                 turn_id: state.turn_id,
-                status: devo_protocol::TurnStatus::Running,
+                status: infinitecode_protocol::TurnStatus::Running,
             });
         }
 
@@ -960,7 +960,7 @@ pub async fn finish_model_invocation(
                 })
             } else {
                 // Clean terminal response
-                let response_item_id = devo_protocol::ItemId::new();
+                let response_item_id = infinitecode_protocol::ItemId::new();
                 let usage = state.accumulated_usage.clone();
                 Ok(ModelInvocationOutcome::TerminalResponse {
                     response_item_id,
@@ -994,7 +994,7 @@ pub async fn finish_model_invocation(
 #[derive(Debug, Clone)]
 pub struct SessionProjection {
     pub session_id: SessionId,
-    pub metadata: devo_protocol::SessionMetadata,
+    pub metadata: infinitecode_protocol::SessionMetadata,
 }
 
 /// Projected turn state for core consumption.

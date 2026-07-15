@@ -171,7 +171,7 @@ Esc: back
 - Pressing Enter on the focused reasoning effort marked by `>` confirms the selection, closes the popup, and returns to the inline setup view.
 - If the selected model does not support reasoning, the inline setup view omits the reasoning effort selection step.
 - Successful setup submits the selected values for persistent configuration storage before normal model invocation begins.
-- If onboarding runs with an active workspace directory and no explicit target selection is available, the default non-secret persistence target is `<workspace>/.devo/config.toml`.
+- If onboarding runs with an active workspace directory and no explicit target selection is available, the default non-secret persistence target is `<workspace>/.infinitecode/config.toml`.
 - If onboarding runs without an active workspace directory and no explicit target selection is available, the default non-secret persistence target is the user-scoped configuration file.
 - Credential material always persists to user-scoped `auth.json`.
 - Validation failures should preserve the selected model slug and safe completed fields where useful.

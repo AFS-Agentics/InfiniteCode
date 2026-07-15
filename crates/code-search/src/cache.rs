@@ -181,7 +181,7 @@ impl CachedFileRecord {
 pub fn default_cache_dir() -> PathBuf {
     dirs::cache_dir()
         .unwrap_or_else(std::env::temp_dir)
-        .join("devo")
+        .join("infinitecode")
         .join("code-search")
         .join("indexes")
 }

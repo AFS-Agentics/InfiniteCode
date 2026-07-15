@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 import { type LandingCopy } from "./data";
-import { renderWithDevoMark } from "./devo-word";
+import { renderWithInfiniteCodeMark } from "./infinitecode-word";
 
 type WorkflowSectionProps = {
   copy: LandingCopy["workflow"];
@@ -16,10 +16,10 @@ export function WorkflowSection({ copy }: WorkflowSectionProps) {
             {copy.kicker}
           </p>
           <h2 className="mt-4 max-w-xl text-4xl font-semibold tracking-normal text-white sm:text-5xl">
-            {renderWithDevoMark(copy.title)}
+            {renderWithInfiniteCodeMark(copy.title)}
           </h2>
           <p className="mt-6 max-w-xl text-lg leading-8 text-white/62">
-            {renderWithDevoMark(copy.body)}
+            {renderWithInfiniteCodeMark(copy.body)}
           </p>
         </div>
         <div className="relative flex min-h-[27rem] items-center justify-end md:min-h-[clamp(25rem,52vw,43rem)]">

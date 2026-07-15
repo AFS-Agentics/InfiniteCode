@@ -30,7 +30,7 @@ const HOUR = 60 * MINUTE
 /** Stable IDs so navigation works across reloads */
 const IDS = {
 	// Projects
-	projectDevo: "proj-a1b2c3d4e5f6",
+	projectInfiniteCode: "proj-a1b2c3d4e5f6",
 	projectAcmeApi: "proj-f6e5d4c3b2a1",
 	projectLanding: "proj-1a2b3c4d5e6f",
 
@@ -80,7 +80,7 @@ function partId(messageId: string, index: number): string {
 // ============================================================
 
 const DIRS = {
-	devo: "/Users/demo/Projects/devo",
+	infinitecode: "/Users/demo/Projects/infinitecode",
 	acmeApi: "/Users/demo/Projects/acme-api",
 	landing: "/Users/demo/Projects/landing-page",
 }
@@ -91,10 +91,10 @@ const DIRS = {
 
 const mockDiscoveredProjects: DiscoveryState["projects"] = [
 	{
-		id: IDS.projectDevo,
-		worktree: DIRS.devo,
+		id: IDS.projectInfiniteCode,
+		worktree: DIRS.infinitecode,
 		vcs: "git",
-		name: "devo",
+		name: "infinitecode",
 		time: { created: NOW - 30 * 24 * HOUR, updated: NOW - 2 * MINUTE },
 		sandboxes: [],
 	},
@@ -259,8 +259,8 @@ function makeSession(
 const mockSessions: Session[] = [
 	makeSession(
 		IDS.sessionDarkMode,
-		IDS.projectDevo,
-		DIRS.devo,
+		IDS.projectInfiniteCode,
+		DIRS.infinitecode,
 		"Add dark mode toggle to settings",
 		NOW - 25 * MINUTE,
 		NOW - 2 * MINUTE,
@@ -291,16 +291,16 @@ const mockSessions: Session[] = [
 	),
 	makeSession(
 		IDS.sessionTests,
-		IDS.projectDevo,
-		DIRS.devo,
+		IDS.projectInfiniteCode,
+		DIRS.infinitecode,
 		"Add unit tests for auth middleware",
 		NOW - 3 * HOUR,
 		NOW - 2 * HOUR,
 	),
 	makeSession(
 		IDS.sessionDocs,
-		IDS.projectDevo,
-		DIRS.devo,
+		IDS.projectInfiniteCode,
+		DIRS.infinitecode,
 		"Update API documentation for v2 endpoints",
 		NOW - 5 * HOUR,
 		NOW - 4 * HOUR,
@@ -319,7 +319,7 @@ export const MOCK_SESSION_ENTRIES: Map<string, SessionEntry> = new Map([
 			status: { type: "busy" as const },
 			permissions: [],
 			questions: [],
-			directory: DIRS.devo,
+			directory: DIRS.infinitecode,
 			branch: "feat/dark-mode",
 		},
 	],
@@ -375,7 +375,7 @@ export const MOCK_SESSION_ENTRIES: Map<string, SessionEntry> = new Map([
 			status: { type: "idle" as const },
 			permissions: [],
 			questions: [],
-			directory: DIRS.devo,
+			directory: DIRS.infinitecode,
 			branch: "test/auth-middleware",
 		},
 	],
@@ -386,7 +386,7 @@ export const MOCK_SESSION_ENTRIES: Map<string, SessionEntry> = new Map([
 			status: { type: "idle" as const },
 			permissions: [],
 			questions: [],
-			directory: DIRS.devo,
+			directory: DIRS.infinitecode,
 			branch: "docs/api-v2",
 		},
 	],
@@ -426,7 +426,7 @@ function assistantMsg(
 		providerID: "bedrock",
 		mode: "Adaptive",
 		agent: "code",
-		path: { cwd: DIRS.devo, root: DIRS.devo },
+		path: { cwd: DIRS.infinitecode, root: DIRS.infinitecode },
 		cost: 0.003 + Math.random() * 0.01,
 		tokens: {
 			input: 1200 + Math.floor(Math.random() * 2000),
@@ -1519,5 +1519,5 @@ export const MOCK_PARTS: Map<string, Record<string, Part[]>> = new Map([
 /** The first session ID, suitable for navigating to after enabling mock mode */
 export const MOCK_DEFAULT_SESSION_ID = IDS.sessionDarkMode
 
-/** Project slug for the default session (devo project) */
-export const MOCK_DEFAULT_PROJECT_SLUG = `devo-${IDS.projectDevo.slice(0, 12)}`
+/** Project slug for the default session (infinitecode project) */
+export const MOCK_DEFAULT_PROJECT_SLUG = `infinitecode-${IDS.projectInfiniteCode.slice(0, 12)}`

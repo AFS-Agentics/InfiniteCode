@@ -13,8 +13,8 @@ use crate::get_git_diff::get_git_diff;
 use crate::history_cell;
 use crate::history_cell::PlainHistoryCell;
 use crate::slash_command::SlashCommand;
-use devo_protocol::MAX_THREAD_GOAL_OBJECTIVE_CHARS;
-use devo_protocol::ThreadGoalStatus;
+use infinitecode_protocol::MAX_THREAD_GOAL_OBJECTIVE_CHARS;
+use infinitecode_protocol::ThreadGoalStatus;
 
 use super::ChatWidget;
 

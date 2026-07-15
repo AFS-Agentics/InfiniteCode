@@ -8,8 +8,8 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::ProviderVendorCatalog;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::ProviderVendorCatalog;
 use futures::SinkExt;
 use futures::StreamExt;
 use pretty_assertions::assert_eq;
@@ -23,27 +23,27 @@ use tokio::time::timeout;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ResponseContent;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::SingleProviderRouter;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
 use futures::stream;
 
 const STDIO_SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
 const STDIO_SERVER_LINE_TIMEOUT: Duration = Duration::from_secs(30);
 
 fn write_test_config(home_dir: &TempDir, listen: &[&str]) -> Result<()> {
-    let config_dir = home_dir.path().join(".devo");
+    let config_dir = home_dir.path().join(".infinitecode");
 
     std::fs::create_dir_all(&config_dir)?;
     let listen_entries = listen
@@ -204,17 +204,17 @@ async fn stdio_server_process_supports_handshake_and_session_start() -> Result<(
 
     let test_cwd = home_dir.path().to_string_lossy().into_owned();
 
-    let mut command = devo_command()?;
+    let mut command = infinitecode_command()?;
     let mut child = command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", home_dir.path().join(".devo"))
+        .env("INFINITECODE_HOME", home_dir.path().join(".infinitecode"))
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn devo child process in server mode")?;
+        .context("spawn infinitecode child process in server mode")?;
 
     let mut stdin = child.stdin.take().context("capture child stdin")?;
     let stdout = child.stdout.take().context("capture child stdout")?;
@@ -238,7 +238,7 @@ async fn stdio_server_process_supports_handshake_and_session_start() -> Result<(
     assert_eq!(initialize_response["id"], serde_json::json!(1));
     assert_eq!(
         initialize_response["result"]["agentInfo"]["name"],
-        serde_json::json!("devo-server")
+        serde_json::json!("infinitecode-server")
     );
     stdin
         .write_all(
@@ -273,7 +273,7 @@ async fn stdio_server_process_supports_handshake_and_session_start() -> Result<(
 
     assert!(session_new_response["result"]["sessionId"].is_string());
     assert_eq!(
-        session_new_response["result"]["_meta"]["devo/session"]["cwd"],
+        session_new_response["result"]["_meta"]["infinitecode/session"]["cwd"],
         serde_json::json!(test_cwd)
     );
 
@@ -287,22 +287,22 @@ async fn stdio_server_process_supports_handshake_and_session_start() -> Result<(
 async fn second_stdio_server_process_proxies_to_singleton() -> Result<()> {
     let home_dir = TempDir::new()?;
     write_test_config(&home_dir, &["stdio://"])?;
-    let devo_home = home_dir.path().join(".devo");
+    let infinitecode_home = home_dir.path().join(".infinitecode");
     let second_workspace = home_dir.path().join("second-workspace");
     std::fs::create_dir_all(&second_workspace)?;
     let second_cwd = second_workspace.to_string_lossy().into_owned();
 
-    let mut first_command = devo_command()?;
+    let mut first_command = infinitecode_command()?;
     let mut first_child = first_command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", &devo_home)
+        .env("INFINITECODE_HOME", &infinitecode_home)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn first devo server process")?;
+        .context("spawn first infinitecode server process")?;
     let mut first_stdin = first_child.stdin.take().context("capture first stdin")?;
     let first_stdout = first_child.stdout.take().context("capture first stdout")?;
     let first_stderr = first_child.stderr.take().context("capture first stderr")?;
@@ -328,17 +328,17 @@ async fn second_stdio_server_process_proxies_to_singleton() -> Result<()> {
     .await?;
     assert_eq!(first_initialize_response["id"], serde_json::json!(1));
 
-    let mut second_command = devo_command()?;
+    let mut second_command = infinitecode_command()?;
     let mut second_child = second_command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", &devo_home)
+        .env("INFINITECODE_HOME", &infinitecode_home)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn proxy devo server process")?;
+        .context("spawn proxy infinitecode server process")?;
     let mut second_stdin = second_child
         .stdin
         .take()
@@ -417,7 +417,7 @@ async fn second_stdio_server_process_proxies_to_singleton() -> Result<()> {
 
     assert!(session_new_response["result"]["sessionId"].is_string());
     assert_eq!(
-        session_new_response["result"]["_meta"]["devo/session"]["cwd"],
+        session_new_response["result"]["_meta"]["infinitecode/session"]["cwd"],
         serde_json::json!(second_cwd)
     );
 
@@ -442,7 +442,7 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
     };
     let bind_address = format!("127.0.0.1:{port}");
     let db_path = std::env::temp_dir().join("test_end_to_end.db");
-    let db = Arc::new(devo_server::db::Database::open(db_path).expect("open test database"));
+    let db = Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
     let provider: Arc<dyn ModelProviderSDK> = Arc::new(PendingProvider);
     let runtime = ServerRuntime::new(
         std::env::temp_dir(),
@@ -454,7 +454,7 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
             Arc::new(PresetModelCatalog::default()),
             Arc::new(ProviderVendorCatalog::default()),
             Box::new(FileSystemSkillCatalog::new(SkillsConfig::default())),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(
                 AppConfigStore::load(std::env::temp_dir(), None).expect("load app config store"),
@@ -464,7 +464,7 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
     let listen = vec![format!("ws://{bind_address}")];
     let listener_task =
         tokio::spawn(
-            async move { devo_server::run_listeners(Arc::clone(&runtime), &listen).await },
+            async move { infinitecode_server::run_listeners(Arc::clone(&runtime), &listen).await },
         );
 
     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -480,7 +480,7 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
     assert_eq!(initialize_response["id"], serde_json::json!(1));
     assert_eq!(
         initialize_response["result"]["agentInfo"]["name"],
-        serde_json::json!("devo-server")
+        serde_json::json!("infinitecode-server")
     );
 
     socket
@@ -519,7 +519,7 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
         .context("extract session id")?
         .to_string();
     assert_eq!(
-        session_response["result"]["_meta"]["devo/session"]["cwd"],
+        session_response["result"]["_meta"]["infinitecode/session"]["cwd"],
         serde_json::json!(test_cwd)
     );
 
@@ -528,7 +528,7 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 3,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "hello" }],
@@ -579,7 +579,7 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 4,
-                "method": "_devo/turn/interrupt",
+                "method": "_infinitecode/turn/interrupt",
                 "params": {
                     "session_id": session_id,
                     "turn_id": turn_id,
@@ -657,7 +657,7 @@ async fn websocket_turn_streams_final_tool_metadata_for_read_and_glob() -> Resul
     };
     let bind_address = format!("127.0.0.1:{port}");
     let db_dir = TempDir::new()?;
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         db_dir.path().join("e2e.db"),
     )?);
     let provider: Arc<dyn ModelProviderSDK> =
@@ -667,12 +667,12 @@ async fn websocket_turn_streams_final_tool_metadata_for_read_and_glob() -> Resul
         ServerRuntimeDependencies::new(
             Arc::clone(&provider),
             Arc::new(SingleProviderRouter::new(provider)),
-            Arc::new(devo_core::tools::create_default_tool_registry()),
+            Arc::new(infinitecode_core::tools::create_default_tool_registry()),
             "test-model".to_string(),
             Arc::new(PresetModelCatalog::default()),
             Arc::new(ProviderVendorCatalog::default()),
             Box::new(FileSystemSkillCatalog::new(SkillsConfig::default())),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(
                 AppConfigStore::load(std::env::temp_dir(), None).expect("load app config store"),
@@ -682,7 +682,7 @@ async fn websocket_turn_streams_final_tool_metadata_for_read_and_glob() -> Resul
     let listen = vec![format!("ws://{bind_address}")];
     let listener_task =
         tokio::spawn(
-            async move { devo_server::run_listeners(Arc::clone(&runtime), &listen).await },
+            async move { infinitecode_server::run_listeners(Arc::clone(&runtime), &listen).await },
         );
 
     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -736,7 +736,7 @@ async fn websocket_turn_streams_final_tool_metadata_for_read_and_glob() -> Resul
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 3,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "read and glob" }],
@@ -823,14 +823,14 @@ async fn websocket_turn_streams_final_tool_metadata_for_read_and_glob() -> Resul
     Ok(())
 }
 
-fn devo_command() -> Result<Command> {
-    if let Some(binary_path) = std::env::var_os("CARGO_BIN_EXE_devo").map(PathBuf::from)
+fn infinitecode_command() -> Result<Command> {
+    if let Some(binary_path) = std::env::var_os("CARGO_BIN_EXE_infinitecode").map(PathBuf::from)
         && binary_path.is_file()
     {
         return Ok(Command::new(binary_path));
     }
 
-    let binary_path = devo_binary_path()?;
+    let binary_path = infinitecode_binary_path()?;
     if binary_path.is_file() {
         return Ok(Command::new(binary_path));
     }
@@ -844,28 +844,28 @@ fn devo_command() -> Result<Command> {
         .arg("run")
         .arg("--quiet")
         .arg("-p")
-        .arg("devo-cli")
+        .arg("infinitecode-cli")
         .arg("--bin")
-        .arg("devo")
+        .arg("infinitecode")
         .arg("--");
     Ok(command)
 }
 
-fn devo_binary_path() -> Result<PathBuf> {
+fn infinitecode_binary_path() -> Result<PathBuf> {
     let mut path = std::env::current_exe()?;
     path.pop();
     path.pop();
-    path.push(if cfg!(windows) { "devo.exe" } else { "devo" });
+    path.push(if cfg!(windows) { "infinitecode.exe" } else { "infinitecode" });
     Ok(path)
 }
 
 fn has_original_method(value: &serde_json::Value, method: &str) -> bool {
     value.get("method").and_then(serde_json::Value::as_str) == Some(method)
-        || value["params"]["_meta"]["devo/originalMethod"].as_str() == Some(method)
+        || value["params"]["_meta"]["infinitecode/originalMethod"].as_str() == Some(method)
 }
 
 fn original_event(value: &serde_json::Value) -> &serde_json::Value {
-    &value["params"]["_meta"]["devo/originalEvent"]
+    &value["params"]["_meta"]["infinitecode/originalEvent"]
 }
 
 async fn read_websocket_json(

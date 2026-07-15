@@ -3,8 +3,8 @@ import {
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
-} from "@devo/ui/components/dropdown-menu"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/dropdown-menu"
+import { cn } from "@infinitecode/ui/lib/utils"
 import {
 	ChevronRightIcon,
 	CirclePauseIcon,

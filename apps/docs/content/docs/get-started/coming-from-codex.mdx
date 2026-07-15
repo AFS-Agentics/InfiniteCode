@@ -1,10 +1,10 @@
 ---
 title: Coming From Codex CLI
-description: Map familiar Codex CLI workflows to Devo.
+description: Map familiar Codex CLI workflows to InfiniteCode.
 ---
 
-This page maps common Codex-style terminal workflows to Devo. It is not a
-feature comparison. Use it to find the Devo command, config, or TUI surface
+This page maps common Codex-style terminal workflows to InfiniteCode. It is not a
+feature comparison. Use it to find the InfiniteCode command, config, or TUI surface
 that matches what you already know.
 
 ## What Carries Over
@@ -17,55 +17,55 @@ The core workflow is familiar:
 - keep context inside the current working tree;
 - resume or start over when a session gets too large.
 
-The biggest Devo difference is provider setup. Devo is model-neutral: you bind
+The biggest InfiniteCode difference is provider setup. InfiniteCode is model-neutral: you bind
 model names to provider records in config, then switch between those bindings
 inside the TUI.
 
 ## First Setup
 
-Install Devo, then run onboarding:
+Install InfiniteCode, then run onboarding:
 
 ```bash
-devo onboard
+infinitecode onboard
 ```
 
 For the fastest first provider, use [Connect DeepSeek](./connect-deepseek).
 DeepSeek official API is configured as a provider plus one or more model
 bindings.
 
-After onboarding, start Devo in a repository:
+After onboarding, start InfiniteCode in a repository:
 
 ```bash
 cd /path/to/project
-devo
+infinitecode
 ```
 
 ## Workflow Map
 
-| Familiar workflow | Devo surface |
+| Familiar workflow | InfiniteCode surface |
 | --- | --- |
-| Start an interactive coding session | `devo` |
-| Run a one-shot prompt | `devo prompt "..."` |
-| Resume a previous session | `devo resume` or `/resume` |
+| Start an interactive coding session | `infinitecode` |
+| Run a one-shot prompt | `infinitecode prompt "..."` |
+| Resume a previous session | `infinitecode resume` or `/resume` |
 | Switch models | `/model` |
 | Set a durable objective | `/goal` |
 | Ask a side question without disrupting the main task | `/btw <question>` |
 | Review current status | `/status` |
 | Review repository changes | `/diff` |
 | Compact context | `/compact` |
-| Open provider and model config | `devo onboard`, then config files under `DEVO_HOME` |
+| Open provider and model config | `infinitecode onboard`, then config files under `INFINITECODE_HOME` |
 
 See [Slash Commands](../reference/slash-commands) for the full command list.
 
 ## Model And Provider Setup
 
-Devo separates these concepts:
+InfiniteCode separates these concepts:
 
 - a provider describes a service endpoint, credential, and wire API;
 - a model binding connects a local model id to one provider model name;
 - the active model is selected from enabled bindings.
 
-This makes Devo useful when you want the same coding workflow against different
+This makes InfiniteCode useful when you want the same coding workflow against different
 providers. You can keep a strong model as the default and add cheaper or faster
 bindings for routine work.
 
@@ -77,7 +77,7 @@ Read these pages next:
 
 ## Permissions
 
-Devo asks before running commands or applying changes according to the current
+InfiniteCode asks before running commands or applying changes according to the current
 permission preset. Open the picker with:
 
 ```text
@@ -85,13 +85,13 @@ permission preset. Open the picker with:
 ```
 
 Start conservatively in an unfamiliar repository. Relax permissions only after
-you understand what Devo is trying to do and which commands are expected.
+you understand what InfiniteCode is trying to do and which commands are expected.
 
-See [Permissions](../using-devo/permissions).
+See [Permissions](../using-infinitecode/permissions).
 
 ## Context
 
-Devo keeps a transcript for the current session and can compact it when the
+InfiniteCode keeps a transcript for the current session and can compact it when the
 conversation grows. Run:
 
 ```text
@@ -110,5 +110,5 @@ Two composer triggers matter during everyday use:
 - type `@` to fuzzy-search files and insert a path into the prompt;
 - type `!` to enter shell mode and run a command from the prompt area.
 
-See [Fuzzy File Search](../using-devo/fuzzy-file-search) and
-[Shell Mode](../using-devo/shell-mode).
+See [Fuzzy File Search](../using-infinitecode/fuzzy-file-search) and
+[Shell Mode](../using-infinitecode/shell-mode).

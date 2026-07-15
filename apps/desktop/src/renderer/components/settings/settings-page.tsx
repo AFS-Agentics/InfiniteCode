@@ -3,7 +3,7 @@ import {
 	SidebarMenu,
 	SidebarMenuButton,
 	SidebarMenuItem,
-} from "@devo/ui/components/sidebar"
+} from "@infinitecode/ui/components/sidebar"
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router"
 import { useAtomValue } from "jotai"
 import {
@@ -11,7 +11,6 @@ import {
 	BellIcon,
 	GitForkIcon,
 	InfoIcon,
-	PlugIcon,
 	ServerIcon,
 	SettingsIcon,
 	WrenchIcon,

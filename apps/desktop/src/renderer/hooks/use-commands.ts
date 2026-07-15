@@ -7,7 +7,7 @@ import { appStore } from "../atoms/store"
 import { formatShortcut } from "../lib/shortcut-display"
 import type { Session, TextPart } from "../lib/types"
 import { getProjectClient } from "../services/connection-manager"
-import { useServerCommands } from "./use-devo-data"
+import { useServerCommands } from "./use-infinitecode-data"
 
 // ============================================================
 // Types

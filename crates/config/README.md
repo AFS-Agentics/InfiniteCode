@@ -1,6 +1,6 @@
 # Config
 
-This crate owns Devo's file-backed runtime configuration.
+This crate owns InfiniteCode's file-backed runtime configuration.
 
 Shared serializable config contract types that are consumed by multiple crates
 also live here. Runtime interpretation of the resolved config stays in the
@@ -25,20 +25,20 @@ consumer crates.
 
 ## Config Files
 
-The user-level config file is `<DEVO_HOME>/config.toml`. `DEVO_HOME` defaults to
-`~/.devo`; if the environment variable is set, it must point to an existing
+The user-level config file is `<INFINITECODE_HOME>/config.toml`. `INFINITECODE_HOME` defaults to
+`~/.infinitecode`; if the environment variable is set, it must point to an existing
 directory.
 
 When a workspace is known, the project-level config file is:
 
 ```text
-<workspace>/.devo/config.toml
+<workspace>/.infinitecode/config.toml
 ```
 
 Provider credentials are stored separately in:
 
 ```text
-<DEVO_HOME>/auth.json
+<INFINITECODE_HOME>/auth.json
 ```
 
 `auth.json` stores secret values, while `config.toml` stores references to those
@@ -49,8 +49,8 @@ credentials.
 `FileSystemAppConfigLoader` starts from `AppConfig::default()` and overlays
 config in this order:
 
-1. User config: `<DEVO_HOME>/config.toml`
-2. Project config: `<workspace>/.devo/config.toml`
+1. User config: `<INFINITECODE_HOME>/config.toml`
+2. Project config: `<workspace>/.infinitecode/config.toml`
 3. CLI overrides
 
 Later layers win over earlier layers for overlapping fields. TOML tables are
@@ -79,7 +79,7 @@ provider fields without clearing every omitted provider field from lower layers.
 - `logging.json = false`
 - `logging.redact_secrets_in_logs = true`
 - `logging.file.directory = None`
-- `logging.file.filename_prefix = "devo"`
+- `logging.file.filename_prefix = "infinitecode"`
 - `logging.file.rotation = "Daily"`
 - `logging.file.max_files = 14`
 - `skills.enabled = true`
@@ -127,7 +127,7 @@ redact_secrets_in_logs = true
 
 [logging.file]
 directory = "diagnostics"
-filename_prefix = "devo"
+filename_prefix = "infinitecode"
 rotation = "Daily" # Never, Minutely, Hourly, or Daily
 max_files = 14
 
@@ -181,10 +181,10 @@ timeout = 30
 `server.listen` accepts `stdio://` and `ws://host:port` entries. An empty list
 uses the server defaults: stdio plus `ws://127.0.0.1:3210`. The short `ws://`
 entry also binds to `127.0.0.1:3210`. To run only WebSocket transport from the
-CLI, use `devo server --transport websocket`.
+CLI, use `infinitecode server --transport websocket`.
 
 `logging.file.directory` is optional. Relative logging directories resolve under
-`DEVO_HOME`.
+`INFINITECODE_HOME`.
 
 ## Validation
 
@@ -270,7 +270,7 @@ All 27 hook event names are accepted by config:
 - `ConfigChange`, `WorktreeCreate`, `WorktreeRemove`
 - `InstructionsLoaded`, `CwdChanged`, `FileChanged`
 
-The current runtime triggers hooks where Devo has a matching lifecycle point:
+The current runtime triggers hooks where InfiniteCode has a matching lifecycle point:
 tool execution, prompt submission, server setup, session start and resume,
 session shutdown, turn stop and failure, subagent start and stop, manual
 compaction, permission request and denial, config writes through `provider/upsert`
@@ -292,16 +292,16 @@ Runtime-triggered events:
 
 Config-ready but not currently triggered:
 
-- `Notification`: Devo has protocol notifications, but no single user-facing
+- `Notification`: InfiniteCode has protocol notifications, but no single user-facing
   notification lifecycle equivalent to Claude's external notification hook.
-- `TeammateIdle`, `TaskCreated`, `TaskCompleted`: the standalone `devo-tasks`
+- `TeammateIdle`, `TaskCreated`, `TaskCompleted`: the standalone `infinitecode-tasks`
   crate is not wired into the server runtime task lifecycle.
 - `Elicitation`, `ElicitationResult`: MCP elicitation is currently handled
   inside the MCP manager with an automatic response and no server-session hook
   bridge.
-- `WorktreeCreate`, `WorktreeRemove`: Devo currently has no worktree lifecycle
+- `WorktreeCreate`, `WorktreeRemove`: InfiniteCode currently has no worktree lifecycle
   API.
-- `InstructionsLoaded`: Devo discovers AGENTS-style instructions during context
+- `InstructionsLoaded`: InfiniteCode discovers AGENTS-style instructions during context
   assembly, but does not expose a hookable per-file instruction-load event.
 
 ## Provider Config
@@ -355,7 +355,7 @@ provider settings.
 ## Provider Credentials
 
 `auth.json` is modeled by `UserAuthConfigFile`. Example
-`<DEVO_HOME>/auth.json`:
+`<INFINITECODE_HOME>/auth.json`:
 
 ```json
 {
@@ -398,7 +398,7 @@ Supported modes:
 
 Local providers currently support `kind = "exa"` and `kind = "tavily"`. Their
 `credential` field is a credential id only; the secret value must live in
-`<DEVO_HOME>/auth.json`. Optional `base_url` and `max_results` fields override
+`<INFINITECODE_HOME>/auth.json`. Optional `base_url` and `max_results` fields override
 the provider default endpoint and result count. Compatibility aliases
 `websearch` and `web-search` route to `web_search`, but aliases are not exposed
 to the model.
@@ -457,7 +457,7 @@ response-storage flag, and preferred auth method.
 `models.json` catalog. `request_model` is the provider-specific model name used for
 the API request. The legacy `model_name` key is accepted when reading existing
 configuration, while subsequent writes use `request_model`. The effective catalog precedence is
-`<workspace>/.devo/models.json`, then `<DEVO_HOME>/models.json`, then built-in
+`<workspace>/.infinitecode/models.json`, then `<INFINITECODE_HOME>/models.json`, then built-in
 defaults, merged by `slug`. Turn metadata records `model` as the catalog slug
 and `request_model` as the provider request model; these values may be
 identical.

@@ -1,4 +1,4 @@
-import type { ModelRef } from "../hooks/use-devo-data"
+import type { ModelRef } from "../hooks/use-infinitecode-data"
 import { getProjectClient } from "../services/connection-manager"
 
 export type RuntimeModelConfigID = "model" | "thought_level"

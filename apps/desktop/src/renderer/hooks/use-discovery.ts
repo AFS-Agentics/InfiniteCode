@@ -8,7 +8,7 @@ import { appStore } from "../atoms/store"
 import { createLogger } from "../lib/logger"
 import { resolveAuthHeader, resolveServerUrl } from "../services/backend"
 import {
-	connectToDevo,
+	connectToInfiniteCode,
 	loadAllProjects,
 	loadProjectSessions,
 } from "../services/connection-manager"
@@ -37,7 +37,7 @@ function setPhase(phase: import("../atoms/discovery").DiscoveryPhase): void {
  * On mount:
  * 1. Resolves the active server URL (starts the local stdio runtime)
  * 2. Resolves auth credentials if the server requires them
- * 3. Connects to the Devo server (ACP events for all projects)
+ * 3. Connects to the InfiniteCode server (ACP events for all projects)
  * 4. Lists all projects from the API via `client.project.list()`
  * 5. Loads sessions for the top few most-recently-active projects
  *    (enough to populate "Recent" and "Active Now" sections)
@@ -79,15 +79,15 @@ export function useDiscovery() {
 
 				// --- Step 3: Connect to the server (starts ACP event loop) ---
 				setPhase("connecting")
-				log.info("Connecting to Devo server", {
+				log.info("Connecting to InfiniteCode server", {
 					url,
 					server: activeServer.name,
 					authenticated: !!authHeader,
 				})
-				await connectToDevo(url, authHeader)
+				await connectToInfiniteCode(url, authHeader)
 
 				// --- Step 3b: Bail if server is unreachable ---
-				// connectToDevo runs a health check and sets serverConnectedAtom.
+				// connectToInfiniteCode runs a health check and sets serverConnectedAtom.
 				// If the server is offline, skip project/session loading so discovery
 				// stays in a non-loaded state, allowing the sidebar to show "Server offline".
 				// Keep discoveryInFlight = true to prevent an infinite retry loop;

@@ -11,9 +11,9 @@
  * 3. Live summary + next 3 runs -- always shown at the bottom
  */
 
-import { Button } from "@devo/ui/components/button"
-import { Input } from "@devo/ui/components/input"
-import { Label } from "@devo/ui/components/label"
+import { Button } from "@infinitecode/ui/components/button"
+import { Input } from "@infinitecode/ui/components/input"
+import { Label } from "@infinitecode/ui/components/label"
 import {
 	Select,
 	SelectContent,
@@ -21,8 +21,8 @@ import {
 	SelectSeparator,
 	SelectTrigger,
 	SelectValue,
-} from "@devo/ui/components/select"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
+} from "@infinitecode/ui/components/select"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
 import { CalendarClockIcon } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import {

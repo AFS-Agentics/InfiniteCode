@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use anyhow::Result;
 use anyhow::anyhow;
-use devo_config::McpServerEnvVar;
+use infinitecode_config::McpServerEnvVar;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use oauth2::TokenResponse;
@@ -71,7 +71,7 @@ use crate::stdio_server_launcher::StdioServerProcessHandle;
 use crate::stdio_server_launcher::StdioServerTransport;
 use crate::utils::apply_default_headers;
 use crate::utils::build_default_headers;
-use devo_config::OAuthCredentialsStoreMode;
+use infinitecode_config::OAuthCredentialsStoreMode;
 
 enum PendingTransport {
     InProcess {
@@ -1058,7 +1058,7 @@ async fn create_oauth_transport_and_runtime(
 )> {
     let builder = apply_default_headers(reqwest::Client::builder(), &default_headers);
     let oauth_metadata_client = builder.build()?;
-    // OAuth discovery and refresh run from the local Devo process, just like
+    // OAuth discovery and refresh run from the local InfiniteCode process, just like
     // normal Streamable HTTP MCP requests.
     let mut oauth_state =
         OAuthState::new(url.to_string(), Some(oauth_metadata_client.clone())).await?;

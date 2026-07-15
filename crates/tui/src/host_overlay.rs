@@ -2,7 +2,7 @@
 
 use crate::ansi_escape::ansi_escape_line;
 use anyhow::Result;
-use devo_core::SessionId;
+use infinitecode_core::SessionId;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 

@@ -93,7 +93,7 @@ For each directory in the search path, for each candidate filename in priority o
 
 ### Step 4 — Load Global Instructions
 
-Before project-specific instructions, check the user-level configuration directory for global instruction files. On macOS and Linux this is `~/.devo/`; on Windows this is `%USERPROFILE%\.devo\`.
+Before project-specific instructions, check the user-level configuration directory for global instruction files. On macOS and Linux this is `~/.infinitecode/`; on Windows this is `%USERPROFILE%\.infinitecode\`.
 
 Check in the same priority order as project directories: `AGENTS.override.md`, then `AGENTS.md`. Fallback filenames are not checked at the global level — only the two primary filenames apply.
 
@@ -122,7 +122,7 @@ When the maximum is set to zero, all discovery is disabled and the assembled res
 
 ## Global Instructions
 
-Global instruction files in `~/.devo/` apply across all projects and sessions. They are the top-level prefix of the assembled instruction content, appearing before project-root instructions.
+Global instruction files in `~/.infinitecode/` apply across all projects and sessions. They are the top-level prefix of the assembled instruction content, appearing before project-root instructions.
 
 Global instructions are discovered on every session start and whenever the assembled instruction content is refreshed. They follow the same filename priority as project directories (`AGENTS.override.md` → `AGENTS.md`), but fallback filenames do not apply at the global level.
 

@@ -35,7 +35,7 @@ The program must automatically discover, read, and apply recognized project inst
 - Once the project root is found, the program must collect all directories on the linear path from the project root down to the current working directory, inclusive of both endpoints.
 - For each directory on that path, the program must look for recognized instruction files.
 - If the current working directory is not inside any project root (no marker found on any ancestor), the program must still check the current working directory itself for instruction files.
-- The program must also check a user-level global directory (e.g., `~/.devo/`) for instruction files that apply across all projects.
+- The program must also check a user-level global directory (e.g., `~/.infinitecode/`) for instruction files that apply across all projects.
 
 ### Filename Priority Per Directory
 

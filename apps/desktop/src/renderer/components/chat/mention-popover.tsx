@@ -4,9 +4,9 @@
  * Preserves server-ranked references and combines them with local agents.
  */
 
-import { ScrollArea } from "@devo/ui/components/scroll-area"
-import { cn } from "@devo/ui/lib/utils"
-import type { ReferenceSearchResult } from "@devo-ai/sdk/v2/client"
+import { ScrollArea } from "@infinitecode/ui/components/scroll-area"
+import { cn } from "@infinitecode/ui/lib/utils"
+import type { ReferenceSearchResult } from "@infinitecode-ai/sdk/v2/client"
 import fuzzysort from "fuzzysort"
 import {
 	BrainIcon,
@@ -27,7 +27,7 @@ import {
 	useState,
 } from "react"
 import { useReferenceSearch } from "../../hooks/use-reference-search"
-import type { SdkAgent } from "../../hooks/use-devo-data"
+import type { SdkAgent } from "../../hooks/use-infinitecode-data"
 
 // ============================================================
 // Types

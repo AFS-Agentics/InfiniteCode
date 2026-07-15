@@ -1,6 +1,6 @@
 //! Launch MCP stdio servers and return the transport rmcp should use.
 //!
-//! Devo starts stdio MCP servers only as local child processes. Remote MCP
+//! InfiniteCode starts stdio MCP servers only as local child processes. Remote MCP
 //! servers are represented by HTTP/SSE/Streamable HTTP endpoints, not by remote
 //! stdio process execution.
 
@@ -20,11 +20,11 @@ use std::thread::spawn;
 #[cfg(unix)]
 use std::time::Duration;
 
-use devo_config::McpServerEnvVar;
+use infinitecode_config::McpServerEnvVar;
 #[cfg(unix)]
-use devo_util_process::process_group::kill_process_group;
+use infinitecode_util_process::process_group::kill_process_group;
 #[cfg(unix)]
-use devo_util_process::process_group::terminate_process_group;
+use infinitecode_util_process::process_group::terminate_process_group;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use rmcp::service::RoleClient;

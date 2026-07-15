@@ -5,8 +5,8 @@
  * and "+ New" button.
  */
 
-import { Button } from "@devo/ui/components/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
+import { Button } from "@infinitecode/ui/components/button"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
 import { FilterIcon, PlusIcon } from "lucide-react"
 
 interface InboxToolbarProps {

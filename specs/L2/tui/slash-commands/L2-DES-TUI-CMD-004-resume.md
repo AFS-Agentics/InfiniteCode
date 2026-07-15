@@ -33,7 +33,7 @@ Submitting `/resume` clears any previous resume browser state, marks the browser
 The host enters the terminal alternate screen before asking the background worker to list sessions. While the worker request is pending, the full visible area renders the loading view:
 
 ```text
-Devo Sessions
+InfiniteCode Sessions
 
 Resume Session
 Loading saved sessions...
@@ -44,7 +44,7 @@ Please wait.
 When sessions are returned, the loading view is replaced by a full-screen session browser:
 
 ```text
-Devo Sessions
+InfiniteCode Sessions
 
 Resume Session  2 / 8 · 33%
 

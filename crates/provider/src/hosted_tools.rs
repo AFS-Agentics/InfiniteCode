@@ -6,9 +6,9 @@
 //! Anthropic requires versioned server-tool type names. Keep those mappings
 //! here so adapter code does not duplicate wire-format conditionals.
 
-use devo_protocol::HostedToolDefinition;
-use devo_protocol::HostedWebFetchTool;
-use devo_protocol::HostedWebSearchTool;
+use infinitecode_protocol::HostedToolDefinition;
+use infinitecode_protocol::HostedWebFetchTool;
+use infinitecode_protocol::HostedWebSearchTool;
 use serde_json::Map;
 use serde_json::Value;
 use serde_json::json;

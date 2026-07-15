@@ -5,18 +5,18 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
-use devo_protocol::ACP_TERMINAL_CREATE_METHOD;
-use devo_protocol::ACP_TERMINAL_KILL_METHOD;
-use devo_protocol::ACP_TERMINAL_OUTPUT_METHOD;
-use devo_protocol::ACP_TERMINAL_RELEASE_METHOD;
-use devo_protocol::ACP_TERMINAL_WAIT_FOR_EXIT_METHOD;
-use devo_protocol::AcpTerminalCreateParams;
-use devo_protocol::AcpTerminalCreateResult;
-use devo_protocol::AcpTerminalExitStatus;
-use devo_protocol::AcpTerminalOutputResult;
-use devo_protocol::AcpTerminalParams;
-use devo_protocol::AcpTerminalWaitForExitResult;
-use devo_protocol::acp_success_response;
+use infinitecode_protocol::ACP_TERMINAL_CREATE_METHOD;
+use infinitecode_protocol::ACP_TERMINAL_KILL_METHOD;
+use infinitecode_protocol::ACP_TERMINAL_OUTPUT_METHOD;
+use infinitecode_protocol::ACP_TERMINAL_RELEASE_METHOD;
+use infinitecode_protocol::ACP_TERMINAL_WAIT_FOR_EXIT_METHOD;
+use infinitecode_protocol::AcpTerminalCreateParams;
+use infinitecode_protocol::AcpTerminalCreateResult;
+use infinitecode_protocol::AcpTerminalExitStatus;
+use infinitecode_protocol::AcpTerminalOutputResult;
+use infinitecode_protocol::AcpTerminalParams;
+use infinitecode_protocol::AcpTerminalWaitForExitResult;
+use infinitecode_protocol::acp_success_response;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
 use tokio::process::Child;
@@ -29,7 +29,7 @@ use tokio::time::Duration;
 use crate::client_core::ServerNotificationMessage;
 
 static ACP_TERMINAL_NEXT_ID: AtomicU64 = AtomicU64::new(1);
-pub const ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD: &str = "_devo/acp_terminal/output";
+pub const ACP_TERMINAL_OUTPUT_NOTIFICATION_METHOD: &str = "_infinitecode/acp_terminal/output";
 const ACP_TERMINAL_DEFAULT_OUTPUT_BYTE_LIMIT: usize = 1024 * 1024;
 
 #[derive(Clone, Default)]
@@ -446,7 +446,7 @@ fn acp_terminal_exit_status_from_process_status(status: ExitStatus) -> AcpTermin
 
 #[cfg(test)]
 mod tests {
-    use devo_protocol::AcpSuccessResponse;
+    use infinitecode_protocol::AcpSuccessResponse;
     use pretty_assertions::assert_eq;
     use tokio::sync::mpsc;
     use tokio::time::Duration;
@@ -456,7 +456,7 @@ mod tests {
 
     #[tokio::test]
     async fn acp_terminal_methods_run_command_and_release() {
-        let session_id = devo_protocol::SessionId::new();
+        let session_id = infinitecode_protocol::SessionId::new();
         let terminals = AcpTerminalManager::new();
         let (notifications_tx, mut notifications_rx) = mpsc::unbounded_channel();
         let (command, args) = short_terminal_command();

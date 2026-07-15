@@ -56,13 +56,13 @@ describe("getToolSubtitle", () => {
 					tool: "read",
 					type: "tool",
 					state: {
-						input: { filePath: "C:\\Users\\lenovo\\Desktop\\devo\\apps\\desktop\\src\\main.ts" },
+						input: { filePath: "C:\\Users\\lenovo\\Desktop\\infinitecode\\apps\\desktop\\src\\main.ts" },
 						status: "completed",
 						time: { end: 1, start: 0 },
 						output: "",
 					},
 				} as any,
-				{ projectRoot: "C:\\Users\\lenovo\\Desktop\\devo" },
+				{ projectRoot: "C:\\Users\\lenovo\\Desktop\\infinitecode" },
 			),
 		).toBe("apps/desktop/src/main.ts")
 	})
@@ -76,13 +76,13 @@ describe("getToolSubtitle", () => {
 					tool: "write",
 					type: "tool",
 					state: {
-						input: { path: "C:\\Users\\lenovo\\Desktop\\devo\\README.md" },
+						input: { path: "C:\\Users\\lenovo\\Desktop\\infinitecode\\README.md" },
 						status: "completed",
 						time: { end: 1, start: 0 },
 						output: "",
 					},
 				} as any,
-				{ projectRoot: "C:\\Users\\lenovo\\Desktop\\devo" },
+				{ projectRoot: "C:\\Users\\lenovo\\Desktop\\infinitecode" },
 			),
 		).toBe("README.md")
 	})
@@ -98,7 +98,7 @@ describe("getToolSubtitle", () => {
 					state: {
 						input: {
 							patch: `*** Begin Patch
-*** Update File: C:\\Users\\lenovo\\Desktop\\devo\\apps\\desktop\\src\\main.ts
+*** Update File: C:\\Users\\lenovo\\Desktop\\infinitecode\\apps\\desktop\\src\\main.ts
 @@
 *** End Patch`,
 						},
@@ -107,7 +107,7 @@ describe("getToolSubtitle", () => {
 						output: "",
 					},
 				} as any,
-				{ projectRoot: "C:\\Users\\lenovo\\Desktop\\devo" },
+				{ projectRoot: "C:\\Users\\lenovo\\Desktop\\infinitecode" },
 			),
 		).toBe("apps/desktop/src/main.ts")
 	})
@@ -116,9 +116,9 @@ describe("getToolSubtitle", () => {
 describe("read tool output density source", () => {
 	test("overrides CodeBlock internal text sizing for read output", () => {
 		expect({
-			readClass: chatToolCallSource.includes("devo-read-output"),
-			preRule: rendererCssSource.includes(".devo-read-output pre"),
-			codeRule: rendererCssSource.includes(".devo-read-output code"),
+			readClass: chatToolCallSource.includes("infinitecode-read-output"),
+			preRule: rendererCssSource.includes(".infinitecode-read-output pre"),
+			codeRule: rendererCssSource.includes(".infinitecode-read-output code"),
 			lineHeight: rendererCssSource.includes("line-height: 1.35"),
 		}).toEqual({
 			readClass: true,

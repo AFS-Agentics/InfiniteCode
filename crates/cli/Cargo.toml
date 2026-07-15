@@ -2,7 +2,7 @@
 description = "CLI entry point that assembles all crates"
 edition.workspace = true
 license.workspace = true
-name = "devo-cli"
+name = "infinitecode-cli"
 version.workspace = true
 
 [[bin]]
@@ -10,16 +10,16 @@ name = "infinitecode"
 path = "src/main.rs"
 
 [dependencies]
-devo-core = { workspace = true }
-devo-mcp = { workspace = true }
-devo-protocol = { workspace = true }
-devo-provider = { workspace = true }
-devo-safety = { workspace = true }
-devo-server = { workspace = true }
-devo-tasks = { workspace = true }
-devo-tui = { workspace = true }
-devo-util-paths = { workspace = true }
-devo-arg0 = { workspace = true }
+infinitecode-core = { workspace = true }
+infinitecode-mcp = { workspace = true }
+infinitecode-protocol = { workspace = true }
+infinitecode-provider = { workspace = true }
+infinitecode-safety = { workspace = true }
+infinitecode-server = { workspace = true }
+infinitecode-tasks = { workspace = true }
+infinitecode-tui = { workspace = true }
+infinitecode-util-paths = { workspace = true }
+infinitecode-arg0 = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -34,7 +34,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [features]
-tokio-console = ["devo-arg0/tokio-console"]
+tokio-console = ["infinitecode-arg0/tokio-console"]
 
 [dev-dependencies]
 pretty_assertions = "1"

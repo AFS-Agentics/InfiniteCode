@@ -4,18 +4,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use devo_config::ResolvedWebFetchConfig;
-use devo_config::ResolvedWebSearchConfig;
-use devo_provider::ProviderRoute;
-use devo_safety::PermissionMode;
-use devo_safety::PermissionPreset;
-use devo_safety::RuntimePermissionProfile;
+use infinitecode_config::ResolvedWebFetchConfig;
+use infinitecode_config::ResolvedWebSearchConfig;
+use infinitecode_provider::ProviderRoute;
+use infinitecode_safety::PermissionMode;
+use infinitecode_safety::PermissionPreset;
+use infinitecode_safety::RuntimePermissionProfile;
 
-use devo_protocol::CollaborationMode;
-use devo_protocol::PendingInputItem;
-use devo_protocol::ThreadGoal;
-use devo_protocol::ThreadGoalStatus;
-use devo_protocol::TurnKind;
+use infinitecode_protocol::CollaborationMode;
+use infinitecode_protocol::PendingInputItem;
+use infinitecode_protocol::ThreadGoal;
+use infinitecode_protocol::ThreadGoalStatus;
+use infinitecode_protocol::TurnKind;
 
 use crate::AgentsMdConfig;
 use crate::Message;
@@ -342,7 +342,7 @@ impl SessionState {
         }
     }
 
-    pub fn to_request_messages(&self) -> Vec<devo_protocol::RequestMessage> {
+    pub fn to_request_messages(&self) -> Vec<infinitecode_protocol::RequestMessage> {
         self.prompt_source_messages()
             .iter()
             .map(|m| m.to_request_message())
@@ -455,9 +455,9 @@ impl SessionState {
 
 #[cfg(test)]
 mod tests {
-    use devo_protocol::ReasoningCapability;
-    use devo_protocol::ReasoningEffort;
-    use devo_protocol::SessionId;
+    use infinitecode_protocol::ReasoningCapability;
+    use infinitecode_protocol::ReasoningEffort;
+    use infinitecode_protocol::SessionId;
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -622,14 +622,14 @@ mod tests {
         use chrono::Utc;
         let state = SessionState::new(SessionConfig::default(), PathBuf::from("/tmp"));
         state.enqueue_pending_input(PendingInputItem::new(
-            devo_protocol::PendingInputKind::UserText {
+            infinitecode_protocol::PendingInputKind::UserText {
                 text: "first".to_string(),
             },
             None,
             Utc::now(),
         ));
         state.enqueue_pending_input(PendingInputItem::new(
-            devo_protocol::PendingInputKind::UserText {
+            infinitecode_protocol::PendingInputKind::UserText {
                 text: "second".to_string(),
             },
             None,
@@ -655,7 +655,7 @@ mod tests {
         use chrono::Utc;
         let mut state = SessionState::new(SessionConfig::default(), PathBuf::from("/tmp"));
         state.enqueue_pending_input(PendingInputItem::new(
-            devo_protocol::PendingInputKind::UserText {
+            infinitecode_protocol::PendingInputKind::UserText {
                 text: "queued".to_string(),
             },
             None,
@@ -675,7 +675,7 @@ mod tests {
         // Push an item into the turn's pending input directly.
         if let Some(turn) = state.turn_state.as_mut() {
             turn.push_pending_input(PendingInputItem::new(
-                devo_protocol::PendingInputKind::UserText {
+                infinitecode_protocol::PendingInputKind::UserText {
                     text: "unconsumed".to_string(),
                 },
                 None,
@@ -695,7 +695,7 @@ mod tests {
         // Push to turn-scoped pending.
         if let Some(turn) = state.turn_state.as_mut() {
             turn.push_pending_input(PendingInputItem::new(
-                devo_protocol::PendingInputKind::UserText {
+                infinitecode_protocol::PendingInputKind::UserText {
                     text: "turn-item".to_string(),
                 },
                 None,
@@ -704,7 +704,7 @@ mod tests {
         }
         // Push to cross-thread inbox.
         state.enqueue_pending_input(PendingInputItem::new(
-            devo_protocol::PendingInputKind::UserText {
+            infinitecode_protocol::PendingInputKind::UserText {
                 text: "inbox-item".to_string(),
             },
             None,
@@ -719,7 +719,7 @@ mod tests {
         use chrono::Utc;
         let state = SessionState::new(SessionConfig::default(), PathBuf::from("/tmp"));
         state.enqueue_pending_input(PendingInputItem::new(
-            devo_protocol::PendingInputKind::UserText {
+            infinitecode_protocol::PendingInputKind::UserText {
                 text: "direct".to_string(),
             },
             None,

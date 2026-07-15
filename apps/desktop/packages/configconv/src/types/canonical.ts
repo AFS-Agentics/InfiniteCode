@@ -1,7 +1,7 @@
 /**
  * Canonical intermediate representation for agent configuration.
  *
- * All format-specific types (Claude Code, Devo, Cursor) convert
+ * All format-specific types (Claude Code, InfiniteCode, Cursor) convert
  * to/from this canonical form. This enables N-to-N conversion:
  *   Source format -> Canonical -> Target format
  *
@@ -13,7 +13,7 @@
 // Format identifiers
 // ============================================================
 
-export type AgentFormat = "claude-code" | "devo" | "cursor"
+export type AgentFormat = "claude-code" | "infinitecode" | "cursor"
 
 // ============================================================
 // Top-level scan result (format-agnostic)

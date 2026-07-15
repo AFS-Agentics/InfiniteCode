@@ -1,10 +1,10 @@
-# install.ps1 — Download and install the latest devo binary for Windows.
+# install.ps1 — Download and install the latest infinitecode binary for Windows.
 #
 # Usage (run as administrator is not required, installs to user-local bin):
-#   irm https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1 | iex
 #
 # Pin a specific version:
-#   $env:VERSION = "v0.1.2"; irm https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1 | iex
+#   $env:VERSION = "v0.1.2"; irm https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1 | iex
 #
 # Offline install from assets next to install.ps1:
 #   .\install.ps1 -Offline
@@ -16,7 +16,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Repo = "7df-lab/devo"
+$Repo = "AFS-Agentics/InfiniteCode"
 $RipgrepRepo = "BurntSushi/ripgrep"
 $CodeSearchModelRepo = "minishlab/potion-code-16M"
 $CodeSearchModelDirName = "minishlab--potion-code-16M"
@@ -174,18 +174,18 @@ function Test-Truthy {
 }
 
 function Should-InstallCodeSearchModel {
-    return $InstallCodeSearchModel -or (Test-Truthy $env:DEVO_INSTALL_CODE_SEARCH_MODEL)
+    return $InstallCodeSearchModel -or (Test-Truthy $env:INFINITECODE_INSTALL_CODE_SEARCH_MODEL)
 }
 
-function Get-DevoHome {
-    if (-not [string]::IsNullOrWhiteSpace($env:DEVO_HOME)) {
-        return $env:DEVO_HOME
+function Get-InfiniteCodeHome {
+    if (-not [string]::IsNullOrWhiteSpace($env:INFINITECODE_HOME)) {
+        return $env:INFINITECODE_HOME
     }
 
-    return Join-Path $HOME ".devo"
+    return Join-Path $HOME ".infinitecode"
 }
 
-function Normalize-DevoVersionOutput {
+function Normalize-InfiniteCodeVersionOutput {
     param(
         [string]$RawVersion
     )
@@ -206,17 +206,17 @@ function Normalize-DevoVersionOutput {
     return "unknown"
 }
 
-function Get-ExistingDevoPath {
+function Get-ExistingInfiniteCodePath {
     param(
         [string]$InstallDir
     )
 
-    $installedTarget = Join-Path $InstallDir "devo.exe"
+    $installedTarget = Join-Path $InstallDir "infinitecode.exe"
     if (Test-Path $installedTarget) {
         return $installedTarget
     }
 
-    $command = Get-Command "devo.exe" -ErrorAction SilentlyContinue
+    $command = Get-Command "infinitecode.exe" -ErrorAction SilentlyContinue
     if ($command) {
         if ($command.Source) {
             return $command.Source
@@ -224,7 +224,7 @@ function Get-ExistingDevoPath {
         return $command.Path
     }
 
-    $command = Get-Command "devo" -ErrorAction SilentlyContinue
+    $command = Get-Command "infinitecode" -ErrorAction SilentlyContinue
     if ($command) {
         if ($command.Source) {
             return $command.Source
@@ -235,18 +235,18 @@ function Get-ExistingDevoPath {
     return $null
 }
 
-function Get-InstalledDevoVersion {
+function Get-InstalledInfiniteCodeVersion {
     param(
-        [string]$DevoPath
+        [string]$InfiniteCodePath
     )
 
     try {
-        $rawVersion = (& $DevoPath --version 2>$null) -join " "
+        $rawVersion = (& $InfiniteCodePath --version 2>$null) -join " "
     } catch {
         $rawVersion = ""
     }
 
-    return Normalize-DevoVersionOutput $rawVersion
+    return Normalize-InfiniteCodeVersionOutput $rawVersion
 }
 
 function Write-VersionTransition {
@@ -255,9 +255,9 @@ function Write-VersionTransition {
         [string]$TargetVersion
     )
 
-    $installedPath = Get-ExistingDevoPath -InstallDir $InstallDir
+    $installedPath = Get-ExistingInfiniteCodePath -InstallDir $InstallDir
     if ($installedPath) {
-        $currentVersion = Get-InstalledDevoVersion -DevoPath $installedPath
+        $currentVersion = Get-InstalledInfiniteCodeVersion -InfiniteCodePath $installedPath
     } else {
         $currentVersion = "not installed"
     }
@@ -265,24 +265,24 @@ function Write-VersionTransition {
     Write-Host "Version: $currentVersion -> $TargetVersion"
 }
 
-function Test-DevoVersionInstalled {
+function Test-InfiniteCodeVersionInstalled {
     param(
         [string]$InstallDir,
         [string]$ExpectedVersion
     )
 
-    $installedPath = Get-ExistingDevoPath -InstallDir $InstallDir
+    $installedPath = Get-ExistingInfiniteCodePath -InstallDir $InstallDir
     if (-not $installedPath) {
         return $false
     }
 
-    $installedVersion = Get-InstalledDevoVersion -DevoPath $installedPath
+    $installedVersion = Get-InstalledInfiniteCodeVersion -InfiniteCodePath $installedPath
     if ($installedVersion -eq $ExpectedVersion) {
-        Write-Host "devo $ExpectedVersion is already installed at $installedPath"
+        Write-Host "infinitecode $ExpectedVersion is already installed at $installedPath"
         return $true
     }
 
-    Write-Host "Found existing devo at $installedPath ($installedVersion)"
+    Write-Host "Found existing infinitecode at $installedPath ($installedVersion)"
     return $false
 }
 
@@ -304,8 +304,8 @@ function Install-RipgrepSidecar {
         [string]$TempRoot
     )
 
-    if ($env:DEVO_SKIP_RG_INSTALL -eq "1") {
-        Write-Host "Skipping ripgrep sidecar install because DEVO_SKIP_RG_INSTALL=1."
+    if ($env:INFINITECODE_SKIP_RG_INSTALL -eq "1") {
+        Write-Host "Skipping ripgrep sidecar install because INFINITECODE_SKIP_RG_INSTALL=1."
         return
     }
 
@@ -344,8 +344,8 @@ function Install-CodeSearchModel {
         return
     }
 
-    $devoHome = Get-DevoHome
-    $modelDir = Join-Path (Join-Path $devoHome "local-models") $CodeSearchModelDirName
+    $infinitecodeHome = Get-InfiniteCodeHome
+    $modelDir = Join-Path (Join-Path $infinitecodeHome "local-models") $CodeSearchModelDirName
     New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
 
     $missingFiles = @(
@@ -408,39 +408,39 @@ function Get-FirstMatchingFile {
         Select-Object -First 1
 }
 
-function Install-DevoOffline {
+function Install-InfiniteCodeOffline {
     param(
         [string]$AssetDir,
         [string]$InstallDir,
         [string]$TempRoot
     )
 
-    $localExe = Join-Path $AssetDir "devo.exe"
+    $localExe = Join-Path $AssetDir "infinitecode.exe"
     if (Test-Path $localExe) {
-        Write-Host "Installing devo from local binary: $localExe"
+        Write-Host "Installing infinitecode from local binary: $localExe"
         New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-        Copy-Item -Path $localExe -Destination (Join-Path $InstallDir "devo.exe") -Force
+        Copy-Item -Path $localExe -Destination (Join-Path $InstallDir "infinitecode.exe") -Force
         return
     }
 
     $target = Get-Target
-    $archive = Get-FirstMatchingFile -Directory $AssetDir -Pattern "devo-*-${target}.zip"
+    $archive = Get-FirstMatchingFile -Directory $AssetDir -Pattern "infinitecode-*-${target}.zip"
     if (-not $archive) {
-        Write-Error "Offline devo asset not found. Place devo-*-${target}.zip or devo.exe next to install.ps1."
+        Write-Error "Offline infinitecode asset not found. Place infinitecode-*-${target}.zip or infinitecode.exe next to install.ps1."
     }
 
-    Write-Host "Installing devo from offline archive: $($archive.FullName)"
-    $devoTmpDir = Join-Path $TempRoot "devo-offline"
-    New-Item -ItemType Directory -Force -Path $devoTmpDir | Out-Null
-    Expand-Archive -Path $archive.FullName -DestinationPath $devoTmpDir -Force
+    Write-Host "Installing infinitecode from offline archive: $($archive.FullName)"
+    $infinitecodeTmpDir = Join-Path $TempRoot "infinitecode-offline"
+    New-Item -ItemType Directory -Force -Path $infinitecodeTmpDir | Out-Null
+    Expand-Archive -Path $archive.FullName -DestinationPath $infinitecodeTmpDir -Force
 
-    $exe = Get-ChildItem -Recurse -Filter "devo.exe" -Path $devoTmpDir | Select-Object -First 1
+    $exe = Get-ChildItem -Recurse -Filter "infinitecode.exe" -Path $infinitecodeTmpDir | Select-Object -First 1
     if (-not $exe) {
-        Write-Error "devo.exe not found in the offline archive"
+        Write-Error "infinitecode.exe not found in the offline archive"
     }
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Copy-Item -Path $exe.FullName -Destination (Join-Path $InstallDir "devo.exe") -Force
+    Copy-Item -Path $exe.FullName -Destination (Join-Path $InstallDir "infinitecode.exe") -Force
 }
 
 function Install-RipgrepSidecarOffline {
@@ -450,8 +450,8 @@ function Install-RipgrepSidecarOffline {
         [string]$TempRoot
     )
 
-    if ($env:DEVO_SKIP_RG_INSTALL -eq "1") {
-        Write-Host "Skipping ripgrep sidecar install because DEVO_SKIP_RG_INSTALL=1."
+    if ($env:INFINITECODE_SKIP_RG_INSTALL -eq "1") {
+        Write-Host "Skipping ripgrep sidecar install because INFINITECODE_SKIP_RG_INSTALL=1."
         return
     }
 
@@ -517,7 +517,7 @@ function Install-CodeSearchModelOffline {
         Write-Error "Offline code_search model files not found. Place config.json, model.safetensors, and tokenizer.json next to install.ps1 or under ${CodeSearchModelDirName}\."
     }
 
-    $modelDir = Join-Path (Join-Path (Get-DevoHome) "local-models") $CodeSearchModelDirName
+    $modelDir = Join-Path (Join-Path (Get-InfiniteCodeHome) "local-models") $CodeSearchModelDirName
     New-Item -ItemType Directory -Force -Path $modelDir | Out-Null
 
     Write-Host "Installing code_search model from $sourceDir into $modelDir"
@@ -534,17 +534,17 @@ function Install-CodeSearchModelOffline {
 function Main {
     Print-Banner
 
-    $tmpDir = Join-Path $env:TEMP "devo-install"
+    $tmpDir = Join-Path $env:TEMP "infinitecode-install"
     Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null
     New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
 
     try {
-        $installDir = Join-Path $env:LOCALAPPDATA "Programs\devo"
+        $installDir = Join-Path $env:LOCALAPPDATA "Programs\infinitecode"
 
         if ($Offline) {
             $assetDir = Get-InstallerAssetDir
             Write-Host "Offline asset directory: $assetDir"
-            Install-DevoOffline -AssetDir $assetDir -InstallDir $installDir -TempRoot $tmpDir
+            Install-InfiniteCodeOffline -AssetDir $assetDir -InstallDir $installDir -TempRoot $tmpDir
             Install-RipgrepSidecarOffline -AssetDir $assetDir -InstallDir $installDir -TempRoot $tmpDir
             Install-CodeSearchModelOffline -AssetDir $assetDir
         } else {
@@ -552,25 +552,25 @@ function Main {
             $version = Resolve-Version
             Write-VersionTransition -InstallDir $installDir -TargetVersion $version
 
-            $skipAppInstall = Test-DevoVersionInstalled -InstallDir $installDir -ExpectedVersion $version
+            $skipAppInstall = Test-InfiniteCodeVersionInstalled -InstallDir $installDir -ExpectedVersion $version
             if (-not $skipAppInstall) {
-                $archiveUrl = "https://github.com/$Repo/releases/download/$version/devo-${version}-${target}.zip"
+                $archiveUrl = "https://github.com/$Repo/releases/download/$version/infinitecode-${version}-${target}.zip"
 
-                Write-Host "Downloading devo $version for $target ..."
+                Write-Host "Downloading infinitecode $version for $target ..."
 
-                $zipPath = Join-Path $tmpDir "devo.zip"
+                $zipPath = Join-Path $tmpDir "infinitecode.zip"
                 Invoke-WebRequest -Uri $archiveUrl -OutFile $zipPath
 
                 Expand-Archive -Path $zipPath -DestinationPath $tmpDir -Force
 
-                # Locate devo.exe (it's inside a versioned subdirectory).
-                $exe = Get-ChildItem -Recurse -Filter "devo.exe" -Path $tmpDir | Select-Object -First 1
+                # Locate infinitecode.exe (it's inside a versioned subdirectory).
+                $exe = Get-ChildItem -Recurse -Filter "infinitecode.exe" -Path $tmpDir | Select-Object -First 1
                 if (-not $exe) {
-                    Write-Error "devo.exe not found in the archive"
+                    Write-Error "infinitecode.exe not found in the archive"
                 }
 
                 New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-                Copy-Item -Path $exe.FullName -Destination (Join-Path $installDir "devo.exe") -Force
+                Copy-Item -Path $exe.FullName -Destination (Join-Path $installDir "infinitecode.exe") -Force
             }
             Install-RipgrepSidecar -InstallDir $installDir -TempRoot $tmpDir
             Install-CodeSearchModel -TempRoot $tmpDir
@@ -578,7 +578,7 @@ function Main {
 
         Add-InstallDirToPath -InstallDir $installDir
 
-        Write-Host "Installed devo to ${installDir}\devo.exe"
+        Write-Host "Installed infinitecode to ${installDir}\infinitecode.exe"
         $rgPath = Join-Path $installDir "rg.exe"
         if (Test-Path $rgPath) {
             Write-Host "ripgrep sidecar available at $rgPath"
@@ -586,13 +586,13 @@ function Main {
             Write-Host "ripgrep sidecar was not installed."
         }
         if ($Offline -or (Should-InstallCodeSearchModel)) {
-            $modelPath = Join-Path (Join-Path (Get-DevoHome) "local-models") $CodeSearchModelDirName
+            $modelPath = Join-Path (Join-Path (Get-InfiniteCodeHome) "local-models") $CodeSearchModelDirName
             Write-Host "code_search model available at $modelPath"
         }
         Write-Host "PATH was updated for future terminals."
         Write-Host "Open a new terminal, or run:"
         Write-Host "  `$env:Path = `"$installDir;`$env:Path`""
-        Write-Host "Run 'devo onboard' to get started."
+        Write-Host "Run 'infinitecode onboard' to get started."
     }
     finally {
         Remove-Item -Recurse -Force $tmpDir -ErrorAction SilentlyContinue | Out-Null

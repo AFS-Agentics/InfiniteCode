@@ -45,7 +45,7 @@ pub(crate) fn resolve_rg_binary() -> Result<PathBuf, ToolCallError> {
     let path_env = std::env::var_os("PATH");
     resolve_rg_binary_from(current_exe.as_deref(), path_env.as_deref()).ok_or_else(|| {
         ToolCallError::NeedsConfiguration(format!(
-            "ripgrep ({}) was not found next to the devo binary or on PATH. Re-run the devo installer or install ripgrep.",
+            "ripgrep ({}) was not found next to the infinitecode binary or on PATH. Re-run the infinitecode installer or install ripgrep.",
             rg_binary_name()
         ))
     })
@@ -124,7 +124,7 @@ mod tests {
         touch(&sibling);
         touch(&path_rg);
 
-        let current_exe = bin_dir.join(if cfg!(windows) { "devo.exe" } else { "devo" });
+        let current_exe = bin_dir.join(if cfg!(windows) { "infinitecode.exe" } else { "infinitecode" });
         let path_env = env::join_paths([path_dir]).expect("join path");
 
         assert_eq!(
@@ -144,7 +144,7 @@ mod tests {
         let path_rg = path_dir.join(rg_binary_name());
         touch(&path_rg);
 
-        let current_exe = bin_dir.join(if cfg!(windows) { "devo.exe" } else { "devo" });
+        let current_exe = bin_dir.join(if cfg!(windows) { "infinitecode.exe" } else { "infinitecode" });
         let path_env = env::join_paths([path_dir]).expect("join path");
 
         assert_eq!(

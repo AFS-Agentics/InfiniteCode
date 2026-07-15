@@ -1,10 +1,10 @@
 /**
  * Global settings converter.
  *
- * Converts ~/.Claude/settings.json -> ~/.config/devo/devo.json
+ * Converts ~/.Claude/settings.json -> ~/.config/infinitecode/infinitecode.json
  */
 import type { ClaudeSettings, ClaudeUserState } from "../types/claude-code"
-import type { DevoConfig } from "../types/devo"
+import type { InfiniteCodeConfig } from "../types/infinitecode"
 import type { MigrationReport } from "../types/report"
 import { createEmptyReport } from "../types/report"
 import { detectProvider, suggestSmallModel, translateModelId } from "./model-id"
@@ -19,17 +19,17 @@ export interface ConfigConversionInput {
 }
 
 export interface ConfigConversionResult {
-	config: Partial<DevoConfig>
+	config: Partial<InfiniteCodeConfig>
 	report: MigrationReport
 }
 
 /**
- * Convert Claude Code global settings to Devo config.
+ * Convert Claude Code global settings to InfiniteCode config.
  */
 export function convertConfig(input: ConfigConversionInput): ConfigConversionResult {
 	const { settings, userState, modelOverrides, defaultModel, defaultSmallModel } = input
-	const config: Partial<DevoConfig> = {
-		$schema: "https://devo.ai/config.json",
+	const config: Partial<InfiniteCodeConfig> = {
+		$schema: "https://infinitecode.ai/config.json",
 	}
 	const report = createEmptyReport()
 
@@ -86,11 +86,11 @@ export function convertConfig(input: ConfigConversionInput): ConfigConversionRes
 		report.warnings.push(...permReport.warnings)
 	}
 
-	// Teammate mode -- no direct Devo equivalent
+	// Teammate mode -- no direct InfiniteCode equivalent
 	if (settings?.teammateMode) {
 		report.manualActions.push(
 			`Claude Code teammateMode="${settings.teammateMode}" detected. ` +
-				`Devo does not have a direct equivalent. ` +
+				`InfiniteCode does not have a direct equivalent. ` +
 				`Consider using agent configurations or multi-agent workflows instead.`,
 		)
 	}
@@ -106,8 +106,8 @@ export function convertConfig(input: ConfigConversionInput): ConfigConversionRes
 		)
 		if (unmappedEnvVars.length > 0) {
 			report.manualActions.push(
-				`The following environment variables from Claude Code settings have no direct Devo equivalent: ${unmappedEnvVars.join(", ")}. ` +
-					`You may need to set these in your shell profile or use {env:VAR} interpolation in devo.json.`,
+				`The following environment variables from Claude Code settings have no direct InfiniteCode equivalent: ${unmappedEnvVars.join(", ")}. ` +
+					`You may need to set these in your shell profile or use {env:VAR} interpolation in infinitecode.json.`,
 			)
 		}
 	}
@@ -121,8 +121,8 @@ export function convertConfig(input: ConfigConversionInput): ConfigConversionRes
 		if (hookTypes.length > 0) {
 			report.manualActions.push(
 				`Claude Code hooks detected (${hookTypes.join(", ")}). ` +
-					`Devo uses a plugin system instead of hooks. ` +
-					`Consider creating a plugin in .devo/plugins/ -- see hooks converter output.`,
+					`InfiniteCode uses a plugin system instead of hooks. ` +
+					`Consider creating a plugin in .infinitecode/plugins/ -- see hooks converter output.`,
 			)
 		}
 	}
@@ -147,9 +147,9 @@ function buildProviderConfig(
 		// Don't copy AWS credentials -- use env var references
 		if (env.AWS_ACCESS_KEY_ID || env.AWS_SECRET_ACCESS_KEY) {
 			report.manualActions.push(
-				"AWS credentials detected in Claude Code env. Devo reads AWS credentials " +
+				"AWS credentials detected in Claude Code env. InfiniteCode reads AWS credentials " +
 					"from environment variables or ~/.aws/credentials automatically. " +
-					"Do NOT put credentials in devo.json.",
+					"Do NOT put credentials in infinitecode.json.",
 			)
 		}
 	}

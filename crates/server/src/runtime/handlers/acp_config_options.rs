@@ -6,16 +6,16 @@ use crate::AcpErrorCode;
 use crate::AcpSetConfigOptionParams;
 use crate::runtime::session_actor::snapshots::HookContextSnapshot;
 use crate::session_context::SessionRuntimeContext;
-use devo_core::SessionConfig;
-use devo_core::TurnConfig;
-use devo_protocol::AcpSessionConfigOption;
-use devo_protocol::AcpSessionConfigOptionCategory;
-use devo_protocol::AcpSessionConfigOptionCategoryKnown;
-use devo_protocol::AcpSessionConfigSelectOption;
-use devo_protocol::AcpSessionConfigSelectOptions;
-use devo_protocol::Model;
-use devo_protocol::PermissionPreset;
-use devo_protocol::SessionId;
+use infinitecode_core::SessionConfig;
+use infinitecode_core::TurnConfig;
+use infinitecode_protocol::AcpSessionConfigOption;
+use infinitecode_protocol::AcpSessionConfigOptionCategory;
+use infinitecode_protocol::AcpSessionConfigOptionCategoryKnown;
+use infinitecode_protocol::AcpSessionConfigSelectOption;
+use infinitecode_protocol::AcpSessionConfigSelectOptions;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::PermissionPreset;
+use infinitecode_protocol::SessionId;
 
 const ACP_MODE_CONFIG_ID: &str = "mode";
 pub(crate) const ACP_MODEL_CONFIG_ID: &str = "model";
@@ -308,7 +308,7 @@ fn acp_mode_config_option_for_session(config: &SessionConfig) -> AcpSessionConfi
     AcpSessionConfigOption::Select {
         id: ACP_MODE_CONFIG_ID.to_string(),
         name: "Session Mode".to_string(),
-        description: Some("Controls how Devo requests permission".to_string()),
+        description: Some("Controls how InfiniteCode requests permission".to_string()),
         category: Some(AcpSessionConfigOptionCategory::Known(
             AcpSessionConfigOptionCategoryKnown::Mode,
         )),
@@ -554,11 +554,11 @@ fn permission_preset_from_value(value: &str) -> Option<PermissionPreset> {
     }
 }
 
-fn permission_preset_from_safety(preset: devo_safety::PermissionPreset) -> PermissionPreset {
+fn permission_preset_from_safety(preset: infinitecode_safety::PermissionPreset) -> PermissionPreset {
     match preset {
-        devo_safety::PermissionPreset::ReadOnly => PermissionPreset::ReadOnly,
-        devo_safety::PermissionPreset::Default => PermissionPreset::Default,
-        devo_safety::PermissionPreset::AutoReview => PermissionPreset::AutoReview,
-        devo_safety::PermissionPreset::FullAccess => PermissionPreset::FullAccess,
+        infinitecode_safety::PermissionPreset::ReadOnly => PermissionPreset::ReadOnly,
+        infinitecode_safety::PermissionPreset::Default => PermissionPreset::Default,
+        infinitecode_safety::PermissionPreset::AutoReview => PermissionPreset::AutoReview,
+        infinitecode_safety::PermissionPreset::FullAccess => PermissionPreset::FullAccess,
     }
 }

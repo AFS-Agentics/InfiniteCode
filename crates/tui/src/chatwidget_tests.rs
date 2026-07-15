@@ -4,21 +4,21 @@ use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use crossterm::event::KeyModifiers;
-use devo_protocol::ApprovalDecisionValue;
-use devo_protocol::ApprovalScopeValue;
-use devo_protocol::InputItem;
-use devo_protocol::ItemId;
-use devo_protocol::Model;
-use devo_protocol::PermissionPreset;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderVendor;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ReasoningCapability;
-use devo_protocol::ReasoningEffort;
-use devo_protocol::RequestUserInputOption;
-use devo_protocol::RequestUserInputQuestion;
-use devo_protocol::SessionId;
-use devo_protocol::TurnId;
+use infinitecode_protocol::ApprovalDecisionValue;
+use infinitecode_protocol::ApprovalScopeValue;
+use infinitecode_protocol::InputItem;
+use infinitecode_protocol::ItemId;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::PermissionPreset;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderVendor;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ReasoningCapability;
+use infinitecode_protocol::ReasoningEffort;
+use infinitecode_protocol::RequestUserInputOption;
+use infinitecode_protocol::RequestUserInputQuestion;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::TurnId;
 use pretty_assertions::assert_eq;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -62,7 +62,7 @@ fn widget_with_model_and_reasoning_effort(
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, Some(model)),
         initial_reasoning_effort_selection,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -100,7 +100,7 @@ fn onboarding_widget_with_model(
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, Some(model)),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -134,7 +134,7 @@ fn onboarding_widget_with_available_model_and_exit_after_onboarding(
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, Some(model.clone())),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -1146,7 +1146,7 @@ fn shift_tab_plan_submission_marks_user_turn_plan_mode() {
     else {
         panic!("expected user turn command");
     };
-    assert_eq!(collaboration_mode, devo_protocol::CollaborationMode::Plan);
+    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Plan);
 }
 
 fn status_row_starting_with(rows: &[String], mode: &str) -> String {
@@ -1164,7 +1164,7 @@ fn composer_marker_color(widget: &ChatWidget) -> Color {
         let row_text = (0..area.width)
             .map(|col| buf[(col, row)].symbol())
             .collect::<String>();
-        if !row_text.contains("Ask Devo") {
+        if !row_text.contains("Ask InfiniteCode") {
             continue;
         }
 
@@ -1533,7 +1533,7 @@ fn bang_command_from_build_submits_one_shot_shell_command() {
             text: "next task".to_string()
         }]
     );
-    assert_eq!(collaboration_mode, devo_protocol::CollaborationMode::Build);
+    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Build);
 }
 
 /// Trace: L2-DES-TUI-003
@@ -1564,7 +1564,7 @@ fn escaped_bang_prefix_submits_normal_chat() {
             text: "!important".to_string()
         }]
     );
-    assert_eq!(collaboration_mode, devo_protocol::CollaborationMode::Build);
+    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Build);
 }
 
 /// Trace: L2-DES-TUI-003
@@ -1595,7 +1595,7 @@ fn leading_space_before_bang_submits_normal_chat() {
             text: "!pwd".to_string()
         }]
     );
-    assert_eq!(collaboration_mode, devo_protocol::CollaborationMode::Build);
+    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Build);
 }
 
 #[test]
@@ -1631,7 +1631,7 @@ fn permissions_command_opens_bottom_pane_picker_and_updates_default() {
     assert_eq!(
         event,
         AppEvent::Command(AppCommand::UpdatePermissions {
-            preset: devo_protocol::PermissionPreset::ReadOnly,
+            preset: infinitecode_protocol::PermissionPreset::ReadOnly,
         })
     );
 }
@@ -1932,7 +1932,7 @@ fn goal_control_slash_commands_emit_goal_app_commands() {
     assert_eq!(
         event_for_slash("/goal pause"),
         AppEvent::Command(AppCommand::SetGoalStatus {
-            status: devo_protocol::ThreadGoalStatus::Paused,
+            status: infinitecode_protocol::ThreadGoalStatus::Paused,
         })
     );
     assert_eq!(
@@ -2115,13 +2115,13 @@ fn toggle_with_levels_treats_enabled_as_default_effort_in_picker() {
 
 #[test]
 fn reasoning_effort_entries_show_off_and_levels_for_toggle_models_with_supported_levels() {
-    let model = devo_core::ModelPreset {
+    let model = infinitecode_core::ModelPreset {
         slug: "deepseek-v4".to_string(),
         display_name: "Deepseek V4".to_string(),
         reasoning_capability: ReasoningCapability::Toggle,
         supported_reasoning_levels: vec![ReasoningEffort::High, ReasoningEffort::Max],
         default_reasoning_effort: None,
-        ..devo_core::ModelPreset::default()
+        ..infinitecode_core::ModelPreset::default()
     }
     .into();
     let (widget, _app_event_rx) = widget_with_model(model, PathBuf::from("."));
@@ -2178,7 +2178,7 @@ fn submit_text_emits_user_turn_with_model_and_reasoning_effort() {
             reasoning_effort_selection: Some("disabled".to_string()),
             sandbox: None,
             approval_policy: Some("on-request".to_string()),
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
         })
     );
 }
@@ -2214,7 +2214,7 @@ fn typed_character_submits_after_paste_burst_flush() {
             reasoning_effort_selection: None,
             sandbox: None,
             approval_policy: Some("on-request".to_string()),
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
         })
     );
 }
@@ -2325,7 +2325,7 @@ fn key_release_does_not_duplicate_text_input() {
             reasoning_effort_selection: None,
             sandbox: None,
             approval_policy: Some("on-request".to_string()),
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
         })
     );
 }
@@ -2515,7 +2515,7 @@ fn proposed_plan_implement_action_sends_build_turn() {
         panic!("expected build user turn");
     };
     assert_eq!(event_cwd, Some(cwd));
-    assert_eq!(collaboration_mode, devo_protocol::CollaborationMode::Build);
+    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Build);
     assert_eq!(
         input,
         vec![InputItem::Text {
@@ -2582,22 +2582,22 @@ fn session_switch_restores_plan_metadata_into_progress() {
         last_query_input_tokens: 0,
         prompt_token_estimate: 0,
         history_items: Vec::new(),
-        rich_history_items: vec![devo_protocol::SessionHistoryItem {
+        rich_history_items: vec![infinitecode_protocol::SessionHistoryItem {
             tool_call_id: None,
-            kind: devo_protocol::SessionHistoryItemKind::Assistant,
+            kind: infinitecode_protocol::SessionHistoryItemKind::Assistant,
             title: String::new(),
             body: r#"{"explanation":"Do work","plan":[{"step":"Inspect","status":"completed"},{"step":"Patch","status":"in_progress"}]}"#.to_string(),
             tool_io: None,
-            metadata: Some(devo_protocol::SessionHistoryMetadata::PlanUpdate {
+            metadata: Some(infinitecode_protocol::SessionHistoryMetadata::PlanUpdate {
                 explanation: Some("Do work".to_string()),
                 steps: vec![
-                    devo_protocol::SessionPlanStep {
+                    infinitecode_protocol::SessionPlanStep {
                         text: "Inspect".to_string(),
-                        status: devo_protocol::SessionPlanStepStatus::Completed,
+                        status: infinitecode_protocol::SessionPlanStepStatus::Completed,
                     },
-                    devo_protocol::SessionPlanStep {
+                    infinitecode_protocol::SessionPlanStep {
                         text: "Patch".to_string(),
-                        status: devo_protocol::SessionPlanStepStatus::InProgress,
+                        status: infinitecode_protocol::SessionPlanStepStatus::InProgress,
                     },
                 ],
             }),
@@ -2638,14 +2638,14 @@ fn session_switch_restores_explored_metadata_into_history() {
         last_query_input_tokens: 0,
         prompt_token_estimate: 0,
         history_items: Vec::new(),
-        rich_history_items: vec![devo_protocol::SessionHistoryItem {
+        rich_history_items: vec![infinitecode_protocol::SessionHistoryItem {
             tool_call_id: Some("call-1".to_string()),
-            kind: devo_protocol::SessionHistoryItemKind::CommandExecution,
+            kind: infinitecode_protocol::SessionHistoryItemKind::CommandExecution,
             title: "cat foo.txt".to_string(),
             body: "hello".to_string(),
             tool_io: None,
-            metadata: Some(devo_protocol::SessionHistoryMetadata::Explored {
-                actions: vec![devo_protocol::parse_command::ParsedCommand::Read {
+            metadata: Some(infinitecode_protocol::SessionHistoryMetadata::Explored {
+                actions: vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
                     cmd: "cat foo.txt".to_string(),
                     name: "foo.txt".to_string(),
                     path: PathBuf::from("foo.txt"),
@@ -2681,7 +2681,7 @@ fn session_switch_restores_edited_metadata_into_history() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("foo.txt"),
-        devo_protocol::protocol::FileChange::Update {
+        infinitecode_protocol::protocol::FileChange::Update {
             unified_diff: "--- a/foo.txt\n+++ b/foo.txt\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
             old_text: None,
             new_text: None,
@@ -2707,13 +2707,13 @@ fn session_switch_restores_edited_metadata_into_history() {
         last_query_input_tokens: 0,
         prompt_token_estimate: 0,
         history_items: Vec::new(),
-        rich_history_items: vec![devo_protocol::SessionHistoryItem {
+        rich_history_items: vec![infinitecode_protocol::SessionHistoryItem {
             tool_call_id: Some("call-1".to_string()),
-            kind: devo_protocol::SessionHistoryItemKind::ToolResult,
+            kind: infinitecode_protocol::SessionHistoryItemKind::ToolResult,
             title: "apply_patch".to_string(),
             body: String::new(),
             tool_io: None,
-            metadata: Some(devo_protocol::SessionHistoryMetadata::Edited { changes }),
+            metadata: Some(infinitecode_protocol::SessionHistoryMetadata::Edited { changes }),
             duration_ms: None,
         }],
         loaded_item_count: 1,
@@ -2756,14 +2756,14 @@ fn session_switch_merges_consecutive_explored_items() {
         prompt_token_estimate: 0,
         history_items: vec![],
         rich_history_items: vec![
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: Some("call-1".to_string()),
-                kind: devo_protocol::SessionHistoryItemKind::ToolCall,
+                kind: infinitecode_protocol::SessionHistoryItemKind::ToolCall,
                 title: "read crates/tui/src/worker.rs".to_string(),
                 body: String::new(),
                 tool_io: None,
-                metadata: Some(devo_protocol::SessionHistoryMetadata::Explored {
-                    actions: vec![devo_protocol::parse_command::ParsedCommand::Read {
+                metadata: Some(infinitecode_protocol::SessionHistoryMetadata::Explored {
+                    actions: vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
                         cmd: "read crates/tui/src/worker.rs".to_string(),
                         name: "worker.rs".to_string(),
                         path: PathBuf::from("crates/tui/src/worker.rs"),
@@ -2771,14 +2771,14 @@ fn session_switch_merges_consecutive_explored_items() {
                 }),
                 duration_ms: None,
             },
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: Some("call-2".to_string()),
-                kind: devo_protocol::SessionHistoryItemKind::ToolCall,
+                kind: infinitecode_protocol::SessionHistoryItemKind::ToolCall,
                 title: "grep command_actions in crates/tui/src/worker.rs".to_string(),
                 body: String::new(),
                 tool_io: None,
-                metadata: Some(devo_protocol::SessionHistoryMetadata::Explored {
-                    actions: vec![devo_protocol::parse_command::ParsedCommand::Search {
+                metadata: Some(infinitecode_protocol::SessionHistoryMetadata::Explored {
+                    actions: vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
                         cmd: "grep command_actions in crates/tui/src/worker.rs".to_string(),
                         query: Some("command_actions".to_string()),
                         path: Some("crates/tui/src/worker.rs".to_string()),
@@ -2835,9 +2835,9 @@ fn session_switch_restores_error_via_tool_result_cell_style() {
         last_query_input_tokens: 0,
         prompt_token_estimate: 0,
         history_items: vec![],
-        rich_history_items: vec![devo_protocol::SessionHistoryItem {
+        rich_history_items: vec![infinitecode_protocol::SessionHistoryItem {
             tool_call_id: Some("call-1".to_string()),
-            kind: devo_protocol::SessionHistoryItemKind::Error,
+            kind: infinitecode_protocol::SessionHistoryItemKind::Error,
             title: "bash error".to_string(),
             body: "permission denied".to_string(),
             tool_io: None,
@@ -2888,36 +2888,36 @@ fn rich_session_restore_orders_terminal_error_before_single_failed_footer() {
         prompt_token_estimate: 0,
         history_items: vec![],
         rich_history_items: vec![
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: Some("call-1".to_string()),
-                kind: devo_protocol::SessionHistoryItemKind::ToolCall,
+                kind: infinitecode_protocol::SessionHistoryItemKind::ToolCall,
                 title: "bash error".to_string(),
                 body: String::new(),
                 tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: Some("call-1".to_string()),
-                kind: devo_protocol::SessionHistoryItemKind::Error,
+                kind: infinitecode_protocol::SessionHistoryItemKind::Error,
                 title: "bash error".to_string(),
                 body: "permission denied".to_string(),
                 tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: None,
-                kind: devo_protocol::SessionHistoryItemKind::Error,
+                kind: infinitecode_protocol::SessionHistoryItemKind::Error,
                 title: "PROVIDER_SERVER_ERROR".to_string(),
                 body: terminal_error.to_string(),
                 tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: None,
-                kind: devo_protocol::SessionHistoryItemKind::TurnSummary,
+                kind: infinitecode_protocol::SessionHistoryItemKind::TurnSummary,
                 title: "test-model".to_string(),
                 body: "failed".to_string(),
                 tool_io: None,
@@ -2993,9 +2993,9 @@ fn live_and_resume_error_share_same_rendering_chain() {
         last_query_input_tokens: 0,
         prompt_token_estimate: 0,
         history_items: vec![],
-        rich_history_items: vec![devo_protocol::SessionHistoryItem {
+        rich_history_items: vec![infinitecode_protocol::SessionHistoryItem {
             tool_call_id: Some("call-1".to_string()),
-            kind: devo_protocol::SessionHistoryItemKind::Error,
+            kind: infinitecode_protocol::SessionHistoryItemKind::Error,
             title: "bash error".to_string(),
             body: "permission denied".to_string(),
             tool_io: None,
@@ -3108,7 +3108,7 @@ fn onboarding_validation_succeeded_waits_for_provider_upsert() {
     );
     assert_eq!(app_event_rx.try_recv().is_err(), true);
     assert_eq!(widget.is_onboarding_active(), false);
-    assert_eq!(widget.placeholder_text(), "Ask Devo");
+    assert_eq!(widget.placeholder_text(), "Ask InfiniteCode");
     assert_eq!(
         widget.current_model().map(|model| model.slug.as_str()),
         Some("deepseek-v4-flash")
@@ -3749,15 +3749,15 @@ fn restored_user_spacing_matches_live_turn_batch_spacing() {
         prompt_token_estimate: 3,
         history_items: Vec::new(),
         rich_history_items: vec![
-            devo_protocol::SessionHistoryItem::new(
+            infinitecode_protocol::SessionHistoryItem::new(
                 None,
-                devo_protocol::SessionHistoryItemKind::User,
+                infinitecode_protocol::SessionHistoryItemKind::User,
                 String::new(),
                 "hello".to_string(),
             ),
-            devo_protocol::SessionHistoryItem::new(
+            infinitecode_protocol::SessionHistoryItem::new(
                 None,
-                devo_protocol::SessionHistoryItemKind::Assistant,
+                infinitecode_protocol::SessionHistoryItemKind::Assistant,
                 String::new(),
                 "world".to_string(),
             ),
@@ -3822,15 +3822,15 @@ fn rich_session_switch_restores_user_spacing_before_assistant_response() {
         prompt_token_estimate: 3,
         history_items: Vec::new(),
         rich_history_items: vec![
-            devo_protocol::SessionHistoryItem::new(
+            infinitecode_protocol::SessionHistoryItem::new(
                 None,
-                devo_protocol::SessionHistoryItemKind::User,
+                infinitecode_protocol::SessionHistoryItemKind::User,
                 String::new(),
                 "hello".to_string(),
             ),
-            devo_protocol::SessionHistoryItem::new(
+            infinitecode_protocol::SessionHistoryItem::new(
                 None,
-                devo_protocol::SessionHistoryItemKind::Assistant,
+                infinitecode_protocol::SessionHistoryItemKind::Assistant,
                 String::new(),
                 "world".to_string(),
             ),
@@ -3942,8 +3942,8 @@ fn user_shell_command_renders_direct_output_and_shell_summary() {
         tool_use_id: "user-shell-1".to_string(),
         command: "ls".to_string(),
         input: None,
-        source: devo_protocol::protocol::ExecCommandSource::UserShell,
-        command_actions: vec![devo_protocol::parse_command::ParsedCommand::ListFiles {
+        source: infinitecode_protocol::protocol::ExecCommandSource::UserShell,
+        command_actions: vec![infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
             cmd: "ls".to_string(),
             path: None,
         }],
@@ -4041,7 +4041,7 @@ fn two_shell_commands_render_as_separate_prompt_cells() {
         tool_use_id: "user-shell-1".to_string(),
         command: "pwd".to_string(),
         input: None,
-        source: devo_protocol::protocol::ExecCommandSource::UserShell,
+        source: infinitecode_protocol::protocol::ExecCommandSource::UserShell,
         command_actions: Vec::new(),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolOutputDelta {
@@ -4063,7 +4063,7 @@ fn two_shell_commands_render_as_separate_prompt_cells() {
         tool_use_id: "user-shell-2".to_string(),
         command: "whoami".to_string(),
         input: None,
-        source: devo_protocol::protocol::ExecCommandSource::UserShell,
+        source: infinitecode_protocol::protocol::ExecCommandSource::UserShell,
         command_actions: Vec::new(),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolOutputDelta {
@@ -4109,7 +4109,7 @@ fn two_shell_commands_render_as_separate_prompt_cells() {
 }
 
 #[test]
-fn active_response_renders_generating_status_without_devo_title() {
+fn active_response_renders_generating_status_without_infinitecode_title() {
     let cwd = std::env::current_dir().expect("current directory is available");
     let model = Model {
         slug: "test-model".to_string(),
@@ -4130,7 +4130,7 @@ fn active_response_renders_generating_status_without_devo_title() {
     widget.handle_worker_event(crate::events::WorkerEvent::TextDelta("hello".to_string()));
 
     let rendered = rendered_rows(&widget, 80, 12).join("\n");
-    assert!(!rendered.contains("Devo -"));
+    assert!(!rendered.contains("InfiniteCode -"));
 }
 
 #[test]
@@ -4241,25 +4241,25 @@ fn active_assistant_renders_resume_like_markdown_without_fragment_gaps() {
         turn_id: Default::default(),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::TextDelta(
-        "## devo-cli -- Binary entry point that assembles all crates\n\n".to_string(),
+        "## infinitecode-cli -- Binary entry point that assembles all crates\n\n".to_string(),
     ));
     widget.pre_draw_tick();
     widget.handle_worker_event(crate::events::WorkerEvent::TextDelta(
-        "4 source files, produces the devo binary.\n\n".to_string(),
+        "4 source files, produces the infinitecode binary.\n\n".to_string(),
     ));
     widget.pre_draw_tick();
     widget.handle_worker_event(crate::events::WorkerEvent::TextDelta(
         "Command dispatch (/crates/cli/src/main.rs)\n\n".to_string(),
     ));
     widget.handle_worker_event(crate::events::WorkerEvent::TextDelta(
-        "devo                 -> run_agent()            interactive TUI (default)\n".to_string(),
+        "infinitecode                 -> run_agent()            interactive TUI (default)\n".to_string(),
     ));
 
     let rows = rendered_rows(&widget, 180, 24);
     let indices = indices_containing(
         &rows,
         &[
-            "devo-cli",
+            "infinitecode-cli",
             "4 source files",
             "Command dispatch",
             "run_agent",
@@ -4713,7 +4713,7 @@ fn edit_running_row_is_path_free_and_disappears_after_patch_result() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("test_edit_test.md"),
-        devo_protocol::protocol::FileChange::Update {
+        infinitecode_protocol::protocol::FileChange::Update {
             unified_diff: "@@ -1 +1 @@\n-old\n+new\n".to_string(),
             old_text: Some("old\n".to_string()),
             new_text: Some("new\n".to_string()),
@@ -4801,7 +4801,7 @@ fn interrupted_turn_flushes_explored_cell_before_summary() {
         tool_use_id: "tool-1".to_string(),
         summary: "code_search update_plan tool handler".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "code_search update_plan tool handler".to_string(),
             query: Some("update_plan tool handler".to_string()),
             path: Some("crates/core/src/tools/handlers".to_string()),
@@ -4878,7 +4878,7 @@ fn widget_with_live_explored_cell() -> ChatWidget {
         tool_use_id: "tool-1".to_string(),
         summary: "code_search update_plan tool handler".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "code_search update_plan tool handler".to_string(),
             query: Some("update_plan tool handler".to_string()),
             path: Some("crates/core/src/tools/handlers".to_string()),
@@ -5033,7 +5033,7 @@ fn preparing_write_disappears_after_patch_applied() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("src/lib.rs"),
-        devo_protocol::protocol::FileChange::Add {
+        infinitecode_protocol::protocol::FileChange::Add {
             content: "pub fn demo() {}\n".to_string(),
         },
     );
@@ -5104,7 +5104,7 @@ fn preparing_apply_patch_disappears_after_patch_applied() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("src/lib.rs"),
-        devo_protocol::protocol::FileChange::Add {
+        infinitecode_protocol::protocol::FileChange::Add {
             content: "pub fn demo() {}\n".to_string(),
         },
     );
@@ -5587,7 +5587,7 @@ fn slash_model_opens_model_picker_instead_of_printing_current_model() {
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, Some(model.clone())),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -5606,7 +5606,7 @@ fn slash_model_opens_model_picker_instead_of_printing_current_model() {
         command: "model".to_string(),
     });
 
-    assert_eq!(widget.placeholder_text(), "Ask Devo");
+    assert_eq!(widget.placeholder_text(), "Ask InfiniteCode");
     assert_eq!(
         widget.current_model().map(|m| m.slug.as_str()),
         Some("test-model")
@@ -6955,7 +6955,7 @@ fn new_session_prepared_does_not_duplicate_startup_header_without_history() {
     });
 
     let rows = rendered_rows(&widget, 80, 16);
-    assert_eq!(rows.iter().filter(|row| row.contains("Devo")).count(), 1);
+    assert_eq!(rows.iter().filter(|row| row.contains("InfiniteCode")).count(), 1);
     assert!(widget.status_summary_text().contains("cached 0 0%"));
 }
 
@@ -6983,7 +6983,7 @@ fn model_selection_updates_session_projection_and_emits_context_override() {
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, Some(model.clone())),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -7030,7 +7030,7 @@ fn model_selection_updates_session_projection_and_emits_context_override() {
             reasoning_effort_selection: Some("high".to_string()),
             sandbox: None,
             approval_policy: Some("on-request".to_string()),
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
         })
     );
 }
@@ -7059,7 +7059,7 @@ fn model_selection_with_reasoning_effort_support_waits_for_second_step() {
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, Some(model)),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -7114,7 +7114,7 @@ fn model_selection_without_reasoning_effort_support_finishes_immediately() {
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, Some(base_model)),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -7560,7 +7560,7 @@ fn transcript_overlay_lines_include_completed_read_input_and_full_output() {
         tool_use_id: "tool-1".to_string(),
         summary: "read src/lib.rs".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
             cmd: "read src/lib.rs".to_string(),
             name: "lib.rs".to_string(),
             path: PathBuf::from("src/lib.rs"),
@@ -7616,7 +7616,7 @@ fn transcript_overlay_lines_include_patch_input_and_diff_output() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("foo.txt"),
-        devo_protocol::protocol::FileChange::Update {
+        infinitecode_protocol::protocol::FileChange::Update {
             unified_diff: "--- a/foo.txt\n+++ b/foo.txt\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
             old_text: None,
             new_text: None,
@@ -7675,12 +7675,12 @@ fn restored_session_transcript_overlay_preserves_paired_tool_io() {
         prompt_token_estimate: 0,
         history_items: Vec::new(),
         rich_history_items: vec![
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: Some("call-1".to_string()),
-                kind: devo_protocol::SessionHistoryItemKind::ToolCall,
+                kind: infinitecode_protocol::SessionHistoryItemKind::ToolCall,
                 title: "read src/lib.rs".to_string(),
                 body: String::new(),
-                tool_io: Some(devo_protocol::SessionHistoryToolIo {
+                tool_io: Some(infinitecode_protocol::SessionHistoryToolIo {
                     tool_name: "read".to_string(),
                     input: serde_json::json!({"path": "src/lib.rs", "offset": 10, "limit": 3}),
                     output: None,
@@ -7689,12 +7689,12 @@ fn restored_session_transcript_overlay_preserves_paired_tool_io() {
                 metadata: None,
                 duration_ms: None,
             },
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: Some("call-1".to_string()),
-                kind: devo_protocol::SessionHistoryItemKind::ToolResult,
+                kind: infinitecode_protocol::SessionHistoryItemKind::ToolResult,
                 title: "read output".to_string(),
                 body: "legacy preview".to_string(),
-                tool_io: Some(devo_protocol::SessionHistoryToolIo {
+                tool_io: Some(infinitecode_protocol::SessionHistoryToolIo {
                     tool_name: "read".to_string(),
                     input: serde_json::Value::Null,
                     output: Some(serde_json::Value::String(
@@ -7753,18 +7753,18 @@ fn legacy_restored_session_without_tool_io_keeps_existing_tool_result_rendering(
         prompt_token_estimate: 0,
         history_items: Vec::new(),
         rich_history_items: vec![
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: Some("call-1".to_string()),
-                kind: devo_protocol::SessionHistoryItemKind::ToolCall,
+                kind: infinitecode_protocol::SessionHistoryItemKind::ToolCall,
                 title: "legacy tool".to_string(),
                 body: String::new(),
                 tool_io: None,
                 metadata: None,
                 duration_ms: None,
             },
-            devo_protocol::SessionHistoryItem {
+            infinitecode_protocol::SessionHistoryItem {
                 tool_call_id: Some("call-1".to_string()),
-                kind: devo_protocol::SessionHistoryItemKind::ToolResult,
+                kind: infinitecode_protocol::SessionHistoryItemKind::ToolResult,
                 title: "legacy tool output".to_string(),
                 body: "legacy result".to_string(),
                 tool_io: None,
@@ -7869,7 +7869,7 @@ fn read_tool_call_renders_relative_path_with_line_range() {
         tool_use_id: "tool-1".to_string(),
         summary: "read crates/core/src/query.rs".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
             cmd: "read crates/core/src/query.rs".to_string(),
             name: "crates/core/src/query.rs L:10-19".to_string(),
             path: PathBuf::from("crates/core/src/query.rs"),
@@ -7914,7 +7914,7 @@ fn read_tool_call_falls_back_to_path_when_read_name_is_empty() {
         tool_use_id: "tool-1".to_string(),
         summary: "read crates/tui/src/mod.rs".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
             cmd: "read crates/tui/src/mod.rs".to_string(),
             name: String::new(),
             path: PathBuf::from("crates/tui/src/mod.rs"),
@@ -7963,7 +7963,7 @@ fn read_tool_call_updates_placeholder_from_completed_tool_call_metadata() {
         tool_use_id: "tool-1".to_string(),
         summary: "read {}".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
             cmd: String::new(),
             name: String::new(),
             path: PathBuf::new(),
@@ -7998,7 +7998,7 @@ fn read_tool_call_updates_placeholder_from_completed_tool_call_metadata() {
     widget.handle_worker_event(crate::events::WorkerEvent::ToolCallUpdated {
         tool_use_id: "tool-1".to_string(),
         summary: "read crates/tui/src/mod.rs".to_string(),
-        parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::Read {
+        parsed_commands: vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
             cmd: "read crates/tui/src/mod.rs".to_string(),
             name: "mod.rs".to_string(),
             path: PathBuf::from("crates/tui/src/mod.rs"),
@@ -8067,7 +8067,7 @@ fn consecutive_read_tool_calls_render_on_one_line_with_spaces() {
             tool_use_id: tool_use_id.clone(),
             summary: "read {}".to_string(),
             preparing: false,
-            parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+            parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
                 cmd: String::new(),
                 name: String::new(),
                 path: PathBuf::new(),
@@ -8076,7 +8076,7 @@ fn consecutive_read_tool_calls_render_on_one_line_with_spaces() {
         widget.handle_worker_event(crate::events::WorkerEvent::ToolCallUpdated {
             tool_use_id: tool_use_id.clone(),
             summary: format!("read crates/tui/src/{name}"),
-            parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::Read {
+            parsed_commands: vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
                 cmd: format!("read crates/tui/src/{name}"),
                 name: name.to_string(),
                 path: PathBuf::from(format!("crates/tui/src/{name}")),
@@ -8125,7 +8125,7 @@ fn glob_tool_call_renders_as_explored_group_in_viewport() {
         summary: "glob **/Cargo.toml in crates".to_string(),
         preparing: false,
         parsed_commands: Some(vec![
-            devo_protocol::parse_command::ParsedCommand::ListFiles {
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                 cmd: "glob **/Cargo.toml in crates".to_string(),
                 path: Some("crates".to_string()),
             },
@@ -8171,7 +8171,7 @@ fn grep_tool_call_renders_as_explored_group_in_viewport() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'rebuild_restored_session' in crates/tui/src".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "grep 'rebuild_restored_session' in crates/tui/src".to_string(),
             query: Some("rebuild_restored_session".to_string()),
             path: Some("crates/tui/src".to_string()),
@@ -8239,7 +8239,7 @@ fn code_search_tool_call_renders_as_explored_group_in_viewport() {
         tool_use_id: "tool-1".to_string(),
         summary: "code_search live tool feedback in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "code_search live tool feedback in crates".to_string(),
             query: Some("live tool feedback".to_string()),
             path: Some("crates".to_string()),
@@ -8285,7 +8285,7 @@ fn exploring_code_search_with_details_shows_input_in_active_cell() {
         tool_use_id: "tool-1".to_string(),
         summary: "code_search live tool feedback in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "code_search live tool feedback in crates".to_string(),
             query: Some("live tool feedback".to_string()),
             path: Some("crates".to_string()),
@@ -8340,7 +8340,7 @@ fn merged_explored_group_becomes_explored_after_all_results_arrive() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "grep 'plan' in crates".to_string(),
             query: Some("plan".to_string()),
             path: Some("crates".to_string()),
@@ -8351,7 +8351,7 @@ fn merged_explored_group_becomes_explored_after_all_results_arrive() {
         summary: "glob **/plan.rs in crates".to_string(),
         preparing: false,
         parsed_commands: Some(vec![
-            devo_protocol::parse_command::ParsedCommand::ListFiles {
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                 cmd: "glob **/plan.rs in crates".to_string(),
                 path: Some("crates".to_string()),
             },
@@ -8408,7 +8408,7 @@ fn live_viewport_shows_explored_group_while_active() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "grep 'plan' in crates".to_string(),
             query: Some("plan".to_string()),
             path: Some("crates".to_string()),
@@ -8419,7 +8419,7 @@ fn live_viewport_shows_explored_group_while_active() {
         summary: "glob **/plan.rs in crates".to_string(),
         preparing: false,
         parsed_commands: Some(vec![
-            devo_protocol::parse_command::ParsedCommand::ListFiles {
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                 cmd: "glob **/plan.rs in crates".to_string(),
                 path: Some("crates".to_string()),
             },
@@ -8465,14 +8465,14 @@ fn reasoning_start_closes_current_explored_group() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "grep 'plan' in crates".to_string(),
             query: Some("plan".to_string()),
             path: Some("crates".to_string()),
         }]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::TextItemStarted {
-        item_id: devo_core::ItemId::new(),
+        item_id: infinitecode_core::ItemId::new(),
         kind: crate::events::TextItemKind::Reasoning,
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
@@ -8480,7 +8480,7 @@ fn reasoning_start_closes_current_explored_group() {
         summary: "glob **/plan.rs in crates".to_string(),
         preparing: false,
         parsed_commands: Some(vec![
-            devo_protocol::parse_command::ParsedCommand::ListFiles {
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                 cmd: "glob **/plan.rs in crates".to_string(),
                 path: Some("crates".to_string()),
             },
@@ -8519,14 +8519,14 @@ fn assistant_text_start_closes_current_explored_group() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "grep 'plan' in crates".to_string(),
             query: Some("plan".to_string()),
             path: Some("crates".to_string()),
         }]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::TextItemStarted {
-        item_id: devo_core::ItemId::new(),
+        item_id: infinitecode_core::ItemId::new(),
         kind: crate::events::TextItemKind::Assistant,
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
@@ -8534,7 +8534,7 @@ fn assistant_text_start_closes_current_explored_group() {
         summary: "glob **/plan.rs in crates".to_string(),
         preparing: false,
         parsed_commands: Some(vec![
-            devo_protocol::parse_command::ParsedCommand::ListFiles {
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                 cmd: "glob **/plan.rs in crates".to_string(),
                 path: Some("crates".to_string()),
             },
@@ -8573,7 +8573,7 @@ fn merged_explored_group_stays_completed_when_tool_results_arrive_after_tool_cal
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "grep 'plan' in crates".to_string(),
             query: Some("plan".to_string()),
             path: Some("crates".to_string()),
@@ -8584,7 +8584,7 @@ fn merged_explored_group_stays_completed_when_tool_results_arrive_after_tool_cal
         summary: "glob **/plan.rs in crates".to_string(),
         preparing: false,
         parsed_commands: Some(vec![
-            devo_protocol::parse_command::ParsedCommand::ListFiles {
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                 cmd: "glob **/plan.rs in crates".to_string(),
                 path: Some("crates".to_string()),
             },
@@ -8655,7 +8655,7 @@ fn explored_group_in_history_can_finish_late_completions() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Search {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
             cmd: "grep 'plan' in crates".to_string(),
             query: Some("plan".to_string()),
             path: Some("crates".to_string()),
@@ -8666,7 +8666,7 @@ fn explored_group_in_history_can_finish_late_completions() {
         summary: "glob **/plan.rs in crates".to_string(),
         preparing: false,
         parsed_commands: Some(vec![
-            devo_protocol::parse_command::ParsedCommand::ListFiles {
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                 cmd: "glob **/plan.rs in crates".to_string(),
                 path: Some("crates".to_string()),
             },
@@ -8751,7 +8751,7 @@ fn patch_applied_event_renders_edited_block() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("foo.txt"),
-        devo_protocol::protocol::FileChange::Update {
+        infinitecode_protocol::protocol::FileChange::Update {
             unified_diff: "--- a/foo.txt\n+++ b/foo.txt\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
             old_text: None,
             new_text: None,
@@ -8784,7 +8784,7 @@ fn added_file_patch_applied_event_renders_added_content_lines() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("quicksort.rs"),
-        devo_protocol::protocol::FileChange::Add {
+        infinitecode_protocol::protocol::FileChange::Add {
             content: "pub fn quicksort() {\n    println!(\"hi\");\n}\n".to_string(),
         },
     );
@@ -8821,7 +8821,7 @@ fn apply_patch_style_full_git_diff_reports_non_zero_counts() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("update.txt"),
-        devo_protocol::protocol::FileChange::Update {
+        infinitecode_protocol::protocol::FileChange::Update {
             unified_diff: "diff --git a/update.txt b/update.txt\n--- a/update.txt\n+++ b/update.txt\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
             old_text: None,
             new_text: None,
@@ -8875,7 +8875,7 @@ fn write_patch_applied_event_renders_edited_block() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("foo.txt"),
-        devo_protocol::protocol::FileChange::Update {
+        infinitecode_protocol::protocol::FileChange::Update {
             unified_diff: "diff --git a/foo.txt b/foo.txt\n--- a/foo.txt\n+++ b/foo.txt\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
             old_text: None,
             new_text: None,
@@ -8907,7 +8907,7 @@ fn write_patch_applied_event_reports_non_zero_counts() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("foo.txt"),
-        devo_protocol::protocol::FileChange::Update {
+        infinitecode_protocol::protocol::FileChange::Update {
             unified_diff: "diff --git a/foo.txt b/foo.txt\n--- a/foo.txt\n+++ b/foo.txt\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
             old_text: None,
             new_text: None,
@@ -8943,7 +8943,7 @@ fn patch_applied_event_with_diff_only_reports_non_zero_counts() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("foo.txt"),
-        devo_protocol::protocol::FileChange::Update {
+        infinitecode_protocol::protocol::FileChange::Update {
             unified_diff: "diff --git a/foo.txt b/foo.txt\n--- a/foo.txt\n+++ b/foo.txt\n@@ -1 +1 @@\n-old\n+new\n".to_string(),
             old_text: None,
             new_text: None,
@@ -9019,7 +9019,7 @@ fn session_switch_restores_added_file_content_in_edited_block() {
     let mut changes = std::collections::HashMap::new();
     changes.insert(
         PathBuf::from("quicksort.rs"),
-        devo_protocol::protocol::FileChange::Add {
+        infinitecode_protocol::protocol::FileChange::Add {
             content: "pub fn quicksort() {\n    println!(\"hi\");\n}\n".to_string(),
         },
     );
@@ -9041,13 +9041,13 @@ fn session_switch_restores_added_file_content_in_edited_block() {
         last_query_input_tokens: 0,
         prompt_token_estimate: 0,
         history_items: Vec::new(),
-        rich_history_items: vec![devo_protocol::SessionHistoryItem {
+        rich_history_items: vec![infinitecode_protocol::SessionHistoryItem {
             tool_call_id: Some("call-1".to_string()),
-            kind: devo_protocol::SessionHistoryItemKind::ToolResult,
+            kind: infinitecode_protocol::SessionHistoryItemKind::ToolResult,
             title: "write".to_string(),
             body: String::new(),
             tool_io: None,
-            metadata: Some(devo_protocol::SessionHistoryMetadata::Edited { changes }),
+            metadata: Some(infinitecode_protocol::SessionHistoryMetadata::Edited { changes }),
             duration_ms: None,
         }],
         loaded_item_count: 1,
@@ -9096,9 +9096,9 @@ fn session_switch_without_rich_edited_metadata_still_restores_edited_block() {
             "Ran apply_patch output",
             "{\"diff\":\"diff --git a/foo.txt b/foo.txt\\n--- a/foo.txt\\n+++ b/foo.txt\\n@@ -1 +1 @@\\n-old\\n+new\\n\",\"files\":[{\"path\":\"foo.txt\",\"kind\":\"update\",\"additions\":1,\"deletions\":1}]}",
         )],
-        rich_history_items: vec![devo_protocol::SessionHistoryItem {
+        rich_history_items: vec![infinitecode_protocol::SessionHistoryItem {
             tool_call_id: Some("call-1".to_string()),
-            kind: devo_protocol::SessionHistoryItemKind::ToolResult,
+            kind: infinitecode_protocol::SessionHistoryItemKind::ToolResult,
             title: "apply_patch output".to_string(),
             body: "{\"diff\":\"diff --git a/foo.txt b/foo.txt\\n--- a/foo.txt\\n+++ b/foo.txt\\n@@ -1 +1 @@\\n-old\\n+new\\n\",\"files\":[{\"path\":\"foo.txt\",\"kind\":\"update\",\"additions\":1,\"deletions\":1}]}".to_string(),
             tool_io: None,

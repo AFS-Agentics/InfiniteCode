@@ -1,6 +1,6 @@
 import { Loader2Icon } from "lucide-react"
 import { memo, useCallback, type ReactNode } from "react"
-import type { ReasoningPart, ToolPart } from "../../lib/types"
+import type { ToolPart } from "../../lib/types"
 import { ChatToolCall, describeToolGroup, getToolInfo, isGroupRunning } from "./chat-tool-call"
 import {
 	buildProcessTimeline,

@@ -6,22 +6,22 @@ use std::time::UNIX_EPOCH;
 
 use anyhow::Context;
 use anyhow::Result;
-use devo_core::AgentsMdConfig;
-use devo_core::Message;
-use devo_core::Model;
-use devo_core::ProviderWireApi;
-use devo_core::QueryEvent;
-use devo_core::ReasoningCapability;
-use devo_core::SessionConfig;
-use devo_core::SessionState;
-use devo_core::TokenBudget;
-use devo_core::TurnConfig;
-use devo_core::default_base_instructions;
-use devo_core::query;
-use devo_core::tools::ToolRegistry;
-use devo_core::tools::ToolRuntime;
-use devo_provider::ModelProviderSDK;
-use devo_provider::openai::OpenAIProvider;
+use infinitecode_core::AgentsMdConfig;
+use infinitecode_core::Message;
+use infinitecode_core::Model;
+use infinitecode_core::ProviderWireApi;
+use infinitecode_core::QueryEvent;
+use infinitecode_core::ReasoningCapability;
+use infinitecode_core::SessionConfig;
+use infinitecode_core::SessionState;
+use infinitecode_core::TokenBudget;
+use infinitecode_core::TurnConfig;
+use infinitecode_core::default_base_instructions;
+use infinitecode_core::query;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_core::tools::ToolRuntime;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::openai::OpenAIProvider;
 
 #[derive(Debug, Clone)]
 struct RealLlmConfig {
@@ -34,10 +34,10 @@ struct RealLlmConfig {
 impl RealLlmConfig {
     fn from_env() -> Result<Self> {
         Ok(Self {
-            base_url: std::env::var("DEVO_E2E_BASE_URL").context("missing DEVO_E2E_BASE_URL")?,
-            api_key: std::env::var("DEVO_E2E_API_KEY").context("missing DEVO_E2E_API_KEY")?,
-            model_slug: std::env::var("DEVO_E2E_MODEL").context("missing DEVO_E2E_MODEL")?,
-            max_tokens: std::env::var("DEVO_E2E_MAX_TOKENS")
+            base_url: std::env::var("INFINITECODE_E2E_BASE_URL").context("missing INFINITECODE_E2E_BASE_URL")?,
+            api_key: std::env::var("INFINITECODE_E2E_API_KEY").context("missing INFINITECODE_E2E_API_KEY")?,
+            model_slug: std::env::var("INFINITECODE_E2E_MODEL").context("missing INFINITECODE_E2E_MODEL")?,
+            max_tokens: std::env::var("INFINITECODE_E2E_MAX_TOKENS")
                 .ok()
                 .and_then(|value| value.parse::<u32>().ok())
                 .unwrap_or(1024),
@@ -75,7 +75,7 @@ fn unique_temp_dir(name: &str) -> Result<PathBuf> {
         .duration_since(UNIX_EPOCH)
         .context("system time before UNIX_EPOCH")?
         .as_nanos();
-    let path = std::env::temp_dir().join(format!("devo-real-llm-{name}-{nanos}"));
+    let path = std::env::temp_dir().join(format!("infinitecode-real-llm-{name}-{nanos}"));
     std::fs::create_dir_all(&path)
         .with_context(|| format!("create temp directory {}", path.display()))?;
     Ok(path)
@@ -97,7 +97,7 @@ fn collect_text_messages(session: &SessionState) -> Vec<String> {
         .iter()
         .flat_map(|message| {
             message.content.iter().filter_map(|block| match block {
-                devo_core::ContentBlock::Text { text } => Some(text.clone()),
+                infinitecode_core::ContentBlock::Text { text } => Some(text.clone()),
                 _ => None,
             })
         })
@@ -121,7 +121,7 @@ async fn run_query(
     let provider = RealLlmConfig::from_env()?.provider();
     let seen_events = Arc::new(std::sync::Mutex::new(Vec::new()));
     let callback_events = Arc::clone(&seen_events);
-    let callback: devo_core::EventCallback = Arc::new(move |event: QueryEvent| {
+    let callback: infinitecode_core::EventCallback = Arc::new(move |event: QueryEvent| {
         let callback_events = Arc::clone(&callback_events);
         Box::pin(async move {
             callback_events
@@ -149,7 +149,7 @@ async fn run_query(
 }
 
 #[tokio::test]
-#[ignore = "requires DEVO_E2E_BASE_URL, DEVO_E2E_API_KEY, and DEVO_E2E_MODEL"]
+#[ignore = "requires INFINITECODE_E2E_BASE_URL, INFINITECODE_E2E_API_KEY, and INFINITECODE_E2E_MODEL"]
 async fn real_llm_session_compaction_roundtrip() -> Result<()> {
     let config = RealLlmConfig::from_env()?;
     let workspace = unique_temp_dir("compaction")?;
@@ -185,7 +185,7 @@ async fn real_llm_session_compaction_roundtrip() -> Result<()> {
         session
             .messages
             .last()
-            .is_some_and(|message| message.role == devo_core::Role::Assistant),
+            .is_some_and(|message| message.role == infinitecode_core::Role::Assistant),
         "expected an assistant response after compaction-triggered live query"
     );
     assert!(
@@ -199,7 +199,7 @@ async fn real_llm_session_compaction_roundtrip() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "requires DEVO_E2E_BASE_URL, DEVO_E2E_API_KEY, and DEVO_E2E_MODEL"]
+#[ignore = "requires INFINITECODE_E2E_BASE_URL, INFINITECODE_E2E_API_KEY, and INFINITECODE_E2E_MODEL"]
 async fn real_llm_context_diffs_and_agents_updates() -> Result<()> {
     let config = RealLlmConfig::from_env()?;
     let root = unique_temp_dir("context-diff")?;
@@ -247,7 +247,7 @@ async fn real_llm_context_diffs_and_agents_updates() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "requires DEVO_E2E_BASE_URL, DEVO_E2E_API_KEY, and DEVO_E2E_MODEL"]
+#[ignore = "requires INFINITECODE_E2E_BASE_URL, INFINITECODE_E2E_API_KEY, and INFINITECODE_E2E_MODEL"]
 async fn real_llm_session_token_totals_accumulate_across_queries() -> Result<()> {
     let config = RealLlmConfig::from_env()?;
     let workspace = unique_temp_dir("accumulation")?;

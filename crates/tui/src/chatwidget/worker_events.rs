@@ -5,9 +5,9 @@
 
 use std::time::Instant;
 
-use devo_protocol::ProviderRetryPhase;
-use devo_protocol::parse_command::ParsedCommand;
-use devo_protocol::protocol::ExecCommandSource;
+use infinitecode_protocol::ProviderRetryPhase;
+use infinitecode_protocol::parse_command::ParsedCommand;
+use infinitecode_protocol::protocol::ExecCommandSource;
 use ratatui::text::Line;
 
 use crate::bottom_pane::ApprovalOverlay;
@@ -23,7 +23,7 @@ use crate::tool_io_cell::FileChangeToolIoCell;
 use crate::tool_io_cell::ToolIoCell;
 use crate::tool_io_cell::ToolIoCellOptions;
 use crate::tool_result_cell::ToolResultCell;
-use devo_util_shell_command::parse_command::parse_command;
+use infinitecode_util_shell_command::parse_command::parse_command;
 
 use super::ActiveToolCall;
 use super::ChatWidget;
@@ -287,7 +287,7 @@ impl ChatWidget {
                     && parsed.iter().all(|parsed| {
                         !matches!(
                             parsed,
-                            devo_protocol::parse_command::ParsedCommand::Unknown { .. }
+                            infinitecode_protocol::parse_command::ParsedCommand::Unknown { .. }
                         )
                     });
                 if exec_like && !preparing {

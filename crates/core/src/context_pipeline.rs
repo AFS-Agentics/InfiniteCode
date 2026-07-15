@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use devo_protocol::{ItemId, SessionId, TurnId};
+use infinitecode_protocol::{ItemId, SessionId, TurnId};
 
 // ── ContextAssembler ────────────────────────────────────────────────
 

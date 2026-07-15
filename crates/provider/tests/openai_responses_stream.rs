@@ -1,11 +1,11 @@
 use std::io;
 
-use devo_protocol::{
+use infinitecode_protocol::{
     ModelRequest, ModelResponse, RequestContent, RequestMessage, ResponseContent, ResponseExtra,
     ResponseMetadata, StopReason, StreamEvent, Usage,
 };
-use devo_provider::ModelProviderSDK;
-use devo_provider::openai::OpenAIResponsesProvider;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::openai::OpenAIResponsesProvider;
 use futures::StreamExt;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -268,7 +268,7 @@ async fn read_http_request(socket: &mut TcpStream) -> io::Result<String> {
 
 fn minimal_request() -> ModelRequest {
     ModelRequest {
-        model_slug: devo_protocol::ModelProfileKey::Generic,
+        model_slug: infinitecode_protocol::ModelProfileKey::Generic,
         model: "test-model".to_string(),
         system: None,
         messages: vec![RequestMessage {

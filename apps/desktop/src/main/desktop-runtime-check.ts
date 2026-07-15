@@ -1,8 +1,8 @@
 import { app } from "electron"
-import { checkDevoProgram, type DevoCheckResult } from "./compatibility"
-import { resolveProgram } from "./devo-program"
+import { checkInfiniteCodeProgram, type InfiniteCodeCheckResult } from "./compatibility"
+import { resolveProgram } from "./infinitecode-program"
 
-export async function checkDesktopRuntime(): Promise<DevoCheckResult> {
+export async function checkDesktopRuntime(): Promise<InfiniteCodeCheckResult> {
 	let program: string
 	try {
 		program = resolveProgram({
@@ -22,5 +22,5 @@ export async function checkDesktopRuntime(): Promise<DevoCheckResult> {
 		}
 	}
 
-	return checkDevoProgram({ program })
+	return checkInfiniteCodeProgram({ program })
 }

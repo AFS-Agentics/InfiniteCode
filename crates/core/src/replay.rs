@@ -9,7 +9,7 @@ use std::collections::HashSet;
 
 use chrono::{DateTime, Utc};
 
-use devo_protocol::{ItemId, SessionId, TurnId, TurnKind, TurnStatus, TurnUsage};
+use infinitecode_protocol::{ItemId, SessionId, TurnId, TurnKind, TurnStatus, TurnUsage};
 
 use crate::durable_record::DurableRecord;
 use crate::durable_record::GoalBudget;
@@ -448,7 +448,7 @@ mod tests {
     use super::*;
     use crate::durable_record::*;
     use chrono::Utc;
-    use devo_protocol::TurnId;
+    use infinitecode_protocol::TurnId;
     use pretty_assertions::assert_eq;
 
     fn now() -> DateTime<Utc> {

@@ -1,6 +1,6 @@
-//! Singleton server coordination for a single `DEVO_HOME`.
+//! Singleton server coordination for a single `INFINITECODE_HOME`.
 //!
-//! At most one **real** devo-server process may run per user data directory.
+//! At most one **real** infinitecode-server process may run per user data directory.
 //! Coordination uses an exclusive file lock plus a small JSON metadata file:
 //!
 //! - `server.lock` — held for the lifetime of the real server (`RealServerGuard`).
@@ -42,8 +42,8 @@ const METADATA_VERSION: u32 = 1;
 /// Real server may still be writing metadata when a proxy process starts.
 const METADATA_READ_RETRIES: usize = 100;
 const METADATA_READ_RETRY_DELAY: Duration = Duration::from_millis(50);
-pub(crate) const SERVER_CONTROL_STATUS_METHOD: &str = "_devo/server/status";
-pub(crate) const SERVER_CONTROL_SHUTDOWN_METHOD: &str = "_devo/server/shutdown";
+pub(crate) const SERVER_CONTROL_STATUS_METHOD: &str = "_infinitecode/server/status";
+pub(crate) const SERVER_CONTROL_SHUTDOWN_METHOD: &str = "_infinitecode/server/shutdown";
 const SERVER_CONTROL_REQUEST_ID: u64 = 1;
 
 /// Outcome of [`acquire_singleton_role`]: either this process runs the server
@@ -102,7 +102,7 @@ impl ServerLockMetadata {
 }
 
 /// One-shot control RPC against the real server's internal proxy
-/// (`devo server --status` / `--shutdown` from a proxy process).
+/// (`infinitecode server --status` / `--shutdown` from a proxy process).
 pub(crate) async fn run_server_control(
     metadata: &ServerLockMetadata,
     action: ServerControlAction,
@@ -169,15 +169,15 @@ impl Drop for RealServerGuard {
     }
 }
 
-/// Attempts an exclusive lock on `DEVO_HOME/server.lock`.
+/// Attempts an exclusive lock on `INFINITECODE_HOME/server.lock`.
 ///
 /// - Success → [`SingletonRole::Real`]: caller becomes the sole server process.
 /// - Lock held by another process → [`SingletonRole::Proxy`]: read metadata and
 ///   connect instead of starting a second runtime.
-pub(crate) fn acquire_singleton_role(devo_home: &Path) -> Result<SingletonRole> {
-    fs::create_dir_all(devo_home)
-        .with_context(|| format!("create DEVO_HOME {}", devo_home.display()))?;
-    let lock_path = lock_path(devo_home);
+pub(crate) fn acquire_singleton_role(infinitecode_home: &Path) -> Result<SingletonRole> {
+    fs::create_dir_all(infinitecode_home)
+        .with_context(|| format!("create INFINITECODE_HOME {}", infinitecode_home.display()))?;
+    let lock_path = lock_path(infinitecode_home);
     let lock_file = OpenOptions::new()
         .create(true)
         .truncate(false)
@@ -189,11 +189,11 @@ pub(crate) fn acquire_singleton_role(devo_home: &Path) -> Result<SingletonRole> 
     match lock_file.try_lock_exclusive() {
         Ok(()) => Ok(SingletonRole::Real(RealServerGuard {
             lock_file,
-            metadata_path: metadata_path(devo_home),
+            metadata_path: metadata_path(infinitecode_home),
         })),
         Err(error) if is_lock_temporarily_unavailable(&error) => {
             // Real server may be mid-startup; retry until metadata appears.
-            Ok(SingletonRole::Proxy(read_metadata_with_retry(devo_home)?))
+            Ok(SingletonRole::Proxy(read_metadata_with_retry(infinitecode_home)?))
         }
         Err(error) => {
             Err(error).with_context(|| format!("lock server singleton {}", lock_path.display()))
@@ -310,10 +310,10 @@ fn is_lock_temporarily_unavailable(error: &std::io::Error) -> bool {
 }
 
 /// Polls until the real server writes metadata (startup race with lock holder).
-fn read_metadata_with_retry(devo_home: &Path) -> Result<ServerLockMetadata> {
+fn read_metadata_with_retry(infinitecode_home: &Path) -> Result<ServerLockMetadata> {
     let mut last_error = None;
     for _ in 0..METADATA_READ_RETRIES {
-        match read_metadata(devo_home) {
+        match read_metadata(infinitecode_home) {
             Ok(metadata) => return Ok(metadata),
             Err(error) => {
                 last_error = Some(error);
@@ -324,8 +324,8 @@ fn read_metadata_with_retry(devo_home: &Path) -> Result<ServerLockMetadata> {
     Err(last_error.expect("metadata read should have failed at least once"))
 }
 
-fn read_metadata(devo_home: &Path) -> Result<ServerLockMetadata> {
-    let path = metadata_path(devo_home);
+fn read_metadata(infinitecode_home: &Path) -> Result<ServerLockMetadata> {
+    let path = metadata_path(infinitecode_home);
     let encoded = fs::read(&path)
         .with_context(|| format!("read server singleton metadata {}", path.display()))?;
     let metadata: ServerLockMetadata =
@@ -339,12 +339,12 @@ fn read_metadata(devo_home: &Path) -> Result<ServerLockMetadata> {
     Ok(metadata)
 }
 
-fn lock_path(devo_home: &Path) -> PathBuf {
-    devo_home.join(LOCK_FILE_NAME)
+fn lock_path(infinitecode_home: &Path) -> PathBuf {
+    infinitecode_home.join(LOCK_FILE_NAME)
 }
 
-fn metadata_path(devo_home: &Path) -> PathBuf {
-    devo_home.join(METADATA_FILE_NAME)
+fn metadata_path(infinitecode_home: &Path) -> PathBuf {
+    infinitecode_home.join(METADATA_FILE_NAME)
 }
 
 #[cfg(test)]

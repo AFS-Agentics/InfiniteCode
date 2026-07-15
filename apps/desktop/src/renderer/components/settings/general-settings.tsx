@@ -4,8 +4,8 @@ import {
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@devo/ui/components/select"
-import { Switch } from "@devo/ui/components/switch"
+} from "@infinitecode/ui/components/select"
+import { Switch } from "@infinitecode/ui/components/switch"
 import { useAtomValue, useSetAtom } from "jotai"
 import { MonitorIcon, MoonIcon, SunIcon } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
@@ -31,6 +31,7 @@ export function GeneralSettings() {
 			</SettingsSection>
 
 			<SettingsSection title="Appearance">
+				<ThemeRow />
 				<OpaqueWindowsRow />
 				<DisplayModeRow />
 			</SettingsSection>

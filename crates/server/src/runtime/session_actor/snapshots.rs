@@ -2,18 +2,18 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
-use devo_core::SessionConfig;
-use devo_core::SessionRecord;
-use devo_core::TurnKind;
-use devo_protocol::PendingInputItem;
-use devo_protocol::SessionId;
-use devo_safety::PermissionMode;
-use devo_safety::RuntimePermissionProfile;
+use infinitecode_core::SessionConfig;
+use infinitecode_core::SessionRecord;
+use infinitecode_core::TurnKind;
+use infinitecode_protocol::PendingInputItem;
+use infinitecode_protocol::SessionId;
+use infinitecode_safety::PermissionMode;
+use infinitecode_safety::RuntimePermissionProfile;
 
 use crate::session::SessionMetadata;
 use crate::session_context::SessionRuntimeContext;
 use crate::turn::TurnMetadata;
-use devo_core::tools::ToolRegistry;
+use infinitecode_core::tools::ToolRegistry;
 
 /// Snapshot used when reserving or queueing a turn on a session actor.
 #[derive(Clone)]
@@ -51,7 +51,7 @@ pub(crate) struct ShellExecContextSnapshot {
     pub(crate) permission_profile: RuntimePermissionProfile,
     pub(crate) runtime_context: Arc<SessionRuntimeContext>,
     pub(crate) tool_registry: Arc<ToolRegistry>,
-    pub(crate) file_read_ledger: Arc<devo_core::tools::FileReadLedger>,
+    pub(crate) file_read_ledger: Arc<infinitecode_core::tools::FileReadLedger>,
 }
 
 /// Context for async title generation.
@@ -59,7 +59,7 @@ pub(crate) struct ShellExecContextSnapshot {
 pub(crate) struct TitleGenerationContext {
     pub(crate) model_selection: Option<String>,
     pub(crate) reasoning_effort_selection: Option<String>,
-    pub(crate) title_state: devo_core::SessionTitleState,
+    pub(crate) title_state: infinitecode_core::SessionTitleState,
     pub(crate) runtime_context: Arc<SessionRuntimeContext>,
 }
 
@@ -83,13 +83,13 @@ pub(crate) struct SessionResumeSnapshot {
 /// Popped queued turn input for follow-up execution.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct QueuedTurnInputData {
-    pub(crate) queued_input_id: devo_core::PendingInputId,
+    pub(crate) queued_input_id: infinitecode_core::PendingInputId,
     pub(crate) display_input: String,
     pub(crate) input_text: String,
     pub(crate) input_messages: Vec<String>,
-    pub(crate) collaboration_mode: devo_protocol::CollaborationMode,
+    pub(crate) collaboration_mode: infinitecode_protocol::CollaborationMode,
     pub(crate) model_selection: Option<String>,
-    pub(crate) subagent_usage_owner: Option<(SessionId, Option<devo_core::TurnId>)>,
+    pub(crate) subagent_usage_owner: Option<(SessionId, Option<infinitecode_core::TurnId>)>,
 }
 
 /// Turn kind and durable record before persisting an item.
@@ -102,8 +102,8 @@ pub(crate) struct PersistItemPrep {
 /// Deferred streaming items captured during graceful shutdown.
 #[derive(Clone, Default)]
 pub(crate) struct ShutdownDeferredSnapshot {
-    pub(crate) deferred_assistant: Option<(devo_core::ItemId, u64, String)>,
-    pub(crate) deferred_reasoning: Option<(devo_core::ItemId, u64, String)>,
-    pub(crate) active_turn_id: Option<devo_core::TurnId>,
+    pub(crate) deferred_assistant: Option<(infinitecode_core::ItemId, u64, String)>,
+    pub(crate) deferred_reasoning: Option<(infinitecode_core::ItemId, u64, String)>,
+    pub(crate) active_turn_id: Option<infinitecode_core::TurnId>,
     pub(crate) record: Option<SessionRecord>,
 }

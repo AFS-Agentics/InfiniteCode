@@ -9,7 +9,7 @@
  * instead of opening this dialog.
  */
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Dialog,
 	DialogClose,
@@ -18,9 +18,9 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@devo/ui/components/dialog"
-import { Input } from "@devo/ui/components/input"
-import { Label } from "@devo/ui/components/label"
+} from "@infinitecode/ui/components/dialog"
+import { Input } from "@infinitecode/ui/components/input"
+import { Label } from "@infinitecode/ui/components/label"
 import { useAtomValue } from "jotai"
 import { FolderOpenIcon, Loader2Icon } from "lucide-react"
 import { useCallback, useState } from "react"

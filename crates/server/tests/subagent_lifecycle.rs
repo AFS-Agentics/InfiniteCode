@@ -3,21 +3,21 @@ use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
-use devo_core::tools::AgentToolCoordinator;
-use devo_protocol::AgentInfo;
-use devo_protocol::AgentOutputEventKind;
-use devo_protocol::AgentTaskMetadata;
-use devo_protocol::AwaitTaskParams;
-use devo_protocol::AwaitTaskResult;
-use devo_protocol::CancelTaskParams;
-use devo_protocol::ErrorResponse;
-use devo_protocol::ListTasksParams;
-use devo_protocol::ModelRequest;
-use devo_protocol::ParentAgentOutputEvent;
-use devo_protocol::ProtocolErrorCode;
-use devo_protocol::TaskInfo;
-use devo_protocol::TaskKind;
-use devo_protocol::TaskState;
+use infinitecode_core::tools::AgentToolCoordinator;
+use infinitecode_protocol::AgentInfo;
+use infinitecode_protocol::AgentOutputEventKind;
+use infinitecode_protocol::AgentTaskMetadata;
+use infinitecode_protocol::AwaitTaskParams;
+use infinitecode_protocol::AwaitTaskResult;
+use infinitecode_protocol::CancelTaskParams;
+use infinitecode_protocol::ErrorResponse;
+use infinitecode_protocol::ListTasksParams;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ParentAgentOutputEvent;
+use infinitecode_protocol::ProtocolErrorCode;
+use infinitecode_protocol::TaskInfo;
+use infinitecode_protocol::TaskKind;
+use infinitecode_protocol::TaskState;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::time::timeout;
@@ -419,12 +419,12 @@ async fn wait_agent_preserves_full_child_report_for_parent_model() -> Result<()>
         .iter()
         .flat_map(|message| message.content.iter())
         .find_map(|content| match content {
-            devo_protocol::RequestContent::ToolResult { content, .. } => Some(content.as_str()),
-            devo_protocol::RequestContent::Text { .. }
-            | devo_protocol::RequestContent::Reasoning { .. }
-            | devo_protocol::RequestContent::ProviderReasoning { .. }
-            | devo_protocol::RequestContent::ToolUse { .. }
-            | devo_protocol::RequestContent::HostedToolUse { .. } => None,
+            infinitecode_protocol::RequestContent::ToolResult { content, .. } => Some(content.as_str()),
+            infinitecode_protocol::RequestContent::Text { .. }
+            | infinitecode_protocol::RequestContent::Reasoning { .. }
+            | infinitecode_protocol::RequestContent::ProviderReasoning { .. }
+            | infinitecode_protocol::RequestContent::ToolUse { .. }
+            | infinitecode_protocol::RequestContent::HostedToolUse { .. } => None,
         })
         .context("expected wait_agent tool result in parent follow-up request")?;
 
@@ -568,7 +568,7 @@ async fn child_to_parent_message_is_rejected() -> Result<()> {
                 connection_id,
                 serde_json::json!({
                     "id": 30,
-                    "method": "_devo/agent/send_message",
+                    "method": "_infinitecode/agent/send_message",
                     "params": {
                         "session_id": child.child_session_id,
                         "target": target,
@@ -653,7 +653,7 @@ async fn invalid_agent_requests_return_invalid_params() -> Result<()> {
         (
             serde_json::json!({
                 "id": 10,
-                "method": "_devo/agent/spawn",
+                "method": "_infinitecode/agent/spawn",
                 "params": {
                     "session_id": parent_session_id,
                     "message": "bad fork",
@@ -665,7 +665,7 @@ async fn invalid_agent_requests_return_invalid_params() -> Result<()> {
         (
             serde_json::json!({
                 "id": 12,
-                "method": "_devo/agent/send_message",
+                "method": "_infinitecode/agent/send_message",
                 "params": {
                     "session_id": parent_session_id,
                     "target": "missing",
@@ -677,9 +677,9 @@ async fn invalid_agent_requests_return_invalid_params() -> Result<()> {
         (
             serde_json::json!({
                 "id": 13,
-                "method": "_devo/agent/spawn",
+                "method": "_infinitecode/agent/spawn",
                 "params": {
-                    "session_id": devo_protocol::SessionId::new(),
+                    "session_id": infinitecode_protocol::SessionId::new(),
                     "message": "missing parent"
                 }
             }),
@@ -688,14 +688,14 @@ async fn invalid_agent_requests_return_invalid_params() -> Result<()> {
         (
             serde_json::json!({
                 "id": 13,
-                "method": "_devo/agent/followup_task",
+                "method": "_infinitecode/agent/followup_task",
                 "params": {
                     "session_id": parent_session_id,
                     "target": "missing",
                     "message": "hello"
                 }
             }),
-            "unknown method: _devo/agent/followup_task",
+            "unknown method: _infinitecode/agent/followup_task",
         ),
     ] {
         let response = runtime
@@ -730,7 +730,7 @@ async fn ephemeral_deny_all_child_agent_has_no_tools_and_one_turn() -> Result<()
             connection_id,
             serde_json::json!({
                 "id": 20,
-                "method": "_devo/agent/spawn",
+                "method": "_infinitecode/agent/spawn",
                 "params": {
                     "session_id": parent_session_id,
                     "message": "answer this side question",
@@ -744,7 +744,7 @@ async fn ephemeral_deny_all_child_agent_has_no_tools_and_one_turn() -> Result<()
         .await
         .context("agent/spawn")?;
     let child = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_protocol::SpawnAgentResult>,
+        infinitecode_server::SuccessResponse<infinitecode_protocol::SpawnAgentResult>,
     >(response)?
     .result;
     wait_for_child_turn_started(&mut notifications_rx, child.child_session_id).await?;
@@ -759,7 +759,7 @@ async fn ephemeral_deny_all_child_agent_has_no_tools_and_one_turn() -> Result<()
             connection_id,
             serde_json::json!({
                 "id": 21,
-                "method": "_devo/agent/send_message",
+                "method": "_infinitecode/agent/send_message",
                 "params": {
                     "session_id": parent_session_id,
                     "target": child.child_session_id.to_string(),

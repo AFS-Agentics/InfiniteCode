@@ -11,7 +11,7 @@ import {
 	ContextMenuItem,
 	ContextMenuSeparator,
 	ContextMenuTrigger,
-} from "@devo/ui/components/context-menu"
+} from "@infinitecode/ui/components/context-menu"
 import {
 	ArchiveIcon,
 	CheckCircle2Icon,

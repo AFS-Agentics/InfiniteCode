@@ -4,9 +4,9 @@ import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
-} from "@devo/ui/components/collapsible"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@devo/ui/components/tabs"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/collapsible"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@infinitecode/ui/components/tabs"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { ToolUIPart } from "ai"
 import { ChevronDownIcon, Code } from "lucide-react"
 import type { ComponentProps } from "react"

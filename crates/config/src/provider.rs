@@ -3,7 +3,7 @@ mod persistence;
 mod resolve;
 mod schema;
 
-pub use devo_protocol::ProviderWireApi;
+pub use infinitecode_protocol::ProviderWireApi;
 
 pub use auth::AUTH_CONFIG_FILE_NAME;
 pub use auth::read_user_auth_config;
@@ -373,7 +373,7 @@ last_model = "qwen3-coder-next"
 
         assert_eq!(
             error.to_string(),
-            "No provider configured. Run `devo onboard` to complete setup."
+            "No provider configured. Run `infinitecode onboard` to complete setup."
         );
     }
 

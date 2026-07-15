@@ -4,20 +4,20 @@ use std::io::ErrorKind;
 use std::sync::Arc;
 use std::time::Duration;
 
-use devo_protocol::HostedToolDefinition;
-use devo_protocol::HostedWebFetchTool;
-use devo_protocol::HostedWebSearchTool;
-use devo_protocol::ModelRequest;
-use devo_protocol::RequestContent;
-use devo_protocol::RequestMessage;
-use devo_protocol::ResolvedReasoningRequest;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseExtra;
-use devo_protocol::SamplingControls;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::ToolDefinition;
-use devo_protocol::TruncationPolicy;
+use infinitecode_protocol::HostedToolDefinition;
+use infinitecode_protocol::HostedWebFetchTool;
+use infinitecode_protocol::HostedWebSearchTool;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::RequestContent;
+use infinitecode_protocol::RequestMessage;
+use infinitecode_protocol::ResolvedReasoningRequest;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseExtra;
+use infinitecode_protocol::SamplingControls;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::ToolDefinition;
+use infinitecode_protocol::TruncationPolicy;
 use futures::StreamExt;
 use futures::future::BoxFuture;
 use tokio::time::sleep;
@@ -33,8 +33,8 @@ use crate::tools::ToolContent;
 use crate::tools::ToolRegistry;
 use crate::tools::ToolRuntime;
 use crate::tools::deferred_loading::is_subagent_agent_coordination_tool;
-use devo_provider::ModelProviderSDK;
-use devo_provider::error::ProviderError;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::error::ProviderError;
 
 use crate::AgentError;
 use crate::ContentBlock;
@@ -73,11 +73,11 @@ const DSML_TOOL_CALL_MARKERS: [&str; 4] = [
 ];
 
 fn hosted_tools_for_web_capabilities(
-    web_search: &devo_config::ResolvedWebSearchConfig,
-    web_fetch: devo_config::ResolvedWebFetchConfig,
+    web_search: &infinitecode_config::ResolvedWebSearchConfig,
+    web_fetch: infinitecode_config::ResolvedWebFetchConfig,
 ) -> Vec<HostedToolDefinition> {
     let mut hosted_tools = Vec::new();
-    if matches!(web_search, devo_config::ResolvedWebSearchConfig::Provider) {
+    if matches!(web_search, infinitecode_config::ResolvedWebSearchConfig::Provider) {
         hosted_tools.push(HostedToolDefinition::WebSearch(HostedWebSearchTool::new()));
     }
     if web_fetch.is_provider() {
@@ -95,9 +95,9 @@ fn hosted_tool_name_for_reminder(tool: &HostedToolDefinition) -> &'static str {
 
 #[cfg(test)]
 fn hosted_tools_for_web_search(
-    web_search: &devo_config::ResolvedWebSearchConfig,
+    web_search: &infinitecode_config::ResolvedWebSearchConfig,
 ) -> Vec<HostedToolDefinition> {
-    hosted_tools_for_web_capabilities(web_search, devo_config::ResolvedWebFetchConfig::Disabled)
+    hosted_tools_for_web_capabilities(web_search, infinitecode_config::ResolvedWebFetchConfig::Disabled)
 }
 
 fn estimate_request_prompt_tokens(request: &ModelRequest) -> usize {
@@ -130,7 +130,7 @@ pub enum QueryEvent {
     ReasoningCompleted,
     /// Incremental token usage update from the provider stream.
     /// TODO: Review the mechanism from the OpenAI API / Anthropic API documentation.
-    UsageDelta { usage: devo_protocol::Usage },
+    UsageDelta { usage: infinitecode_protocol::Usage },
     /// The assistant started a tool call.
     ToolUseStart {
         /// Stable provider-issued tool use identifier.
@@ -164,7 +164,7 @@ pub enum QueryEvent {
     /// A turn is complete (model stopped generating).
     TurnComplete { stop_reason: StopReason },
     /// Token usage update.
-    Usage { usage: devo_protocol::Usage },
+    Usage { usage: infinitecode_protocol::Usage },
 }
 
 /// Async sink for streaming `QueryEvent`s out of the core query loop.
@@ -915,7 +915,7 @@ pub async fn query_with_options(
     let mut dsml_text_tool_call_continuations = 0usize;
 
     if session.turn_state.is_none() {
-        session.start_turn(devo_protocol::TurnKind::Regular);
+        session.start_turn(infinitecode_protocol::TurnKind::Regular);
     }
 
     let compaction_model_slug = turn_config
@@ -940,10 +940,10 @@ pub async fn query_with_options(
 
         for item in &pending {
             match &item.kind {
-                devo_protocol::PendingInputKind::UserText { text } => {
+                infinitecode_protocol::PendingInputKind::UserText { text } => {
                     session.push_message(Message::user(text.clone()));
                 }
-                devo_protocol::PendingInputKind::UserInput {
+                infinitecode_protocol::PendingInputKind::UserInput {
                     prompt_text,
                     prompt_messages,
                     ..
@@ -956,7 +956,7 @@ pub async fn query_with_options(
                         }
                     }
                 }
-                devo_protocol::PendingInputKind::ToolCallBlockedByHook {
+                infinitecode_protocol::PendingInputKind::ToolCallBlockedByHook {
                     tool_use_id,
                     reason,
                 } => {
@@ -965,7 +965,7 @@ pub async fn query_with_options(
                         tool_use_id, reason
                     )));
                 }
-                devo_protocol::PendingInputKind::BudgetLimitSteering => {
+                infinitecode_protocol::PendingInputKind::BudgetLimitSteering => {
                     session.push_message(Message::system(
                         "Note: The conversation is approaching the token budget limit. \
                          Please be concise and consider wrapping up the current task.",
@@ -983,8 +983,8 @@ pub async fn query_with_options(
         {
             if !budget_steer_injected {
                 if let Some(turn) = session.turn_state.as_mut() {
-                    turn.push_pending_input(devo_protocol::PendingInputItem::new(
-                        devo_protocol::PendingInputKind::BudgetLimitSteering,
+                    turn.push_pending_input(infinitecode_protocol::PendingInputItem::new(
+                        infinitecode_protocol::PendingInputKind::BudgetLimitSteering,
                         None,
                         chrono::Utc::now(),
                     ));
@@ -1021,7 +1021,7 @@ pub async fn query_with_options(
             let mut system = session_context.build_system_prompt();
             if !matches!(
                 &turn_config.web_search,
-                devo_config::ResolvedWebSearchConfig::Disabled
+                infinitecode_config::ResolvedWebSearchConfig::Disabled
             ) {
                 if !system.trim().is_empty() {
                     system.push_str("\n\n");
@@ -1080,7 +1080,7 @@ pub async fn query_with_options(
         let hosted_tools =
             hosted_tools_for_web_capabilities(&turn_config.web_search, turn_config.web_fetch);
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::CatalogSlug(catalog_request_model),
+            model_slug: infinitecode_protocol::ModelProfileKey::CatalogSlug(catalog_request_model),
             model: provider_request_model,
             system: request_system,
             messages,
@@ -1803,7 +1803,7 @@ pub async fn query_with_options(
 pub async fn test_model_connection(
     provider: &dyn ModelProviderSDK,
     model: &Model,
-    model_profile: devo_protocol::ModelProfileKey,
+    model_profile: infinitecode_protocol::ModelProfileKey,
     request_model: &str,
     prompt: &str,
 ) -> Result<String, AgentError> {
@@ -1818,9 +1818,9 @@ pub async fn test_model_connection(
         model_slug: model_profile,
         model: request_model.to_string(),
         system: None,
-        messages: vec![devo_protocol::RequestMessage {
+        messages: vec![infinitecode_protocol::RequestMessage {
             role: "user".to_string(),
-            content: vec![devo_protocol::RequestContent::Text {
+            content: vec![infinitecode_protocol::RequestContent::Text {
                 text: prompt.to_string(),
             }],
         }],
@@ -1922,7 +1922,7 @@ fn retry_backoff_duration(attempt: usize) -> Duration {
 
 #[cfg(test)]
 mod tests {
-    use devo_protocol::Usage;
+    use infinitecode_protocol::Usage;
     use std::collections::HashMap;
     use std::pin::Pin;
     use std::sync::Arc;
@@ -1950,20 +1950,20 @@ mod tests {
     use crate::tools::tool_spec::ToolSpec;
     use anyhow::Result;
     use async_trait::async_trait;
-    use devo_protocol::CollaborationMode;
-    use devo_protocol::ModelRequest;
-    use devo_protocol::ModelResponse;
-    use devo_protocol::RequestContent;
-    use devo_protocol::RequestMessage;
-    use devo_protocol::ResponseContent;
-    use devo_protocol::ResponseExtra;
-    use devo_protocol::ResponseMetadata;
-    use devo_protocol::StopReason;
-    use devo_protocol::StreamEvent;
-    use devo_protocol::ThreadGoal;
-    use devo_protocol::ThreadGoalStatus;
-    use devo_provider::ModelProviderSDK;
-    use devo_safety::PermissionMode;
+    use infinitecode_protocol::CollaborationMode;
+    use infinitecode_protocol::ModelRequest;
+    use infinitecode_protocol::ModelResponse;
+    use infinitecode_protocol::RequestContent;
+    use infinitecode_protocol::RequestMessage;
+    use infinitecode_protocol::ResponseContent;
+    use infinitecode_protocol::ResponseExtra;
+    use infinitecode_protocol::ResponseMetadata;
+    use infinitecode_protocol::StopReason;
+    use infinitecode_protocol::StreamEvent;
+    use infinitecode_protocol::ThreadGoal;
+    use infinitecode_protocol::ThreadGoalStatus;
+    use infinitecode_provider::ModelProviderSDK;
+    use infinitecode_safety::PermissionMode;
     use futures::Stream;
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -2035,22 +2035,22 @@ mod tests {
 
     #[test]
     fn hosted_tools_follow_resolved_web_search_mode() {
-        let hosted = hosted_tools_for_web_search(&devo_config::ResolvedWebSearchConfig::Provider);
+        let hosted = hosted_tools_for_web_search(&infinitecode_config::ResolvedWebSearchConfig::Provider);
         assert_eq!(hosted.len(), 1);
         assert!(matches!(
             hosted.as_slice(),
-            [devo_protocol::HostedToolDefinition::WebSearch(_)]
+            [infinitecode_protocol::HostedToolDefinition::WebSearch(_)]
         ));
 
         assert_eq!(
-            hosted_tools_for_web_search(&devo_config::ResolvedWebSearchConfig::Disabled),
+            hosted_tools_for_web_search(&infinitecode_config::ResolvedWebSearchConfig::Disabled),
             Vec::new()
         );
         assert_eq!(
-            hosted_tools_for_web_search(&devo_config::ResolvedWebSearchConfig::Local(
-                devo_config::ResolvedLocalWebSearchConfig {
+            hosted_tools_for_web_search(&infinitecode_config::ResolvedWebSearchConfig::Local(
+                infinitecode_config::ResolvedLocalWebSearchConfig {
                     provider_id: "test".to_string(),
-                    kind: devo_config::LocalWebSearchProviderKind::Exa,
+                    kind: infinitecode_config::LocalWebSearchProviderKind::Exa,
                     api_key: "secret".to_string(),
                     base_url: None,
                     max_results: None,
@@ -2079,7 +2079,7 @@ mod tests {
                 std::io::ErrorKind::TimedOut,
                 "socket timed out",
             )),
-            anyhow::Error::new(devo_provider::error::ProviderError::ProviderTimeoutError {
+            anyhow::Error::new(infinitecode_provider::error::ProviderError::ProviderTimeoutError {
                 message: "provider request timed out".into(),
                 provider_name: Some("test-provider".into()),
             }),
@@ -2216,7 +2216,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for SingleToolUseProvider {
+    impl infinitecode_provider::ModelProviderSDK for SingleToolUseProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2280,7 +2280,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for CapturingToolUseProvider {
+    impl infinitecode_provider::ModelProviderSDK for CapturingToolUseProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2335,7 +2335,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for InterleavedToolUseProvider {
+    impl infinitecode_provider::ModelProviderSDK for InterleavedToolUseProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2416,7 +2416,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for ParallelToolUseProvider {
+    impl infinitecode_provider::ModelProviderSDK for ParallelToolUseProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2537,7 +2537,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for CapturingProvider {
+    impl infinitecode_provider::ModelProviderSDK for CapturingProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2566,7 +2566,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for OpenAiCapturingProvider {
+    impl infinitecode_provider::ModelProviderSDK for OpenAiCapturingProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2595,7 +2595,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for HostedWebSearchProvider {
+    impl infinitecode_provider::ModelProviderSDK for HostedWebSearchProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2661,7 +2661,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for HostedDsmlTextProvider {
+    impl infinitecode_provider::ModelProviderSDK for HostedDsmlTextProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2701,7 +2701,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for HostedWebFetchProvider {
+    impl infinitecode_provider::ModelProviderSDK for HostedWebFetchProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2763,7 +2763,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for TransientStreamCreateProvider {
+    impl infinitecode_provider::ModelProviderSDK for TransientStreamCreateProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -2796,7 +2796,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_provider::ModelProviderSDK for TransientStreamEventProvider {
+    impl infinitecode_provider::ModelProviderSDK for TransientStreamEventProvider {
         async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
             unreachable!("tests stream responses only")
         }
@@ -3260,10 +3260,10 @@ mod tests {
             },
             None,
         );
-        turn_config.web_search = devo_config::ResolvedWebSearchConfig::Local(
-            devo_config::ResolvedLocalWebSearchConfig {
+        turn_config.web_search = infinitecode_config::ResolvedWebSearchConfig::Local(
+            infinitecode_config::ResolvedLocalWebSearchConfig {
                 provider_id: "test".to_string(),
-                kind: devo_config::LocalWebSearchProviderKind::Exa,
+                kind: infinitecode_config::LocalWebSearchProviderKind::Exa,
                 api_key: "secret".to_string(),
                 base_url: None,
                 max_results: None,
@@ -3347,7 +3347,7 @@ mod tests {
             },
             None,
         );
-        turn_config.web_search = devo_config::ResolvedWebSearchConfig::Provider;
+        turn_config.web_search = infinitecode_config::ResolvedWebSearchConfig::Provider;
 
         query(
             &mut session,
@@ -3370,7 +3370,7 @@ mod tests {
         assert!(system.contains("The current month is "));
         assert!(matches!(
             request.hosted_tools.as_slice(),
-            [devo_protocol::HostedToolDefinition::WebSearch(_)]
+            [infinitecode_protocol::HostedToolDefinition::WebSearch(_)]
         ));
         assert!(
             request
@@ -3414,7 +3414,7 @@ mod tests {
         let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
         session.push_message(Message::user("search current docs"));
         let mut turn_config = TurnConfig::new(Model::default(), None);
-        turn_config.web_search = devo_config::ResolvedWebSearchConfig::Provider;
+        turn_config.web_search = infinitecode_config::ResolvedWebSearchConfig::Provider;
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
@@ -3442,7 +3442,7 @@ mod tests {
         let request = &captured[0];
         assert!(matches!(
             request.hosted_tools.as_slice(),
-            [devo_protocol::HostedToolDefinition::WebSearch(_)]
+            [infinitecode_protocol::HostedToolDefinition::WebSearch(_)]
         ));
         assert!(
             request
@@ -3571,7 +3571,7 @@ mod tests {
         let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
         session.push_message(Message::user("search current docs"));
         let mut turn_config = TurnConfig::new(Model::default(), None);
-        turn_config.web_search = devo_config::ResolvedWebSearchConfig::Provider;
+        turn_config.web_search = infinitecode_config::ResolvedWebSearchConfig::Provider;
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
@@ -3598,7 +3598,7 @@ mod tests {
         let request = &captured[0];
         assert!(matches!(
             request.hosted_tools.as_slice(),
-            [devo_protocol::HostedToolDefinition::WebSearch(_)]
+            [infinitecode_protocol::HostedToolDefinition::WebSearch(_)]
         ));
         let continuation = &captured[1];
         assert!(continuation.messages.iter().any(|message| {
@@ -3678,7 +3678,7 @@ mod tests {
         let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
         session.push_message(Message::user("fetch docs"));
         let mut turn_config = TurnConfig::new(Model::default(), None);
-        turn_config.web_fetch = devo_config::ResolvedWebFetchConfig::Provider;
+        turn_config.web_fetch = infinitecode_config::ResolvedWebFetchConfig::Provider;
 
         let seen = Arc::new(Mutex::new(Vec::new()));
         let seen_clone = Arc::clone(&seen);
@@ -3706,7 +3706,7 @@ mod tests {
         let request = &captured[0];
         assert!(matches!(
             request.hosted_tools.as_slice(),
-            [devo_protocol::HostedToolDefinition::WebFetch(_)]
+            [infinitecode_protocol::HostedToolDefinition::WebFetch(_)]
         ));
         assert!(
             request
@@ -3850,7 +3850,7 @@ mod tests {
 
     fn active_goal(objective: &str) -> ThreadGoal {
         ThreadGoal {
-            thread_id: devo_protocol::SessionId::new(),
+            thread_id: infinitecode_protocol::SessionId::new(),
             objective: objective.to_string(),
             status: ThreadGoalStatus::Active,
             token_budget: Some(10_000),
@@ -3948,7 +3948,7 @@ mod tests {
         let model = Model {
             slug: "kimi-k2.5".into(),
             display_name: "Kimi K2.5".into(),
-            provider: devo_protocol::ProviderWireApi::OpenAIChatCompletions,
+            provider: infinitecode_protocol::ProviderWireApi::OpenAIChatCompletions,
             description: None,
             reasoning_capability: ReasoningCapability::Toggle,
             default_reasoning_effort: Some(ReasoningEffort::Medium),
@@ -4291,7 +4291,7 @@ mod tests {
         let registry = Arc::new(ToolRegistry::new());
         let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
         let temp_root =
-            std::env::temp_dir().join(format!("devo-query-lock-{}", uuid::Uuid::new_v4()));
+            std::env::temp_dir().join(format!("infinitecode-query-lock-{}", uuid::Uuid::new_v4()));
         let second_cwd = temp_root.join("nested");
         let first_model = Model {
             slug: "model-a".into(),
@@ -4348,11 +4348,11 @@ mod tests {
         let first_prefix = &captured[0].messages[0];
         let second_prefix = &captured[1].messages[0];
         assert_eq!(first_prefix.role, second_prefix.role);
-        let devo_protocol::RequestContent::Text { text: first_text } = &first_prefix.content[0]
+        let infinitecode_protocol::RequestContent::Text { text: first_text } = &first_prefix.content[0]
         else {
             panic!("expected text prefix");
         };
-        let devo_protocol::RequestContent::Text { text: second_text } = &second_prefix.content[0]
+        let infinitecode_protocol::RequestContent::Text { text: second_text } = &second_prefix.content[0]
         else {
             panic!("expected text prefix");
         };
@@ -4681,7 +4681,7 @@ mod tests {
                 .messages
                 .iter()
                 .flat_map(|message| message.content.iter())
-                .all(|content| !matches!(content, devo_protocol::RequestContent::ToolUse { .. })),
+                .all(|content| !matches!(content, infinitecode_protocol::RequestContent::ToolUse { .. })),
             "expected orphaned tool calls to be removed from prompt history"
         );
     }
@@ -4694,14 +4694,14 @@ mod tests {
         };
         let model = Model {
             slug: "glm-4.5".into(),
-            reasoning_capability: devo_protocol::ReasoningCapability::Toggle,
+            reasoning_capability: infinitecode_protocol::ReasoningCapability::Toggle,
             top_p: Some(0.95),
             ..Model::default()
         };
         let preview = test_model_connection(
             &provider,
             &model,
-            devo_protocol::ModelProfileKey::CatalogSlug(model.slug.clone()),
+            infinitecode_protocol::ModelProfileKey::CatalogSlug(model.slug.clone()),
             "renamed-provider-model",
             "Reply with OK only.",
         )
@@ -4713,7 +4713,7 @@ mod tests {
         assert_eq!(captured.len(), 1);
         assert_eq!(
             captured[0].model_slug,
-            devo_protocol::ModelProfileKey::CatalogSlug("glm-4.5".to_string())
+            infinitecode_protocol::ModelProfileKey::CatalogSlug("glm-4.5".to_string())
         );
         assert_eq!(captured[0].model, "renamed-provider-model");
         assert_eq!(captured[0].request_thinking.as_deref(), Some("enabled"));
@@ -4730,7 +4730,7 @@ mod tests {
         }
 
         #[async_trait]
-        impl devo_provider::ModelProviderSDK for ReasoningProvider {
+        impl infinitecode_provider::ModelProviderSDK for ReasoningProvider {
             async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
                 unreachable!("tests stream responses only")
             }
@@ -4866,7 +4866,7 @@ mod tests {
         }
 
         #[async_trait]
-        impl devo_provider::ModelProviderSDK for SignedReasoningProvider {
+        impl infinitecode_provider::ModelProviderSDK for SignedReasoningProvider {
             async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
                 unreachable!("tests stream responses only")
             }
@@ -5018,7 +5018,7 @@ mod tests {
         }
 
         #[async_trait]
-        impl devo_provider::ModelProviderSDK for ThinkingOnlyThenTextProvider {
+        impl infinitecode_provider::ModelProviderSDK for ThinkingOnlyThenTextProvider {
             async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
                 unreachable!("tests stream responses only")
             }
@@ -5078,7 +5078,7 @@ mod tests {
         let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
         let model = Model {
             slug: "deepseek-v4-pro".into(),
-            provider: devo_protocol::ProviderWireApi::AnthropicMessages,
+            provider: infinitecode_protocol::ProviderWireApi::AnthropicMessages,
             ..Model::default()
         };
         let mut session = SessionState::new(SessionConfig::default(), std::env::temp_dir());
@@ -5180,7 +5180,7 @@ mod tests {
         }
 
         #[async_trait]
-        impl devo_provider::ModelProviderSDK for OrderedHostedProvider {
+        impl infinitecode_provider::ModelProviderSDK for OrderedHostedProvider {
             async fn completion(&self, _request: ModelRequest) -> Result<ModelResponse> {
                 unreachable!("tests stream responses only")
             }
@@ -5384,7 +5384,7 @@ mod tests {
         let runtime = ToolRuntime::new_without_permissions(Arc::clone(&registry));
         let model = Model {
             slug: "deepseek-v4-flash".into(),
-            provider: devo_protocol::ProviderWireApi::OpenAIChatCompletions,
+            provider: infinitecode_protocol::ProviderWireApi::OpenAIChatCompletions,
             reasoning_capability: ReasoningCapability::Toggle,
             base_instructions: String::new(),
             ..Model::default()
@@ -5408,7 +5408,7 @@ mod tests {
         assert_eq!(captured.len(), 1);
         assert_eq!(
             captured[0].model_slug,
-            devo_protocol::ModelProfileKey::CatalogSlug("deepseek-v4-flash".to_string())
+            infinitecode_protocol::ModelProfileKey::CatalogSlug("deepseek-v4-flash".to_string())
         );
         assert_eq!(captured[0].request_thinking.as_deref(), Some("enabled"));
         // Toggle capability does not set reasoning_effort on the request.

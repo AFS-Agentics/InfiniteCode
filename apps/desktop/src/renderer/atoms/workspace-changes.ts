@@ -5,7 +5,7 @@ import type {
 	WorkspaceChangeView,
 	WorkspaceChangeViewStatus,
 	WorkspaceChangesUpdatedEventProperties,
-} from "@devo-ai/sdk/v2/client"
+} from "@infinitecode-ai/sdk/v2/client"
 import { atom } from "jotai"
 import { atomFamily } from "jotai/utils"
 

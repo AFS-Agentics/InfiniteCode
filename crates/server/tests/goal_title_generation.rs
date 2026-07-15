@@ -8,27 +8,27 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::Model;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::SessionId;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::SingleProviderRouter;
-use devo_server::ClientTransportKind;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
 use futures::Stream;
 use futures::stream;
 use pretty_assertions::assert_eq;
@@ -84,7 +84,7 @@ async fn goal_set_objective_generates_session_title_for_new_session() -> Result<
             connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "investigate goal title generation",
@@ -137,7 +137,7 @@ async fn goal_create_rejects_unknown_session() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 5,
-                "method": "_devo/goal/create",
+                "method": "_infinitecode/goal/create",
                 "params": {
                     "sessionId": unknown_session_id,
                     "objective": "unknown session goal",
@@ -175,7 +175,7 @@ async fn goal_set_rejects_unknown_session() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 6,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": unknown_session_id,
                     "objective": "unknown session goal",
@@ -205,7 +205,7 @@ fn build_runtime(
     provider: Arc<GoalTitleProvider>,
 ) -> Result<Arc<ServerRuntime>> {
     let provider: Arc<dyn ModelProviderSDK> = provider;
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         data_root.join("goal_title.db"),
     )?);
     Ok(ServerRuntime::new(
@@ -225,7 +225,7 @@ fn build_runtime(
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 data_root.to_path_buf(),
@@ -238,7 +238,7 @@ fn build_runtime(
 async fn initialize_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(1024);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(1024);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -264,7 +264,7 @@ async fn initialize_connection(
     let response: serde_json::Value = initialize_response;
     assert_eq!(
         response["result"]["agentInfo"]["name"],
-        serde_json::json!("devo-server")
+        serde_json::json!("infinitecode-server")
     );
     Ok((connection_id, notifications_rx))
 }
@@ -290,7 +290,7 @@ async fn start_untitled_session(
         )
         .await
         .context("session/start response")?;
-    let response: devo_server::SuccessResponse<devo_server::SessionStartResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult> =
         serde_json::from_value(start_response)?;
     Ok(response.result.session.session_id)
 }
@@ -323,21 +323,21 @@ async fn wait_for_title_update(
 fn title_request_contains(request: &ModelRequest, needle: &str) -> bool {
     request.messages.iter().any(|message| {
         message.content.iter().any(|content| match content {
-            devo_protocol::RequestContent::Text { text }
-            | devo_protocol::RequestContent::Reasoning { text } => text.contains(needle),
-            devo_protocol::RequestContent::ProviderReasoning { .. }
-            | devo_protocol::RequestContent::ToolUse { .. }
-            | devo_protocol::RequestContent::HostedToolUse { .. }
-            | devo_protocol::RequestContent::ToolResult { .. } => false,
+            infinitecode_protocol::RequestContent::Text { text }
+            | infinitecode_protocol::RequestContent::Reasoning { text } => text.contains(needle),
+            infinitecode_protocol::RequestContent::ProviderReasoning { .. }
+            | infinitecode_protocol::RequestContent::ToolUse { .. }
+            | infinitecode_protocol::RequestContent::HostedToolUse { .. }
+            | infinitecode_protocol::RequestContent::ToolResult { .. } => false,
         })
     })
 }
 
 fn decode_acp_session_list_response(
     response: serde_json::Value,
-) -> Result<Vec<devo_server::SessionMetadata>> {
+) -> Result<Vec<infinitecode_server::SessionMetadata>> {
     let response_value = response.clone();
-    let response: devo_server::AcpSuccessResponse<devo_server::AcpListSessionsResult> =
+    let response: infinitecode_server::AcpSuccessResponse<infinitecode_server::AcpListSessionsResult> =
         serde_json::from_value(response)
             .with_context(|| format!("decode ACP session/list response: {response_value}"))?;
     response
@@ -348,14 +348,14 @@ fn decode_acp_session_list_response(
             session
                 .meta
                 .as_ref()
-                .and_then(|meta| meta.get(devo_server::DEVO_SESSION_META))
+                .and_then(|meta| meta.get(infinitecode_server::INFINITECODE_SESSION_META))
                 .cloned()
                 .map(serde_json::from_value)
                 .transpose()
-                .context("decode Devo session metadata from ACP session/list response")?
+                .context("decode InfiniteCode session metadata from ACP session/list response")?
                 .with_context(|| {
                     format!(
-                        "ACP session/list response missing Devo session metadata for {}",
+                        "ACP session/list response missing InfiniteCode session metadata for {}",
                         session.session_id
                     )
                 })
@@ -364,10 +364,10 @@ fn decode_acp_session_list_response(
 }
 
 fn assert_session_not_found(response: serde_json::Value) -> Result<()> {
-    let response: devo_server::ErrorResponse = serde_json::from_value(response)?;
+    let response: infinitecode_server::ErrorResponse = serde_json::from_value(response)?;
     assert_eq!(
         response.error.code,
-        devo_server::ProtocolErrorCode::SessionNotFound
+        infinitecode_server::ProtocolErrorCode::SessionNotFound
     );
     Ok(())
 }
@@ -382,7 +382,7 @@ async fn assert_goal_status_empty(
             connection_id,
             serde_json::json!({
                 "id": 7,
-                "method": "_devo/goal/status",
+                "method": "_infinitecode/goal/status",
                 "params": {
                     "sessionId": session_id
                 }
@@ -390,7 +390,7 @@ async fn assert_goal_status_empty(
         )
         .await
         .context("goal/status response")?;
-    let response: devo_server::SuccessResponse<devo_protocol::GoalStatusResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalStatusResult> =
         serde_json::from_value(response)?;
     assert_eq!(response.result.goal, None);
     Ok(())

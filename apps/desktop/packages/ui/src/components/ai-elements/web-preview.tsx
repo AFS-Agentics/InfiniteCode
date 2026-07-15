@@ -1,19 +1,19 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
-} from "@devo/ui/components/collapsible"
-import { Input } from "@devo/ui/components/input"
+} from "@infinitecode/ui/components/collapsible"
+import { Input } from "@infinitecode/ui/components/input"
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
-} from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { ChevronDownIcon } from "lucide-react"
 import type { ComponentProps, ReactNode } from "react"
 import { createContext, useCallback, useContext, useMemo, useState } from "react"

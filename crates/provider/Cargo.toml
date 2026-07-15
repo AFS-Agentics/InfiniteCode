@@ -2,15 +2,15 @@
 description = "Unified model provider interface with streaming support"
 edition.workspace = true
 license.workspace = true
-name = "devo-provider"
+name = "infinitecode-provider"
 version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
 async-stream = { workspace = true }
 async-trait = { workspace = true }
-devo-network-proxy = { workspace = true }
-devo-protocol = { workspace = true }
+infinitecode-network-proxy = { workspace = true }
+infinitecode-protocol = { workspace = true }
 futures = { workspace = true }
 reqwest = { workspace = true }
 reqwest-eventsource = { workspace = true }

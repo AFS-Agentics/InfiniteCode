@@ -2,20 +2,20 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use devo_protocol::AgentListParams;
-use devo_protocol::AgentMessageParams;
-use devo_protocol::AgentToolPolicy;
-use devo_protocol::AwaitTaskParams;
-use devo_protocol::CancelTaskParams;
-use devo_protocol::CloseAgentParams;
-use devo_protocol::ListTasksParams;
-use devo_protocol::ParentAgentInfo;
-use devo_protocol::ParentAgentListResult;
-use devo_protocol::ParentSpawnAgentResult;
-use devo_protocol::SessionId;
-use devo_protocol::SpawnAgentParams;
-use devo_protocol::TaskId;
-use devo_protocol::WaitAgentParams;
+use infinitecode_protocol::AgentListParams;
+use infinitecode_protocol::AgentMessageParams;
+use infinitecode_protocol::AgentToolPolicy;
+use infinitecode_protocol::AwaitTaskParams;
+use infinitecode_protocol::CancelTaskParams;
+use infinitecode_protocol::CloseAgentParams;
+use infinitecode_protocol::ListTasksParams;
+use infinitecode_protocol::ParentAgentInfo;
+use infinitecode_protocol::ParentAgentListResult;
+use infinitecode_protocol::ParentSpawnAgentResult;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::SpawnAgentParams;
+use infinitecode_protocol::TaskId;
+use infinitecode_protocol::WaitAgentParams;
 
 use crate::contracts::ToolCallError;
 use crate::contracts::ToolContext;
@@ -245,7 +245,7 @@ impl ToolHandler for AgentToolHandler {
                     .await_task(
                         session_id,
                         &input.task_id,
-                        std::time::Duration::from_secs(devo_protocol::resolve_wait_agent_timeout(
+                        std::time::Duration::from_secs(infinitecode_protocol::resolve_wait_agent_timeout(
                             input.timeout_secs,
                         )),
                     )
@@ -292,7 +292,7 @@ impl ToolHandler for AgentToolHandler {
                     .cancel(session_id, &input.task_id)
                     .await
                 {
-                    return json_result(devo_protocol::CancelTaskResult { task }, "task canceled");
+                    return json_result(infinitecode_protocol::CancelTaskResult { task }, "task canceled");
                 }
                 if input.task_id.0.starts_with("task-") {
                     return Err(ToolCallError::InvalidInput(format!(
@@ -586,14 +586,14 @@ mod tests {
     struct BlockingWaitCoordinator;
 
     #[async_trait]
-    impl devo_tools::AgentToolCoordinator for FakeAgentCoordinator {
+    impl infinitecode_tools::AgentToolCoordinator for FakeAgentCoordinator {
         async fn spawn_agent(
             self: Arc<Self>,
             params: SpawnAgentParams,
-        ) -> Result<devo_protocol::SpawnAgentResult, ToolCallError> {
+        ) -> Result<infinitecode_protocol::SpawnAgentResult, ToolCallError> {
             self.spawned.lock().await.push(params);
             let child_session_id = SessionId::new();
-            Ok(devo_protocol::SpawnAgentResult {
+            Ok(infinitecode_protocol::SpawnAgentResult {
                 task_id: TaskId::from(child_session_id),
                 child_session_id,
                 agent_path: "root/reviewer".to_string(),
@@ -605,11 +605,11 @@ mod tests {
         async fn send_message(
             self: Arc<Self>,
             params: AgentMessageParams,
-        ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
+        ) -> Result<infinitecode_protocol::AgentMessageResult, ToolCallError> {
             let child_session_id = SessionId::try_from(params.target.as_str())
                 .map_err(|error| ToolCallError::InvalidInput(error.to_string()))?;
             self.messages.lock().await.push(params);
-            Ok(devo_protocol::AgentMessageResult {
+            Ok(infinitecode_protocol::AgentMessageResult {
                 delivered: true,
                 task_id: TaskId::from(child_session_id),
             })
@@ -617,9 +617,9 @@ mod tests {
 
         async fn wait_agent(
             self: Arc<Self>,
-            _params: devo_protocol::WaitAgentParams,
-        ) -> Result<devo_protocol::WaitAgentResult, ToolCallError> {
-            Ok(devo_protocol::WaitAgentResult {
+            _params: infinitecode_protocol::WaitAgentParams,
+        ) -> Result<infinitecode_protocol::WaitAgentResult, ToolCallError> {
+            Ok(infinitecode_protocol::WaitAgentResult {
                 events: Vec::new(),
                 next_sequence: 1,
                 timed_out: false,
@@ -629,15 +629,15 @@ mod tests {
         async fn list_agents(
             self: Arc<Self>,
             _params: AgentListParams,
-        ) -> Result<Vec<devo_protocol::AgentInfo>, ToolCallError> {
+        ) -> Result<Vec<infinitecode_protocol::AgentInfo>, ToolCallError> {
             Ok(Vec::new())
         }
 
         async fn close_agent(
             self: Arc<Self>,
             _params: CloseAgentParams,
-        ) -> Result<devo_protocol::CloseAgentResult, ToolCallError> {
-            Ok(devo_protocol::CloseAgentResult {
+        ) -> Result<infinitecode_protocol::CloseAgentResult, ToolCallError> {
+            Ok(infinitecode_protocol::CloseAgentResult {
                 closed: true,
                 status: "closed".to_string(),
             })
@@ -645,39 +645,39 @@ mod tests {
     }
 
     #[async_trait]
-    impl devo_tools::AgentToolCoordinator for BlockingWaitCoordinator {
+    impl infinitecode_tools::AgentToolCoordinator for BlockingWaitCoordinator {
         async fn spawn_agent(
             self: Arc<Self>,
             _params: SpawnAgentParams,
-        ) -> Result<devo_protocol::SpawnAgentResult, ToolCallError> {
+        ) -> Result<infinitecode_protocol::SpawnAgentResult, ToolCallError> {
             Err(ToolCallError::InternalError("not used".to_string()))
         }
 
         async fn send_message(
             self: Arc<Self>,
             _params: AgentMessageParams,
-        ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
+        ) -> Result<infinitecode_protocol::AgentMessageResult, ToolCallError> {
             Err(ToolCallError::InternalError("not used".to_string()))
         }
 
         async fn wait_agent(
             self: Arc<Self>,
-            _params: devo_protocol::WaitAgentParams,
-        ) -> Result<devo_protocol::WaitAgentResult, ToolCallError> {
+            _params: infinitecode_protocol::WaitAgentParams,
+        ) -> Result<infinitecode_protocol::WaitAgentResult, ToolCallError> {
             std::future::pending().await
         }
 
         async fn list_agents(
             self: Arc<Self>,
             _params: AgentListParams,
-        ) -> Result<Vec<devo_protocol::AgentInfo>, ToolCallError> {
+        ) -> Result<Vec<infinitecode_protocol::AgentInfo>, ToolCallError> {
             Err(ToolCallError::InternalError("not used".to_string()))
         }
 
         async fn close_agent(
             self: Arc<Self>,
             _params: CloseAgentParams,
-        ) -> Result<devo_protocol::CloseAgentResult, ToolCallError> {
+        ) -> Result<infinitecode_protocol::CloseAgentResult, ToolCallError> {
             Err(ToolCallError::InternalError("not used".to_string()))
         }
     }
@@ -692,7 +692,7 @@ mod tests {
             .handle(
                 tool_context(
                     session_id,
-                    Some(coordinator.clone() as Arc<dyn devo_tools::AgentToolCoordinator>),
+                    Some(coordinator.clone() as Arc<dyn infinitecode_tools::AgentToolCoordinator>),
                 ),
                 serde_json::json!({
                     "message": "review this",
@@ -732,7 +732,7 @@ mod tests {
             .handle(
                 tool_context(
                     session_id,
-                    Some(coordinator.clone() as Arc<dyn devo_tools::AgentToolCoordinator>),
+                    Some(coordinator.clone() as Arc<dyn infinitecode_tools::AgentToolCoordinator>),
                 ),
                 serde_json::json!({
                     "target": child_session_id.to_string(),
@@ -880,7 +880,7 @@ mod tests {
         let cancel_token = CancellationToken::new();
         let ctx = tool_context_with_cancel_token(
             session_id,
-            Some(coordinator as Arc<dyn devo_tools::AgentToolCoordinator>),
+            Some(coordinator as Arc<dyn infinitecode_tools::AgentToolCoordinator>),
             cancel_token.clone(),
         );
         cancel_token.cancel();
@@ -895,7 +895,7 @@ mod tests {
 
     fn tool_context(
         session_id: SessionId,
-        agent_coordinator: Option<Arc<dyn devo_tools::AgentToolCoordinator>>,
+        agent_coordinator: Option<Arc<dyn infinitecode_tools::AgentToolCoordinator>>,
     ) -> ToolContext {
         tool_context_with_cancel_token(session_id, agent_coordinator, CancellationToken::new())
     }
@@ -907,7 +907,7 @@ mod tests {
 
     fn tool_context_with_cancel_token(
         session_id: SessionId,
-        agent_coordinator: Option<Arc<dyn devo_tools::AgentToolCoordinator>>,
+        agent_coordinator: Option<Arc<dyn infinitecode_tools::AgentToolCoordinator>>,
         cancel_token: CancellationToken,
     ) -> ToolContext {
         ToolContext {
@@ -921,7 +921,7 @@ mod tests {
             },
             cancel_token,
             agent_scope: crate::contracts::ToolAgentScope::Parent,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
             agent_coordinator,
             client_filesystem: None,
             client_terminal: None,

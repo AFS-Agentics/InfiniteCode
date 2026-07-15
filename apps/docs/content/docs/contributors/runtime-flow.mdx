@@ -1,21 +1,21 @@
 ---
 title: Runtime Flow
-description: Follow a user message through Devo.
+description: Follow a user message through InfiniteCode.
 ---
 
-This page follows one normal user prompt through Devo.
+This page follows one normal user prompt through InfiniteCode.
 
 ## Turn Path
 
 ```mermaid
 sequenceDiagram
   participant User
-  participant TUI as devo-tui
+  participant TUI as infinitecode-tui
   participant Worker as TUI worker
-  participant Server as devo-server
-  participant Core as devo-core
+  participant Server as infinitecode-server
+  participant Core as infinitecode-core
   participant Tools as tools
-  participant Provider as devo-provider
+  participant Provider as infinitecode-provider
 
   User->>TUI: submit prompt
   TUI->>Worker: AppCommand
@@ -75,7 +75,7 @@ Server handlers live under `crates/server/src/runtime/handlers`.
 
 ## 4. Core Query
 
-The server delegates agent execution to `devo-core`.
+The server delegates agent execution to `infinitecode-core`.
 
 Core owns:
 
@@ -113,7 +113,7 @@ cells, status updates, and final turn state.
 
 ## 7. Persistence And Resume
 
-Interactive sessions persist enough metadata and records for `devo resume` and
+Interactive sessions persist enough metadata and records for `infinitecode resume` and
 `/resume` to reconstruct history. Resume starts through the same interactive
 startup path, but passes an initial session id into the TUI and worker.
 

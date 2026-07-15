@@ -26,7 +26,7 @@ Define the TUI behavior for `/permissions`, which lets the user choose what the 
 ## Command Contract
 
 - Command: `/permissions`
-- Description: `choose what Devo is allowed to do`
+- Description: `choose what InfiniteCode is allowed to do`
 - Parameters: none in the first milestone.
 - Mutability: session permission metadata and possibly durable configuration, depending on persistence choice.
 - Active-turn availability: allowed only for future work; it must not retroactively authorize already-running tool calls.

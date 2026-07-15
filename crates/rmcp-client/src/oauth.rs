@@ -19,7 +19,7 @@
 use anyhow::Context;
 use anyhow::Error;
 use anyhow::Result;
-use devo_config::OAuthCredentialsStoreMode;
+use infinitecode_config::OAuthCredentialsStoreMode;
 use oauth2::AccessToken;
 use oauth2::EmptyExtraTokenFields;
 use oauth2::RefreshToken;
@@ -43,12 +43,12 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use tracing::warn;
 
-use devo_keyring_store::DefaultKeyringStore;
-use devo_keyring_store::KeyringStore;
+use infinitecode_keyring_store::DefaultKeyringStore;
+use infinitecode_keyring_store::KeyringStore;
 use rmcp::transport::auth::AuthorizationManager;
 use tokio::sync::Mutex;
 
-use devo_util_paths::find_devo_home;
+use infinitecode_util_paths::find_infinitecode_home;
 
 const KEYRING_SERVICE: &str = "Codex MCP Credentials";
 const REFRESH_SKEW_MILLIS: u64 = 30_000;
@@ -520,7 +520,7 @@ fn compute_store_key(server_name: &str, server_url: &str) -> Result<String> {
 }
 
 fn fallback_file_path() -> Result<PathBuf> {
-    Ok(find_devo_home()?.join(FALLBACK_FILENAME).to_path_buf())
+    Ok(find_infinitecode_home()?.join(FALLBACK_FILENAME).to_path_buf())
 }
 
 fn read_fallback_file() -> Result<Option<FallbackFile>> {
@@ -595,7 +595,7 @@ mod tests {
     use std::sync::PoisonError;
     use tempfile::tempdir;
 
-    use devo_keyring_store::tests::MockKeyringStore;
+    use infinitecode_keyring_store::tests::MockKeyringStore;
 
     struct TempCodexHome {
         _guard: MutexGuard<'static, ()>,

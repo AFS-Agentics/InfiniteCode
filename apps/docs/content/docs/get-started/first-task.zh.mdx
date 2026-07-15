@@ -1,26 +1,26 @@
 ---
 title: 第一个任务
-description: 用 Devo 运行一个实际的第一个编程任务。
+description: 用 InfiniteCode 运行一个实际的第一个编程任务。
 ---
 
 第一个任务用于验证三件事：
 
-1. Devo 在你期望的仓库中运行。
+1. InfiniteCode 在你期望的仓库中运行。
 2. 模型能读取并理解项目。
-3. Devo 能做一个小范围修改，并运行正确检查。
+3. InfiniteCode 能做一个小范围修改，并运行正确检查。
 
-先从只读上下文开始。只有当回答与仓库匹配后，再让 Devo 修改文件。
+先从只读上下文开始。只有当回答与仓库匹配后，再让 InfiniteCode 修改文件。
 
 ## 从仓库中启动
 
-启动 Devo 前先进入仓库：
+启动 InfiniteCode 前先进入仓库：
 
 ```bash
 cd /path/to/your/repo
-devo
+infinitecode
 ```
 
-Devo 使用当前工作目录作为会话 workspace。如果从错误目录启动，文件搜索、上下文和验证命令都会指向错误项目。
+InfiniteCode 使用当前工作目录作为会话 workspace。如果从错误目录启动，文件搜索、上下文和验证命令都会指向错误项目。
 
 ## 询问运行时路径
 
@@ -52,7 +52,7 @@ Explain the crates involved in provider configuration. Do not edit files yet.
 Review @apps/web/content/docs/get-started/install.mdx for missing install paths. Do not edit yet.
 ```
 
-当你希望 Devo 检查特定上下文，而不是从零搜索时，使用 `@`。
+当你希望 InfiniteCode 检查特定上下文，而不是从零搜索时，使用 `@`。
 
 ## 要求一个小范围修改
 
@@ -70,11 +70,11 @@ Update @apps/web/content/docs/get-started/install.mdx so it covers offline insta
 Improve the docs.
 ```
 
-这会在你验证配置前给 Devo 太多自由度。
+这会在你验证配置前给 InfiniteCode 太多自由度。
 
 ## 运行验证
 
-要求 Devo 运行相关检查：
+要求 InfiniteCode 运行相关检查：
 
 ```text
 Run the docs lint and build checks for this change.
@@ -89,7 +89,7 @@ Run the docs lint and build checks for this change.
 Rust 修改优先使用 package 级检查：
 
 ```text
-!cargo test -p devo-tui status_indicator -- --nocapture
+!cargo test -p infinitecode-tui status_indicator -- --nocapture
 ```
 
 只有当改动触及共享行为时，再扩大检查范围。
@@ -102,13 +102,13 @@ Rust 修改优先使用 package 级检查：
 !git status --short
 ```
 
-要求 Devo 总结 diff：
+要求 InfiniteCode 总结 diff：
 
 ```text
 Summarize the docs changes and call out anything unrelated.
 ```
 
-如果有无关文件变脏，先弄清原因再 stage。Devo 应配合现有工作树，并避免 revert 无关改动。
+如果有无关文件变脏，先弄清原因再 stage。InfiniteCode 应配合现有工作树，并避免 revert 无关改动。
 
 ## 继续或停止
 
@@ -116,6 +116,6 @@ Summarize the docs changes and call out anything unrelated.
 
 - 如果配置表现正确，可以继续做另一个小范围修改。
 - 扩大范围前，先修复 provider、model、working directory 或 permission 问题。
-- 已知文件使用 [@ 模糊文件搜索](/zh/docs/using-devo/fuzzy-file-search)。
-- 精确命令使用 [! Shell 模式](/zh/docs/using-devo/shell-mode)。
+- 已知文件使用 [@ 模糊文件搜索](/zh/docs/using-infinitecode/fuzzy-file-search)。
+- 精确命令使用 [! Shell 模式](/zh/docs/using-infinitecode/shell-mode)。
 - 修改运行时代码前先读 [架构概览](/zh/docs/contributors/architecture-overview)。

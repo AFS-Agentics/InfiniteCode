@@ -309,9 +309,9 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	// --- Onboarding ---
 
 	onboarding: {
-		/** Check if the bundled Devo runtime is installed and compatible. */
-		checkInfiniteCode: () => ipcRenderer.invoke("onboarding:check-devo"),
-		/** Quick detect all supported providers (Claude Code, Cursor, Devo). */
+		/** Check if the bundled InfiniteCode runtime is installed and compatible. */
+		checkInfiniteCode: () => ipcRenderer.invoke("onboarding:check-infinitecode"),
+		/** Quick detect all supported providers (Claude Code, Cursor, InfiniteCode). */
 		detectProviders: () => ipcRenderer.invoke("onboarding:detect-providers"),
 		/** Full scan of a specific provider's configuration. */
 		scanProvider: (provider: string) => ipcRenderer.invoke("onboarding:scan-provider", provider),

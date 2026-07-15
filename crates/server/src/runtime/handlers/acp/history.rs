@@ -1,6 +1,6 @@
 use super::*;
 
-const DEVO_TURN_DURATION_MS_META: &str = "devo/turnDurationMs";
+const INFINITECODE_TURN_DURATION_MS_META: &str = "infinitecode/turnDurationMs";
 
 pub(super) fn acp_update_from_history_item(
     index: usize,
@@ -49,7 +49,7 @@ pub(super) fn acp_update_from_history_item(
             let mut meta = meta;
             if let Some(duration_secs) = item.duration_ms {
                 meta.insert(
-                    DEVO_TURN_DURATION_MS_META.to_string(),
+                    INFINITECODE_TURN_DURATION_MS_META.to_string(),
                     serde_json::json!(duration_secs.saturating_mul(1_000)),
                 );
             }
@@ -112,12 +112,12 @@ pub(super) fn acp_update_from_history_item(
 fn history_meta(index: usize, parent_message_id: Option<&str>) -> AcpMeta {
     let mut meta = AcpMeta::new();
     meta.insert(
-        DEVO_HISTORY_INDEX_META.to_string(),
+        INFINITECODE_HISTORY_INDEX_META.to_string(),
         serde_json::json!(index),
     );
     if let Some(parent_message_id) = parent_message_id {
         meta.insert(
-            DEVO_PARENT_MESSAGE_ID_META.to_string(),
+            INFINITECODE_PARENT_MESSAGE_ID_META.to_string(),
             serde_json::Value::String(parent_message_id.to_string()),
         );
     }
@@ -189,7 +189,7 @@ mod tests {
         };
         let mut expected = history_meta(5, Some("history-0"));
         expected.insert(
-            DEVO_TURN_DURATION_MS_META.to_string(),
+            INFINITECODE_TURN_DURATION_MS_META.to_string(),
             serde_json::json!(42_000_u64),
         );
         assert_eq!(message_id, Some("history-5".to_string()));

@@ -142,8 +142,8 @@ fn build_registry_from_builder(
             #[cfg(feature = "code-search")]
             ToolHandlerKind::CodeSearch => {
                 let service = Arc::new(
-                    devo_code_search::CodeSearchService::production_with_network_proxy(
-                        devo_network_proxy::NetworkProxyConfig {
+                    infinitecode_code_search::CodeSearchService::production_with_network_proxy(
+                        infinitecode_network_proxy::NetworkProxyConfig {
                             proxy_url: config.network_proxy.clone(),
                             no_proxy: config.network_no_proxy.clone(),
                         },

@@ -2,17 +2,17 @@
 description = "Shell command parsing and safety helpers"
 edition.workspace = true
 license.workspace = true
-name = "devo-util-shell-command"
+name = "infinitecode-util-shell-command"
 version.workspace = true
 
 [lib]
-name = "devo_util_shell_command"
+name = "infinitecode_util_shell_command"
 path = "src/lib.rs"
 
 [dependencies]
 base64 = { workspace = true }
-devo-protocol = { workspace = true }
-devo-util-paths = { workspace = true }
+infinitecode-protocol = { workspace = true }
+infinitecode-util-paths = { workspace = true }
 once_cell = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

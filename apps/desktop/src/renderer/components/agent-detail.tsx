@@ -3,10 +3,10 @@ import {
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
-} from "@devo/ui/components/dropdown-menu"
-import { Input } from "@devo/ui/components/input"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/dropdown-menu"
+import { Input } from "@infinitecode/ui/components/input"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { useAtom, useAtomValue } from "jotai"
 import {
@@ -32,7 +32,7 @@ import type {
 	ProvidersData,
 	SdkAgent,
 	VcsData,
-} from "../hooks/use-devo-data"
+} from "../hooks/use-infinitecode-data"
 import type { ChatTurn } from "../hooks/use-session-chat"
 import { formatShortcut } from "../lib/shortcut-display"
 import type { Agent, FileAttachment, QuestionAnswer } from "../lib/types"
@@ -108,8 +108,8 @@ interface AgentDetailProps {
 	config?: ConfigData | null
 	/** VCS data for status bar */
 	vcs?: VcsData | null
-	/** Available Devo agents for agent selector */
-	devoAgents?: SdkAgent[]
+	/** Available InfiniteCode agents for agent selector */
+	infinitecodeAgents?: SdkAgent[]
 	/** Whether undo is available */
 	canUndo?: boolean
 	/** Whether redo is available */
@@ -144,7 +144,7 @@ export function AgentDetail({
 	providers,
 	config,
 	vcs,
-	devoAgents,
+	infinitecodeAgents,
 	chatLoadingEarlier,
 	chatHasEarlier,
 	onLoadEarlier,
@@ -279,7 +279,7 @@ export function AgentDetail({
 					providers={providers}
 					config={config}
 					vcs={vcs}
-					devoAgents={devoAgents}
+					infinitecodeAgents={infinitecodeAgents}
 					onApprove={onApprove}
 					onDeny={onDeny}
 					onReplyQuestion={onReplyQuestion}

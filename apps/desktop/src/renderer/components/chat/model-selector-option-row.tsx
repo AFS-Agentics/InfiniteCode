@@ -1,4 +1,4 @@
-import { SearchableListPopoverItem } from "@devo/ui/components/searchable-list-popover"
+import { SearchableListPopoverItem } from "@infinitecode/ui/components/searchable-list-popover"
 import { CheckIcon } from "lucide-react"
 import { MODEL_SELECTOR_ROW_INTERACTION_CLASS } from "./model-selector-row-styles"
 

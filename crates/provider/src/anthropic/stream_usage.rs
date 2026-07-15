@@ -1,4 +1,4 @@
-use devo_protocol::Usage;
+use infinitecode_protocol::Usage;
 use serde_json::Value;
 
 #[derive(Debug, Default)]

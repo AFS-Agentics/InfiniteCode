@@ -108,7 +108,7 @@ pub fn global_instruction_dir() -> Option<PathBuf> {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .ok()?;
-    Some(PathBuf::from(home).join(".devo"))
+    Some(PathBuf::from(home).join(".infinitecode"))
 }
 
 /// Discover instruction files in a single directory.

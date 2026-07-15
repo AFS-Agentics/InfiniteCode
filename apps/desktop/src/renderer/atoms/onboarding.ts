@@ -18,7 +18,7 @@ export interface OnboardingState {
 	migrationPerformed: boolean
 	/** Which provider(s) were migrated from (e.g. ["claude-code", "cursor"]). */
 	migratedFrom: string[]
-	devoVersion: string | null
+	infinitecodeVersion: string | null
 	/** Number of AI providers connected during onboarding. */
 	providersConnected: number
 }
@@ -27,12 +27,12 @@ export interface OnboardingState {
 // Atoms
 // ============================================================
 
-export const onboardingStateAtom = atomWithStorage<OnboardingState>("devo:onboarding", {
+export const onboardingStateAtom = atomWithStorage<OnboardingState>("infinitecode:onboarding", {
 	completed: false,
 	completedAt: null,
 	skippedSteps: [],
 	migrationPerformed: false,
 	migratedFrom: [],
-	devoVersion: null,
+	infinitecodeVersion: null,
 	providersConnected: 0,
 })

@@ -1,4 +1,4 @@
-pub use devo_protocol::{
+pub use infinitecode_protocol::{
     ActiveTurnSteeringState, CollaborationMode, InputItem, ShellCommandParams, ShellCommandResult,
     SteerInputRecord, TurnExecutionMode, TurnInputDisposition, TurnInterruptParams,
     TurnInterruptResult, TurnKind, TurnMetadata, TurnQueueRemoveParams, TurnQueueRemoveResult,

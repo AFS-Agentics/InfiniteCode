@@ -4,10 +4,10 @@ import {
 	DialogDescription,
 	DialogHeader,
 	DialogTitle,
-} from "@devo/ui/components/dialog"
-import { InputGroup, InputGroupAddon } from "@devo/ui/components/input-group"
+} from "@infinitecode/ui/components/dialog"
+import { InputGroup, InputGroupAddon } from "@infinitecode/ui/components/input-group"
 
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { Command as CommandPrimitive } from "cmdk"
 import { CheckIcon, SearchIcon } from "lucide-react"
 import type * as React from "react"

@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use devo_core::tools::{
+use infinitecode_core::tools::{
     AgentToolCoordinator, ClientFilesystem, ClientTerminal, ToolAgentScope, ToolCall,
     ToolExecutionOptions, ToolRuntime, ToolRuntimeContext,
 };
-use devo_core::{Message, QueryEvent, QueryOptions, TurnConfig, query_with_options};
+use infinitecode_core::{Message, QueryEvent, QueryOptions, TurnConfig, query_with_options};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -15,13 +15,13 @@ use super::types::TurnQueryOutcome;
 
 pub(crate) struct TurnModelQueryParams<'a> {
     pub state: &'a mut SessionActorState,
-    pub turn_id: devo_core::TurnId,
+    pub turn_id: infinitecode_core::TurnId,
     pub turn_config: &'a TurnConfig,
     pub input: &'a str,
     pub input_messages: &'a [String],
-    pub collaboration_mode: devo_protocol::CollaborationMode,
+    pub collaboration_mode: infinitecode_protocol::CollaborationMode,
     pub input_mode: super::super::TurnInputMode,
-    pub usage_parent_session_id: Option<devo_core::SessionId>,
+    pub usage_parent_session_id: Option<infinitecode_core::SessionId>,
     pub event_tx: mpsc::Sender<QueryEvent>,
 }
 
@@ -77,7 +77,7 @@ impl ServerRuntime {
             }
         }
         let event_callback_tx = event_tx.clone();
-        let callback: devo_core::EventCallback = std::sync::Arc::new(move |event: QueryEvent| {
+        let callback: infinitecode_core::EventCallback = std::sync::Arc::new(move |event: QueryEvent| {
             let event_callback_tx = event_callback_tx.clone();
             Box::pin(async move {
                 enqueue_query_event(&event_callback_tx, event).await;
@@ -85,12 +85,12 @@ impl ServerRuntime {
         });
         let tool_execution_start_tx = event_tx.clone();
         let registry = match agent_tool_policy {
-            devo_protocol::AgentToolPolicy::Inherit if usage_parent_session_id.is_some() => {
+            infinitecode_protocol::AgentToolPolicy::Inherit if usage_parent_session_id.is_some() => {
                 Arc::new(without_agent_coordination_tools(&session_tool_registry))
             }
-            devo_protocol::AgentToolPolicy::Inherit => session_tool_registry,
-            devo_protocol::AgentToolPolicy::DenyAll => {
-                Arc::new(devo_core::tools::ToolRegistry::new())
+            infinitecode_protocol::AgentToolPolicy::Inherit => session_tool_registry,
+            infinitecode_protocol::AgentToolPolicy::DenyAll => {
+                Arc::new(infinitecode_core::tools::ToolRegistry::new())
             }
         };
         let permission_mode = state.core.config.permission_mode;
@@ -123,9 +123,9 @@ impl ServerRuntime {
                 client_terminal: Some(Arc::clone(self) as Arc<dyn ClientTerminal>),
                 file_read_ledger: Arc::clone(&state.file_read_ledger),
                 local_web_search: match &turn_config.web_search {
-                    devo_core::ResolvedWebSearchConfig::Local(config) => Some(config.clone()),
-                    devo_core::ResolvedWebSearchConfig::Disabled
-                    | devo_core::ResolvedWebSearchConfig::Provider => None,
+                    infinitecode_core::ResolvedWebSearchConfig::Local(config) => Some(config.clone()),
+                    infinitecode_core::ResolvedWebSearchConfig::Disabled
+                    | infinitecode_core::ResolvedWebSearchConfig::Provider => None,
                 },
                 hooks: hook_context,
                 network_proxy: provider_http.proxy_url,
@@ -181,8 +181,8 @@ impl ServerRuntime {
                     )
                     .await
                     {
-                        Ok(Ok(())) | Ok(Err(devo_core::AgentError::Aborted)) | Err(_) => {
-                            Err(devo_core::AgentError::Aborted)
+                        Ok(Ok(())) | Ok(Err(infinitecode_core::AgentError::Aborted)) | Err(_) => {
+                            Err(infinitecode_core::AgentError::Aborted)
                         }
                         Ok(Err(error)) => Err(error),
                     }

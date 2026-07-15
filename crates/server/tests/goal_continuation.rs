@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
-use devo_protocol::Usage;
+use infinitecode_protocol::Usage;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::Notify;
@@ -57,7 +57,7 @@ async fn goal_token_budget_reached_after_turn_enters_budget_limited() -> Result<
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 9,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "use budget",
@@ -78,7 +78,7 @@ async fn goal_token_budget_reached_after_turn_enters_budget_limited() -> Result<
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 10,
-                "method": "_devo/goal/status",
+                "method": "_infinitecode/goal/status",
                 "params": {
                     "sessionId": session_id
                 }
@@ -86,11 +86,11 @@ async fn goal_token_budget_reached_after_turn_enters_budget_limited() -> Result<
         )
         .await
         .context("goal/status response")?;
-    let response: devo_server::SuccessResponse<devo_protocol::GoalStatusResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalStatusResult> =
         serde_json::from_value(status_response)?;
 
     let goal = response.result.goal.expect("goal");
-    assert_eq!(goal.status, devo_protocol::ThreadGoalStatus::BudgetLimited);
+    assert_eq!(goal.status, infinitecode_protocol::ThreadGoalStatus::BudgetLimited);
     assert_eq!(goal.tokens_used, 160);
     assert_eq!(provider.requests.load(Ordering::SeqCst), 2);
     let requests = provider.captured_requests.lock().expect("lock requests");
@@ -128,7 +128,7 @@ async fn budget_limited_goal_pause_interrupts_pending_wrapup_turn() -> Result<()
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 110,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "pause during budget wrap-up",
@@ -157,7 +157,7 @@ async fn budget_limited_goal_pause_interrupts_pending_wrapup_turn() -> Result<()
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 111,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "status": "paused"
@@ -215,7 +215,7 @@ async fn persisted_paused_goal_replays_without_continuation() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 11,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "persist paused goal",
@@ -239,7 +239,7 @@ async fn persisted_paused_goal_replays_without_continuation() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 12,
-                "method": "_devo/goal/status",
+                "method": "_infinitecode/goal/status",
                 "params": {
                     "sessionId": session_id
                 }
@@ -247,12 +247,12 @@ async fn persisted_paused_goal_replays_without_continuation() -> Result<()> {
         )
         .await
         .context("goal/status response")?;
-    let response: devo_server::SuccessResponse<devo_protocol::GoalStatusResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalStatusResult> =
         serde_json::from_value(status_response)?;
 
     assert_eq!(
         response.result.goal.as_ref().map(|goal| goal.status),
-        Some(devo_protocol::ThreadGoalStatus::Paused)
+        Some(infinitecode_protocol::ThreadGoalStatus::Paused)
     );
     tokio::time::sleep(Duration::from_millis(/*millis*/ 50)).await;
     assert_eq!(replay_provider.requests.load(Ordering::SeqCst), 0);
@@ -274,7 +274,7 @@ async fn persisted_active_goal_pauses_on_restart_without_continuation() -> Resul
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 13,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "plan before setting goal" }],
@@ -296,7 +296,7 @@ async fn persisted_active_goal_pauses_on_restart_without_continuation() -> Resul
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 14,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "persist active goal without restart loop",
@@ -320,7 +320,7 @@ async fn persisted_active_goal_pauses_on_restart_without_continuation() -> Resul
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 15,
-                "method": "_devo/goal/status",
+                "method": "_infinitecode/goal/status",
                 "params": {
                     "sessionId": session_id
                 }
@@ -328,12 +328,12 @@ async fn persisted_active_goal_pauses_on_restart_without_continuation() -> Resul
         )
         .await
         .context("goal/status response")?;
-    let response: devo_server::SuccessResponse<devo_protocol::GoalStatusResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalStatusResult> =
         serde_json::from_value(status_response)?;
 
     assert_eq!(
         response.result.goal.as_ref().map(|goal| goal.status),
-        Some(devo_protocol::ThreadGoalStatus::Paused)
+        Some(infinitecode_protocol::ThreadGoalStatus::Paused)
     );
     tokio::time::sleep(Duration::from_millis(/*millis*/ 50)).await;
     assert_eq!(replay_provider.requests.load(Ordering::SeqCst), 0);
@@ -355,7 +355,7 @@ async fn goal_pause_interrupts_active_hidden_continuation_turn() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 16,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "pause an active continuation",
@@ -380,7 +380,7 @@ async fn goal_pause_interrupts_active_hidden_continuation_turn() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 17,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "status": "paused"
@@ -424,7 +424,7 @@ async fn provider_400_tool_call_adjacency_failure_pauses_goal_without_looping() 
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 13,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "do not loop after bad request",
@@ -443,7 +443,7 @@ async fn provider_400_tool_call_adjacency_failure_pauses_goal_without_looping() 
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 14,
-                "method": "_devo/goal/status",
+                "method": "_infinitecode/goal/status",
                 "params": {
                     "sessionId": session_id
                 }
@@ -451,12 +451,12 @@ async fn provider_400_tool_call_adjacency_failure_pauses_goal_without_looping() 
         )
         .await
         .context("goal/status response")?;
-    let response: devo_server::SuccessResponse<devo_protocol::GoalStatusResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalStatusResult> =
         serde_json::from_value(status_response)?;
 
     assert_eq!(
         response.result.goal.as_ref().map(|goal| goal.status),
-        Some(devo_protocol::ThreadGoalStatus::Paused)
+        Some(infinitecode_protocol::ThreadGoalStatus::Paused)
     );
     assert_eq!(provider.requests.load(Ordering::SeqCst), 1);
     Ok(())
@@ -477,7 +477,7 @@ async fn goal_set_starts_hidden_continuation_turn() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 19,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "previous visible prompt" }],
@@ -498,7 +498,7 @@ async fn goal_set_starts_hidden_continuation_turn() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 20,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "write a benchmark note",
@@ -508,7 +508,7 @@ async fn goal_set_starts_hidden_continuation_turn() -> Result<()> {
         )
         .await
         .context("goal/set response")?;
-    let response: devo_server::SuccessResponse<devo_protocol::GoalSetResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalSetResult> =
         serde_json::from_value(goal_response)?;
     assert_eq!(response.result.goal.objective, "write a benchmark note");
     tokio::time::timeout(Duration::from_secs(/*secs*/ 5), async {
@@ -528,7 +528,7 @@ async fn goal_set_starts_hidden_continuation_turn() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 21,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "status": "paused"
@@ -579,7 +579,7 @@ async fn goal_set_does_not_start_continuation_while_turn_is_active() -> Result<(
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 30,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "keep this turn active" }],
@@ -601,7 +601,7 @@ async fn goal_set_does_not_start_continuation_while_turn_is_active() -> Result<(
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 31,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "continue after this turn",
@@ -620,7 +620,7 @@ async fn goal_set_does_not_start_continuation_while_turn_is_active() -> Result<(
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 32,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "status": "paused"
@@ -638,7 +638,7 @@ async fn goal_set_does_not_start_continuation_while_turn_is_active() -> Result<(
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 33,
-                "method": "_devo/turn/interrupt",
+                "method": "_infinitecode/turn/interrupt",
                 "params": {
                     "session_id": session_id,
                     "turn_id": turn_id,
@@ -666,7 +666,7 @@ async fn goal_create_starts_hidden_continuation_turn() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 34,
-                "method": "_devo/goal/create",
+                "method": "_infinitecode/goal/create",
                 "params": {
                     "sessionId": session_id,
                     "objective": "created goal should run",
@@ -679,7 +679,7 @@ async fn goal_create_starts_hidden_continuation_turn() -> Result<()> {
     let turn_started = wait_for_notification(&mut notifications_rx, "turn/started").await?;
     wait_for_request_count(&provider.requests, /*expected*/ 1).await?;
 
-    let turn_id: devo_protocol::TurnId =
+    let turn_id: infinitecode_protocol::TurnId =
         serde_json::from_value(turn_started["params"]["turn"]["turn_id"].clone())?;
     pause_goal_and_interrupt_turn(&runtime, connection_id, session_id, turn_id).await?;
     Ok(())
@@ -699,7 +699,7 @@ async fn goal_resume_starts_hidden_continuation_turn() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 35,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "paused goal should resume",
@@ -717,7 +717,7 @@ async fn goal_resume_starts_hidden_continuation_turn() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 36,
-                "method": "_devo/goal/resume",
+                "method": "_infinitecode/goal/resume",
                 "params": {
                     "sessionId": session_id,
                     "status": "active"
@@ -729,7 +729,7 @@ async fn goal_resume_starts_hidden_continuation_turn() -> Result<()> {
     let turn_started = wait_for_notification(&mut notifications_rx, "turn/started").await?;
     wait_for_request_count(&provider.requests, /*expected*/ 1).await?;
 
-    let turn_id: devo_protocol::TurnId =
+    let turn_id: infinitecode_protocol::TurnId =
         serde_json::from_value(turn_started["params"]["turn"]["turn_id"].clone())?;
     pause_goal_and_interrupt_turn(&runtime, connection_id, session_id, turn_id).await?;
     Ok(())
@@ -753,7 +753,7 @@ async fn queued_user_turn_runs_before_goal_continuation() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 40,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "hold the first turn" }],
@@ -766,7 +766,7 @@ async fn queued_user_turn_runs_before_goal_continuation() -> Result<()> {
         )
         .await
         .context("active turn/start response")?;
-    let active_result: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let active_result: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(active_response)?;
     let active_turn_id = active_result
         .result
@@ -781,7 +781,7 @@ async fn queued_user_turn_runs_before_goal_continuation() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 41,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": {
                     "session_id": session_id,
                     "input": [{ "type": "text", "text": "queued user input wins" }],
@@ -794,9 +794,9 @@ async fn queued_user_turn_runs_before_goal_continuation() -> Result<()> {
         )
         .await
         .context("queued turn/start response")?;
-    let queued_result: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let queued_result: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(queued_response)?;
-    let devo_server::TurnStartResult::Queued {
+    let infinitecode_server::TurnStartResult::Queued {
         active_turn_id: queued_active_turn_id,
         queued_input_id,
         status,
@@ -807,7 +807,7 @@ async fn queued_user_turn_runs_before_goal_continuation() -> Result<()> {
     };
     assert_eq!(queued_active_turn_id, active_turn_id);
     assert_ne!(queued_input_id.to_string(), active_turn_id.to_string());
-    assert_eq!(status, devo_core::TurnStatus::Pending);
+    assert_eq!(status, infinitecode_core::TurnStatus::Pending);
 
     let _ = runtime
         .handle_incoming(
@@ -815,7 +815,7 @@ async fn queued_user_turn_runs_before_goal_continuation() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 42,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "do not skip queued input",
@@ -845,7 +845,7 @@ async fn queued_user_turn_runs_before_goal_continuation() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 43,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "status": "paused"
@@ -860,7 +860,7 @@ async fn queued_user_turn_runs_before_goal_continuation() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 44,
-                "method": "_devo/turn/interrupt",
+                "method": "_infinitecode/turn/interrupt",
                 "params": {
                     "session_id": session_id,
                     "turn_id": queued_turn_started["params"]["turn"]["turn_id"],

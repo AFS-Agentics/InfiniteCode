@@ -1,7 +1,7 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { MultiFileDiff, PatchDiff } from "@pierre/diffs/react"
 import { CheckIcon, CopyIcon, MinusIcon, PlusIcon } from "lucide-react"
 import {

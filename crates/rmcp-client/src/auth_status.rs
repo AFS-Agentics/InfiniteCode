@@ -10,8 +10,8 @@ use std::time::Duration;
 
 use anyhow::Error;
 use anyhow::Result;
-use devo_config::OAuthCredentialsStoreMode;
-use devo_protocol::protocol::McpAuthStatus;
+use infinitecode_config::OAuthCredentialsStoreMode;
+use infinitecode_protocol::protocol::McpAuthStatus;
 use reqwest::Client;
 use reqwest::StatusCode;
 use reqwest::Url;

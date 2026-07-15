@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Command,
 	CommandDialog,
@@ -11,11 +11,11 @@ import {
 	CommandList,
 	CommandSeparator,
 	CommandShortcut,
-} from "@devo/ui/components/command"
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@devo/ui/components/dialog"
-import { Spinner } from "@devo/ui/components/spinner"
-import { useControllableState } from "@devo/ui/hooks/use-controllable-state"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/command"
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@infinitecode/ui/components/dialog"
+import { Spinner } from "@infinitecode/ui/components/spinner"
+import { useControllableState } from "@infinitecode/ui/hooks/use-controllable-state"
+import { cn } from "@infinitecode/ui/lib/utils"
 import {
 	CircleSmallIcon,
 	MarsIcon,

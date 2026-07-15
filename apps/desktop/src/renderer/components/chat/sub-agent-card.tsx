@@ -1,5 +1,5 @@
-import { MessageResponse } from "@devo/ui/components/ai-elements/message"
-import { cn } from "@devo/ui/lib/utils"
+import { MessageResponse } from "@infinitecode/ui/components/ai-elements/message"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { useAtomValue } from "jotai"
 import {

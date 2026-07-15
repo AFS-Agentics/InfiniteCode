@@ -2,7 +2,7 @@ use std::hint::black_box;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use devo_skills::{
+use infinitecode_skills::{
     SkillLoadOutcome, SkillMetadata, SkillScope, SkillSelection, collect_explicit_skill_mentions,
 };
 use pretty_assertions::assert_eq;

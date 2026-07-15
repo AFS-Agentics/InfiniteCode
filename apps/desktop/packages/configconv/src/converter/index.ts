@@ -9,7 +9,7 @@ import type {
 	ConvertOptions,
 	MigrationCategory,
 } from "../types/conversion-result"
-import type { DevoConfig } from "../types/devo"
+import type { InfiniteCodeConfig } from "../types/infinitecode"
 import type { MigrationReport } from "../types/report"
 import { createEmptyReport, mergeReports } from "../types/report"
 import type { ScanResult } from "../types/scan-result"
@@ -36,7 +36,7 @@ const ALL_CATEGORIES: MigrationCategory[] = [
 ]
 
 /**
- * Convert Claude Code scan results to Devo format.
+ * Convert Claude Code scan results to InfiniteCode format.
  *
  * @param scanResult - Output from `scan()`
  * @param options - Conversion options (category filter, model overrides, etc.)
@@ -102,7 +102,7 @@ export async function convert(
 			projectPath: "~",
 		})
 		if (agentsMd) {
-			result.rules.set("~/.config/devo/AGENTS.md", agentsMd)
+			result.rules.set("~/.config/infinitecode/AGENTS.md", agentsMd)
 		}
 		reports.push(report)
 	}
@@ -111,14 +111,14 @@ export async function convert(
 	if (categories.has("hooks") && scanResult.global.settings?.hooks) {
 		const { plugins, report } = convertHooks(scanResult.global.settings.hooks)
 		for (const [path, content] of plugins) {
-			result.hookPlugins.set(`~/.config/devo/plugins/${path}`, content)
+			result.hookPlugins.set(`~/.config/infinitecode/plugins/${path}`, content)
 		}
 		reports.push(report)
 	}
 
 	// ─── Per-project conversion ──────────────────────────────────────
 	for (const project of scanResult.projects) {
-		const projectConfig: Partial<DevoConfig> = {}
+		const projectConfig: Partial<InfiniteCodeConfig> = {}
 
 		// Project MCP servers (merged from .mcp.json + ~/.claude.json per-project)
 		if (categories.has("mcp")) {
@@ -196,7 +196,7 @@ export async function convert(
 				modelOverrides: options.modelOverrides,
 			})
 			for (const [filename, content] of agents) {
-				result.agents.set(`${project.path}/.devo/agents/${filename}`, content)
+				result.agents.set(`${project.path}/.infinitecode/agents/${filename}`, content)
 			}
 			reports.push(report)
 		}
@@ -205,7 +205,7 @@ export async function convert(
 		if (categories.has("commands") && project.commands.length > 0) {
 			const { commands, report } = convertCommands(project.commands)
 			for (const [filename, content] of commands) {
-				result.commands.set(`${project.path}/.devo/commands/${filename}`, content)
+				result.commands.set(`${project.path}/.infinitecode/commands/${filename}`, content)
 			}
 			reports.push(report)
 		}

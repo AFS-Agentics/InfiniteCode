@@ -21,7 +21,7 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 				{
 					status: "busy",
 					title: "修复 desktop ACP 渲染和回复问题",
-					directory: "/Users/tsiao/Desktop/devo_feat_desktop",
+					directory: "/Users/tsiao/Desktop/infinitecode_feat_desktop",
 				},
 			],
 		])
@@ -29,7 +29,7 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			{
 				id: "s1",
 				title: "修复 desktop ACP 渲染和回复问题",
-				directory: "/Users/tsiao/Desktop/devo_feat_desktop",
+				directory: "/Users/tsiao/Desktop/infinitecode_feat_desktop",
 				time: { created: 1000, updated: 5000 },
 				totalInputTokens: 18_000,
 				totalOutputTokens: 6_500,
@@ -39,7 +39,7 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			{
 				id: "s2",
 				title: "添加 macOS tray 图标",
-				directory: "/Users/tsiao/Desktop/devo_feat_desktop",
+				directory: "/Users/tsiao/Desktop/infinitecode_feat_desktop",
 				time: { created: 1000, updated: 4000 },
 				totalInputTokens: 1_000,
 				totalOutputTokens: 500,
@@ -47,8 +47,8 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			},
 			{
 				id: "s3",
-				title: "调研 devo 被杀原因",
-				directory: "/Users/tsiao/Desktop/devo_simplify_0623",
+				title: "调研 infinitecode 被杀原因",
+				directory: "/Users/tsiao/Desktop/infinitecode_simplify_0623",
 				time: { created: 1000, updated: 3000 },
 				totalInputTokens: 2_000,
 				totalOutputTokens: 800,
@@ -57,7 +57,7 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			{
 				id: "s4",
 				title: "梳理深度研究流程",
-				directory: "/Users/tsiao/Desktop/devo_simplify_0623",
+				directory: "/Users/tsiao/Desktop/infinitecode_simplify_0623",
 				time: { created: 1000, updated: 2000 },
 				totalInputTokens: 3_000,
 				totalOutputTokens: 900,
@@ -66,7 +66,7 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			{
 				id: "s5",
 				title: "Create feat/desktop worktree",
-				directory: "/Users/tsiao/Desktop/devo_simplify_0623",
+				directory: "/Users/tsiao/Desktop/infinitecode_simplify_0623",
 				time: { created: 1000, updated: 1000 },
 				totalInputTokens: 4_000,
 				totalOutputTokens: 1_100,
@@ -91,7 +91,7 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			{ label: "Running", sublabel: undefined, enabled: false, type: undefined, click: false, submenu: undefined },
 			{
 				label: "修复 desktop ACP 渲染和回复问题",
-				sublabel: "devo_feat_desktop",
+				sublabel: "infinitecode_feat_desktop",
 				enabled: undefined,
 				type: undefined,
 				click: true,
@@ -101,15 +101,15 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			{ label: "Recent", sublabel: undefined, enabled: false, type: undefined, click: false, submenu: undefined },
 			{
 				label: "添加 macOS tray 图标",
-				sublabel: "devo_feat_desktop",
+				sublabel: "infinitecode_feat_desktop",
 				enabled: undefined,
 				type: undefined,
 				click: true,
 				submenu: undefined,
 			},
 			{
-				label: "调研 devo 被杀原因",
-				sublabel: "devo_simplify_0623",
+				label: "调研 infinitecode 被杀原因",
+				sublabel: "infinitecode_simplify_0623",
 				enabled: undefined,
 				type: undefined,
 				click: true,
@@ -117,7 +117,7 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 			},
 			{
 				label: "梳理深度研究流程",
-				sublabel: "devo_simplify_0623",
+				sublabel: "infinitecode_simplify_0623",
 				enabled: undefined,
 				type: undefined,
 				click: true,
@@ -132,7 +132,7 @@ describe("buildCodexStyleTrayMenuTemplate", () => {
 				submenu: [
 					{
 						label: "Create feat/desktop worktree",
-						sublabel: "devo_simplify_0623",
+						sublabel: "infinitecode_simplify_0623",
 						enabled: undefined,
 						type: undefined,
 						click: true,

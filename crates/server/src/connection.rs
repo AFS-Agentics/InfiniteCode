@@ -1,1 +1,1 @@
-pub use devo_protocol::{ClientTransportKind, ConnectionState, InitializeResult};
+pub use infinitecode_protocol::{ClientTransportKind, ConnectionState, InitializeResult};

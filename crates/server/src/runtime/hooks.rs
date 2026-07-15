@@ -7,7 +7,7 @@ use crate::runtime::session_actor::SessionActorState;
 use crate::runtime::session_actor::snapshots::HookContextSnapshot;
 
 impl ServerRuntime {
-    pub(crate) fn hook_runner(&self) -> Option<devo_core::HookRunner> {
+    pub(crate) fn hook_runner(&self) -> Option<infinitecode_core::HookRunner> {
         let config = {
             let config_store = self
                 .deps
@@ -16,13 +16,13 @@ impl ServerRuntime {
                 .expect("app config store mutex should not be poisoned");
             config_store.effective_config().hooks.clone()
         };
-        (!config.is_empty()).then(|| devo_core::HookRunner::new(config))
+        (!config.is_empty()).then(|| infinitecode_core::HookRunner::new(config))
     }
 
     pub(crate) fn hook_context_from_actor_state(
         state: &SessionActorState,
         session_id: SessionId,
-    ) -> Option<devo_core::HookRuntimeContext> {
+    ) -> Option<infinitecode_core::HookRuntimeContext> {
         let runner = state.runtime_context.hook_runner()?;
         let transcript_path = state
             .record
@@ -40,9 +40,9 @@ impl ServerRuntime {
             .agent_role
             .clone()
             .or_else(|| state.summary.agent_nickname.clone());
-        Some(devo_core::HookRuntimeContext {
+        Some(infinitecode_core::HookRuntimeContext {
             runner,
-            base: devo_core::HookBaseInput {
+            base: infinitecode_core::HookBaseInput {
                 session_id: session_id.to_string(),
                 transcript_path,
                 cwd: state.summary.cwd.clone(),
@@ -56,7 +56,7 @@ impl ServerRuntime {
     pub(crate) async fn hook_context_for_session(
         &self,
         session_id: SessionId,
-    ) -> Option<devo_core::HookRuntimeContext> {
+    ) -> Option<infinitecode_core::HookRuntimeContext> {
         if let Some(stream) = self.active_stream_state(session_id).await {
             let stream = stream.lock().await;
             if let Some(inline) = stream.turn_inline.as_ref() {
@@ -71,7 +71,7 @@ impl ServerRuntime {
     fn hook_runtime_context_from_snapshot(
         session_id: SessionId,
         snapshot: &HookContextSnapshot,
-    ) -> Option<devo_core::HookRuntimeContext> {
+    ) -> Option<infinitecode_core::HookRuntimeContext> {
         let runner = snapshot.runtime_context.hook_runner()?;
         let transcript_path = snapshot
             .record
@@ -89,9 +89,9 @@ impl ServerRuntime {
             .agent_role
             .clone()
             .or_else(|| snapshot.summary.agent_nickname.clone());
-        Some(devo_core::HookRuntimeContext {
+        Some(infinitecode_core::HookRuntimeContext {
             runner,
-            base: devo_core::HookBaseInput {
+            base: infinitecode_core::HookBaseInput {
                 session_id: session_id.to_string(),
                 transcript_path,
                 cwd: snapshot.summary.cwd.clone(),
@@ -105,13 +105,13 @@ impl ServerRuntime {
     pub(crate) async fn run_session_hook(
         &self,
         session_id: SessionId,
-        event: devo_core::HookEvent,
+        event: infinitecode_core::HookEvent,
         extra: Map<String, Value>,
-    ) -> devo_core::HookRunReport {
+    ) -> infinitecode_core::HookRunReport {
         let Some(context) = self.hook_context_for_session(session_id).await else {
-            return devo_core::HookRunReport::default();
+            return infinitecode_core::HookRunReport::default();
         };
-        let input = devo_core::HookInput::new(&context.base, event, extra);
+        let input = infinitecode_core::HookInput::new(&context.base, event, extra);
         context.runner.run(input).await
     }
 
@@ -119,26 +119,26 @@ impl ServerRuntime {
         &self,
         state: &SessionActorState,
         session_id: SessionId,
-        event: devo_core::HookEvent,
+        event: infinitecode_core::HookEvent,
         extra: Map<String, Value>,
-    ) -> devo_core::HookRunReport {
+    ) -> infinitecode_core::HookRunReport {
         let Some(context) = Self::hook_context_from_actor_state(state, session_id) else {
-            return devo_core::HookRunReport::default();
+            return infinitecode_core::HookRunReport::default();
         };
-        let input = devo_core::HookInput::new(&context.base, event, extra);
+        let input = infinitecode_core::HookInput::new(&context.base, event, extra);
         context.runner.run(input).await
     }
 
     pub(crate) async fn run_global_hook(
         &self,
-        event: devo_core::HookEvent,
+        event: infinitecode_core::HookEvent,
         extra: Map<String, Value>,
-    ) -> devo_core::HookRunReport {
+    ) -> infinitecode_core::HookRunReport {
         let Some(runner) = self.hook_runner() else {
-            return devo_core::HookRunReport::default();
+            return infinitecode_core::HookRunReport::default();
         };
         let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let base = devo_core::HookBaseInput {
+        let base = infinitecode_core::HookBaseInput {
             session_id: String::new(),
             transcript_path: String::new(),
             cwd,
@@ -147,7 +147,7 @@ impl ServerRuntime {
             agent_type: None,
         };
         runner
-            .run(devo_core::HookInput::new(&base, event, extra))
+            .run(infinitecode_core::HookInput::new(&base, event, extra))
             .await
     }
 
@@ -160,18 +160,18 @@ impl ServerRuntime {
         if let Some(file_path) = file_path {
             extra.insert("file_path".to_string(), Value::String(file_path));
         }
-        self.run_global_hook(devo_core::HookEvent::ConfigChange, extra)
+        self.run_global_hook(infinitecode_core::HookEvent::ConfigChange, extra)
             .await
             .first_blocking_reason()
             .map(str::to_string)
     }
 }
 
-pub(crate) fn permission_mode_label(mode: devo_safety::PermissionMode) -> String {
+pub(crate) fn permission_mode_label(mode: infinitecode_safety::PermissionMode) -> String {
     match mode {
-        devo_safety::PermissionMode::AutoApprove => "auto-approve",
-        devo_safety::PermissionMode::Interactive => "interactive",
-        devo_safety::PermissionMode::Deny => "deny",
+        infinitecode_safety::PermissionMode::AutoApprove => "auto-approve",
+        infinitecode_safety::PermissionMode::Interactive => "interactive",
+        infinitecode_safety::PermissionMode::Deny => "deny",
     }
     .to_string()
 }

@@ -14,7 +14,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use devo_network_proxy::NetworkProxyConfig;
+use infinitecode_network_proxy::NetworkProxyConfig;
 
 use crate::cache::{cache_file_path, default_cache_dir, load_payload, save_payload};
 use crate::dense::{EmbeddingProvider, Model2VecEmbeddingProvider};
@@ -32,7 +32,7 @@ const MANIFEST_SAFETY_INTERVAL: Duration = Duration::from_secs(30);
 const MAX_WARM_INDEXES: usize = 8;
 const WINDOWS_ERROR_INVALID_FUNCTION: i32 = 1;
 
-/// Thread-safe entrypoint used by the Devo tool runtime.
+/// Thread-safe entrypoint used by the InfiniteCode tool runtime.
 ///
 /// `CodeSearchService` keeps a bounded in-memory index cache keyed by
 /// root/content/model identity. The service is read-only with respect to the

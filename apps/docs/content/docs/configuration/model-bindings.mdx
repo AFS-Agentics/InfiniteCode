@@ -3,7 +3,7 @@ title: Model Bindings
 description: Bind a supported model to a configured provider.
 ---
 
-A model binding connects Devo's local model identity to the provider model name
+A model binding connects InfiniteCode's local model identity to the provider model name
 that should be sent over the wire.
 
 Bindings live under `[model_bindings.<id>]`.
@@ -23,7 +23,7 @@ default_reasoning_effort = "high"
 
 | Field | Required | Meaning |
 | --- | --- | --- |
-| `model_slug` | Yes | Devo's local model metadata id. |
+| `model_slug` | Yes | InfiniteCode's local model metadata id. |
 | `provider` | Yes | Provider id from `[providers.<id>]`. |
 | `request_model` | Yes | Model string sent to the provider. |
 | `display_name` | No | Label shown in the TUI model picker and header. |
@@ -35,16 +35,16 @@ default_reasoning_effort = "high"
 
 ## Slug Versus Request Model
 
-`model_slug` is the Devo-side identity. It maps to local model metadata such as
+`model_slug` is the InfiniteCode-side identity. It maps to local model metadata such as
 context window, reasoning support, and display defaults.
 
 `request_model` is the provider-side value sent in the API request.
 
-The legacy `model_name` key remains readable, but Devo writes `request_model`
+The legacy `model_name` key remains readable, but InfiniteCode writes `request_model`
 when the binding is saved again.
 
 They are often the same, but they do not have to be. Use different values when
-a gateway expects names like `openai/gpt-5.2` while Devo should still use a
+a gateway expects names like `openai/gpt-5.2` while InfiniteCode should still use a
 stable local slug.
 
 ## Binding Id

@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-/// Provider-hosted tools executed by the model provider rather than by Devo.
+/// Provider-hosted tools executed by the model provider rather than by InfiniteCode.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum HostedToolDefinition {

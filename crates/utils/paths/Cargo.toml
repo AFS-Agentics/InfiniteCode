@@ -1,12 +1,12 @@
 [package]
-description = "Path and Devo home helpers"
+description = "Path and InfiniteCode home helpers"
 edition.workspace = true
 license.workspace = true
-name = "devo-util-paths"
+name = "infinitecode-util-paths"
 version.workspace = true
 
 [lib]
-name = "devo_util_paths"
+name = "infinitecode_util_paths"
 path = "src/lib.rs"
 
 [dependencies]

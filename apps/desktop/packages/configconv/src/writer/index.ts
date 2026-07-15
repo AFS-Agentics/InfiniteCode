@@ -6,7 +6,7 @@
  */
 import { createBackup } from "../backup"
 import type { ConversionResult } from "../types/conversion-result"
-import type { DevoConfig } from "../types/devo"
+import type { InfiniteCodeConfig } from "../types/infinitecode"
 import { exists, safeReadFile, writeFileSafe } from "../utils/fs"
 import { stringifyJson } from "../utils/json"
 import * as paths from "../utils/paths"
@@ -19,7 +19,7 @@ export interface WriteOptions {
 	backup?: boolean
 	/** Overwrite existing files */
 	force?: boolean
-	/** How to handle existing devo.json configs */
+	/** How to handle existing infinitecode.json configs */
 	mergeStrategy?: MergeStrategy
 }
 
@@ -181,7 +181,7 @@ export async function write(
 
 async function writeConfigFile(
 	filePath: string,
-	config: Partial<DevoConfig>,
+	config: Partial<InfiniteCodeConfig>,
 	options: {
 		dryRun: boolean
 		force: boolean
@@ -197,9 +197,9 @@ async function writeConfigFile(
 			return
 		}
 
-		let existingConfig: Partial<DevoConfig> = {}
+		let existingConfig: Partial<InfiniteCodeConfig> = {}
 		try {
-			existingConfig = JSON.parse(existingContent) as Partial<DevoConfig>
+			existingConfig = JSON.parse(existingContent) as Partial<InfiniteCodeConfig>
 		} catch {
 			// Existing file is malformed -- treat as empty
 		}

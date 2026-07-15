@@ -95,7 +95,7 @@ export function StartupOverlay() {
 					alt="InfiniteCode"
 					className="mb-6 h-24 w-auto object-contain"
 				/>
-				<div className="devo-loading-dots mt-8" aria-hidden="true">
+				<div className="infinitecode-loading-dots mt-8" aria-hidden="true">
 					<span />
 					<span />
 					<span />

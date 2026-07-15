@@ -1,9 +1,9 @@
 use std::io;
 
-use devo_protocol::{ModelRequest, RequestContent, RequestMessage, ResponseContent, StreamEvent};
-use devo_provider::ModelProviderSDK;
-use devo_provider::error::ProviderError;
-use devo_provider::openai::OpenAIProvider;
+use infinitecode_protocol::{ModelRequest, RequestContent, RequestMessage, ResponseContent, StreamEvent};
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::error::ProviderError;
+use infinitecode_provider::openai::OpenAIProvider;
 use futures::StreamExt;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -298,7 +298,7 @@ async fn collect_chat_stream_events(chunks: Vec<String>) -> Vec<StreamEvent> {
     events
 }
 
-fn message_done_response(events: &[StreamEvent]) -> &devo_protocol::ModelResponse {
+fn message_done_response(events: &[StreamEvent]) -> &infinitecode_protocol::ModelResponse {
     let Some(response) = events.iter().find_map(|event| match event {
         StreamEvent::MessageDone { response } => Some(response),
         _ => None,
@@ -357,7 +357,7 @@ fn sse_data(value: serde_json::Value) -> String {
 
 fn minimal_request() -> ModelRequest {
     ModelRequest {
-        model_slug: devo_protocol::ModelProfileKey::Generic,
+        model_slug: infinitecode_protocol::ModelProfileKey::Generic,
         model: "test-model".to_string(),
         system: None,
         messages: vec![RequestMessage {

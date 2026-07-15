@@ -6,13 +6,13 @@ describe("draft keys", () => {
 		expect([
 			newChatDraftKey(null),
 			newChatDraftKey(""),
-			newChatDraftKey("/repo/devo"),
-			newChatDraftKey("/repo/devo-feat"),
+			newChatDraftKey("/repo/infinitecode"),
+			newChatDraftKey("/repo/infinitecode-feat"),
 		]).toEqual([
 			NEW_CHAT_DRAFT_KEY,
 			NEW_CHAT_DRAFT_KEY,
-			"__new_chat__:/repo/devo",
-			"__new_chat__:/repo/devo-feat",
+			"__new_chat__:/repo/infinitecode",
+			"__new_chat__:/repo/infinitecode-feat",
 		])
 	})
 })

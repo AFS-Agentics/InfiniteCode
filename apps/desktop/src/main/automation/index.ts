@@ -286,7 +286,7 @@ export async function runNow(id: string): Promise<boolean> {
 export { previewSchedule }
 
 // ============================================================
-// Execution -- runs agent sessions via Devo SDK
+// Execution -- runs agent sessions via InfiniteCode SDK
 // ============================================================
 
 interface ExecuteOptions {

@@ -1,9 +1,9 @@
 ---
 title: Hooks
-description: Run configured commands around Devo events.
+description: Run configured commands around InfiniteCode events.
 ---
 
-Hooks run configured commands around Devo lifecycle events.
+Hooks run configured commands around InfiniteCode lifecycle events.
 
 Use hooks for local policy, audit, notification, and integration tasks that
 should happen outside the model's reasoning.
@@ -19,7 +19,7 @@ By default, a hook runs with a 600-second timeout.
 
 ## Events
 
-Hook configuration is keyed by event name. Devo recognizes events including:
+Hook configuration is keyed by event name. InfiniteCode recognizes events including:
 
 | Event | Example Use |
 | --- | --- |
@@ -58,7 +58,7 @@ A command hook can block in two ways:
 - exit with status code `2`;
 - print JSON with a blocking decision, such as `{"decision":"block","reason":"..."}`.
 
-When a hook blocks, Devo surfaces the reason and stops the protected action.
+When a hook blocks, InfiniteCode surfaces the reason and stops the protected action.
 For example, a blocked prompt is rejected before the turn starts, and a blocked
 tool call returns a tool error instead of executing.
 
@@ -68,7 +68,7 @@ errors and are logged.
 ## Async Hooks
 
 Set a command hook as async when it should run in the background. Async hooks
-are spawned and do not block the Devo operation they are attached to.
+are spawned and do not block the InfiniteCode operation they are attached to.
 
 Use async hooks for notifications and telemetry. Do not use them for policy
 checks that must prevent unsafe actions.
@@ -80,4 +80,4 @@ Avoid commands that mutate broad filesystem areas or depend on untrusted prompt
 text without validation.
 
 If a hook is meant to enforce policy, make the blocking reason explicit so the
-user and Devo can understand what happened.
+user and InfiniteCode can understand what happened.

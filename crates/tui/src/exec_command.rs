@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::path::PathBuf;
 
-use devo_util_shell_command::parse_command::extract_shell_command;
+use infinitecode_util_shell_command::parse_command::extract_shell_command;
 use dirs::home_dir;
 use shlex::try_join;
 

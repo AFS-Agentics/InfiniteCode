@@ -5,7 +5,7 @@
  * safely revert if something goes wrong.
  *
  * Backup structure:
- *   ~/.config/devo/backups/
+ *   ~/.config/infinitecode/backups/
  *     2026-02-11T12-00-00/
  *       manifest.json        -- metadata + file list
  *       files/

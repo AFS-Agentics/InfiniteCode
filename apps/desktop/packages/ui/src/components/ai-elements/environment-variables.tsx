@@ -1,9 +1,9 @@
 "use client"
 
-import { Badge } from "@devo/ui/components/badge"
-import { Button } from "@devo/ui/components/button"
-import { Switch } from "@devo/ui/components/switch"
-import { cn } from "@devo/ui/lib/utils"
+import { Badge } from "@infinitecode/ui/components/badge"
+import { Button } from "@infinitecode/ui/components/button"
+import { Switch } from "@infinitecode/ui/components/switch"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { CheckIcon, CopyIcon, EyeIcon, EyeOffIcon } from "lucide-react"
 import type { ComponentProps, HTMLAttributes } from "react"
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"

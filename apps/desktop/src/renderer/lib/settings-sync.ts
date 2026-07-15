@@ -16,10 +16,10 @@ function readJsonStorageValue(storage: Storage, key: string): unknown {
 }
 
 function readRendererAppearanceSnapshot(storage: Storage): AppearancePatch {
-	const colorScheme = readJsonStorageValue(storage, "devo:colorScheme")
-	const themeId = readJsonStorageValue(storage, "devo:theme")
-	const displayMode = readJsonStorageValue(storage, "devo:displayMode")
-	const hideThinkingWhileWorking = readJsonStorageValue(storage, "devo:hideThinkingWhileWorking")
+	const colorScheme = readJsonStorageValue(storage, "infinitecode:colorScheme")
+	const themeId = readJsonStorageValue(storage, "infinitecode:theme")
+	const displayMode = readJsonStorageValue(storage, "infinitecode:displayMode")
+	const hideThinkingWhileWorking = readJsonStorageValue(storage, "infinitecode:hideThinkingWhileWorking")
 
 	const snapshot: AppearancePatch = {}
 	if (typeof colorScheme === "string" && COLOR_SCHEMES.has(colorScheme)) {

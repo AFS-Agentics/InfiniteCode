@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { ReferenceSearchResult } from "@devo-ai/sdk/v2/client"
+import type { ReferenceSearchResult } from "@infinitecode-ai/sdk/v2/client"
 import { isMentionOptionDisabled, mapReferenceSearchResults } from "./mention-popover"
 import { createMentionFromOption, insertMentionIntoText } from "./prompt-mentions"
 

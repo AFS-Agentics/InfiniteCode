@@ -64,13 +64,13 @@ describe("project list ordering", () => {
 describe("project display names", () => {
 	test("derives folder names from platform-specific paths", () => {
 		expect({
-			windows: projectNameFromDir("C:\\Users\\lenovo\\Desktop\\devo"),
-			windowsTrailingSlash: projectNameFromDir("C:\\Users\\lenovo\\Desktop\\devo\\"),
+			windows: projectNameFromDir("C:\\Users\\lenovo\\Desktop\\infinitecode"),
+			windowsTrailingSlash: projectNameFromDir("C:\\Users\\lenovo\\Desktop\\infinitecode\\"),
 			unix: projectNameFromDir("/repo/seo_0623"),
 			unixTrailingSlash: projectNameFromDir("/repo/seo_0623/"),
 		}).toEqual({
-			windows: "devo",
-			windowsTrailingSlash: "devo",
+			windows: "infinitecode",
+			windowsTrailingSlash: "infinitecode",
 			unix: "seo_0623",
 			unixTrailingSlash: "seo_0623",
 		})
@@ -80,16 +80,16 @@ describe("project display names", () => {
 		expect({
 			shortName: projectDisplayName("seo_0623", "C:\\Users\\lenovo\\Desktop\\seo_0623"),
 			windowsPathName: projectDisplayName(
-				"C:\\Users\\lenovo\\Desktop\\devo",
-				"C:\\Users\\lenovo\\Desktop\\devo",
+				"C:\\Users\\lenovo\\Desktop\\infinitecode",
+				"C:\\Users\\lenovo\\Desktop\\infinitecode",
 			),
-			unixPathName: projectDisplayName("/repo/devo", "/repo/devo"),
-			blankName: projectDisplayName("  ", "/repo/devo"),
+			unixPathName: projectDisplayName("/repo/infinitecode", "/repo/infinitecode"),
+			blankName: projectDisplayName("  ", "/repo/infinitecode"),
 		}).toEqual({
 			shortName: "seo_0623",
-			windowsPathName: "devo",
-			unixPathName: "devo",
-			blankName: "devo",
+			windowsPathName: "infinitecode",
+			unixPathName: "infinitecode",
+			blankName: "infinitecode",
 		})
 	})
 })

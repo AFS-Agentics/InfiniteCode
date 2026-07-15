@@ -5,7 +5,7 @@ const stackSource = readFileSync(new URL("./composer-status-stack.tsx", import.m
 const chatViewSource = readFileSync(new URL("./chat-view.tsx", import.meta.url), "utf8")
 const chatTurnSource = readFileSync(new URL("./chat-turn.tsx", import.meta.url), "utf8")
 const clientSource = readFileSync(
-	new URL("../../../../packages/devo-ai-sdk/src/v2/client.ts", import.meta.url),
+	new URL("../../../../packages/infinitecode-ai-sdk/src/v2/client.ts", import.meta.url),
 	"utf8",
 )
 

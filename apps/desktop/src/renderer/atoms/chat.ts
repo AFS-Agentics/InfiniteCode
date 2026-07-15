@@ -1,6 +1,6 @@
 import { atom } from "jotai"
 import { atomFamily } from "jotai-family"
-import type { ModelRef } from "../hooks/use-devo-data"
+import type { ModelRef } from "../hooks/use-infinitecode-data"
 import { appStore } from "./store"
 
 // ============================================================

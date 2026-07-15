@@ -1,6 +1,6 @@
-use devo_protocol::ReasoningEffort;
-use devo_protocol::RequestRole;
-use devo_protocol::ToolDefinition;
+use infinitecode_protocol::ReasoningEffort;
+use infinitecode_protocol::RequestRole;
+use infinitecode_protocol::ToolDefinition;
 use serde_json::Value;
 use serde_json::json;
 use tracing::warn;

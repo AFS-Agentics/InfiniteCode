@@ -3,7 +3,7 @@ title: MCP
 description: Connect external context and tools through Model Context Protocol.
 ---
 
-MCP connects Devo to external tools, resources, and prompts through configured
+MCP connects InfiniteCode to external tools, resources, and prompts through configured
 Model Context Protocol servers.
 
 Use MCP when the model needs access to systems outside the local repository,
@@ -19,13 +19,13 @@ An MCP server can expose:
 - resource templates;
 - prompts.
 
-Devo discovers MCP tools during runtime setup and normalizes them into
+InfiniteCode discovers MCP tools during runtime setup and normalizes them into
 model-callable tool names. MCP tool names use the `mcp__` prefix internally so
 they do not collide with built-in tools.
 
 ## Configuration Shape
 
-MCP configuration belongs in Devo config, not in prompts. Each configured server
+MCP configuration belongs in InfiniteCode config, not in prompts. Each configured server
 has:
 
 - stable server id;
@@ -55,7 +55,7 @@ Use `/mcp` in the TUI to list configured MCP servers.
 
 The transcript output shows each server's id, display name, enabled state,
 startup policy, transport kind, and target command or URL. If no servers are
-configured, Devo shows:
+configured, InfiniteCode shows:
 
 ```text
 No MCP servers configured.
@@ -70,17 +70,17 @@ MCP reference token such as:
 @mcp:docs
 ```
 
-The mention target uses an internal `mcp://server/<id>` path so Devo can carry
+The mention target uses an internal `mcp://server/<id>` path so InfiniteCode can carry
 the reference through the turn.
 
 ## Tool Exposure
 
-If a server exposes a small tool set, Devo can expose visible MCP tools directly
-to the model. When many MCP tools are available, Devo defers exposure so tool
+If a server exposes a small tool set, InfiniteCode can expose visible MCP tools directly
+to the model. When many MCP tools are available, InfiniteCode defers exposure so tool
 search can load the relevant tools on demand.
 
 MCP tool metadata can also mark a tool as hidden from model-facing tool
-declarations. Devo respects that visibility metadata during discovery.
+declarations. InfiniteCode respects that visibility metadata during discovery.
 
 ## Safety
 

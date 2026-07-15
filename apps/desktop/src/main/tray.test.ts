@@ -93,7 +93,7 @@ mock.module("electron", () => ({
 	Tray: FakeElectronTray,
 }))
 
-mock.module("./devo-manager", () => ({
+mock.module("./infinitecode-manager", () => ({
 	getAcpTransport: () => fakeAcpTransport,
 	getServerUrl: () => serverUrl,
 	onServerReady: (listener: () => void) => {

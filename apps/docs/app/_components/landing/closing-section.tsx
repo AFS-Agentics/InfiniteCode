@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { type LandingCopy } from "./data";
-import { renderWithDevoMark } from "./devo-word";
+import { renderWithInfiniteCodeMark } from "./infinitecode-word";
 import { ArrowIcon } from "./icons";
 
 type ClosingSectionProps = {
@@ -24,12 +24,12 @@ export function ClosingSection({ copy, docsHref }: ClosingSectionProps) {
             {copy.title}
           </h2>
           <p className="mt-5 max-w-xl text-lg leading-8 text-white/58">
-            {renderWithDevoMark(copy.bodyBeforeEmail)}{" "}
+            {renderWithInfiniteCodeMark(copy.bodyBeforeEmail)}{" "}
             <a
               className="text-orange-200 underline-offset-4 hover:underline"
-              href="mailto:devo@devo.7df.ai"
+              href="mailto:infinitecode@infinitecode.7df.ai"
             >
-              devo@devo.7df.ai
+              infinitecode@infinitecode.7df.ai
             </a>
             .
           </p>
@@ -50,7 +50,7 @@ export function ClosingSection({ copy, docsHref }: ClosingSectionProps) {
           </Link>
           <a
             className="inline-flex min-h-12 items-center justify-center gap-2 border border-white/20 bg-white/7 px-5 text-sm font-bold text-white transition hover:-translate-y-px hover:border-white/35 hover:bg-white/12"
-            href="https://github.com/7df-lab/devo"
+            href="https://github.com/AFS-Agentics/InfiniteCode"
             rel="noreferrer"
             target="_blank"
           >

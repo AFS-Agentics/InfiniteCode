@@ -8,9 +8,9 @@ import { atomWithStorage } from "jotai/utils"
 /**
  * Persisted toggle for demo/mock mode.
  * When true, the app uses static fixture data instead of connecting
- * to the Devo server. Used for screenshots and marketing.
+ * to the InfiniteCode server. Used for screenshots and marketing.
  */
-export const mockModeStorageAtom = atomWithStorage<boolean>("devo:mockMode", false)
+export const mockModeStorageAtom = atomWithStorage<boolean>("infinitecode:mockMode", false)
 
 /**
  * Check if ?mock=1 is present in the URL (works with both hash and regular URLs).

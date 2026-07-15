@@ -1,8 +1,8 @@
 //! Single-binary dispatch via `argv[0]`.
 //!
-//! Allows `devo` and `devo-server` to share a single executable. The trick:
+//! Allows `infinitecode` and `infinitecode-server` to share a single executable. The trick:
 //!
-//! - On Unix, symlinks (e.g. `devo-server -> devo`) are placed on PATH so the
+//! - On Unix, symlinks (e.g. `infinitecode-server -> infinitecode`) are placed on PATH so the
 //!   right sub‑function runs based on `argv[0]`.
 //! - On Windows, `.bat` wrappers are generated that re‑invoke the binary with a
 //!   sentinel argument so the same dispatch logic can work.
@@ -11,7 +11,7 @@
 //!
 //! ```ignore
 //! fn main() -> anyhow::Result<()> {
-//!     devo_arg0::run_as(|_paths| async {
+//!     infinitecode_arg0::run_as(|_paths| async {
 //!         // regular CLI logic here
 //!     })
 //! }
@@ -27,10 +27,10 @@ use std::time::Duration;
 use anyhow::Result;
 
 /// Alias name for the server sub‑binary.
-const SERVER_ALIAS: &str = "devo-server";
-const ALIAS_SENTINEL_PREFIX: &str = "--devo-alias=";
+const SERVER_ALIAS: &str = "infinitecode-server";
+const ALIAS_SENTINEL_PREFIX: &str = "--infinitecode-alias=";
 
-/// Directory (under DEVO_HOME/tmp/arg0) where alias entries are created.
+/// Directory (under INFINITECODE_HOME/tmp/arg0) where alias entries are created.
 const ALIAS_TEMP_ROOT: &str = "arg0";
 const LOCK_FILENAME: &str = ".lock";
 
@@ -47,8 +47,8 @@ const RUNTIME_SHUTDOWN_TIMEOUT: Duration = Duration::from_millis(500);
 /// under test harnesses).
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Arg0DispatchPaths {
-    /// Stable path to the current devo executable for child re-execs.
-    pub devo_self_exe: Option<PathBuf>,
+    /// Stable path to the current infinitecode executable for child re-execs.
+    pub infinitecode_self_exe: Option<PathBuf>,
 }
 
 /// Result of a pre-runtime dispatch hook.
@@ -75,13 +75,13 @@ pub fn maybe_init_tokio_console() {
 
 /// Entry‑point wrapper that performs `argv[0]` dispatch first.
 ///
-/// If the current executable was invoked as `devo-server` (via symlink or batch
+/// If the current executable was invoked as `infinitecode-server` (via symlink or batch
 /// script), `run_as` runs the server entry‑point and exits the process.
 /// Otherwise it calls `main_fn`, which should contain the normal CLI logic.
 ///
 /// The function also:
-/// - Loads `~/.devo/.env` (if present) before any threading starts, filtering
-///   out `DEVO_`-prefixed vars for security.
+/// - Loads `~/.infinitecode/.env` (if present) before any threading starts, filtering
+///   out `INFINITECODE_`-prefixed vars for security.
 /// - Injects a temporary directory on `PATH` so that alias names (symlinks /
 ///   `.bat` scripts) are found by child processes.
 /// - Cleans up stale temp directories from previous sessions.
@@ -105,7 +105,7 @@ where
     if let Some(alias) = argv0_alias() {
         match alias {
             SERVER_ALIAS => {
-                // Called as `devo-server` — run the server directly.
+                // Called as `infinitecode-server` — run the server directly.
                 run_server_alias_dispatch()?;
                 // Never returns normally; the server stays up until signaled.
                 std::process::exit(0);
@@ -122,13 +122,13 @@ where
 
     // ── Inject aliases on PATH (best‑effort) ──
     let _guard = prepend_path_for_aliases().unwrap_or_else(|err| {
-        eprintln!("WARNING: could not update PATH for devo aliases: {err}");
+        eprintln!("WARNING: could not update PATH for infinitecode aliases: {err}");
         None
     });
 
     let current_exe = std::env::current_exe().ok();
     let paths = Arg0DispatchPaths {
-        devo_self_exe: current_exe,
+        infinitecode_self_exe: current_exe,
     };
 
     match early_dispatch(&paths) {
@@ -145,7 +145,7 @@ where
 // ── argv[0] detection ─────────────────────────────────────────────────────
 
 /// Returns the alias name if the process was invoked through one of our
-/// symlinks or batch scripts, or `None` for a normal `devo` invocation.
+/// symlinks or batch scripts, or `None` for a normal `infinitecode` invocation.
 fn argv0_alias() -> Option<&'static str> {
     argv0_alias_from_args(std::env::args_os())
 }
@@ -161,7 +161,7 @@ where
         .and_then(|s| s.to_str())
         .unwrap_or("");
 
-    // Direct alias hit: `devo-server` symlink or bare name.
+    // Direct alias hit: `infinitecode-server` symlink or bare name.
     if file_name == SERVER_ALIAS {
         return Some(SERVER_ALIAS);
     }
@@ -215,26 +215,26 @@ fn run_server_alias_dispatch() -> Result<()> {
     Ok(())
 }
 
-fn parse_server_dispatch_args() -> devo_server::ServerProcessArgs {
+fn parse_server_dispatch_args() -> infinitecode_server::ServerProcessArgs {
     use clap::Parser;
-    devo_server::ServerProcessArgs::parse_from(server_dispatch_args())
+    infinitecode_server::ServerProcessArgs::parse_from(server_dispatch_args())
 }
 
-fn install_server_logging_for_dispatch() -> Option<devo_core::LoggingRuntime> {
-    let home_dir = match devo_util_paths::find_devo_home() {
+fn install_server_logging_for_dispatch() -> Option<infinitecode_core::LoggingRuntime> {
+    let home_dir = match infinitecode_util_paths::find_infinitecode_home() {
         Ok(d) => d,
         Err(err) => {
-            eprintln!("error: could not locate DEVO_HOME: {err}");
+            eprintln!("error: could not locate INFINITECODE_HOME: {err}");
             std::process::exit(1);
         }
     };
-    let loader = devo_core::FileSystemAppConfigLoader::new(home_dir.clone());
-    use devo_core::AppConfigLoader;
+    let loader = infinitecode_core::FileSystemAppConfigLoader::new(home_dir.clone());
+    use infinitecode_core::AppConfigLoader;
     let app_config = loader.load(/*workspace_root*/ None).unwrap_or_else(|err| {
         eprintln!("warning: failed to load app config for logging: {err}");
-        devo_core::AppConfig::default()
+        infinitecode_core::AppConfig::default()
     });
-    let logging = devo_core::LoggingBootstrap {
+    let logging = infinitecode_core::LoggingBootstrap {
         process_name: "server",
         config: app_config.logging,
         home_dir,
@@ -251,13 +251,13 @@ fn install_server_logging_for_dispatch() -> Option<devo_core::LoggingRuntime> {
 
 /// Run the server dispatch: parse `ServerProcessArgs` and invoke the server.
 ///
-/// Uses `clap::Parser` directly; the `--devo-alias` sentinel has already been
+/// Uses `clap::Parser` directly; the `--infinitecode-alias` sentinel has already been
 /// consumed by `argv0_alias()` so the remaining args are the server's own.
 async fn run_server_dispatch() {
     let args = parse_server_dispatch_args();
     let _logging = install_server_logging_for_dispatch();
     if let Err(err) =
-        devo_server::run_server_process(args, devo_server::ServerProcessRunOptions::default()).await
+        infinitecode_server::run_server_process(args, infinitecode_server::ServerProcessRunOptions::default()).await
     {
         eprintln!("server error: {err}");
         std::process::exit(1);
@@ -266,18 +266,18 @@ async fn run_server_dispatch() {
 
 // ── .env loading ───────────────────────────────────────────────────────────
 
-const ILLEGAL_ENV_VAR_PREFIX: &str = "DEVO_";
+const ILLEGAL_ENV_VAR_PREFIX: &str = "INFINITECODE_";
 
-/// Load env vars from `~/.devo/.env`.
+/// Load env vars from `~/.infinitecode/.env`.
 ///
 /// Security: Do not allow `.env` files to create or modify any variables with
-/// names starting with `DEVO_`.
+/// names starting with `INFINITECODE_`.
 fn load_dotenv() {
-    let devo_home = match devo_util_paths::find_devo_home() {
+    let infinitecode_home = match infinitecode_util_paths::find_infinitecode_home() {
         Ok(d) => d,
         Err(_) => return,
     };
-    let env_path = devo_home.join(".env");
+    let env_path = infinitecode_home.join(".env");
     if !env_path.exists() {
         return;
     }
@@ -288,7 +288,7 @@ fn load_dotenv() {
     set_filtered(iter);
 }
 
-/// Set env vars from a dotenvy iterator, filtering out `DEVO_`-prefixed keys.
+/// Set env vars from a dotenvy iterator, filtering out `INFINITECODE_`-prefixed keys.
 fn set_filtered<I>(iter: I)
 where
     I: IntoIterator<Item = std::result::Result<(String, String), dotenvy::Error>>,
@@ -313,8 +313,8 @@ where
 ///
 /// Returns a guard whose lifetime keeps the directory alive.
 fn prepend_path_for_aliases() -> std::io::Result<Option<PathGuard>> {
-    let devo_home = devo_util_paths::find_devo_home()?;
-    let temp_root = devo_home.join("tmp").join(ALIAS_TEMP_ROOT);
+    let infinitecode_home = infinitecode_util_paths::find_infinitecode_home()?;
+    let temp_root = infinitecode_home.join("tmp").join(ALIAS_TEMP_ROOT);
     std::fs::create_dir_all(&temp_root)?;
 
     // Best-effort cleanup of stale per-session dirs.
@@ -323,7 +323,7 @@ fn prepend_path_for_aliases() -> std::io::Result<Option<PathGuard>> {
     }
 
     let temp_dir = tempfile::Builder::new()
-        .prefix("devo-arg0")
+        .prefix("infinitecode-arg0")
         .tempdir_in(&temp_root)?;
     let path = temp_dir.path();
 
@@ -357,7 +357,7 @@ fn prepend_path_for_aliases() -> std::io::Result<Option<PathGuard>> {
         std::fs::write(
             &batch,
             format!(
-                "@echo off\r\n\"{}\" --devo-alias={SERVER_ALIAS} %*\r\n",
+                "@echo off\r\n\"{}\" --infinitecode-alias={SERVER_ALIAS} %*\r\n",
                 exe.display()
             ),
         )?;
@@ -505,8 +505,8 @@ mod tests {
     #[test]
     fn argv0_alias_detects_batch_sentinel() {
         let args = vec![
-            OsString::from("devo.exe"),
-            OsString::from("--devo-alias=devo-server"),
+            OsString::from("infinitecode.exe"),
+            OsString::from("--infinitecode-alias=infinitecode-server"),
             OsString::from("--transport"),
             OsString::from("stdio"),
         ];
@@ -520,8 +520,8 @@ mod tests {
     #[test]
     fn server_dispatch_args_remove_batch_alias_sentinel() {
         let args = vec![
-            OsString::from("devo.exe"),
-            OsString::from("--devo-alias=devo-server"),
+            OsString::from("infinitecode.exe"),
+            OsString::from("--infinitecode-alias=infinitecode-server"),
             OsString::from("--transport"),
             OsString::from("stdio"),
         ];
@@ -529,7 +529,7 @@ mod tests {
         assert_eq!(
             super::server_dispatch_args_from(args),
             vec![
-                OsString::from("devo.exe"),
+                OsString::from("infinitecode.exe"),
                 OsString::from("--transport"),
                 OsString::from("stdio")
             ]
@@ -539,7 +539,7 @@ mod tests {
     #[test]
     fn server_dispatch_args_keep_direct_alias_args() {
         let args = vec![
-            OsString::from("devo-server"),
+            OsString::from("infinitecode-server"),
             OsString::from("--transport"),
             OsString::from("stdio"),
         ];
@@ -547,7 +547,7 @@ mod tests {
         assert_eq!(
             super::server_dispatch_args_from(args),
             vec![
-                OsString::from("devo-server"),
+                OsString::from("infinitecode-server"),
                 OsString::from("--transport"),
                 OsString::from("stdio")
             ]

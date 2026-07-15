@@ -8,7 +8,7 @@ import { initCredentialStore } from "./credential-store"
 import { getOpaqueWindowsPref, registerIpcHandlers } from "./ipc-handlers"
 import { installLiquidGlass, resolveStartupWindowBackground, resolveWindowChrome } from "./liquid-glass"
 import { createLogger } from "./logger"
-import { stopServer } from "./devo-manager"
+import { stopServer } from "./infinitecode-manager"
 import { getSessionStates } from "./notification-watcher"
 import {
 	CONFIRM_QUIT_BUTTON_INDEX,
@@ -38,7 +38,7 @@ const __dirname = path.dirname(__filename)
 // GUI launches get a minimal launchd environment missing user PATH additions
 // (homebrew, nvm, bun, etc.). This spawns a login shell in the background --
 // window creation proceeds immediately without waiting. Operations that need the
-// full PATH (e.g., spawning devo) call waitForEnv() before proceeding.
+// full PATH (e.g., spawning infinitecode) call waitForEnv() before proceeding.
 startEnvResolution()
 
 // Minimal menu — required on macOS for Cmd+C/V/X/A to work in web contents.
@@ -98,7 +98,7 @@ ipcMain.handle(
 const disabledFeatures: string[] = []
 
 // Chromium networking: disable HTTPS upgrades for localhost connections.
-// The Devo server is plain HTTP/1.1 on 127.0.0.1. Chromium 134+ (Electron 40+)
+// The InfiniteCode server is plain HTTP/1.1 on 127.0.0.1. Chromium 134+ (Electron 40+)
 // can silently upgrade http:// to https://, which causes ERR_ALPN_NEGOTIATION_FAILED
 // when hitting a plain HTTP server. Disabling this feature prevents that.
 // Must be set before app.whenReady().
@@ -359,10 +359,10 @@ if (!gotLock) {
 	})
 
 	app.whenReady().then(() => {
-		// Bypass Chromium's Private Network Access checks for Devo server requests.
+		// Bypass Chromium's Private Network Access checks for InfiniteCode server requests.
 		// Chromium (134+/Electron 40+) blocks renderer fetch() to private network addresses
 		// (127.0.0.1) with ERR_ALPN_NEGOTIATION_FAILED when the PNA preflight response
-		// doesn't include Access-Control-Allow-Private-Network. The Devo server (Bun/Hono)
+		// doesn't include Access-Control-Allow-Private-Network. The InfiniteCode server (Bun/Hono)
 		// doesn't send this header. Instead of patching the server, we inject the header
 		// for all responses from the local server.
 		session.defaultSession.webRequest.onHeadersReceived(

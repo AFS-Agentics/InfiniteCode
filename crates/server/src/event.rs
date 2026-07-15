@@ -1,4 +1,4 @@
-pub use devo_protocol::{
+pub use infinitecode_protocol::{
     ApprovalDecisionPayload, ApprovalRequestPayload, CommandExecutionPayload, EventContext,
     FileChangePayload, ItemDeltaKind, ItemDeltaPayload, ItemEnvelope, ItemEventPayload, ItemKind,
     MessageEditRecordedPayload, PendingServerRequestContext, RequestUserInputPayload, ServerEvent,

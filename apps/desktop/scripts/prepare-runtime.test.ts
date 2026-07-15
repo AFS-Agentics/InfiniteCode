@@ -2,49 +2,49 @@ import { describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { defaultDevoSourcePath, runtimeBinaryName, stageRuntime } from "./prepare-runtime"
+import { defaultInfiniteCodeSourcePath, runtimeBinaryName, stageRuntime } from "./prepare-runtime"
 
 describe("prepare-runtime helpers", () => {
 	test("uses platform executable names", () => {
 		expect({
-			darwin: runtimeBinaryName("devo", "darwin"),
-			linux: runtimeBinaryName("devo", "linux"),
-			win32: runtimeBinaryName("devo", "win32"),
+			darwin: runtimeBinaryName("infinitecode", "darwin"),
+			linux: runtimeBinaryName("infinitecode", "linux"),
+			win32: runtimeBinaryName("infinitecode", "win32"),
 		}).toEqual({
-			darwin: "devo",
-			linux: "devo",
-			win32: "devo.exe",
+			darwin: "infinitecode",
+			linux: "infinitecode",
+			win32: "infinitecode.exe",
 		})
 	})
 
 	test("resolves cargo release output by target triple", () => {
 		expect(
-			defaultDevoSourcePath({
+			defaultInfiniteCodeSourcePath({
 				repoRoot: "/repo",
 				targetTriple: "x86_64-apple-darwin",
 				platform: "darwin",
 			}),
-		).toBe(join("/repo", "target", "x86_64-apple-darwin", "release", "devo"))
+		).toBe(join("/repo", "target", "x86_64-apple-darwin", "release", "infinitecode"))
 	})
 
 	test("derives Windows executable names from target triples", () => {
 		expect(
-			defaultDevoSourcePath({
+			defaultInfiniteCodeSourcePath({
 				repoRoot: "/repo",
 				targetTriple: "x86_64-pc-windows-msvc",
 				platform: "darwin",
 			}),
-		).toBe(join("/repo", "target", "x86_64-pc-windows-msvc", "release", "devo.exe"))
+		).toBe(join("/repo", "target", "x86_64-pc-windows-msvc", "release", "infinitecode.exe"))
 	})
 
 	test("requires explicit ripgrep sidecar for cross-target staging", () => {
-		const root = mkdtempSync(join(tmpdir(), "devo-runtime-test-"))
+		const root = mkdtempSync(join(tmpdir(), "infinitecode-runtime-test-"))
 		const repoRoot = join(root, "repo")
 		const desktopDir = join(root, "desktop")
 		const targetDir = join(repoRoot, "target", "aarch64-apple-darwin", "release")
 		mkdirSync(targetDir, { recursive: true })
 		mkdirSync(desktopDir, { recursive: true })
-		writeFileSync(join(targetDir, "devo"), "")
+		writeFileSync(join(targetDir, "infinitecode"), "")
 
 		expect(() =>
 			stageRuntime({
@@ -58,29 +58,29 @@ describe("prepare-runtime helpers", () => {
 		expect(existsSync(join(desktopDir, "resources", "runtime", "bin"))).toBe(false)
 	})
 
-	test("stages Devo and ripgrep sidecars into the desktop runtime directory", () => {
-		const root = mkdtempSync(join(tmpdir(), "devo-runtime-test-"))
+	test("stages InfiniteCode and ripgrep sidecars into the desktop runtime directory", () => {
+		const root = mkdtempSync(join(tmpdir(), "infinitecode-runtime-test-"))
 		const desktopDir = join(root, "desktop")
 		const sourceDir = join(root, "source")
-		const devoBin = join(sourceDir, "devo")
+		const infinitecodeBin = join(sourceDir, "infinitecode")
 		const rgBin = join(sourceDir, "rg")
 		mkdirSync(sourceDir, { recursive: true })
-		writeFileSync(devoBin, "devo")
+		writeFileSync(infinitecodeBin, "infinitecode")
 		writeFileSync(rgBin, "rg")
 
 		stageRuntime({
 			desktopDir,
 			repoRoot: root,
 			platform: "darwin",
-			devoBin,
+			infinitecodeBin,
 			rgBin,
 		})
 
 		expect({
-			devo: readFileSync(join(desktopDir, "resources", "runtime", "bin", "devo"), "utf8"),
+			infinitecode: readFileSync(join(desktopDir, "resources", "runtime", "bin", "infinitecode"), "utf8"),
 			rg: readFileSync(join(desktopDir, "resources", "runtime", "bin", "rg"), "utf8"),
 		}).toEqual({
-			devo: "devo",
+			infinitecode: "infinitecode",
 			rg: "rg",
 		})
 	})

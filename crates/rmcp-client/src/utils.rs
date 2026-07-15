@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use anyhow::anyhow;
-use devo_config::McpServerEnvVar;
+use infinitecode_config::McpServerEnvVar;
 use reqwest::ClientBuilder;
 use reqwest::header::HeaderMap;
 use reqwest::header::HeaderName;
@@ -47,7 +47,7 @@ where
 fn local_stdio_env_var_names(env_vars: &[McpServerEnvVar]) -> Result<impl Iterator<Item = &str>> {
     if let Some(remote_var) = env_vars.iter().find(|var| var.is_remote_source()) {
         return Err(anyhow!(
-            "env_vars entry `{}` uses source `remote`, but Devo does not support remote stdio MCP execution",
+            "env_vars entry `{}` uses source `remote`, but InfiniteCode does not support remote stdio MCP execution",
             remote_var.name()
         ));
     }

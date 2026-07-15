@@ -3,8 +3,8 @@
 use ratatui::style::Stylize;
 use ratatui::text::Line;
 
-use devo_protocol::ThreadGoal;
-use devo_protocol::ThreadGoalStatus;
+use infinitecode_protocol::ThreadGoal;
+use infinitecode_protocol::ThreadGoalStatus;
 
 use crate::app_command::AppCommand;
 use crate::app_command::GoalObjectiveMode;

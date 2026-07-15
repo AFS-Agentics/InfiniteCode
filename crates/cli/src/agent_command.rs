@@ -1,21 +1,21 @@
 use anyhow::Context;
 use anyhow::Result;
-use devo_core::AppConfig;
-use devo_core::AppConfigLoader;
-use devo_core::FileSystemAppConfigLoader;
-use devo_core::ModelCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ResolvedProviderSettings;
-use devo_core::SessionId;
-use devo_core::project_config_key;
-use devo_core::resolve_model_binding;
-use devo_protocol::PermissionPreset;
-use devo_protocol::ProviderWireApi;
-use devo_tui::InitialTuiSession;
-use devo_tui::InteractiveTuiConfig;
-use devo_tui::SavedModelEntry;
-use devo_tui::run_interactive_tui;
-use devo_util_paths::find_devo_home;
+use infinitecode_core::AppConfig;
+use infinitecode_core::AppConfigLoader;
+use infinitecode_core::FileSystemAppConfigLoader;
+use infinitecode_core::ModelCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ResolvedProviderSettings;
+use infinitecode_core::SessionId;
+use infinitecode_core::project_config_key;
+use infinitecode_core::resolve_model_binding;
+use infinitecode_protocol::PermissionPreset;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_tui::InitialTuiSession;
+use infinitecode_tui::InteractiveTuiConfig;
+use infinitecode_tui::SavedModelEntry;
+use infinitecode_tui::run_interactive_tui;
+use infinitecode_util_paths::find_infinitecode_home;
 
 /// Runs the interactive coding-agent entrypoint.
 ///
@@ -30,9 +30,9 @@ pub(crate) async fn run_agent(
     log_level: Option<&str>,
     initial_session_id: Option<SessionId>,
     dangerously_skip_permissions: bool,
-) -> Result<devo_tui::AppExit> {
+) -> Result<infinitecode_tui::AppExit> {
     let cwd = std::env::current_dir()?;
-    let config_home = find_devo_home().context("could not determine devo home directory")?;
+    let config_home = find_infinitecode_home().context("could not determine infinitecode home directory")?;
     let model_catalog = PresetModelCatalog::load_from_config(&config_home, Some(&cwd))?;
     let startup_warnings = model_catalog
         .warnings()
@@ -263,20 +263,20 @@ mod tests {
     use super::initial_permission_preset;
     use super::resolve_initial_provider_settings;
     use super::saved_model_entries;
-    use devo_core::AppConfig;
-    use devo_core::ConfiguredModel;
-    use devo_core::LegacyModelProviderConfig;
-    use devo_core::Model;
-    use devo_core::ModelBindingConfig;
-    use devo_core::PresetModelCatalog;
-    use devo_core::ProjectConfig;
-    use devo_core::ProviderConfigSection;
-    use devo_core::ProviderDefaultsConfig;
-    use devo_core::ProviderVendorConfig;
-    use devo_core::ResolvedProviderSettings;
-    use devo_protocol::PermissionPreset;
-    use devo_protocol::ProviderWireApi;
-    use devo_tui::SavedModelEntry;
+    use infinitecode_core::AppConfig;
+    use infinitecode_core::ConfiguredModel;
+    use infinitecode_core::LegacyModelProviderConfig;
+    use infinitecode_core::Model;
+    use infinitecode_core::ModelBindingConfig;
+    use infinitecode_core::PresetModelCatalog;
+    use infinitecode_core::ProjectConfig;
+    use infinitecode_core::ProviderConfigSection;
+    use infinitecode_core::ProviderDefaultsConfig;
+    use infinitecode_core::ProviderVendorConfig;
+    use infinitecode_core::ResolvedProviderSettings;
+    use infinitecode_protocol::PermissionPreset;
+    use infinitecode_protocol::ProviderWireApi;
+    use infinitecode_tui::SavedModelEntry;
 
     fn test_catalog() -> PresetModelCatalog {
         PresetModelCatalog::new(vec![Model {
@@ -291,7 +291,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system time")
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("devo-cli-test-{nanos}"));
+        let path = std::env::temp_dir().join(format!("infinitecode-cli-test-{nanos}"));
         std::fs::create_dir_all(&path).expect("create temp dir");
         path
     }

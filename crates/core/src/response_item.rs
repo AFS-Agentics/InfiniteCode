@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use devo_protocol::{ContentBlock, Message, RequestContent, RequestMessage, Role};
+use infinitecode_protocol::{ContentBlock, Message, RequestContent, RequestMessage, Role};
 
 /// Unified representation of LLM conversation items.
 ///
@@ -263,7 +263,7 @@ mod tests {
     use std::time::Instant;
 
     use super::*;
-    use devo_protocol::{ContentBlock, Message, Role};
+    use infinitecode_protocol::{ContentBlock, Message, Role};
 
     #[test]
     fn response_item_reason_variant() {

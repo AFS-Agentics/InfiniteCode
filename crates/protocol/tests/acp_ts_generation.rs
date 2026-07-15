@@ -1,6 +1,6 @@
 #[test]
 fn generated_acp_typescript_contains_wire_discriminants_and_names() {
-    let output = devo_protocol::acp_ts::generate_acp_typescript();
+    let output = infinitecode_protocol::acp_ts::generate_acp_typescript();
 
     assert!(output.contains("export type JsonValue"));
     assert!(output.contains("export type AcpSessionNotification"));
@@ -18,7 +18,7 @@ fn generated_acp_typescript_contains_wire_discriminants_and_names() {
 
 #[test]
 fn generated_protocol_typescript_contains_non_acp_client_method_roots() {
-    let output = devo_protocol::acp_ts::generate_protocol_typescript();
+    let output = infinitecode_protocol::acp_ts::generate_protocol_typescript();
 
     assert!(output.contains("export type GoalStatusParams"));
     assert!(output.contains("export type GoalStatusResult"));
@@ -32,7 +32,7 @@ fn generated_protocol_typescript_contains_non_acp_client_method_roots() {
 
 #[test]
 fn generated_protocol_schema_contains_method_bindings() {
-    let output = devo_protocol::acp_ts::generate_protocol_schema_json();
+    let output = infinitecode_protocol::acp_ts::generate_protocol_schema_json();
     let value: serde_json::Value = serde_json::from_str(&output).expect("schema JSON");
 
     assert_eq!(

@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use devo_protocol::{ModelRequest, ProviderWireApi, StreamEvent};
+use infinitecode_protocol::{ModelRequest, ProviderWireApi, StreamEvent};
 use futures::Stream;
 
 use crate::error::ProviderError;
@@ -56,7 +56,7 @@ pub trait ProviderRouter: Send + Sync {
         &self,
         route: ProviderRoute,
         request: ModelRequest,
-    ) -> Result<devo_protocol::ModelResponse, ProviderError>;
+    ) -> Result<infinitecode_protocol::ModelResponse, ProviderError>;
 
     /// Human-readable name of the router (e.g. "multi-provider", "openai-only").
     fn name(&self) -> &str;
@@ -94,7 +94,7 @@ impl ProviderRouter for SingleProviderRouter {
         &self,
         _route: ProviderRoute,
         request: ModelRequest,
-    ) -> Result<devo_protocol::ModelResponse, ProviderError> {
+    ) -> Result<infinitecode_protocol::ModelResponse, ProviderError> {
         self.provider
             .completion(request)
             .await
@@ -164,7 +164,7 @@ impl ProviderRouter for MultiProviderRouter {
         &self,
         route: ProviderRoute,
         request: ModelRequest,
-    ) -> Result<devo_protocol::ModelResponse, ProviderError> {
+    ) -> Result<infinitecode_protocol::ModelResponse, ProviderError> {
         self.provider_for_route(&route)?
             .completion(request)
             .await
@@ -188,7 +188,7 @@ mod tests {
     use std::sync::Mutex;
 
     use async_trait::async_trait;
-    use devo_protocol::{
+    use infinitecode_protocol::{
         ModelResponse, RequestContent, RequestMessage, ResponseContent, ResponseMetadata,
         StopReason, Usage,
     };
@@ -246,7 +246,7 @@ mod tests {
 
     fn request(model: &str) -> ModelRequest {
         ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::Generic,
+            model_slug: infinitecode_protocol::ModelProfileKey::Generic,
             model: model.to_string(),
             system: None,
             messages: vec![RequestMessage {

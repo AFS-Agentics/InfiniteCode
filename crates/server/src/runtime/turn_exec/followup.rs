@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use devo_core::{SessionId, TurnId, TurnStatus};
+use infinitecode_core::{SessionId, TurnId, TurnStatus};
 
 use super::super::*;
 use super::types::{ExecuteTurnRequest, QueuedTurnInput};
@@ -104,7 +104,7 @@ impl ServerRuntime {
             return;
         };
         self.broadcast_event(crate::ServerEvent::InputQueueUpdated(
-            devo_core::InputQueueUpdatedPayload {
+            infinitecode_core::InputQueueUpdatedPayload {
                 session_id,
                 pending_count: snapshot.pending_count,
                 pending_texts: snapshot.pending_texts,
@@ -149,7 +149,7 @@ impl ServerRuntime {
         self: &Arc<Self>,
         session_id: SessionId,
         queued: &QueuedTurnInput,
-    ) -> Option<(crate::TurnMetadata, devo_core::TurnConfig)> {
+    ) -> Option<(crate::TurnMetadata, infinitecode_core::TurnConfig)> {
         let session_handle = self.sessions.lock().await.get(&session_id).cloned()?;
         let reservation = session_handle.turn_reservation_snapshot().await?;
         let model_override = queued
@@ -174,7 +174,7 @@ impl ServerRuntime {
             session_id,
             sequence,
             status: TurnStatus::Running,
-            kind: devo_core::TurnKind::Regular,
+            kind: infinitecode_core::TurnKind::Regular,
             model: turn_config.model.slug.clone(),
             model_binding_id: turn_config.model_binding_id.clone(),
             reasoning_effort_selection: turn_config.reasoning_effort_selection.clone(),
@@ -194,7 +194,7 @@ impl ServerRuntime {
         self: &Arc<Self>,
         session_id: SessionId,
         turn: &crate::TurnMetadata,
-        turn_config: &devo_core::TurnConfig,
+        turn_config: &infinitecode_core::TurnConfig,
     ) {
         if let Some(session_handle) = self.sessions.lock().await.get(&session_id).cloned() {
             session_handle

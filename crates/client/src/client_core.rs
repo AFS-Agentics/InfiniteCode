@@ -1,4 +1,4 @@
-//! Transport-agnostic Devo server client: JSON-RPC request/response routing,
+//! Transport-agnostic InfiniteCode server client: JSON-RPC request/response routing,
 //! server-initiated ACP client handlers, and notification demultiplexing.
 //!
 //! Both [`crate::stdio::StdioServerClient`] and [`crate::websocket::WebSocketServerClient`]
@@ -25,7 +25,7 @@ use anyhow::Result;
 use anyhow::anyhow;
 use anyhow::bail;
 use chrono::Utc;
-use devo_protocol::*;
+use infinitecode_protocol::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::sync::Mutex;
@@ -40,8 +40,8 @@ use crate::acp_permissions::resolve_acp_permission_response;
 use crate::acp_terminal::AcpTerminalManager;
 use crate::acp_terminal::handle_acp_terminal_request;
 
-pub const ACP_PROMPT_STARTED_NOTIFICATION_METHOD: &str = "_devo/acp_prompt/started";
-pub const ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD: &str = "_devo/acp_prompt/completed";
+pub const ACP_PROMPT_STARTED_NOTIFICATION_METHOD: &str = "_infinitecode/acp_prompt/started";
+pub const ACP_PROMPT_COMPLETED_NOTIFICATION_METHOD: &str = "_infinitecode/acp_prompt/completed";
 
 const SERVER_RESPONSE_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -157,8 +157,8 @@ impl ServerClientCore {
                     protocol_version: 1,
                     client_capabilities: self.client_capabilities.clone(),
                     client_info: Some(
-                        AcpImplementation::new("devo", env!("CARGO_PKG_VERSION"))
-                            .with_title("Devo"),
+                        AcpImplementation::new("infinitecode", env!("CARGO_PKG_VERSION"))
+                            .with_title("InfiniteCode"),
                     ),
                     meta: None,
                 },
@@ -173,24 +173,24 @@ impl ServerClientCore {
                 .agent_info
                 .as_ref()
                 .map(|info| info.name.clone())
-                .unwrap_or_else(|| "devo-server".to_string()),
+                .unwrap_or_else(|| "infinitecode-server".to_string()),
             server_version: result
                 .agent_info
                 .as_ref()
                 .map(|info| info.version.clone())
                 .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string()),
             platform_family: meta
-                .and_then(|meta| meta.get("devo/platformFamily"))
+                .and_then(|meta| meta.get("infinitecode/platformFamily"))
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or(std::env::consts::FAMILY)
                 .into(),
             platform_os: meta
-                .and_then(|meta| meta.get("devo/platformOs"))
+                .and_then(|meta| meta.get("infinitecode/platformOs"))
                 .and_then(serde_json::Value::as_str)
                 .unwrap_or(std::env::consts::OS)
                 .into(),
             server_home: meta
-                .and_then(|meta| meta.get("devo/serverHome"))
+                .and_then(|meta| meta.get("infinitecode/serverHome"))
                 .and_then(serde_json::Value::as_str)
                 .map(PathBuf::from)
                 .unwrap_or_default(),
@@ -225,7 +225,7 @@ impl ServerClientCore {
         let session = result
             .meta
             .as_ref()
-            .and_then(|meta| meta.get(DEVO_SESSION_META))
+            .and_then(|meta| meta.get(INFINITECODE_SESSION_META))
             .cloned()
             .map(serde_json::from_value)
             .transpose()
@@ -263,7 +263,7 @@ impl ServerClientCore {
         Ok(result
             .meta
             .as_ref()
-            .and_then(|meta| meta.get(DEVO_SESSION_RESUME_META))
+            .and_then(|meta| meta.get(INFINITECODE_SESSION_RESUME_META))
             .cloned()
             .map(serde_json::from_value)
             .transpose()
@@ -303,7 +303,7 @@ impl ServerClientCore {
                 let session = session_info
                     .meta
                     .as_ref()
-                    .and_then(|meta| meta.get(DEVO_SESSION_META))
+                    .and_then(|meta| meta.get(INFINITECODE_SESSION_META))
                     .cloned()
                     .map(serde_json::from_value)
                     .transpose()
@@ -322,12 +322,12 @@ impl ServerClientCore {
         Ok(sessions)
     }
 
-    pub(crate) async fn request_devo<P, R>(&mut self, method: &str, params: P) -> Result<R>
+    pub(crate) async fn request_infinitecode<P, R>(&mut self, method: &str, params: P) -> Result<R>
     where
         P: Serialize,
         R: DeserializeOwned,
     {
-        let method = devo_extension_method(method);
+        let method = infinitecode_extension_method(method);
         self.request(&method, params).await
     }
 
@@ -371,7 +371,7 @@ impl ServerClientCore {
 
     pub(crate) async fn turn_start(&mut self, params: TurnStartParams) -> Result<TurnStartResult> {
         match self
-            .request_devo::<_, TurnStartResult>("turn/start", params.clone())
+            .request_infinitecode::<_, TurnStartResult>("turn/start", params.clone())
             .await
         {
             Ok(result) => Ok(result),
@@ -403,7 +403,7 @@ impl ServerClientCore {
         params: RequestUserInputRespondParams,
     ) -> Result<()> {
         let _: serde_json::Value = self
-            .request_devo("request_user_input/respond", params)
+            .request_infinitecode("request_user_input/respond", params)
             .await?;
         Ok(())
     }
@@ -435,42 +435,42 @@ impl ServerClientCore {
     }
 
     pub(crate) async fn agent_list(&mut self, params: AgentListParams) -> Result<AgentListResult> {
-        self.request_devo("agent/list", params).await
+        self.request_infinitecode("agent/list", params).await
     }
 
     pub(crate) async fn agent_spawn(
         &mut self,
         params: SpawnAgentParams,
     ) -> Result<SpawnAgentResult> {
-        self.request_devo("agent/spawn", params).await
+        self.request_infinitecode("agent/spawn", params).await
     }
 
     pub(crate) async fn agent_close(
         &mut self,
         params: CloseAgentParams,
     ) -> Result<CloseAgentResult> {
-        self.request_devo("agent/close", params).await
+        self.request_infinitecode("agent/close", params).await
     }
 
     pub(crate) async fn session_title_update(
         &mut self,
         params: SessionTitleUpdateParams,
     ) -> Result<SessionTitleUpdateResult> {
-        self.request_devo("session/title/update", params).await
+        self.request_infinitecode("session/title/update", params).await
     }
 
     pub(crate) async fn session_metadata_update(
         &mut self,
         params: SessionMetadataUpdateParams,
     ) -> Result<SessionMetadataUpdateResult> {
-        self.request_devo("session/metadata/update", params).await
+        self.request_infinitecode("session/metadata/update", params).await
     }
 
     pub(crate) async fn session_permissions_update(
         &mut self,
         params: SessionPermissionsUpdateParams,
     ) -> Result<SessionPermissionsUpdateResult> {
-        self.request_devo("session/permissions/update", params)
+        self.request_infinitecode("session/permissions/update", params)
             .await
     }
 
@@ -478,191 +478,191 @@ impl ServerClientCore {
         &mut self,
         params: SessionCompactParams,
     ) -> Result<SessionCompactResult> {
-        self.request_devo("session/compact", params).await
+        self.request_infinitecode("session/compact", params).await
     }
 
     pub(crate) async fn goal_create(
         &mut self,
         params: GoalCreateParams,
     ) -> Result<GoalCreateResult> {
-        self.request_devo("goal/create", params).await
+        self.request_infinitecode("goal/create", params).await
     }
 
     pub(crate) async fn goal_set(&mut self, params: GoalSetParams) -> Result<GoalSetResult> {
-        self.request_devo("goal/set", params).await
+        self.request_infinitecode("goal/set", params).await
     }
 
     pub(crate) async fn goal_status(
         &mut self,
         params: GoalStatusParams,
     ) -> Result<GoalStatusResult> {
-        self.request_devo("goal/status", params).await
+        self.request_infinitecode("goal/status", params).await
     }
 
     pub(crate) async fn goal_pause(
         &mut self,
         params: GoalSetStatusParams,
     ) -> Result<GoalSetStatusResult> {
-        self.request_devo("goal/pause", params).await
+        self.request_infinitecode("goal/pause", params).await
     }
 
     pub(crate) async fn goal_resume(
         &mut self,
         params: GoalSetStatusParams,
     ) -> Result<GoalSetStatusResult> {
-        self.request_devo("goal/resume", params).await
+        self.request_infinitecode("goal/resume", params).await
     }
 
     pub(crate) async fn goal_complete(
         &mut self,
         params: GoalSetStatusParams,
     ) -> Result<GoalSetStatusResult> {
-        self.request_devo("goal/complete", params).await
+        self.request_infinitecode("goal/complete", params).await
     }
 
     pub(crate) async fn goal_clear(&mut self, params: GoalClearParams) -> Result<GoalClearResult> {
-        self.request_devo("goal/clear", params).await
+        self.request_infinitecode("goal/clear", params).await
     }
 
     pub(crate) async fn session_fork(
         &mut self,
         params: SessionForkParams,
     ) -> Result<SessionForkResult> {
-        self.request_devo("session/fork", params).await
+        self.request_infinitecode("session/fork", params).await
     }
 
     pub(crate) async fn session_rollback(
         &mut self,
         params: SessionRollbackParams,
     ) -> Result<SessionRollbackResult> {
-        self.request_devo("session/rollback", params).await
+        self.request_infinitecode("session/rollback", params).await
     }
 
     pub(crate) async fn skills_list(&mut self, params: SkillListParams) -> Result<SkillListResult> {
-        self.request_devo("skills/list", params).await
+        self.request_infinitecode("skills/list", params).await
     }
 
     pub(crate) async fn skills_changed(
         &mut self,
         params: SkillChangedParams,
     ) -> Result<SkillChangedResult> {
-        self.request_devo("skills/changed", params).await
+        self.request_infinitecode("skills/changed", params).await
     }
 
     pub(crate) async fn skills_set_enabled(
         &mut self,
         params: SkillSetEnabledParams,
     ) -> Result<SkillSetEnabledResult> {
-        self.request_devo("skills/set_enabled", params).await
+        self.request_infinitecode("skills/set_enabled", params).await
     }
 
     pub(crate) async fn model_catalog(
         &mut self,
         params: ModelCatalogParams,
     ) -> Result<ModelCatalogResult> {
-        self.request_devo("model/catalog", params).await
+        self.request_infinitecode("model/catalog", params).await
     }
 
     pub(crate) async fn model_saved(
         &mut self,
         params: ModelSavedParams,
     ) -> Result<ModelSavedResult> {
-        self.request_devo("model/saved", params).await
+        self.request_infinitecode("model/saved", params).await
     }
 
     pub(crate) async fn provider_vendor_list(
         &mut self,
         params: ProviderVendorListParams,
     ) -> Result<ProviderVendorListResult> {
-        self.request_devo("provider/list", params).await
+        self.request_infinitecode("provider/list", params).await
     }
 
     pub(crate) async fn provider_vendor_upsert(
         &mut self,
         params: ProviderVendorUpsertParams,
     ) -> Result<ProviderVendorUpsertResult> {
-        self.request_devo("provider/upsert", params).await
+        self.request_infinitecode("provider/upsert", params).await
     }
 
     pub(crate) async fn provider_validate(
         &mut self,
         params: ProviderValidateParams,
     ) -> Result<ProviderValidateResult> {
-        self.request_devo("provider/validate", params).await
+        self.request_infinitecode("provider/validate", params).await
     }
 
     pub(crate) async fn command_exec(
         &mut self,
         params: CommandExecParams,
     ) -> Result<CommandExecResult> {
-        self.request_devo("command/exec", params).await
+        self.request_infinitecode("command/exec", params).await
     }
 
     pub(crate) async fn command_exec_write(
         &mut self,
         params: CommandExecWriteParams,
     ) -> Result<CommandExecWriteResult> {
-        self.request_devo("command/exec/write", params).await
+        self.request_infinitecode("command/exec/write", params).await
     }
 
     pub(crate) async fn command_exec_resize(
         &mut self,
         params: CommandExecResizeParams,
     ) -> Result<CommandExecResizeResult> {
-        self.request_devo("command/exec/resize", params).await
+        self.request_infinitecode("command/exec/resize", params).await
     }
 
     pub(crate) async fn command_exec_terminate(
         &mut self,
         params: CommandExecTerminateParams,
     ) -> Result<CommandExecTerminateResult> {
-        self.request_devo("command/exec/terminate", params).await
+        self.request_infinitecode("command/exec/terminate", params).await
     }
 
     pub(crate) async fn turn_shell_command(
         &mut self,
         params: ShellCommandParams,
     ) -> Result<ShellCommandResult> {
-        self.request_devo("turn/shell_command", params).await
+        self.request_infinitecode("turn/shell_command", params).await
     }
 
     pub(crate) async fn turn_interrupt(
         &mut self,
         params: TurnInterruptParams,
     ) -> Result<TurnInterruptResult> {
-        self.request_devo("turn/interrupt", params).await
+        self.request_infinitecode("turn/interrupt", params).await
     }
 
     pub(crate) async fn turn_steer(&mut self, params: TurnSteerParams) -> Result<TurnSteerResult> {
-        self.request_devo("turn/steer", params).await
+        self.request_infinitecode("turn/steer", params).await
     }
 
     pub(crate) async fn reference_search_start(
         &mut self,
         params: ReferenceSearchStartParams,
     ) -> Result<ReferenceSearchStartResult> {
-        self.request_devo("search/start", params).await
+        self.request_infinitecode("search/start", params).await
     }
 
     pub(crate) async fn reference_search_update(
         &mut self,
         params: ReferenceSearchUpdateParams,
     ) -> Result<ReferenceSearchUpdateResult> {
-        self.request_devo("search/update", params).await
+        self.request_infinitecode("search/update", params).await
     }
 
     pub(crate) async fn reference_search_cancel(
         &mut self,
         params: ReferenceSearchCancelParams,
     ) -> Result<ReferenceSearchCancelResult> {
-        self.request_devo("search/cancel", params).await
+        self.request_infinitecode("search/cancel", params).await
     }
 
-    /// Fallback when the server does not implement `_devo/turn/start`.
+    /// Fallback when the server does not implement `_infinitecode/turn/start`.
     ///
     /// Sends blocking ACP `session/prompt` but returns immediately after the
     /// request is written. Completion is delivered later via synthetic
-    /// `_devo/acp_prompt/completed` notifications. Multiple detached prompts
+    /// `_infinitecode/acp_prompt/completed` notifications. Multiple detached prompts
     /// may be in flight at once; each uses a distinct JSON-RPC `id` in
     /// [`PendingResponses`], so responses do not collide as long as ids stay unique.
     async fn turn_start_acp_prompt_detached(&mut self, params: TurnStartParams) -> Result<()> {
@@ -784,7 +784,7 @@ impl ServerClientReaderState {
             });
             return;
         }
-        if let Some(method) = devo_extension_inner_method(&notification.method)
+        if let Some(method) = infinitecode_extension_inner_method(&notification.method)
             && serde_json::from_value::<ServerEvent>(notification.params.clone()).is_ok()
         {
             let _ = self.notifications_tx.send(ServerNotificationMessage {
@@ -1130,7 +1130,7 @@ fn assistant_token_log_preview(text: &str) -> Option<String> {
 fn assistant_token_logging_enabled() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
     *ENABLED.get_or_init(|| {
-        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+        std::env::var("INFINITECODE_LOG_ASSISTANT_TOKEN_TEXT")
             .ok()
             .is_some_and(|value| {
                 matches!(
@@ -1144,7 +1144,7 @@ fn assistant_token_logging_enabled() -> bool {
 fn assistant_token_log_max_chars() -> usize {
     static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
     *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
-        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+        std::env::var("INFINITECODE_ASSISTANT_TOKEN_LOG_MAX_CHARS")
             .ok()
             .and_then(|value| value.parse::<usize>().ok())
             .filter(|value| *value > 0)

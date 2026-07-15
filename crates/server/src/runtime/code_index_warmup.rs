@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, mpsc};
 
-use devo_code_search::{CodeSearchService, ContentFilter};
+use infinitecode_code_search::{CodeSearchService, ContentFilter};
 
 const WARMUP_QUEUE_CAPACITY: usize = 16;
 
@@ -25,7 +25,7 @@ impl CodeIndexWarmup {
         let queued = Arc::new(Mutex::new(HashSet::new()));
         let worker_queued = Arc::clone(&queued);
         let sender = match std::thread::Builder::new()
-            .name("devo-code-index".to_string())
+            .name("infinitecode-code-index".to_string())
             .spawn(move || run_worker(receiver, worker_queued))
         {
             Ok(_) => Some(sender),
@@ -110,7 +110,7 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, Instant};
 
-    use devo_code_search::{CodeSearchError, EmbeddingProvider, HashEmbeddingProvider};
+    use infinitecode_code_search::{CodeSearchError, EmbeddingProvider, HashEmbeddingProvider};
     use pretty_assertions::assert_eq;
 
     use super::*;

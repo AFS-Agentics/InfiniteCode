@@ -1,6 +1,6 @@
 use super::super::*;
 
-use devo_core::ServerAuthConfig;
+use infinitecode_core::ServerAuthConfig;
 
 use crate::AcpAuthCapabilities;
 use crate::AcpAuthMethod;

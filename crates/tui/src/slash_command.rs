@@ -1,5 +1,5 @@
-pub use devo_protocol::SlashCommand;
-pub use devo_protocol::built_in_slash_commands;
+pub use infinitecode_protocol::SlashCommand;
+pub use infinitecode_protocol::built_in_slash_commands;
 
 #[cfg(test)]
 mod tests {

@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use devo_protocol::Model;
+use infinitecode_protocol::Model;
 use pretty_assertions::assert_eq;
 use tokio::sync::mpsc;
 
@@ -21,7 +21,7 @@ fn widget_with_model(model: Model) -> (ChatWidget, mpsc::UnboundedReceiver<AppEv
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(PathBuf::from("."), Some(model)),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,

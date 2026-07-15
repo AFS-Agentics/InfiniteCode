@@ -31,7 +31,7 @@ export const INFINITECODE_COMPAT = {
 // Types
 // ============================================================
 
-export interface DevoCheckResult {
+export interface InfiniteCodeCheckResult {
 	installed: boolean
 	version: string | null
 	path: string | null
@@ -47,7 +47,7 @@ export type ExecFileForCheck = (
 	callback: (err: Error | null, stdout: string) => void,
 ) => void
 
-export interface CheckDevoProgramOptions {
+export interface CheckInfiniteCodeProgramOptions {
 	program: string
 	env?: Record<string, string | undefined>
 	execFile?: ExecFileForCheck
@@ -59,9 +59,9 @@ export interface CheckDevoProgramOptions {
 
 /** Build the augmented PATH that includes ~/.infinitecode/bin. */
 function getAugmentedPath(): string {
-	const devoBinDir = path.join(homedir(), ".infinitecode", "bin")
+	const infinitecodeBinDir = path.join(homedir(), ".infinitecode", "bin")
 	const sep = process.platform === "win32" ? ";" : ":"
-	return `${devoBinDir}${sep}${process.env.PATH ?? ""}`
+	return `${infinitecodeBinDir}${sep}${process.env.PATH ?? ""}`
 }
 
 /** Run a command and return stdout, or null on failure. */
@@ -116,10 +116,10 @@ async function detectInfiniteCode(): Promise<{ version: string | null; path: str
 // ============================================================
 
 /**
- * Check whether Devo is installed and compatible with this version of Devo.
+ * Check whether InfiniteCode is installed and compatible with this version of InfiniteCode.
  * Runs the binary to get its version, then compares against the compatibility range.
  */
-export async function checkDevo(): Promise<DevoCheckResult> {
+export async function checkInfiniteCode(): Promise<InfiniteCodeCheckResult> {
 	log.info("Checking InfiniteCode CLI installation...")
 
 	const { version, path: binaryPath } = await detectInfiniteCode()
@@ -141,11 +141,11 @@ export async function checkDevo(): Promise<DevoCheckResult> {
 	return compatibilityResult(version, binaryPath)
 }
 
-export async function checkDevoProgram({
+export async function checkInfiniteCodeProgram({
 	program,
 	env = process.env,
 	execFile: execFileImpl,
-}: CheckDevoProgramOptions): Promise<DevoCheckResult> {
+}: CheckInfiniteCodeProgramOptions): Promise<InfiniteCodeCheckResult> {
 	log.info("Checking InfiniteCode runtime...", { program })
 	const versionOutput = await execAsync(program, ["--version"], env, execFileImpl)
 	if (!versionOutput) {
@@ -159,17 +159,17 @@ export async function checkDevoProgram({
 		}
 	}
 
-	const version = parseDevoVersion(versionOutput)
+	const version = parseInfiniteCodeVersion(versionOutput)
 	log.info("InfiniteCode runtime found", { version, path: program })
 	return compatibilityResult(version, program)
 }
 
-function parseDevoVersion(versionOutput: string): string {
+function parseInfiniteCodeVersion(versionOutput: string): string {
 	const match = versionOutput.match(/v?(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?)/)
 	return match ? match[1] : versionOutput.trim()
 }
 
-function compatibilityResult(version: string, binaryPath: string | null): DevoCheckResult {
+function compatibilityResult(version: string, binaryPath: string | null): InfiniteCodeCheckResult {
 	// Coerce loose version strings (e.g. "1.3" -> "1.3.0") into valid semver.
 	// Non-semver versions (e.g. "local", "dev", "unknown") are assumed compatible --
 	// these are typically local/dev builds where the user knows what they're doing.
@@ -208,7 +208,7 @@ function compatibilityResult(version: string, binaryPath: string | null): DevoCh
 			path: binaryPath,
 			compatible: false,
 			compatibility: "too-old",
-			message: `InfiniteCode CLI ${version} is too old. Requires ${DEVO_COMPAT.supported}.`,
+			message: `InfiniteCode CLI ${version} is too old. Requires ${INFINITECODE_COMPAT.supported}.`,
 		}
 	}
 
@@ -220,7 +220,7 @@ function compatibilityResult(version: string, binaryPath: string | null): DevoCh
 			path: binaryPath,
 			compatible: true,
 			compatibility: "too-new",
-			message: `InfiniteCode CLI ${version} is newer than tested. Tested with ${DEVO_COMPAT.tested}. Some features may not work as expected.`,
+			message: `InfiniteCode CLI ${version} is newer than tested. Tested with ${INFINITECODE_COMPAT.tested}. Some features may not work as expected.`,
 		}
 	}
 

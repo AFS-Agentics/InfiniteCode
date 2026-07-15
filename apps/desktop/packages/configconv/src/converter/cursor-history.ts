@@ -1,7 +1,7 @@
 /**
  * Cursor chat history converter.
  *
- * Converts Cursor chat sessions (from state.vscdb) to the Devo session format.
+ * Converts Cursor chat sessions (from state.vscdb) to the InfiniteCode session format.
  * Uses the same ConvertedSession/ConvertedMessage types as the Claude Code history
  * converter, so the writer layer can handle both identically.
  */
@@ -17,7 +17,7 @@ import type { MigrationReport } from "../types/report"
 import { createEmptyReport } from "../types/report"
 
 /**
- * Convert Cursor chat history to Devo session format.
+ * Convert Cursor chat history to InfiniteCode session format.
  */
 export function convertCursorHistory(history: CursorHistoryScanResult): {
 	sessions: ConvertedSession[]
@@ -55,7 +55,7 @@ export function convertCursorHistory(history: CursorHistoryScanResult): {
 }
 
 /**
- * Convert a single Cursor chat session to Devo format.
+ * Convert a single Cursor chat session to InfiniteCode format.
  */
 function convertSession(session: CursorHistorySession): ConvertedSession | null {
 	const projectId = hashProjectPath(session.projectPath)
@@ -90,7 +90,7 @@ function convertSession(session: CursorHistorySession): ConvertedSession | null 
 }
 
 /**
- * Convert Cursor chat messages to Devo message format.
+ * Convert Cursor chat messages to InfiniteCode message format.
  */
 function convertMessages(
 	cursorMessages: CursorHistoryMessage[],
@@ -122,7 +122,7 @@ function convertMessages(
 }
 
 /**
- * Convert a single Cursor message to Devo parts.
+ * Convert a single Cursor message to InfiniteCode parts.
  */
 function convertParts(msg: CursorHistoryMessage, msgId: string): ConvertedPart[] {
 	const parts: ConvertedPart[] = []

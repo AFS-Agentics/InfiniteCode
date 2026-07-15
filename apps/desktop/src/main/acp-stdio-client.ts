@@ -9,9 +9,9 @@ import type { AcpTrafficLogRecord, AcpTrafficLogger } from "./acp-traffic-log"
 import { createLogger } from "./logger"
 
 const log = createLogger("acp-stdio-client")
-export const DESKTOP_NETWORK_PROXY_MODE_ENV = "DEVO_DESKTOP_NETWORK_PROXY_MODE"
-export const DESKTOP_NETWORK_PROXY_URL_ENV = "DEVO_DESKTOP_NETWORK_PROXY_URL"
-export const DESKTOP_NETWORK_NO_PROXY_ENV = "DEVO_DESKTOP_NETWORK_NO_PROXY"
+export const DESKTOP_NETWORK_PROXY_MODE_ENV = "INFINITECODE_DESKTOP_NETWORK_PROXY_MODE"
+export const DESKTOP_NETWORK_PROXY_URL_ENV = "INFINITECODE_DESKTOP_NETWORK_PROXY_URL"
+export const DESKTOP_NETWORK_NO_PROXY_ENV = "INFINITECODE_DESKTOP_NETWORK_NO_PROXY"
 
 const PROXY_ENV_KEYS = [
 	"HTTP_PROXY",
@@ -83,7 +83,7 @@ export function buildServerProcessEnv({
 	runtimeBinDir,
 	networkProxy,
 }: BuildServerProcessEnvOptions = {}): NodeJS.ProcessEnv {
-	const binDir = runtimeBinDir ?? path.join(homeDir, ".devo", "bin")
+	const binDir = runtimeBinDir ?? path.join(homeDir, ".infinitecode", "bin")
 	const env: NodeJS.ProcessEnv = {
 		...baseEnv,
 		...optionsEnv,
@@ -197,7 +197,7 @@ export class StdioAcpClient implements AcpTransport {
 	start(): void {
 		if (this.child) return
 
-		const devoBinDir = path.join(homedir(), ".infinitecode", "bin")
+		const infinitecodeBinDir = path.join(homedir(), ".infinitecode", "bin")
 		const program = this.options.program ?? "infinitecode"
 		const runtimeBinDir = path.isAbsolute(program) ? path.dirname(program) : undefined
 		const env = buildServerProcessEnv({
@@ -212,7 +212,7 @@ export class StdioAcpClient implements AcpTransport {
 			program,
 			args,
 			cwd,
-			binDir: runtimeBinDir ?? devoBinDir,
+			binDir: runtimeBinDir ?? infinitecodeBinDir,
 		})
 		const child = spawn(program, args, {
 			cwd,

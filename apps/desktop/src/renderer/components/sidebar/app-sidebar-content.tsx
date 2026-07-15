@@ -1,5 +1,5 @@
-import { SidebarContent, SidebarFooter } from "@devo/ui/components/sidebar"
-import { cn } from "@devo/ui/lib/utils"
+import { SidebarContent, SidebarFooter } from "@infinitecode/ui/components/sidebar"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { useAtom, useAtomValue } from "jotai"
 import {

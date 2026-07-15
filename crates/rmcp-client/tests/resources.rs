@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use devo_rmcp_client::ElicitationAction;
-use devo_rmcp_client::ElicitationResponse;
-use devo_rmcp_client::LocalStdioServerLauncher;
-use devo_rmcp_client::RmcpClient;
+use infinitecode_rmcp_client::ElicitationAction;
+use infinitecode_rmcp_client::ElicitationResponse;
+use infinitecode_rmcp_client::LocalStdioServerLauncher;
+use infinitecode_rmcp_client::RmcpClient;
 use futures::FutureExt as _;
 use rmcp::model::AnnotateAble;
 use rmcp::model::ClientCapabilities;

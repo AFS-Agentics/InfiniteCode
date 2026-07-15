@@ -1,13 +1,13 @@
 ---
 title: Development Setup
-description: Build and run Devo locally as a contributor.
+description: Build and run InfiniteCode locally as a contributor.
 ---
 
-This page covers the local setup needed to work on Devo code and docs.
+This page covers the local setup needed to work on InfiniteCode code and docs.
 
 ## Toolchains
 
-Devo is a Rust workspace plus a Next.js docs app.
+InfiniteCode is a Rust workspace plus a Next.js docs app.
 
 | Area | Toolchain |
 | --- | --- |
@@ -27,20 +27,20 @@ cargo build
 Run the CLI from source:
 
 ```bash
-cargo run -p devo-cli -- --help
-cargo run -p devo-cli
+cargo run -p infinitecode-cli -- --help
+cargo run -p infinitecode-cli
 ```
 
 Run a focused package test:
 
 ```bash
-cargo test -p devo-config
+cargo test -p infinitecode-config
 ```
 
 Format a changed Rust package:
 
 ```bash
-cargo fmt --package devo-config
+cargo fmt --package infinitecode-config
 ```
 
 If a Rust command is slow because another Rust command is holding a build lock,
@@ -78,20 +78,20 @@ npm run build
 
 ## Config For Local Testing
 
-Use a separate `DEVO_HOME` when testing config migrations or onboarding:
+Use a separate `INFINITECODE_HOME` when testing config migrations or onboarding:
 
 ```bash
-mkdir -p /tmp/devo-dev-home
-DEVO_HOME=/tmp/devo-dev-home cargo run -p devo-cli -- onboard
+mkdir -p /tmp/infinitecode-dev-home
+INFINITECODE_HOME=/tmp/infinitecode-dev-home cargo run -p infinitecode-cli -- onboard
 ```
 
-`DEVO_HOME` must point to an existing directory when set.
+`INFINITECODE_HOME` must point to an existing directory when set.
 
 ## Repository Conventions
 
 Follow the repository conventions in `AGENTS.md`:
 
-- crate names use the `devo-` prefix;
+- crate names use the `infinitecode-` prefix;
 - prefer inline `format!` arguments;
 - collapse nested `if` statements when clippy would flag them;
 - make match expressions exhaustive when practical;

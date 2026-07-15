@@ -1,10 +1,10 @@
-use devo_core::{
+use infinitecode_core::{
     CommandExecutionItem, ContentBlock, Message, SessionRecord, TextItem, ToolCallItem,
     ToolResultItem, TurnItem, TurnRecord,
 };
-use devo_protocol::{SessionHistoryMetadata, SessionPlanStep, SessionPlanStepStatus};
-use devo_util_git::extract_paths_from_patch;
-use devo_util_shell_command::parse_command::parse_command;
+use infinitecode_protocol::{SessionHistoryMetadata, SessionPlanStep, SessionPlanStepStatus};
+use infinitecode_util_git::extract_paths_from_patch;
+use infinitecode_util_shell_command::parse_command::parse_command;
 
 use crate::session::{
     SessionHistoryItem, SessionHistoryItemKind, SessionHistoryToolIo, SessionMetadata,
@@ -41,7 +41,7 @@ impl DefaultProjection {
             for block in &message.content {
                 match block {
                     ContentBlock::Text { text } if !text.is_empty() => {
-                        let kind = if message.role == devo_core::Role::User {
+                        let kind = if message.role == infinitecode_core::Role::User {
                             SessionHistoryItemKind::User
                         } else {
                             SessionHistoryItemKind::Assistant
@@ -355,21 +355,21 @@ fn parse_edited_history_metadata(output: &serde_json::Value) -> Option<SessionHi
             .and_then(serde_json::Value::as_u64)
             .unwrap_or(0);
         let change = match kind {
-            "add" => devo_protocol::protocol::FileChange::Add {
+            "add" => infinitecode_protocol::protocol::FileChange::Add {
                 content: file
                     .get("content")
                     .and_then(serde_json::Value::as_str)
                     .map(ToOwned::to_owned)
                     .unwrap_or_else(|| "\n".repeat(additions as usize)),
             },
-            "delete" => devo_protocol::protocol::FileChange::Delete {
+            "delete" => infinitecode_protocol::protocol::FileChange::Delete {
                 content: file
                     .get("content")
                     .and_then(serde_json::Value::as_str)
                     .map(ToOwned::to_owned)
                     .unwrap_or_else(|| "\n".repeat(deletions as usize)),
             },
-            "update" | "move" => devo_protocol::protocol::FileChange::Update {
+            "update" | "move" => infinitecode_protocol::protocol::FileChange::Update {
                 unified_diff: file
                     .get("diff")
                     .or_else(|| file.get("patch"))
@@ -402,7 +402,7 @@ fn parse_edited_history_metadata(output: &serde_json::Value) -> Option<SessionHi
         for path in extract_paths_from_patch(&diff) {
             changes.insert(
                 std::path::PathBuf::from(path),
-                devo_protocol::protocol::FileChange::Update {
+                infinitecode_protocol::protocol::FileChange::Update {
                     unified_diff: diff.clone(),
                     old_text: None,
                     new_text: None,
@@ -494,7 +494,7 @@ impl TurnProjector for DefaultProjection {
 
 fn summarize_tool_call(tool_name: &str, input: &serde_json::Value) -> String {
     let cwd = std::env::current_dir().unwrap_or_default();
-    devo_core::tools::tool_summary::tool_summary(tool_name, input, &cwd).replacen(": ", " ", 1)
+    infinitecode_core::tools::tool_summary::tool_summary(tool_name, input, &cwd).replacen(": ", " ", 1)
 }
 
 fn summarize_tool_result(tool_name: Option<&str>, is_error: bool) -> String {
@@ -512,9 +512,9 @@ mod tests {
 
     use super::history_item_from_turn_item;
     use crate::session::{SessionHistoryItem, SessionHistoryItemKind};
-    use devo_core::TurnItem;
-    use devo_core::{CommandExecutionItem, TextItem, ToolCallItem, ToolResultItem};
-    use devo_protocol::{
+    use infinitecode_core::TurnItem;
+    use infinitecode_core::{CommandExecutionItem, TextItem, ToolCallItem, ToolResultItem};
+    use infinitecode_protocol::{
         SessionHistoryMetadata, SessionHistoryToolIo, SessionPlanStepStatus,
         parse_command::ParsedCommand,
     };
@@ -699,7 +699,7 @@ mod tests {
             SessionHistoryMetadata::Explored { actions } => {
                 assert!(matches!(
                     &actions[0],
-                    devo_protocol::parse_command::ParsedCommand::Read { name, .. }
+                    infinitecode_protocol::parse_command::ParsedCommand::Read { name, .. }
                     if name == "crates/tui/src/mod.rs"
                 ));
             }
@@ -900,7 +900,7 @@ mod tests {
         else {
             panic!("expected edited metadata");
         };
-        let devo_protocol::protocol::FileChange::Update { unified_diff, .. } = changes
+        let infinitecode_protocol::protocol::FileChange::Update { unified_diff, .. } = changes
             .get(&std::path::PathBuf::from("foo.txt"))
             .expect("update change")
         else {

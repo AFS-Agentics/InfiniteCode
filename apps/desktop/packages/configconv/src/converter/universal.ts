@@ -2,7 +2,7 @@
  * Universal converter orchestrator.
  *
  * Converts between any supported agent configuration formats:
- *   Claude Code <-> Devo <-> Cursor
+ *   Claude Code <-> InfiniteCode <-> Cursor
  *
  * Architecture:
  *   Source format -> toCanonical() -> Canonical IR -> fromCanonical() -> Target format
@@ -17,11 +17,11 @@ import type { CursorScanResult } from "../types/cursor"
 import type { ScanResult } from "../types/scan-result"
 import { canonicalToClaudeCode } from "./from-canonical/to-claude-code"
 import { canonicalToCursor } from "./from-canonical/to-cursor"
-import { canonicalToDevo } from "./from-canonical/to-devo"
+import { canonicalToInfiniteCode } from "./from-canonical/to-infinitecode"
 import { claudeCodeToCanonical } from "./to-canonical/claude-code"
 import { cursorToCanonical } from "./to-canonical/cursor"
-import type { DevoScanResult } from "./to-canonical/devo"
-import { openCodeToCanonical } from "./to-canonical/devo"
+import type { InfiniteCodeScanResult } from "./to-canonical/infinitecode"
+import { openCodeToCanonical } from "./to-canonical/infinitecode"
 
 // ============================================================
 // Type-safe scan result union
@@ -29,7 +29,7 @@ import { openCodeToCanonical } from "./to-canonical/devo"
 
 export type AnyScanResult =
 	| { format: "claude-code"; data: ScanResult }
-	| { format: "devo"; data: DevoScanResult }
+	| { format: "infinitecode"; data: InfiniteCodeScanResult }
 	| { format: "cursor"; data: CursorScanResult }
 
 // ============================================================
@@ -61,7 +61,7 @@ export function toCanonical(scan: AnyScanResult): CanonicalScanResult {
 	switch (scan.format) {
 		case "claude-code":
 			return claudeCodeToCanonical(scan.data)
-		case "devo":
+		case "infinitecode":
 			return openCodeToCanonical(scan.data)
 		case "cursor":
 			return cursorToCanonical(scan.data)
@@ -83,8 +83,8 @@ export function fromCanonical(
 	switch (targetFormat) {
 		case "claude-code":
 			return canonicalToClaudeCode(canonical)
-		case "devo":
-			return canonicalToDevo(canonical, options)
+		case "infinitecode":
+			return canonicalToInfiniteCode(canonical, options)
 		case "cursor":
 			return canonicalToCursor(canonical)
 	}
@@ -94,7 +94,7 @@ export function fromCanonical(
  * Get all supported format pairs for conversion.
  */
 export function getSupportedConversions(): Array<{ from: AgentFormat; to: AgentFormat }> {
-	const formats: AgentFormat[] = ["claude-code", "devo", "cursor"]
+	const formats: AgentFormat[] = ["claude-code", "infinitecode", "cursor"]
 	const pairs: Array<{ from: AgentFormat; to: AgentFormat }> = []
 
 	for (const from of formats) {
@@ -115,8 +115,8 @@ export function formatName(format: AgentFormat): string {
 	switch (format) {
 		case "claude-code":
 			return "Claude Code"
-		case "devo":
-			return "Devo"
+		case "infinitecode":
+			return "InfiniteCode"
 		case "cursor":
 			return "Cursor"
 	}

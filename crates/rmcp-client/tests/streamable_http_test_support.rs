@@ -13,10 +13,10 @@ use std::path::PathBuf;
 use std::time::Duration;
 use std::time::Instant;
 
-use devo_config::OAuthCredentialsStoreMode;
-use devo_rmcp_client::ElicitationAction;
-use devo_rmcp_client::ElicitationResponse;
-use devo_rmcp_client::RmcpClient;
+use infinitecode_config::OAuthCredentialsStoreMode;
+use infinitecode_rmcp_client::ElicitationAction;
+use infinitecode_rmcp_client::ElicitationResponse;
+use infinitecode_rmcp_client::RmcpClient;
 use futures::FutureExt as _;
 use pretty_assertions::assert_eq;
 use rmcp::model::CallToolResult;

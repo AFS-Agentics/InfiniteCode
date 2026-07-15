@@ -1,22 +1,22 @@
 use std::io;
 
-use devo_protocol::HostedToolDefinition;
-use devo_protocol::HostedWebSearchTool;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::RequestContent;
-use devo_protocol::RequestMessage;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseExtra;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderHttpOptions;
-use devo_provider::anthropic::AnthropicProvider;
-use devo_provider::openai::OpenAIProvider;
-use devo_provider::openai::OpenAIResponsesProvider;
+use infinitecode_protocol::HostedToolDefinition;
+use infinitecode_protocol::HostedWebSearchTool;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::RequestContent;
+use infinitecode_protocol::RequestMessage;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseExtra;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderHttpOptions;
+use infinitecode_provider::anthropic::AnthropicProvider;
+use infinitecode_provider::openai::OpenAIProvider;
+use infinitecode_provider::openai::OpenAIResponsesProvider;
 use futures::StreamExt;
 use pretty_assertions::assert_eq;
 use tokio::io::AsyncReadExt;
@@ -33,7 +33,7 @@ async fn openai_chat_completions_applies_custom_headers_after_builtin_headers() 
             ProviderHttpOptions::from_raw(
                 None,
                 Some(
-                    r#"{"Authorization":"custom-auth","Content-Type":"application/custom","X-Devo":"yes"}"#
+                    r#"{"Authorization":"custom-auth","Content-Type":"application/custom","X-InfiniteCode":"yes"}"#
                         .to_string(),
                 ),
             )
@@ -53,7 +53,7 @@ async fn openai_chat_completions_applies_custom_headers_after_builtin_headers() 
         header_value(&request, "content-type"),
         Some("application/custom")
     );
-    assert_eq!(header_value(&request, "x-devo"), Some("yes"));
+    assert_eq!(header_value(&request, "x-infinitecode"), Some("yes"));
 }
 
 /// Trace: L2-DES-APP-005, L2-DES-MODEL-001
@@ -66,7 +66,7 @@ async fn openai_responses_applies_custom_headers_after_builtin_headers() {
             ProviderHttpOptions::from_raw(
                 None,
                 Some(
-                    r#"{"Authorization":"custom-auth","Content-Type":"application/custom","X-Devo":"yes"}"#
+                    r#"{"Authorization":"custom-auth","Content-Type":"application/custom","X-InfiniteCode":"yes"}"#
                         .to_string(),
                 ),
             )
@@ -86,7 +86,7 @@ async fn openai_responses_applies_custom_headers_after_builtin_headers() {
         header_value(&request, "content-type"),
         Some("application/custom")
     );
-    assert_eq!(header_value(&request, "x-devo"), Some("yes"));
+    assert_eq!(header_value(&request, "x-infinitecode"), Some("yes"));
 }
 
 /// Trace: L2-DES-APP-005, L2-DES-MODEL-001
@@ -99,7 +99,7 @@ async fn anthropic_messages_applies_custom_headers_after_builtin_headers() {
             ProviderHttpOptions::from_raw(
                 None,
                 Some(
-                    r#"{"x-api-key":"custom-key","anthropic-version":"custom-version","Content-Type":"application/custom","X-Devo":"yes"}"#
+                    r#"{"x-api-key":"custom-key","anthropic-version":"custom-version","Content-Type":"application/custom","X-InfiniteCode":"yes"}"#
                         .to_string(),
                 ),
             )
@@ -123,7 +123,7 @@ async fn anthropic_messages_applies_custom_headers_after_builtin_headers() {
         header_value(&request, "content-type"),
         Some("application/custom")
     );
-    assert_eq!(header_value(&request, "x-devo"), Some("yes"));
+    assert_eq!(header_value(&request, "x-infinitecode"), Some("yes"));
 }
 
 #[tokio::test]
@@ -650,7 +650,7 @@ fn request_body_json(request: &str) -> serde_json::Value {
 
 fn minimal_request() -> ModelRequest {
     ModelRequest {
-        model_slug: devo_protocol::ModelProfileKey::Generic,
+        model_slug: infinitecode_protocol::ModelProfileKey::Generic,
         model: "test-model".to_string(),
         system: None,
         messages: vec![RequestMessage {
@@ -671,7 +671,7 @@ fn minimal_request() -> ModelRequest {
 
 fn anthropic_split_tool_result_request() -> ModelRequest {
     ModelRequest {
-        model_slug: devo_protocol::ModelProfileKey::Generic,
+        model_slug: infinitecode_protocol::ModelProfileKey::Generic,
         model: "test-model".to_string(),
         system: None,
         messages: vec![
@@ -732,7 +732,7 @@ fn deepseek_api_key() -> Option<String> {
 
 fn deepseek_provider_hosted_web_search_request() -> ModelRequest {
     ModelRequest {
-        model_slug: devo_protocol::ModelProfileKey::CatalogSlug(
+        model_slug: infinitecode_protocol::ModelProfileKey::CatalogSlug(
             "deepseek-v4-flash".to_string(),
         ),
         model: "deepseek-v4-flash".to_string(),

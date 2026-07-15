@@ -145,7 +145,7 @@ mod tests {
             },
             cancel_token: tokio_util::sync::CancellationToken::new(),
             agent_scope: crate::contracts::ToolAgentScope::Parent,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: None,

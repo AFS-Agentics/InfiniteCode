@@ -1,6 +1,6 @@
 mod records;
 
-pub use devo_protocol::{ItemId, SessionId, SessionTitleState, TurnId, TurnStatus, TurnUsage};
+pub use infinitecode_protocol::{ItemId, SessionId, SessionTitleState, TurnId, TurnStatus, TurnUsage};
 pub use records::{
     ApprovalDecisionItem, ApprovalRequestItem, CommandExecutionItem, CompactionSnapshotLine,
     ItemLine, ItemRecord, MessageEditRecordedLine, RolloutLine, SessionContextUpdatedLine,

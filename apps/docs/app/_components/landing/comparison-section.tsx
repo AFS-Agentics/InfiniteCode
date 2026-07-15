@@ -1,7 +1,7 @@
 import Image from "next/image";
 
 import { type LandingCopy } from "./data";
-import { renderWithDevoMark } from "./devo-word";
+import { renderWithInfiniteCodeMark } from "./infinitecode-word";
 
 type ComparisonSectionProps = {
   copy: LandingCopy["comparison"];
@@ -12,7 +12,7 @@ type ProductMarkProps = {
 };
 
 const productLogos: Record<string, string> = {
-  Devo: "/devo-mark.svg",
+  InfiniteCode: "/infinitecode-mark.svg",
   "Claude Code": "/brand/claude-code.svg",
   Droid: "/brand/droid.svg",
   OpenCode: "/brand/opencode.svg",
@@ -65,7 +65,7 @@ export function ComparisonSection({ copy }: ComparisonSectionProps) {
               {copy.kicker}
             </p>
             <h2 className="mt-4 max-w-3xl text-4xl font-semibold tracking-normal text-white sm:text-5xl">
-              {renderWithDevoMark(copy.title)}
+              {renderWithInfiniteCodeMark(copy.title)}
             </h2>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { atom } from "jotai"
-import type { DevoProject } from "../lib/types"
+import type { InfiniteCodeProject } from "../lib/types"
 
 // ============================================================
 // Types
@@ -9,7 +9,7 @@ import type { DevoProject } from "../lib/types"
  * Granular startup phase for UI feedback.
  *
  * - `idle`: initial state, discovery hasn't started
- * - `starting-server`: waiting for the Devo server to start/connect
+ * - `starting-server`: waiting for the InfiniteCode server to start/connect
  * - `connecting`: establishing ACP event stream
  * - `loading-projects`: fetching the project list from the API
  * - `loading-sessions`: fetching sessions for discovered projects
@@ -39,8 +39,8 @@ export interface DiscoveryState {
 	error: string | null
 	/** Granular startup phase for loading UI */
 	phase: DiscoveryPhase
-	/** Projects discovered from the Devo API (Project type from SDK) */
-	projects: DevoProject[]
+	/** Projects discovered from the InfiniteCode API (Project type from SDK) */
+	projects: InfiniteCodeProject[]
 }
 
 // ============================================================

@@ -20,12 +20,12 @@ describe("startup overlay background", () => {
 
 	test("uses a concrete pre-React splash background token", () => {
 		expect({
-			definesBackground: indexHtmlSource.includes("--devo-startup-background: #181818"),
-			definesLightBackground: indexHtmlSource.includes("--devo-startup-background: #ffffff"),
+			definesBackground: indexHtmlSource.includes("--infinitecode-startup-background: #181818"),
+			definesLightBackground: indexHtmlSource.includes("--infinitecode-startup-background: #ffffff"),
 			appliesToHtml: indexHtmlSource.includes("html {"),
 			appliesToBody: indexHtmlSource.includes("body {"),
 			appliesToSplash: indexHtmlSource.includes(
-				"background: var(--devo-startup-background)",
+				"background: var(--infinitecode-startup-background)",
 			),
 			usesTransparentSplash: indexHtmlSource.includes("background: transparent"),
 		}).toEqual({

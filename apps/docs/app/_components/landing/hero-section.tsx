@@ -10,7 +10,7 @@ import {
   type LandingCopy,
   type Locale,
 } from "./data";
-import { DevoWord, renderWithDevoMark } from "./devo-word";
+import { InfiniteCodeWord, renderWithInfiniteCodeMark } from "./infinitecode-word";
 import { ArrowIcon, CopyIcon } from "./icons";
 
 const installTabs = ["unix", "windows", "source"] as const;
@@ -46,30 +46,30 @@ function HeaderBrand() {
     <span ref={brandRef} className="inline-flex items-center gap-2.5">
       <span className="inline-flex h-10 w-10 items-center justify-center">
         <Image
-          src="/devo-mark.svg"
+          src="/infinitecode-mark.svg"
           alt=""
           width={36}
           height={36}
           className={[
             "h-9 w-9",
-            shouldAnimate ? "devo-brand-mark-attention" : "",
+            shouldAnimate ? "infinitecode-brand-mark-attention" : "",
           ].join(" ")}
           key={`brand-mark-${attentionCycle}`}
         />
       </span>
-      <span className="sr-only">Devo</span>
+      <span className="sr-only">InfiniteCode</span>
       <span
         aria-hidden="true"
         className={[
-          "devo-brand-word",
-          shouldAnimate ? "devo-brand-word-attention" : "",
+          "infinitecode-brand-word",
+          shouldAnimate ? "infinitecode-brand-word-attention" : "",
         ].join(" ")}
         key={`brand-word-${attentionCycle}`}
       >
-        <span className="devo-brand-word-track">
+        <span className="infinitecode-brand-word-track">
           <span>DEVO</span>
-          <span>devo</span>
-          <span>Devo</span>
+          <span>infinitecode</span>
+          <span>InfiniteCode</span>
         </span>
       </span>
     </span>
@@ -105,7 +105,7 @@ export function HeroSection({
   return (
     <section className="relative isolate min-h-[94vh] overflow-hidden md:min-h-[92vh]">
       <Image
-        src="/devo-hero-halftone.png"
+        src="/infinitecode-hero-halftone.png"
         alt=""
         fill
         priority
@@ -119,7 +119,7 @@ export function HeroSection({
         <Link
           href="/"
           className="inline-flex items-center gap-2.5 text-base font-bold tracking-normal text-white"
-          aria-label="Devo home"
+          aria-label="InfiniteCode home"
         >
           <HeaderBrand />
         </Link>
@@ -145,7 +145,7 @@ export function HeroSection({
             </a>
             <a
               className="inline-flex min-h-10 items-center justify-center rounded-full px-3 transition-colors hover:bg-white/10 hover:text-white sm:min-h-9 sm:px-4"
-              href="https://github.com/7df-lab/devo"
+              href="https://github.com/AFS-Agentics/InfiniteCode"
               rel="noreferrer"
               target="_blank"
             >
@@ -180,7 +180,7 @@ export function HeroSection({
       <div className="relative z-10 mx-auto grid min-h-[calc(92vh-84px)] w-full max-w-7xl items-center gap-12 px-5 pb-16 pt-8 sm:px-8 lg:grid-cols-[minmax(0,0.82fr)_minmax(28rem,0.68fr)] lg:px-10">
         <div className="max-w-3xl">
           <h1 className="text-[clamp(3.6rem,10vw,8.8rem)] font-semibold leading-[0.84] tracking-normal text-white">
-            <DevoWord
+            <InfiniteCodeWord
               className="gap-[0.16em]"
               iconClassName="h-[0.66em] w-[0.66em]"
             />
@@ -193,7 +193,7 @@ export function HeroSection({
               className="inline-flex min-h-12 items-center justify-center gap-2 bg-[#ff941f] px-5 text-sm font-bold text-[#080a0e] transition hover:-translate-y-px hover:bg-[#ffb45f]"
               onClick={highlightInstallCard}
             >
-              {renderWithDevoMark(copy.hero.primaryCta)}
+              {renderWithInfiniteCodeMark(copy.hero.primaryCta)}
               <ArrowIcon />
             </a>
             <Link
@@ -209,7 +209,7 @@ export function HeroSection({
           id="install"
           className={[
             "relative w-full overflow-hidden border border-white/14 bg-white/[0.055] shadow-[0_2rem_6rem_rgb(0_0_0_/_32%)] backdrop-blur-2xl",
-            installAttentionCycle > 0 ? "devo-install-card-attention" : "",
+            installAttentionCycle > 0 ? "infinitecode-install-card-attention" : "",
           ].join(" ")}
           key={`install-card-${installAttentionCycle}`}
         >
@@ -234,7 +234,7 @@ export function HeroSection({
           <div className="flex min-h-14 items-center justify-between gap-4 border-b border-white/10 px-4 font-mono text-sm text-white/48">
             <span>{copy.install.terminalTitle}</span>
             <button
-              className="devo-install-copy-button inline-flex min-h-9 items-center gap-2 border border-white/14 bg-white/[0.045] px-3 font-sans text-sm font-bold text-white transition hover:border-[#60A5FA]/45 hover:bg-[#60A5FA]/12"
+              className="infinitecode-install-copy-button inline-flex min-h-9 items-center gap-2 border border-white/14 bg-white/[0.045] px-3 font-sans text-sm font-bold text-white transition hover:border-[#60A5FA]/45 hover:bg-[#60A5FA]/12"
               onClick={copyInstallCommand}
               type="button"
             >
@@ -242,7 +242,7 @@ export function HeroSection({
               {copied ? copy.install.copied : copy.install.copy}
             </button>
           </div>
-          <pre className="devo-install-command min-h-44 overflow-x-auto whitespace-pre-wrap break-words bg-black/22 p-5 font-mono text-[clamp(0.88rem,1.35vw,1.02rem)] leading-8 text-white/90 sm:min-h-52 sm:p-6">
+          <pre className="infinitecode-install-command min-h-44 overflow-x-auto whitespace-pre-wrap break-words bg-black/22 p-5 font-mono text-[clamp(0.88rem,1.35vw,1.02rem)] leading-8 text-white/90 sm:min-h-52 sm:p-6">
             <code>{command}</code>
           </pre>
         </div>

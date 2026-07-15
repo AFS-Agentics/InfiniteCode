@@ -2,7 +2,7 @@
 description = "Secret redaction, approval policy, and sandbox policy contracts"
 edition.workspace = true
 license.workspace = true
-name = "devo-safety"
+name = "infinitecode-safety"
 version.workspace = true
 
 [dependencies]

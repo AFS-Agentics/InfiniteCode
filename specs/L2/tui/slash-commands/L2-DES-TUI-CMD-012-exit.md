@@ -18,7 +18,7 @@ Define the TUI behavior for `/exit`, which exits the TUI while preserving termin
 ## Command Contract
 
 - Command: `/exit`
-- Description: `exit Devo`
+- Description: `exit InfiniteCode`
 - Parameters: none in the first milestone.
 - Mutability: TUI process lifecycle only, unless the user also chooses an active-work policy.
 - Active-turn availability: allowed, but must clearly handle active work.

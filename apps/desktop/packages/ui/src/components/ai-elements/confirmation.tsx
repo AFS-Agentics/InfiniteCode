@@ -1,8 +1,8 @@
 "use client"
 
-import { Alert, AlertDescription } from "@devo/ui/components/alert"
-import { Button } from "@devo/ui/components/button"
-import { cn } from "@devo/ui/lib/utils"
+import { Alert, AlertDescription } from "@infinitecode/ui/components/alert"
+import { Button } from "@infinitecode/ui/components/button"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { ToolUIPart } from "ai"
 import type { ComponentProps, ReactNode } from "react"
 import { createContext, useContext } from "react"

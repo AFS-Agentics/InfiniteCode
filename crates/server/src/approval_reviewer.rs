@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 
-use devo_core::tools::ToolPermissionRequest;
-use devo_protocol::{
+use infinitecode_core::tools::ToolPermissionRequest;
+use infinitecode_protocol::{
     ModelRequest, RequestContent, RequestMessage, ResponseContent, SamplingControls,
 };
 
@@ -17,10 +17,10 @@ pub(crate) fn build_approval_review_request(
     request: &ToolPermissionRequest,
 ) -> ModelRequest {
     ModelRequest {
-        model_slug: devo_protocol::ModelProfileKey::Generic,
+        model_slug: infinitecode_protocol::ModelProfileKey::Generic,
         model,
         system: Some(
-            "You are Devo's automatic approval reviewer. Decide whether a tool approval request is safe under the user's active policy. Respond with exactly one compact JSON object and no markdown: {\"decision\":\"approve|deny|uncertain\",\"rationale\":\"short reason\"}. Approve only when the action is clearly low risk and scoped to the stated target. Deny destructive, credential, privilege escalation, or ambiguous high-impact actions. Use uncertain when more context or user intent is needed."
+            "You are InfiniteCode's automatic approval reviewer. Decide whether a tool approval request is safe under the user's active policy. Respond with exactly one compact JSON object and no markdown: {\"decision\":\"approve|deny|uncertain\",\"rationale\":\"short reason\"}. Approve only when the action is clearly low risk and scoped to the stated target. Deny destructive, credential, privilege escalation, or ambiguous high-impact actions. Use uncertain when more context or user intent is needed."
                 .to_string(),
         ),
         messages: vec![RequestMessage {
@@ -151,7 +151,7 @@ mod tests {
             cwd: std::path::PathBuf::from("repo"),
             session_id: "session".to_string(),
             turn_id: Some("turn".to_string()),
-            resource: devo_safety::ResourceKind::ShellExec,
+            resource: infinitecode_safety::ResourceKind::ShellExec,
             action_summary: "Run git add -A".to_string(),
             justification: Some("stage files".to_string()),
             path: None,

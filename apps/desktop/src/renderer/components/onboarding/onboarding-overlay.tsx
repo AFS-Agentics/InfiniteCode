@@ -5,7 +5,7 @@
  * Uses Framer Motion for step transitions and a progress indicator at the top.
  *
  * Core flow: Welcome -> Environment Check -> Complete (3 steps).
- * Migration from any detected provider (Claude Code, Cursor, Devo, OpenCode) is an
+ * Migration from any detected provider (Claude Code, Cursor, InfiniteCode, OpenCode) is an
  * optional detour the user can trigger from the Complete screen.
  */
 
@@ -38,7 +38,7 @@ interface OnboardingOverlayProps {
 		skippedSteps: string[]
 		migrationPerformed: boolean
 		migratedFrom: string[]
-		devoVersion: string | null
+		infinitecodeVersion: string | null
 		providersConnected: number
 	}) => void
 }
@@ -64,7 +64,7 @@ const STEP_TRANSITION = {
 export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
 	const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome")
 	const [skippedSteps, setSkippedSteps] = useState<string[]>([])
-	const [devoVersion, setDevoVersion] = useState<string | null>(null)
+	const [infinitecodeVersion, setInfiniteCodeVersion] = useState<string | null>(null)
 	const [providersConnected, setProvidersConnected] = useState(0)
 	const [migratedProviders, setMigratedProviders] = useState<string[]>([])
 
@@ -96,7 +96,7 @@ export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
 
 	const handleEnvironmentComplete = useCallback(
 		(version: string | null) => {
-			setDevoVersion(version)
+			setInfiniteCodeVersion(version)
 			goToStep("providers")
 		},
 		[goToStep],
@@ -171,10 +171,10 @@ export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
 			skippedSteps,
 			migrationPerformed: migratedProviders.length > 0,
 			migratedFrom: migratedProviders,
-			devoVersion,
+			infinitecodeVersion,
 			providersConnected,
 		})
-	}, [onComplete, skippedSteps, migratedProviders, devoVersion, providersConnected])
+	}, [onComplete, skippedSteps, migratedProviders, infinitecodeVersion, providersConnected])
 
 	return (
 		<div
@@ -244,7 +244,7 @@ export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
 							{...STEP_TRANSITION}
 						>
 							<CompleteStep
-								devoVersion={devoVersion}
+								infinitecodeVersion={infinitecodeVersion}
 								migratedProviders={migratedProviders}
 								migrationResult={migrationResult}
 								onStartMigration={handleStartMigration}

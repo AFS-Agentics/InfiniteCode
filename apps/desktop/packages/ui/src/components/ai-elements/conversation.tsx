@@ -1,7 +1,7 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { ArrowDownIcon, DownloadIcon } from "lucide-react"
 import type { ComponentProps } from "react"
 import { useCallback } from "react"

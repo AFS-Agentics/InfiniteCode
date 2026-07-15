@@ -8,7 +8,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: devo_protocol::GoalCreateParams = match serde_json::from_value(params) {
+        let params: infinitecode_protocol::GoalCreateParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
                 return self.error_response(
@@ -39,7 +39,7 @@ impl ServerRuntime {
                 let durable_goal = goal.clone();
                 let result = serde_json::to_value(SuccessResponse {
                     id: request_id,
-                    result: devo_protocol::GoalCreateResult { goal: thread_goal },
+                    result: infinitecode_protocol::GoalCreateResult { goal: thread_goal },
                 })
                 .expect("serialize goal create result");
                 drop(stores);
@@ -74,7 +74,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: devo_protocol::GoalSetParams = match serde_json::from_value(params) {
+        let params: infinitecode_protocol::GoalSetParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
                 return self.error_response(
@@ -93,7 +93,7 @@ impl ServerRuntime {
             .filter(|objective| !objective.is_empty())
             .map(str::to_string);
         let only_pause_budget_limited = requested_status
-            == Some(devo_protocol::ThreadGoalStatus::Paused)
+            == Some(infinitecode_protocol::ThreadGoalStatus::Paused)
             && params.objective.is_none()
             && params.token_budget.is_none();
         if !self.sessions.lock().await.contains_key(&session_id) {
@@ -114,7 +114,7 @@ impl ServerRuntime {
             let thread_goal = goal.to_thread_goal();
             let result = serde_json::to_value(SuccessResponse {
                 id: request_id,
-                result: devo_protocol::GoalSetResult { goal: thread_goal },
+                result: infinitecode_protocol::GoalSetResult { goal: thread_goal },
             })
             .expect("serialize budget-limited goal pause result");
             drop(stores);
@@ -140,7 +140,7 @@ impl ServerRuntime {
                 let durable_goal = goal.clone();
                 let result = serde_json::to_value(SuccessResponse {
                     id: request_id,
-                    result: devo_protocol::GoalSetResult { goal: thread_goal },
+                    result: infinitecode_protocol::GoalSetResult { goal: thread_goal },
                 })
                 .expect("serialize goal set result");
                 drop(stores);
@@ -186,7 +186,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: devo_protocol::GoalSetStatusParams = match serde_json::from_value(params) {
+        let params: infinitecode_protocol::GoalSetStatusParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
                 return self.error_response(
@@ -218,7 +218,7 @@ impl ServerRuntime {
             let thread_goal = goal.to_thread_goal();
             let result = serde_json::to_value(SuccessResponse {
                 id: request_id,
-                result: devo_protocol::GoalSetStatusResult { goal: thread_goal },
+                result: infinitecode_protocol::GoalSetStatusResult { goal: thread_goal },
             })
             .expect("serialize budget-limited goal pause result");
             let session_id = params.session_id;
@@ -231,13 +231,13 @@ impl ServerRuntime {
             self.sync_core_session_goal(session_id, None).await;
             return result;
         }
-        match store.set_status(devo_protocol::ThreadGoalStatus::Paused) {
+        match store.set_status(infinitecode_protocol::ThreadGoalStatus::Paused) {
             Ok(goal) => {
                 let thread_goal = goal.to_thread_goal();
                 let durable_goal = goal.clone();
                 let result = serde_json::to_value(SuccessResponse {
                     id: request_id,
-                    result: devo_protocol::GoalSetStatusResult { goal: thread_goal },
+                    result: infinitecode_protocol::GoalSetStatusResult { goal: thread_goal },
                 })
                 .expect("serialize goal pause result");
                 let session_id = params.session_id;
@@ -270,7 +270,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: devo_protocol::GoalSetStatusParams = match serde_json::from_value(params) {
+        let params: infinitecode_protocol::GoalSetStatusParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
                 return self.error_response(
@@ -291,7 +291,7 @@ impl ServerRuntime {
             );
         };
         let previous_status = store.get().map(|goal| goal.status);
-        match store.set_status(devo_protocol::ThreadGoalStatus::Active) {
+        match store.set_status(infinitecode_protocol::ThreadGoalStatus::Active) {
             Ok(goal) => {
                 let should_continue = goal.status == crate::goal::GoalStatus::Active;
                 let thread_goal = goal.to_thread_goal();
@@ -299,7 +299,7 @@ impl ServerRuntime {
                 let durable_goal = goal.clone();
                 let result = serde_json::to_value(SuccessResponse {
                     id: request_id,
-                    result: devo_protocol::GoalSetStatusResult { goal: thread_goal },
+                    result: infinitecode_protocol::GoalSetStatusResult { goal: thread_goal },
                 })
                 .expect("serialize goal resume result");
                 drop(stores);
@@ -334,7 +334,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: devo_protocol::GoalSetStatusParams = match serde_json::from_value(params) {
+        let params: infinitecode_protocol::GoalSetStatusParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
                 return self.error_response(
@@ -354,13 +354,13 @@ impl ServerRuntime {
             );
         };
         let previous_status = store.get().map(|goal| goal.status);
-        match store.set_status(devo_protocol::ThreadGoalStatus::Complete) {
+        match store.set_status(infinitecode_protocol::ThreadGoalStatus::Complete) {
             Ok(goal) => {
                 let thread_goal = goal.to_thread_goal();
                 let durable_goal = goal.clone();
                 let result = serde_json::to_value(SuccessResponse {
                     id: request_id,
-                    result: devo_protocol::GoalSetStatusResult { goal: thread_goal },
+                    result: infinitecode_protocol::GoalSetStatusResult { goal: thread_goal },
                 })
                 .expect("serialize goal complete result");
                 let session_id = params.session_id;
@@ -391,7 +391,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: devo_protocol::GoalCancelParams = match serde_json::from_value(params) {
+        let params: infinitecode_protocol::GoalCancelParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
                 return self.error_response(
@@ -420,7 +420,7 @@ impl ServerRuntime {
                 let durable_goal = goal.clone();
                 let result = serde_json::to_value(SuccessResponse {
                     id: request_id,
-                    result: devo_protocol::GoalSetStatusResult { goal: thread_goal },
+                    result: infinitecode_protocol::GoalSetStatusResult { goal: thread_goal },
                 })
                 .expect("serialize goal cancel result");
                 let session_id = params.session_id;
@@ -452,7 +452,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: devo_protocol::GoalClearParams = match serde_json::from_value(params) {
+        let params: infinitecode_protocol::GoalClearParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
                 return self.error_response(
@@ -488,7 +488,7 @@ impl ServerRuntime {
 
         serde_json::to_value(SuccessResponse {
             id: request_id,
-            result: devo_protocol::GoalClearResult { cleared },
+            result: infinitecode_protocol::GoalClearResult { cleared },
         })
         .expect("serialize goal clear result")
     }
@@ -498,7 +498,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: devo_protocol::GoalStatusParams = match serde_json::from_value(params) {
+        let params: infinitecode_protocol::GoalStatusParams = match serde_json::from_value(params) {
             Ok(p) => p,
             Err(e) => {
                 return self.error_response(
@@ -517,7 +517,7 @@ impl ServerRuntime {
 
         serde_json::to_value(SuccessResponse {
             id: request_id,
-            result: devo_protocol::GoalStatusResult { goal: projection },
+            result: infinitecode_protocol::GoalStatusResult { goal: projection },
         })
         .expect("serialize goal status result")
     }
@@ -525,7 +525,7 @@ impl ServerRuntime {
     pub(super) async fn sync_core_session_goal(
         &self,
         session_id: SessionId,
-        goal: Option<devo_protocol::ThreadGoal>,
+        goal: Option<infinitecode_protocol::ThreadGoal>,
     ) {
         let Some(session_handle) = self.session(session_id).await else {
             return;

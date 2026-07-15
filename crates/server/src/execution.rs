@@ -5,27 +5,27 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
-use devo_core::AppConfigStore;
-use devo_core::ProviderVendorCatalog;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::ProviderVendorCatalog;
 use tokio::sync::Mutex;
 use tokio::sync::oneshot;
 
-use devo_core::AgentsMdConfig;
-use devo_core::ModelCatalog;
-use devo_core::SessionConfig;
-use devo_core::SessionRecord;
-use devo_core::SessionState;
-use devo_core::SkillCatalog;
-use devo_core::SkillError;
+use infinitecode_core::AgentsMdConfig;
+use infinitecode_core::ModelCatalog;
+use infinitecode_core::SessionConfig;
+use infinitecode_core::SessionRecord;
+use infinitecode_core::SessionState;
+use infinitecode_core::SkillCatalog;
+use infinitecode_core::SkillError;
 #[cfg(test)]
-use devo_core::TurnConfig;
-use devo_core::TurnId;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::ApprovalDecisionValue;
-use devo_protocol::PendingInputItem;
-use devo_protocol::RequestUserInputResponse;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderRouter;
+use infinitecode_core::TurnConfig;
+use infinitecode_core::TurnId;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::ApprovalDecisionValue;
+use infinitecode_protocol::PendingInputItem;
+use infinitecode_protocol::RequestUserInputResponse;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderRouter;
 
 #[cfg(test)]
 use crate::InputItem;
@@ -41,13 +41,13 @@ use crate::turn::TurnMetadata;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PersistedTurnItem {
     pub(crate) turn_id: TurnId,
-    pub(crate) turn_kind: devo_core::TurnKind,
-    pub(crate) item_id: devo_core::ItemId,
-    pub(crate) turn_item: devo_core::TurnItem,
+    pub(crate) turn_kind: infinitecode_core::TurnKind,
+    pub(crate) item_id: infinitecode_core::ItemId,
+    pub(crate) turn_item: infinitecode_core::TurnItem,
 }
 
 pub(crate) struct PendingApproval {
-    pub(crate) owner_session_id: devo_protocol::SessionId,
+    pub(crate) owner_session_id: infinitecode_protocol::SessionId,
     pub(crate) tool_name: String,
     pub(crate) path: Option<PathBuf>,
     pub(crate) host: Option<String>,
@@ -209,20 +209,20 @@ pub(crate) struct RuntimeSession {
     /// Canonical persisted turn items in prompt order for replay/compaction bookkeeping.
     pub(crate) persisted_turn_items: Vec<PersistedTurnItem>,
     /// Latest compaction snapshot used to rebuild the model-facing prompt view.
-    pub(crate) latest_compaction_snapshot: Option<devo_core::CompactionSnapshotLine>,
+    pub(crate) latest_compaction_snapshot: Option<infinitecode_core::CompactionSnapshotLine>,
     /// Shared handle to the pending-turn queue owned by `core_session`.
     pub(crate) pending_turn_queue: Arc<StdMutex<VecDeque<PendingInputItem>>>,
     /// Shared handle to the `/btw` queue owned by `core_session`.
     pub(crate) btw_input_queue: Arc<StdMutex<VecDeque<PendingInputItem>>>,
     /// Tool exposure policy for turns run in this session.
-    pub(crate) agent_tool_policy: devo_protocol::AgentToolPolicy,
+    pub(crate) agent_tool_policy: infinitecode_protocol::AgentToolPolicy,
     /// Optional maximum number of turns allowed in this session.
     pub(crate) max_turns: Option<u32>,
     /// Deferred completion info for in-progress assistant text item.
     /// Cleared when the item is completed; used for crash/interrupt recovery.
-    pub(crate) deferred_assistant: Option<(devo_core::ItemId, u64, String)>,
+    pub(crate) deferred_assistant: Option<(infinitecode_core::ItemId, u64, String)>,
     /// Deferred completion info for in-progress reasoning text item.
-    pub(crate) deferred_reasoning: Option<(devo_core::ItemId, u64, String)>,
+    pub(crate) deferred_reasoning: Option<(infinitecode_core::ItemId, u64, String)>,
     /// Monotonic session-scoped item sequence counter.
     pub(crate) next_item_seq: u64,
     /// First user input captured from the session's first turn, used for title generation.
@@ -231,7 +231,7 @@ pub(crate) struct RuntimeSession {
     /// request-scoped tool sources such as ACP MCP servers.
     pub(crate) tool_registry: Option<Arc<ToolRegistry>>,
     /// Session-scoped ledger of files read/written by tools (used by `edit`).
-    pub(crate) file_read_ledger: Arc<devo_core::tools::FileReadLedger>,
+    pub(crate) file_read_ledger: Arc<infinitecode_core::tools::FileReadLedger>,
     /// Session-scoped approvals granted through ACP permission responses.
     pub(crate) session_approval_cache: ApprovalGrantCache,
     /// Turn-scoped approvals granted through ACP permission responses.
@@ -248,22 +248,22 @@ mod tests {
 
     use anyhow::Result;
     use async_trait::async_trait;
-    use devo_core::AppConfigStore;
-    use devo_core::BundledSkillsConfig;
-    use devo_core::FileSystemSkillCatalog;
-    use devo_core::Model;
-    use devo_core::PresetModelCatalog;
-    use devo_core::ProviderVendorCatalog;
-    use devo_core::SkillsConfig;
-    use devo_core::tools::ToolRegistry;
-    use devo_protocol::InputItem;
-    use devo_protocol::ModelRequest;
-    use devo_protocol::ModelResponse;
-    use devo_protocol::ProviderWireApi;
-    use devo_protocol::StreamEvent;
-    use devo_provider::ModelProviderSDK;
-    use devo_provider::ProviderRoute;
-    use devo_provider::SingleProviderRouter;
+    use infinitecode_core::AppConfigStore;
+    use infinitecode_core::BundledSkillsConfig;
+    use infinitecode_core::FileSystemSkillCatalog;
+    use infinitecode_core::Model;
+    use infinitecode_core::PresetModelCatalog;
+    use infinitecode_core::ProviderVendorCatalog;
+    use infinitecode_core::SkillsConfig;
+    use infinitecode_core::tools::ToolRegistry;
+    use infinitecode_protocol::InputItem;
+    use infinitecode_protocol::ModelRequest;
+    use infinitecode_protocol::ModelResponse;
+    use infinitecode_protocol::ProviderWireApi;
+    use infinitecode_protocol::StreamEvent;
+    use infinitecode_provider::ModelProviderSDK;
+    use infinitecode_provider::ProviderRoute;
+    use infinitecode_provider::SingleProviderRouter;
     use futures::Stream;
     use pretty_assertions::assert_eq;
 
@@ -297,7 +297,7 @@ mod tests {
             .expect("system time")
             .as_nanos();
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
-        std::env::temp_dir().join(format!("devo-{name}-{nanos}-{id}"))
+        std::env::temp_dir().join(format!("infinitecode-{name}-{nanos}-{id}"))
     }
 
     fn test_deps(config: &str) -> ServerRuntimeDependencies {
@@ -329,7 +329,7 @@ mod tests {
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(
                 AppConfigStore::load(root, /*workspace_root*/ None).expect("load config"),
@@ -370,15 +370,15 @@ mod tests {
         let root = unique_temp_dir("session-context-project-models");
         let workspace_a = root.join("workspace-a");
         let workspace_b = root.join("workspace-b");
-        std::fs::create_dir_all(workspace_a.join(".devo")).expect("create workspace a config dir");
-        std::fs::create_dir_all(workspace_b.join(".devo")).expect("create workspace b config dir");
+        std::fs::create_dir_all(workspace_a.join(".infinitecode")).expect("create workspace a config dir");
+        std::fs::create_dir_all(workspace_b.join(".infinitecode")).expect("create workspace b config dir");
         std::fs::write(
-            workspace_a.join(".devo").join("models.json"),
+            workspace_a.join(".infinitecode").join("models.json"),
             r#"[{"slug":"workspace-a-model","display_name":"Workspace A","priority":10000}]"#,
         )
         .expect("write workspace a models");
         std::fs::write(
-            workspace_b.join(".devo").join("models.json"),
+            workspace_b.join(".infinitecode").join("models.json"),
             r#"[{"slug":"workspace-b-model","display_name":"Workspace B","priority":10000}]"#,
         )
         .expect("write workspace b models");
@@ -423,9 +423,9 @@ invocation_method = "openai_chat_completions"
 "#,
         );
         let workspace = unique_temp_dir("session-context-provider-http");
-        std::fs::create_dir_all(workspace.join(".devo")).expect("create workspace config dir");
+        std::fs::create_dir_all(workspace.join(".infinitecode")).expect("create workspace config dir");
         std::fs::write(
-            workspace.join(".devo").join("config.toml"),
+            workspace.join(".infinitecode").join("config.toml"),
             r#"
 [provider_http]
 proxy_url = "http://workspace-proxy.example:8080"
@@ -575,7 +575,7 @@ invocation_method = "openai_chat_completions"
 
         assert_eq!(
             turn_config.web_search,
-            devo_core::ResolvedWebSearchConfig::Provider
+            infinitecode_core::ResolvedWebSearchConfig::Provider
         );
     }
 
@@ -616,7 +616,7 @@ mode = "disabled"
 
         assert_eq!(
             turn_config.web_search,
-            devo_core::ResolvedWebSearchConfig::Disabled
+            infinitecode_core::ResolvedWebSearchConfig::Disabled
         );
     }
 }

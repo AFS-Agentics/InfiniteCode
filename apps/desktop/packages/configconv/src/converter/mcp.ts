@@ -2,10 +2,10 @@
  * MCP server configuration converter.
  *
  * Claude Code: { mcpServers: { name: { command, args, env, type, url } } }
- * Devo:    { mcp: { name: { type: "local"|"remote", command[], environment } } }
+ * InfiniteCode:    { mcp: { name: { type: "local"|"remote", command[], environment } } }
  */
 import type { ClaudeMcpServer } from "../types/claude-code"
-import type { DevoMcp, DevoMcpLocal, DevoMcpRemote } from "../types/devo"
+import type { InfiniteCodeMcp, InfiniteCodeMcpLocal, InfiniteCodeMcpRemote } from "../types/infinitecode"
 import type { MigrationReport } from "../types/report"
 import { createEmptyReport } from "../types/report"
 
@@ -19,15 +19,15 @@ export interface McpConversionInput {
 }
 
 export interface McpConversionResult {
-	mcp: Record<string, DevoMcp>
+	mcp: Record<string, InfiniteCodeMcp>
 	report: MigrationReport
 }
 
 /**
- * Convert Claude Code MCP server configs to Devo format.
+ * Convert Claude Code MCP server configs to InfiniteCode format.
  */
 export function convertMcpServers(input: McpConversionInput): McpConversionResult {
-	const mcp: Record<string, DevoMcp> = {}
+	const mcp: Record<string, InfiniteCodeMcp> = {}
 	const report = createEmptyReport()
 	const source = input.sourceDescription ?? "Claude Code"
 	const disabledSet = new Set(input.disabledServers ?? [])
@@ -52,7 +52,7 @@ export function convertMcpServers(input: McpConversionInput): McpConversionResul
 				if (/[?&](token|key|secret|api_key)=/i.test(converted.url)) {
 					report.warnings.push(
 						`MCP server "${name}": URL contains embedded credentials. ` +
-							`Consider using {env:TOKEN_VAR} interpolation in Devo.`,
+							`Consider using {env:TOKEN_VAR} interpolation in InfiniteCode.`,
 					)
 				}
 			}
@@ -82,7 +82,7 @@ export function convertMcpServers(input: McpConversionInput): McpConversionResul
 export function convertSingleMcpServer(
 	server: ClaudeMcpServer,
 	disabled: boolean = false,
-): DevoMcpLocal | DevoMcpRemote {
+): InfiniteCodeMcpLocal | InfiniteCodeMcpRemote {
 	// Determine if this is a remote or local server
 	if (isRemoteServer(server)) {
 		return convertRemoteMcp(server, disabled)
@@ -98,12 +98,12 @@ function isRemoteServer(server: ClaudeMcpServer): boolean {
 	return false
 }
 
-function convertRemoteMcp(server: ClaudeMcpServer, disabled: boolean): DevoMcpRemote {
+function convertRemoteMcp(server: ClaudeMcpServer, disabled: boolean): InfiniteCodeMcpRemote {
 	if (!server.url) {
 		throw new Error("Remote MCP server missing url")
 	}
 
-	const result: DevoMcpRemote = {
+	const result: InfiniteCodeMcpRemote = {
 		type: "remote",
 		url: server.url,
 	}
@@ -114,7 +114,7 @@ function convertRemoteMcp(server: ClaudeMcpServer, disabled: boolean): DevoMcpRe
 	return result
 }
 
-function convertLocalMcp(server: ClaudeMcpServer, disabled: boolean): DevoMcpLocal {
+function convertLocalMcp(server: ClaudeMcpServer, disabled: boolean): InfiniteCodeMcpLocal {
 	if (!server.command) {
 		throw new Error("Local MCP server missing command")
 	}
@@ -124,7 +124,7 @@ function convertLocalMcp(server: ClaudeMcpServer, disabled: boolean): DevoMcpLoc
 		? [...(server.command as unknown as string[])]
 		: [server.command, ...(server.args ?? [])]
 
-	const result: DevoMcpLocal = {
+	const result: InfiniteCodeMcpLocal = {
 		type: "local",
 		command,
 	}

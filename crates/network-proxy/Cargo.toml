@@ -1,12 +1,12 @@
 [package]
-description = "Network proxy helpers for Devo HTTP clients"
-name = "devo-network-proxy"
+description = "Network proxy helpers for InfiniteCode HTTP clients"
+name = "infinitecode-network-proxy"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 
 [lib]
-name = "devo_network_proxy"
+name = "infinitecode_network_proxy"
 path = "src/lib.rs"
 doctest = false
 

@@ -6,7 +6,7 @@ use bm25::Document;
 use bm25::Language;
 use bm25::SearchEngine;
 use bm25::SearchEngineBuilder;
-use devo_protocol::ToolDefinition;
+use infinitecode_protocol::ToolDefinition;
 
 use crate::contracts::ToolAgentScope;
 use crate::contracts::ToolCallError;
@@ -452,7 +452,7 @@ mod tests {
                     },
                     cancel_token: tokio_util::sync::CancellationToken::new(),
                     agent_scope: ToolAgentScope::Parent,
-                    collaboration_mode: devo_protocol::CollaborationMode::Build,
+                    collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
                     agent_coordinator: None,
                     client_filesystem: None,
                     client_terminal: None,
@@ -590,7 +590,7 @@ mod tests {
                         },
                         cancel_token: tokio_util::sync::CancellationToken::new(),
                         agent_scope: ToolAgentScope::Subagent,
-                        collaboration_mode: devo_protocol::CollaborationMode::Build,
+                        collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
                         agent_coordinator: None,
                         client_filesystem: None,
                         client_terminal: None,

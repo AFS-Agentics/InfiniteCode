@@ -4,7 +4,7 @@
  * Provides IPC-callable functions for the first-run experience:
  * - CLI detection and version compatibility check
  * - CLI installation (via curl/shell)
- * - Multi-provider config detection and migration via @devo/configconv
+ * - Multi-provider config detection and migration via @infinitecode/configconv
  *   Supported providers: Claude Code, Cursor, InfiniteCode, OpenCode
  */
 
@@ -13,8 +13,8 @@ import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
 import { BrowserWindow } from "electron"
-import type { DevoCheckResult } from "./compatibility"
-import { checkDevo } from "./compatibility"
+import type { InfiniteCodeCheckResult } from "./compatibility"
+import { checkInfiniteCode } from "./compatibility"
 import {
 	buildClaudeCodeProviderMigrationPreview,
 	executeClaudeCodeProviderMigration,
@@ -23,7 +23,7 @@ import {
 	buildOpenCodeProviderMigrationPreview,
 	executeOpenCodeProviderMigration,
 } from "./opencode-provider-migration"
-import { requestAcp } from "./devo-manager"
+import { requestAcp } from "./infinitecode-manager"
 import { createLogger } from "./logger"
 
 const log = createLogger("onboarding")
@@ -33,7 +33,7 @@ const log = createLogger("onboarding")
 // ============================================================
 
 /** Supported migration source providers. */
-export type MigrationProvider = "claude-code" | "cursor" | "devo" | "opencode"
+export type MigrationProvider = "claude-code" | "cursor" | "infinitecode" | "opencode"
 
 /** Quick-detect result for a single provider (no heavy imports). */
 export interface ProviderDetection {
@@ -111,7 +111,7 @@ export interface MigrationResult {
 const PROVIDER_LABELS: Record<MigrationProvider, string> = {
 	"claude-code": "Claude Code",
 	cursor: "Cursor",
-	devo: "InfiniteCode",
+	infinitecode: "InfiniteCode",
 	opencode: "OpenCode",
 }
 
@@ -119,12 +119,12 @@ const PROVIDER_LABELS: Record<MigrationProvider, string> = {
 // CLI check (delegates to compatibility module)
 // ============================================================
 
-export async function checkDevoInstallation(): Promise<DevoCheckResult> {
-	return checkDevo()
+export async function checkInfiniteCodeInstallation(): Promise<InfiniteCodeCheckResult> {
+	return checkInfiniteCode()
 }
 
 // ============================================================
-// Devo install
+// InfiniteCode install
 // ============================================================
 
 let installProcess: ChildProcess | null = null
@@ -134,7 +134,7 @@ let installProcess: ChildProcess | null = null
  * Streams output lines to the renderer via the "onboarding:install-output" channel.
  * Returns when the install process exits.
  */
-export async function installDevo(): Promise<{ success: boolean; error?: string }> {
+export async function installInfiniteCode(): Promise<{ success: boolean; error?: string }> {
 	if (installProcess) {
 		return { success: false, error: "Installation already in progress" }
 	}
@@ -146,7 +146,7 @@ export async function installDevo(): Promise<{ success: boolean; error?: string 
 			// Windows: use PowerShell to run the install script
 			installProcess = spawn(
 				"powershell",
-				["-Command", "irm https://devo.ai/install.ps1 | iex"],
+				["-Command", "irm https://infinitecode.ai/install.ps1 | iex"],
 				{
 					cwd: homedir(),
 					stdio: "pipe",
@@ -155,7 +155,7 @@ export async function installDevo(): Promise<{ success: boolean; error?: string 
 			)
 		} else {
 			// macOS/Linux: use bash + curl
-			installProcess = spawn("bash", ["-c", "curl -fsSL https://devo.ai/install | bash"], {
+			installProcess = spawn("bash", ["-c", "curl -fsSL https://infinitecode.ai/install | bash"], {
 				cwd: homedir(),
 				stdio: "pipe",
 				env: process.env,
@@ -207,14 +207,14 @@ export async function installDevo(): Promise<{ success: boolean; error?: string 
 
 /**
  * Quickly detects which agent tools have configuration on this machine.
- * Does NOT import @devo/configconv, just checks for file/directory existence.
+ * Does NOT import @infinitecode/configconv, just checks for file/directory existence.
  * Returns an array of detections (one per supported provider).
  */
 export async function detectProviders(): Promise<ProviderDetection[]> {
 	const results = await Promise.all([
 		detectClaudeCode(),
 		detectCursor(),
-		detectDevoProvider(),
+		detectInfiniteCodeProvider(),
 		detectOpenCode(),
 	])
 	return results
@@ -439,7 +439,7 @@ async function detectOpenCode(): Promise<ProviderDetection> {
  * Quickly detects whether InfiniteCode configuration exists on this machine.
  * Parses infinitecode.json to count MCP servers.
  */
-async function detectDevoProvider(): Promise<ProviderDetection> {
+async function detectInfiniteCodeProvider(): Promise<ProviderDetection> {
 	const { readFileSync, readdirSync } = await import("node:fs")
 	const home = homedir()
 	const xdgConfig = process.env.XDG_CONFIG_HOME || path.join(home, ".config")
@@ -513,9 +513,9 @@ async function detectDevoProvider(): Promise<ProviderDetection> {
 	if (skillCount > 0) summaryParts.push(`${skillCount} skill${skillCount === 1 ? "" : "s"}`)
 
 	return {
-		provider: "devo",
+		provider: "infinitecode",
 		found,
-		label: PROVIDER_LABELS.devo,
+		label: PROVIDER_LABELS.infinitecode,
 		summary: found ? `Found ${summaryParts.join(", ")}` : "No InfiniteCode configuration detected",
 		hasGlobalSettings: hasConfig,
 		hasPermissions,
@@ -532,18 +532,18 @@ async function detectDevoProvider(): Promise<ProviderDetection> {
 }
 
 // ============================================================
-// Migration (lazy-loads @devo/configconv)
+// Migration (lazy-loads @infinitecode/configconv)
 // ============================================================
 
 /**
  * Runs a full scan for the specified provider and returns detailed detection results.
- * Lazy-loads @devo/configconv to keep the main process fast when not needed.
+ * Lazy-loads @infinitecode/configconv to keep the main process fast when not needed.
  */
 export async function scanProvider(provider: MigrationProvider): Promise<{
 	detection: ProviderDetection
 	scanResult: unknown
 }> {
-	const { scanFormat } = await import("@devo/configconv")
+	const { scanFormat } = await import("@infinitecode/configconv")
 
 	const scanResult = await scanFormat({
 		format: provider,
@@ -580,11 +580,11 @@ export async function previewMigration(
 		}
 	}
 
-	const { universalConvert } = await import("@devo/configconv")
+	const { universalConvert } = await import("@infinitecode/configconv")
 
-	// Convert from source provider to Devo (the target for Devo)
+	// Convert from source provider to InfiniteCode (the target for InfiniteCode)
 	// biome-ignore lint/suspicious/noExplicitAny: scanResult is dynamically typed from IPC
-	const conversion = universalConvert(scanResult as any, { to: "devo" })
+	const conversion = universalConvert(scanResult as any, { to: "infinitecode" })
 
 	const categoryPreviews: MigrationCategoryPreview[] = []
 	const claudeCodeProviderPreview =
@@ -783,10 +783,10 @@ export async function executeMigration(
 		}
 	}
 
-	const { universalConvert, universalWrite } = await import("@devo/configconv")
+	const { universalConvert, universalWrite } = await import("@infinitecode/configconv")
 
 	// biome-ignore lint/suspicious/noExplicitAny: scanResult is dynamically typed from IPC
-	const conversion = universalConvert(scanResult as any, { to: "devo" })
+	const conversion = universalConvert(scanResult as any, { to: "infinitecode" })
 
 	const writeResult = await universalWrite(conversion, {
 		backup: true,
@@ -861,8 +861,8 @@ async function executeHistoryMigration(
 	}
 
 	if (provider === "cursor" && result?.data?.history) {
-		const { convertCursorHistory } = await import("@devo/configconv/converter/cursor-history")
-		const { writeHistorySessionsDetailed } = await import("@devo/configconv/writer/history")
+		const { convertCursorHistory } = await import("@infinitecode/configconv/converter/cursor-history")
+		const { writeHistorySessionsDetailed } = await import("@infinitecode/configconv/writer/history")
 
 		sendProgress("converting", 0, 0, 0)
 		const { sessions } = convertCursorHistory(result.data.history)
@@ -884,8 +884,8 @@ async function executeHistoryMigration(
 			}
 		}
 	} else if (provider === "claude-code" && result?.data?.history) {
-		const { convertHistory } = await import("@devo/configconv/converter/history")
-		const { writeHistorySessionsDetailed } = await import("@devo/configconv/writer/history")
+		const { convertHistory } = await import("@infinitecode/configconv/converter/history")
+		const { writeHistorySessionsDetailed } = await import("@infinitecode/configconv/writer/history")
 
 		sendProgress("converting", 0, 0, 0)
 		const { sessions } = await convertHistory(result.data.history)
@@ -920,7 +920,7 @@ export async function restoreMigrationBackup(): Promise<{
 	removed: string[]
 	errors: string[]
 }> {
-	const { restore } = await import("@devo/configconv")
+	const { restore } = await import("@infinitecode/configconv")
 	const result = await restore()
 	return {
 		success: result.errors.length === 0,
@@ -950,8 +950,8 @@ function buildDetectionFromScan(
 			return buildClaudeCodeDetection(data)
 		case "cursor":
 			return buildCursorDetection(data)
-		case "devo":
-			return buildDevoDetection(data)
+		case "infinitecode":
+			return buildInfiniteCodeDetection(data)
 		case "opencode":
 			return buildOpenCodeDetection(data)
 	}
@@ -1048,7 +1048,7 @@ function buildCursorDetection(data: any): ProviderDetection {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: scan result is dynamically typed
-function buildDevoDetection(data: any): ProviderDetection {
+function buildInfiniteCodeDetection(data: any): ProviderDetection {
 	let mcpServerCount = 0
 	if (data.global.config?.mcp) {
 		mcpServerCount += Object.keys(data.global.config.mcp).length
@@ -1068,9 +1068,9 @@ function buildDevoDetection(data: any): ProviderDetection {
 	if (agentCount > 0) summaryParts.push(`${agentCount} agent${agentCount === 1 ? "" : "s"}`)
 
 	return {
-		provider: "devo",
+		provider: "infinitecode",
 		found: true,
-		label: PROVIDER_LABELS.devo,
+		label: PROVIDER_LABELS.infinitecode,
 		summary: `Found ${summaryParts.join(", ") || "configuration"}`,
 		hasGlobalSettings: !!data.global.config,
 		hasPermissions,

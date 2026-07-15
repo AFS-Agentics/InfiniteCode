@@ -3,7 +3,7 @@ title: Provider Setup
 description: Add provider connection records.
 ---
 
-A provider record tells Devo how to reach one model service. It does not decide
+A provider record tells InfiniteCode how to reach one model service. It does not decide
 which model is active by itself; a model binding does that.
 
 Provider records live under `[providers.<id>]` in `config.toml`.
@@ -24,13 +24,13 @@ wire_apis = ["anthropic_messages"]
 | `name` | Yes | Human-readable provider name. |
 | `enabled` | No | Whether this provider can be used. Defaults to `true`. |
 | `base_url` | Usually | Provider endpoint. Some built-in providers can supply defaults. |
-| `credential` | Usually | Credential id in `<DEVO_HOME>/auth.json`. |
+| `credential` | Usually | Credential id in `<INFINITECODE_HOME>/auth.json`. |
 | `headers` | No | Raw JSON object string for provider-specific HTTP headers. |
 | `wire_apis` | Recommended | Wire APIs this provider entry supports. |
 | `web_search` | No | Provider-specific web search override. |
 | `web_fetch` | No | Provider-specific web fetch override. |
 
-If `wire_apis` is empty, Devo can still default some paths, but explicit
+If `wire_apis` is empty, InfiniteCode can still default some paths, but explicit
 `wire_apis` makes validation and future maintenance clearer.
 
 ## Credentials
@@ -59,7 +59,7 @@ Onboarding does this for you when you enter an API key.
 
 ## Web Search And Web Fetch
 
-Devo has two web capability layers:
+InfiniteCode has two web capability layers:
 
 - provider-hosted web tools, when the selected provider path supports them;
 - local third-party web search providers configured under `[tools.web_search]`.
@@ -110,5 +110,5 @@ enabled = false
 name = "Old Provider"
 ```
 
-If a selected binding points to a disabled provider, Devo reports that the
+If a selected binding points to a disabled provider, InfiniteCode reports that the
 provider is disabled.

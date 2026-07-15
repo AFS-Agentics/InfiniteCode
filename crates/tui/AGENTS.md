@@ -227,7 +227,7 @@ The `BottomPane` owns a stack of popups drawn above the composer:
 ### Import Style
 
 - Use crate-qualified paths for sibling modules (e.g., `crate::chatwidget::ChatWidget`, not `super::ChatWidget`).
-- Group imports in this order: std library, external crates, devo crates, crate-local modules. Separate each group with a blank line.
+- Group imports in this order: std library, external crates, infinitecode crates, crate-local modules. Separate each group with a blank line.
 
 ## Commits & Documentation
 

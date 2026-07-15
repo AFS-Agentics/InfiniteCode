@@ -24,30 +24,30 @@ pub const ACP_TERMINAL_WAIT_FOR_EXIT_METHOD: &str = "terminal/wait_for_exit";
 pub const ACP_TERMINAL_KILL_METHOD: &str = "terminal/kill";
 pub const ACP_TERMINAL_RELEASE_METHOD: &str = "terminal/release";
 pub const ACP_JSONRPC_VERSION: &str = "2.0";
-pub const DEVO_EXTENSION_METHOD_PREFIX: &str = "_devo/";
-pub const DEVO_ORIGINAL_METHOD_META: &str = "devo/originalMethod";
-pub const DEVO_ORIGINAL_EVENT_META: &str = "devo/originalEvent";
-pub const DEVO_SESSION_META: &str = "devo/session";
-pub const DEVO_SESSION_RESUME_META: &str = "devo/sessionResume";
-pub const DEVO_TURN_ID_META: &str = "devo/turnId";
-pub const DEVO_ITEM_ID_META: &str = "devo/itemId";
-pub const DEVO_ACTIVITY_AT_META: &str = "devo/activityAt";
-pub const DEVO_HISTORY_INDEX_META: &str = "devo/historyIndex";
-pub const DEVO_PARENT_MESSAGE_ID_META: &str = "devo/parentMessageId";
-pub const DEVO_ITEM_KIND_META: &str = "devo/itemKind";
-pub const DEVO_TURN_USAGE_META: &str = "devo/turnUsage";
+pub const INFINITECODE_EXTENSION_METHOD_PREFIX: &str = "_infinitecode/";
+pub const INFINITECODE_ORIGINAL_METHOD_META: &str = "infinitecode/originalMethod";
+pub const INFINITECODE_ORIGINAL_EVENT_META: &str = "infinitecode/originalEvent";
+pub const INFINITECODE_SESSION_META: &str = "infinitecode/session";
+pub const INFINITECODE_SESSION_RESUME_META: &str = "infinitecode/sessionResume";
+pub const INFINITECODE_TURN_ID_META: &str = "infinitecode/turnId";
+pub const INFINITECODE_ITEM_ID_META: &str = "infinitecode/itemId";
+pub const INFINITECODE_ACTIVITY_AT_META: &str = "infinitecode/activityAt";
+pub const INFINITECODE_HISTORY_INDEX_META: &str = "infinitecode/historyIndex";
+pub const INFINITECODE_PARENT_MESSAGE_ID_META: &str = "infinitecode/parentMessageId";
+pub const INFINITECODE_ITEM_KIND_META: &str = "infinitecode/itemKind";
+pub const INFINITECODE_TURN_USAGE_META: &str = "infinitecode/turnUsage";
 
 pub type AcpMeta = serde_json::Map<String, serde_json::Value>;
 
 pub use crate::acp_event_to_update::acp_notification_from_server_event;
 pub use crate::acp_event_to_update::original_event_from_acp_notification;
 
-pub fn devo_extension_method(method: &str) -> String {
-    format!("{DEVO_EXTENSION_METHOD_PREFIX}{method}")
+pub fn infinitecode_extension_method(method: &str) -> String {
+    format!("{INFINITECODE_EXTENSION_METHOD_PREFIX}{method}")
 }
 
-pub fn devo_extension_inner_method(method: &str) -> Option<&str> {
-    method.strip_prefix(DEVO_EXTENSION_METHOD_PREFIX)
+pub fn infinitecode_extension_inner_method(method: &str) -> Option<&str> {
+    method.strip_prefix(INFINITECODE_EXTENSION_METHOD_PREFIX)
 }
 
 pub fn input_items_from_acp_prompt(prompt: Vec<AcpContentBlock>) -> Result<Vec<InputItem>, String> {
@@ -84,18 +84,18 @@ mod tests {
     fn turn_item_meta(turn_id: &TurnId, item_id: &ItemId) -> AcpMeta {
         AcpMeta::from_iter([
             (
-                DEVO_TURN_ID_META.to_string(),
+                INFINITECODE_TURN_ID_META.to_string(),
                 serde_json::Value::String(turn_id.to_string()),
             ),
             (
-                DEVO_ITEM_ID_META.to_string(),
+                INFINITECODE_ITEM_ID_META.to_string(),
                 serde_json::Value::String(item_id.to_string()),
             ),
         ])
     }
     fn strip_activity_at(meta: &mut Option<AcpMeta>) {
         if let Some(meta) = meta {
-            meta.remove(DEVO_ACTIVITY_AT_META);
+            meta.remove(INFINITECODE_ACTIVITY_AT_META);
         }
     }
     fn strip_update_activity_at(mut update: Option<AcpSessionUpdate>) -> Option<AcpSessionUpdate> {
@@ -121,11 +121,11 @@ mod tests {
             .get_mut("_meta")
             .and_then(serde_json::Value::as_object_mut)
         {
-            meta.remove(DEVO_ACTIVITY_AT_META);
+            meta.remove(INFINITECODE_ACTIVITY_AT_META);
         }
     }
     fn assert_activity_at(update: &serde_json::Value) {
-        let activity_at = update["_meta"][DEVO_ACTIVITY_AT_META]
+        let activity_at = update["_meta"][INFINITECODE_ACTIVITY_AT_META]
             .as_str()
             .expect("activity timestamp");
         chrono::DateTime::parse_from_rfc3339(activity_at).expect("activity timestamp is RFC3339");
@@ -157,7 +157,7 @@ mod tests {
                 ..AcpAgentCapabilities::default()
             },
             auth_methods: Vec::new(),
-            agent_info: Some(AcpImplementation::new("devo", "1.2.3").with_title("Devo")),
+            agent_info: Some(AcpImplementation::new("infinitecode", "1.2.3").with_title("InfiniteCode")),
             meta: None,
         };
 
@@ -181,8 +181,8 @@ mod tests {
                     "sessionCapabilities": {}
                 },
                 "agentInfo": {
-                    "name": "devo",
-                    "title": "Devo",
+                    "name": "infinitecode",
+                    "title": "InfiniteCode",
                     "version": "1.2.3"
                 }
             })
@@ -1078,9 +1078,9 @@ mod tests {
         assert_eq!(value["update"]["used"], serde_json::json!(42));
         assert_eq!(value["update"]["size"], serde_json::json!(200_000));
         let actual_payload = serde_json::from_value::<crate::TurnUsageUpdatedPayload>(
-            value["update"]["_meta"][DEVO_TURN_USAGE_META].clone(),
+            value["update"]["_meta"][INFINITECODE_TURN_USAGE_META].clone(),
         )
-        .expect("usage update should preserve Devo turn usage payload");
+        .expect("usage update should preserve InfiniteCode turn usage payload");
         assert_eq!(actual_payload, payload);
     }
 
@@ -1165,13 +1165,13 @@ mod tests {
         assert_eq!(
             started_update["_meta"],
             serde_json::json!({
-                "devo/turnId": turn_id.to_string(),
-                "devo/itemId": item_id.to_string()
+                "infinitecode/turnId": turn_id.to_string(),
+                "infinitecode/itemId": item_id.to_string()
             })
         );
         assert!(
             started_value["_meta"]
-                .get(DEVO_ORIGINAL_METHOD_META)
+                .get(INFINITECODE_ORIGINAL_METHOD_META)
                 .is_some(),
             "tool item/started should keep original method for legacy clients"
         );
@@ -1196,7 +1196,7 @@ mod tests {
                 "toolCallId": "call-1",
                 "status": "in_progress",
                 "_meta": {
-                    "devo/turnId": turn_id.to_string()
+                    "infinitecode/turnId": turn_id.to_string()
                 }
             })
         );
@@ -1232,14 +1232,14 @@ mod tests {
                     }
                 ],
                 "_meta": {
-                    "devo/turnId": turn_id.to_string()
+                    "infinitecode/turnId": turn_id.to_string()
                 }
             })
         );
     }
 
     #[test]
-    fn native_session_update_omits_devo_event_meta() {
+    fn native_session_update_omits_infinitecode_event_meta() {
         let session_id = SessionId::new();
         let item_id = ItemId::new();
         let event = ServerEvent::ItemDelta {
@@ -1275,7 +1275,7 @@ mod tests {
                 },
                 "messageId": item_id.to_string(),
                 "_meta": {
-                    "devo/itemId": item_id.to_string()
+                    "infinitecode/itemId": item_id.to_string()
                 }
             })
         );
@@ -1317,7 +1317,7 @@ mod tests {
                 },
                 "messageId": reasoning_item_id.to_string(),
                 "_meta": {
-                    "devo/itemId": reasoning_item_id.to_string()
+                    "infinitecode/itemId": reasoning_item_id.to_string()
                 }
             })
         );

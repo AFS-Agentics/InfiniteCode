@@ -2,7 +2,7 @@
 description = "Shared serializable configuration contract types"
 edition.workspace = true
 license.workspace = true
-name = "devo-config"
+name = "infinitecode-config"
 version.workspace = true
 
 [lints]
@@ -10,9 +10,9 @@ workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
-devo-protocol = { workspace = true }
-devo-util-git = { workspace = true }
-devo-util-paths = { workspace = true }
+infinitecode-protocol = { workspace = true }
+infinitecode-util-git = { workspace = true }
+infinitecode-util-paths = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

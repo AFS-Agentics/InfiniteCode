@@ -1,6 +1,6 @@
 //! Integration coverage for Streamable HTTP RMCP over a URL endpoint.
 //!
-//! Remote MCP in Devo is represented by HTTP/SSE/Streamable HTTP endpoints,
+//! Remote MCP in InfiniteCode is represented by HTTP/SSE/Streamable HTTP endpoints,
 //! not by remote stdio process execution.
 
 mod streamable_http_test_support;

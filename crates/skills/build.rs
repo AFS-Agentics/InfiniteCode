@@ -14,7 +14,7 @@ fn main() {
 
     println!("cargo:rerun-if-changed={}", samples_dir.display());
     println!(
-        "cargo:rustc-env=DEVO_SKILLS_SAMPLES_DIR={}",
+        "cargo:rustc-env=INFINITECODE_SKILLS_SAMPLES_DIR={}",
         samples_dir.display()
     );
 }

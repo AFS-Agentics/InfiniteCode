@@ -1,13 +1,13 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
-} from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { LucideIcon } from "lucide-react"
 import { XIcon } from "lucide-react"
 import type { ComponentProps, HTMLAttributes } from "react"

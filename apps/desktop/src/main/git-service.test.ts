@@ -20,7 +20,7 @@ const notDirectoryBranchSummary = branchSummary("not_directory")
 
 describe("git service", () => {
 	test("returns an explicit not-git state for non-git directories", async () => {
-		const directory = await mkdtemp(path.join(tmpdir(), "devo-git-service-"))
+		const directory = await mkdtemp(path.join(tmpdir(), "infinitecode-git-service-"))
 		try {
 			await expect(listBranches(directory)).resolves.toEqual(notGitBranchSummary)
 		} finally {
@@ -29,7 +29,7 @@ describe("git service", () => {
 	})
 
 	test("returns an explicit missing state for missing directories", async () => {
-		const directory = await mkdtemp(path.join(tmpdir(), "devo-git-service-"))
+		const directory = await mkdtemp(path.join(tmpdir(), "infinitecode-git-service-"))
 		const missingDirectory = path.join(directory, "missing")
 		try {
 			await expect(listBranches(missingDirectory)).resolves.toEqual(missingBranchSummary)
@@ -39,7 +39,7 @@ describe("git service", () => {
 	})
 
 	test("returns an explicit not-directory state for non-directory paths", async () => {
-		const directory = await mkdtemp(path.join(tmpdir(), "devo-git-service-"))
+		const directory = await mkdtemp(path.join(tmpdir(), "infinitecode-git-service-"))
 		const filePath = path.join(directory, "file.txt")
 		try {
 			await writeFile(filePath, "not a directory")

@@ -4,12 +4,12 @@
 
 use std::path::Path;
 
-use devo_protocol::ACP_FS_READ_TEXT_FILE_METHOD;
-use devo_protocol::ACP_FS_WRITE_TEXT_FILE_METHOD;
-use devo_protocol::AcpFsReadTextFileParams;
-use devo_protocol::AcpFsReadTextFileResult;
-use devo_protocol::AcpFsWriteTextFileParams;
-use devo_protocol::acp_success_response;
+use infinitecode_protocol::ACP_FS_READ_TEXT_FILE_METHOD;
+use infinitecode_protocol::ACP_FS_WRITE_TEXT_FILE_METHOD;
+use infinitecode_protocol::AcpFsReadTextFileParams;
+use infinitecode_protocol::AcpFsReadTextFileResult;
+use infinitecode_protocol::AcpFsWriteTextFileParams;
+use infinitecode_protocol::acp_success_response;
 
 pub(crate) async fn handle_acp_fs_request(
     request_id: serde_json::Value,
@@ -92,7 +92,7 @@ mod tests {
     use std::sync::atomic::AtomicU64;
     use std::sync::atomic::Ordering;
 
-    use devo_protocol::AcpSuccessResponse;
+    use infinitecode_protocol::AcpSuccessResponse;
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -122,7 +122,7 @@ mod tests {
             serde_json::json!(1),
             ACP_FS_READ_TEXT_FILE_METHOD,
             serde_json::to_value(AcpFsReadTextFileParams {
-                session_id: devo_protocol::SessionId::new(),
+                session_id: infinitecode_protocol::SessionId::new(),
                 path: PathBuf::from("relative.txt"),
                 line: None,
                 limit: None,
@@ -143,7 +143,7 @@ mod tests {
     async fn write_then_read_text_file_with_line_limit() {
         let path = temp_test_path();
         let _ = tokio::fs::remove_file(&path).await;
-        let session_id = devo_protocol::SessionId::new();
+        let session_id = infinitecode_protocol::SessionId::new();
 
         let write_response = handle_acp_fs_request(
             serde_json::json!(2),
@@ -201,7 +201,7 @@ mod tests {
 
     fn temp_test_path() -> PathBuf {
         std::env::temp_dir().join(format!(
-            "devo-acp-fs-{}-{}.txt",
+            "infinitecode-acp-fs-{}-{}.txt",
             std::process::id(),
             ACP_FS_TEST_NEXT_ID.fetch_add(1, Ordering::SeqCst)
         ))

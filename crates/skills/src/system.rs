@@ -10,22 +10,22 @@ use std::path::PathBuf;
 use include_dir::Dir;
 use thiserror::Error;
 
-const SYSTEM_SKILLS_DIR: Dir<'_> = include_dir::include_dir!("$DEVO_SKILLS_SAMPLES_DIR");
+const SYSTEM_SKILLS_DIR: Dir<'_> = include_dir::include_dir!("$INFINITECODE_SKILLS_SAMPLES_DIR");
 const SYSTEM_SKILLS_DIR_NAME: &str = ".system";
 const SKILLS_DIR_NAME: &str = "skills";
-const SYSTEM_SKILLS_MARKER_FILENAME: &str = ".devo-system-skills.marker";
+const SYSTEM_SKILLS_MARKER_FILENAME: &str = ".infinitecode-system-skills.marker";
 const SYSTEM_SKILLS_MARKER_SALT: &str = "v1";
 
-pub fn system_cache_root_dir(devo_home: &Path) -> PathBuf {
-    devo_home.join(SKILLS_DIR_NAME).join(SYSTEM_SKILLS_DIR_NAME)
+pub fn system_cache_root_dir(infinitecode_home: &Path) -> PathBuf {
+    infinitecode_home.join(SKILLS_DIR_NAME).join(SYSTEM_SKILLS_DIR_NAME)
 }
 
-pub fn install_system_skills(devo_home: &Path) -> Result<(), SystemSkillsError> {
-    let skills_root_dir = devo_home.join(SKILLS_DIR_NAME);
+pub fn install_system_skills(infinitecode_home: &Path) -> Result<(), SystemSkillsError> {
+    let skills_root_dir = infinitecode_home.join(SKILLS_DIR_NAME);
     fs::create_dir_all(&skills_root_dir)
         .map_err(|source| SystemSkillsError::io("create skills root dir", source))?;
 
-    let dest_system = system_cache_root_dir(devo_home);
+    let dest_system = system_cache_root_dir(infinitecode_home);
     let marker_path = dest_system.join(SYSTEM_SKILLS_MARKER_FILENAME);
     let expected_fingerprint = embedded_system_skills_fingerprint();
     if dest_system.is_dir()
@@ -45,8 +45,8 @@ pub fn install_system_skills(devo_home: &Path) -> Result<(), SystemSkillsError> 
     Ok(())
 }
 
-pub fn uninstall_system_skills(devo_home: &Path) {
-    let _ = fs::remove_dir_all(system_cache_root_dir(devo_home));
+pub fn uninstall_system_skills(infinitecode_home: &Path) {
+    let _ = fs::remove_dir_all(system_cache_root_dir(infinitecode_home));
 }
 
 fn read_marker(path: &Path) -> Result<String, SystemSkillsError> {
@@ -185,11 +185,11 @@ mod tests {
 
     #[test]
     fn bundled_deep_research_skill_installs_with_interface_metadata() {
-        let devo_home = TempDir::new().expect("devo home");
+        let infinitecode_home = TempDir::new().expect("infinitecode home");
 
-        install_system_skills(devo_home.path()).expect("install system skills");
+        install_system_skills(infinitecode_home.path()).expect("install system skills");
 
-        let skill_root = system_cache_root_dir(devo_home.path()).join("deep-research");
+        let skill_root = system_cache_root_dir(infinitecode_home.path()).join("deep-research");
         assert_eq!(
             [
                 skill_root.join("SKILL.md").is_file(),

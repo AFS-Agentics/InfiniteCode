@@ -30,8 +30,8 @@ Define the TUI behavior for `/theme`, which lets the user switch the terminal UI
 ```text
 ┃ /theme
 
-> ● devo-dark
-    devo-light
+> ● infinitecode-dark
+    infinitecode-light
     terminal-default
 ```
 

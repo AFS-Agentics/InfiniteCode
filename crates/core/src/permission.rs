@@ -118,7 +118,7 @@ fn build_workspace_profile(roots: &[PathBuf]) -> PermissionProfile {
 
     // Add read-only carveouts for protected directories within writable roots
     for root in roots {
-        for protected in &[".git", ".devo", ".agents"] {
+        for protected in &[".git", ".infinitecode", ".agents"] {
             let protected_path = root.join(protected);
             // Only add if not already covered by a more specific entry
             if !entries.iter().any(|e| e.path == protected_path) {

@@ -1,10 +1,10 @@
 {
-  "title": "Devo",
+  "title": "InfiniteCode",
   "icon": "Bot",
   "pages": [
     "index",
     "get-started",
-    "using-devo",
+    "using-infinitecode",
     "core-concepts",
     "configuration",
     "contributors",

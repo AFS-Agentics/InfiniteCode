@@ -1,15 +1,15 @@
 use std::collections::VecDeque;
 
 use chrono::Utc;
-use devo_core::{
+use infinitecode_core::{
     ItemId, SessionId, SessionRecord, SessionTitleFinalSource, SessionTitleState, TurnId,
     TurnRecord, TurnStatus,
 };
-use devo_protocol::{
+use infinitecode_protocol::{
     AcpClientCapabilities, AcpInitializeParams, SkillChangedParams, SkillListParams,
     SkillListResult,
 };
-use devo_server::{
+use infinitecode_server::{
     ActiveTurnSteeringState, ApprovalDecisionValue, ApprovalRequestPayload, ApprovalResponseParams,
     ApprovalScopeValue, ClientRequest, DefaultProjection, EventContext, EventsSubscribeParams,
     InputItem, ItemDeltaKind, ItemDeltaPayload, PendingServerRequestContext, ProtocolError,
@@ -61,7 +61,7 @@ fn skill_changed_params_roundtrip() {
 fn skill_list_result_serializes_expected_shape() {
     let result = SkillListResult {
         skills: vec![
-            devo_protocol::SkillRecord {
+            infinitecode_protocol::SkillRecord {
                 id: "rust-docs".into(),
                 name: "Rust Documentation".into(),
                 description: "Official Rust docs skill".into(),
@@ -70,11 +70,11 @@ fn skill_list_result_serializes_expected_shape() {
                 dependencies: None,
                 path: std::path::PathBuf::from("/skills/rust/SKILL.md"),
                 enabled: true,
-                source: devo_protocol::SkillSource::User,
-                scope: devo_protocol::SkillScope::User,
+                source: infinitecode_protocol::SkillSource::User,
+                scope: infinitecode_protocol::SkillScope::User,
                 plugin_id: None,
             },
-            devo_protocol::SkillRecord {
+            infinitecode_protocol::SkillRecord {
                 id: "python-guide".into(),
                 name: "Python Guide".into(),
                 description: "Python programming skill".into(),
@@ -83,10 +83,10 @@ fn skill_list_result_serializes_expected_shape() {
                 dependencies: None,
                 path: std::path::PathBuf::from("/skills/python/SKILL.md"),
                 enabled: false,
-                source: devo_protocol::SkillSource::Workspace {
+                source: infinitecode_protocol::SkillSource::Workspace {
                     cwd: std::path::PathBuf::from("/workspace"),
                 },
-                scope: devo_protocol::SkillScope::Repo,
+                scope: infinitecode_protocol::SkillScope::Repo,
                 plugin_id: None,
             },
         ],
@@ -264,7 +264,7 @@ fn turn_projection_preserves_turn_status_vocabulary() {
         started_at: Utc::now(),
         completed_at: None,
         status: TurnStatus::Running,
-        kind: devo_core::TurnKind::Regular,
+        kind: infinitecode_core::TurnKind::Regular,
         model: "claude-sonnet".into(),
         model_binding_id: None,
         reasoning_effort_selection: None,
@@ -333,7 +333,7 @@ fn session_title_update_params_roundtrip() {
 
 #[test]
 fn session_title_updated_event_serializes_expected_kind() {
-    let event = ServerEvent::SessionTitleUpdated(devo_server::SessionEventPayload {
+    let event = ServerEvent::SessionTitleUpdated(infinitecode_server::SessionEventPayload {
         session: SessionMetadata {
             session_id: SessionId::new(),
             cwd: ".".into(),
@@ -399,14 +399,14 @@ fn session_compaction_events_serialize_expected_kinds() {
         status: SessionRuntimeStatus::Idle,
     };
 
-    let started = ServerEvent::SessionCompactionStarted(devo_server::SessionEventPayload {
+    let started = ServerEvent::SessionCompactionStarted(infinitecode_server::SessionEventPayload {
         session: metadata.clone(),
     });
-    let completed = ServerEvent::SessionCompactionCompleted(devo_server::SessionEventPayload {
+    let completed = ServerEvent::SessionCompactionCompleted(infinitecode_server::SessionEventPayload {
         session: metadata,
     });
     let failed =
-        ServerEvent::SessionCompactionFailed(devo_server::SessionCompactionFailedPayload {
+        ServerEvent::SessionCompactionFailed(infinitecode_server::SessionCompactionFailedPayload {
             session_id: SessionId::new(),
             message: "boom".into(),
         });

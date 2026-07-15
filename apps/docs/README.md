@@ -1,9 +1,9 @@
-# Devo Web
+# InfiniteCode Web
 
-This is the homepage website for Devo.
+This is the homepage website for InfiniteCode.
 
-The app mainly hosts Devo's user documentation, including setup notes, usage
-guides, and product pages that help users understand and adopt Devo.
+The app mainly hosts InfiniteCode's user documentation, including setup notes, usage
+guides, and product pages that help users understand and adopt InfiniteCode.
 
 ## Development
 

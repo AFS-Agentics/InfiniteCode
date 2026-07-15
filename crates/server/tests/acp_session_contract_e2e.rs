@@ -14,7 +14,7 @@ use acp_session_setup::assert_prompt_response;
 use acp_session_setup::assert_prompt_updates_before_response;
 use acp_session_setup::assert_replayed_history_before_response;
 use acp_session_setup::build_test_mcp_server_binary;
-use acp_session_setup::devo_command;
+use acp_session_setup::infinitecode_command;
 use acp_session_setup::mcp_stdio_server_config;
 use acp_session_setup::read_stdio_json;
 use acp_session_setup::read_stdio_json_collect_until;
@@ -41,17 +41,17 @@ async fn stdio_acp_load_and_resume_match_session_setup_contract() -> Result<()> 
     let additional_directory = additional_directory.to_string_lossy().into_owned();
     let mcp_server_binary = build_test_mcp_server_binary().await?;
 
-    let mut command = devo_command()?;
+    let mut command = infinitecode_command()?;
     let mut child = command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", home_dir.path().join(".devo"))
+        .env("INFINITECODE_HOME", home_dir.path().join(".infinitecode"))
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn devo child process in server mode")?;
+        .context("spawn infinitecode child process in server mode")?;
 
     let mut stdin = child.stdin.take().context("capture child stdin")?;
     let stdout = child.stdout.take().context("capture child stdout")?;
@@ -307,9 +307,9 @@ async fn stdio_acp_session_config_options_select_model_binding() -> Result<()> {
 
     let cwd = home_dir.path().join("workspace");
     std::fs::create_dir_all(&cwd)?;
-    std::fs::create_dir_all(cwd.join(".devo"))?;
+    std::fs::create_dir_all(cwd.join(".infinitecode"))?;
     std::fs::write(
-        cwd.join(".devo").join("models.json"),
+        cwd.join(".infinitecode").join("models.json"),
         serde_json::to_string(&serde_json::json!([
             {
                 "slug": "test-model",
@@ -337,17 +337,17 @@ async fn stdio_acp_session_config_options_select_model_binding() -> Result<()> {
     )?;
     let cwd = cwd.to_string_lossy().into_owned();
 
-    let mut command = devo_command()?;
+    let mut command = infinitecode_command()?;
     let mut child = command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", home_dir.path().join(".devo"))
+        .env("INFINITECODE_HOME", home_dir.path().join(".infinitecode"))
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn devo child process in server mode")?;
+        .context("spawn infinitecode child process in server mode")?;
 
     let mut stdin = child.stdin.take().context("capture child stdin")?;
     let stdout = child.stdout.take().context("capture child stdout")?;
@@ -603,22 +603,22 @@ async fn stdio_proxy_acp_prompt_streams_each_agent_chunk_once() -> Result<()> {
     let mut provider = spawn_openai_chat_completions_server().await?;
     write_test_config(&home_dir, &["stdio://"], &provider.base_url)?;
 
-    let devo_home = home_dir.path().join(".devo");
+    let infinitecode_home = home_dir.path().join(".infinitecode");
     let cwd = home_dir.path().join("workspace");
     std::fs::create_dir_all(&cwd)?;
     let cwd = cwd.to_string_lossy().into_owned();
 
-    let mut first_command = devo_command()?;
+    let mut first_command = infinitecode_command()?;
     let mut first_child = first_command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", &devo_home)
+        .env("INFINITECODE_HOME", &infinitecode_home)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn real devo server process")?;
+        .context("spawn real infinitecode server process")?;
     let mut first_stdin = first_child.stdin.take().context("capture first stdin")?;
     let first_stdout = first_child.stdout.take().context("capture first stdout")?;
     let first_stderr = first_child.stderr.take().context("capture first stderr")?;
@@ -704,17 +704,17 @@ async fn stdio_proxy_acp_prompt_streams_each_agent_chunk_once() -> Result<()> {
     )
     .await?;
 
-    let mut proxy_command = devo_command()?;
+    let mut proxy_command = infinitecode_command()?;
     let mut proxy_child = proxy_command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", &devo_home)
+        .env("INFINITECODE_HOME", &infinitecode_home)
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn proxy devo server process")?;
+        .context("spawn proxy infinitecode server process")?;
     let mut proxy_stdin = proxy_child.stdin.take().context("capture proxy stdin")?;
     let proxy_stdout = proxy_child.stdout.take().context("capture proxy stdout")?;
     let proxy_stderr = proxy_child.stderr.take().context("capture proxy stderr")?;

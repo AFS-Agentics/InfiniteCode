@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use devo_core::SessionId;
-use devo_core::TurnId;
+use infinitecode_core::SessionId;
+use infinitecode_core::TurnId;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 

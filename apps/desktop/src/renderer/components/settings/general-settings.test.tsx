@@ -16,7 +16,7 @@ Object.defineProperty(globalThis, "localStorage", {
 	},
 })
 
-mock.module("@devo/ui/components/select", () => ({
+mock.module("@infinitecode/ui/components/select", () => ({
 	Select: ({ children }: { children: React.ReactNode }) => <div data-slot="select">{children}</div>,
 	SelectContent: ({ children }: { children: React.ReactNode }) => (
 		<div data-slot="select-content">{children}</div>
@@ -34,7 +34,7 @@ mock.module("@devo/ui/components/select", () => ({
 	SelectValue: () => <span data-slot="select-value" />,
 }))
 
-mock.module("@devo/ui/components/switch", () => ({
+mock.module("@infinitecode/ui/components/switch", () => ({
 	Switch: ({ checked }: { checked: boolean }) => (
 		<button type="button" aria-pressed={checked} data-slot="switch" />
 	),

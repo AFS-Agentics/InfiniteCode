@@ -18,7 +18,7 @@ export interface SkillsVerificationResult {
 }
 
 /**
- * Verify skills are compatible with Devo.
+ * Verify skills are compatible with InfiniteCode.
  * Since both tools use the same SKILL.md format, this is mostly validation.
  */
 export function verifySkills(skills: SkillInfo[]): SkillsVerificationResult {
@@ -37,7 +37,7 @@ export function verifySkills(skills: SkillInfo[]): SkillsVerificationResult {
 			needsAttention.push(skill)
 			report.warnings.push(
 				`Skill "${skill.name}" at "${skill.path}" has no description in frontmatter. ` +
-					`Devo may not load it correctly.`,
+					`InfiniteCode may not load it correctly.`,
 			)
 			continue
 		}
@@ -55,8 +55,8 @@ export function verifySkills(skills: SkillInfo[]): SkillsVerificationResult {
 		report.migrated.push({
 			category: "skills",
 			source: `${compatible.length} skills`,
-			target: "Devo reads .claude/skills/ natively",
-			details: "No migration needed -- Devo has built-in Claude Code skill compatibility",
+			target: "InfiniteCode reads .claude/skills/ natively",
+			details: "No migration needed -- InfiniteCode has built-in Claude Code skill compatibility",
 		})
 	}
 

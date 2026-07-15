@@ -1,8 +1,8 @@
-use devo_protocol::ModelRequest;
-use devo_protocol::RequestContent;
-use devo_protocol::RequestMessage;
-use devo_protocol::ResponseContent;
-use devo_protocol::SamplingControls;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::RequestContent;
+use infinitecode_protocol::RequestMessage;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::SamplingControls;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum GeneratedTitleError {
@@ -57,7 +57,7 @@ pub(crate) fn build_title_generation_request(
     user_input: &str,
 ) -> ModelRequest {
     ModelRequest {
-        model_slug: devo_protocol::ModelProfileKey::CatalogSlug(model_slug),
+        model_slug: infinitecode_protocol::ModelProfileKey::CatalogSlug(model_slug),
         model,
         system: Some(
             "Generate a short session title. Respond with only the title in sentence case. Use 3 to 8 words. No markdown, no quotes, no trailing punctuation unless required by a proper noun.".to_string(),
@@ -223,7 +223,7 @@ fn sentence_case(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use devo_protocol::ResponseContent;
+    use infinitecode_protocol::ResponseContent;
     use pretty_assertions::assert_eq;
 
     use super::GeneratedTitleError;

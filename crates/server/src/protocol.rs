@@ -1,4 +1,4 @@
-pub use devo_protocol::{
+pub use infinitecode_protocol::{
     ACP_AUTHENTICATE_METHOD, ACP_FS_READ_TEXT_FILE_METHOD, ACP_FS_WRITE_TEXT_FILE_METHOD,
     ACP_INITIALIZE_METHOD, ACP_LOGOUT_METHOD, ACP_SESSION_CANCEL_METHOD, ACP_SESSION_CLOSE_METHOD,
     ACP_SESSION_DELETE_METHOD, ACP_SESSION_LIST_METHOD, ACP_SESSION_LOAD_METHOD,
@@ -28,7 +28,7 @@ pub use devo_protocol::{
     AcpToolCallStatus, AcpToolKind, AcpUnsupportedMcpServer, AgentInfo, AgentListParams,
     AgentListResult, AgentMailboxMessage, AgentMessageParams, AgentMessageResult, AgentOutputEvent,
     AgentStatusParams, ClientMethod, ClientNotification, ClientRequest, CloseAgentParams,
-    CloseAgentResult, DEVO_SESSION_META, DEVO_SESSION_RESUME_META, ErrorResponse,
+    CloseAgentResult, INFINITECODE_SESSION_META, INFINITECODE_SESSION_RESUME_META, ErrorResponse,
     MessageEditPreviousParams, MessageEditPreviousResult, MessageEditWorkspaceRestorePolicy,
     ModelCatalogEntry, ModelCatalogParams, ModelCatalogResult, ModelConfigParams,
     ModelConfigResult, ModelSavedEntry, ModelSavedParams, ModelSavedResult, NotificationEnvelope,
@@ -43,6 +43,6 @@ pub use devo_protocol::{
     SkillSetEnabledParams, SkillSetEnabledResult, SkillSource, SkillToolDependency,
     SpawnAgentParams, SpawnAgentResult, SuccessResponse, WaitAgentParams, WaitAgentResult,
     acp_auth_required_response, acp_error_response, acp_notification_from_server_event,
-    acp_session_info_from_metadata, acp_success_response, devo_extension_inner_method,
+    acp_session_info_from_metadata, acp_success_response, infinitecode_extension_inner_method,
     input_items_from_acp_prompt,
 };

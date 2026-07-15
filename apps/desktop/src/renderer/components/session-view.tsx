@@ -17,8 +17,8 @@ import { markSessionReadAtom, upsertSessionAtom } from "../atoms/sessions"
 import { appStore } from "../atoms/store"
 import { viewedSessionIdAtom } from "../atoms/ui"
 import { useSessionRevert } from "../hooks/use-commands"
-import type { ModelRef } from "../hooks/use-devo-data"
-import { useConfig, useDevoAgents, useProviders, useVcs } from "../hooks/use-devo-data"
+import type { ModelRef } from "../hooks/use-infinitecode-data"
+import { useConfig, useInfiniteCodeAgents, useProviders, useVcs } from "../hooks/use-infinitecode-data"
 import { useAgentActions } from "../hooks/use-server"
 import { useSessionChat } from "../hooks/use-session-chat"
 import { createLogger } from "../lib/logger"
@@ -29,7 +29,7 @@ import { AgentDetail } from "./agent-detail"
 const log = createLogger("session-view")
 
 interface SessionViewProps {
-	/** The Devo session ID to display */
+	/** The InfiniteCode session ID to display */
 	sessionId: string
 }
 
@@ -131,12 +131,12 @@ export function SessionView({ sessionId }: SessionViewProps) {
 		selectedAgent?.sessionId ?? null,
 	)
 
-	// Toolbar data -- providers, config, VCS, and Devo agents
+	// Toolbar data -- providers, config, VCS, and InfiniteCode agents
 	const directory = selectedAgent?.directory ?? null
 	const { data: providers } = useProviders(directory)
 	const { data: config } = useConfig(directory)
 	const { data: vcs } = useVcs(directory)
-	const { agents: devoAgents } = useDevoAgents(directory)
+	const { agents: infinitecodeAgents } = useInfiniteCodeAgents(directory)
 
 	// Handlers
 	const handleStopAgent = useCallback(
@@ -300,7 +300,7 @@ export function SessionView({ sessionId }: SessionViewProps) {
 			providers={providers}
 			config={config}
 			vcs={vcs}
-			devoAgents={devoAgents}
+			infinitecodeAgents={infinitecodeAgents}
 			canUndo={canUndo}
 			canRedo={canRedo}
 			onUndo={undo}

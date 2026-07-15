@@ -1,6 +1,6 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -8,8 +8,8 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
-} from "@devo/ui/components/dropdown-menu"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/dropdown-menu"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { ChevronDownIcon, ExternalLinkIcon, MessageCircleIcon } from "lucide-react"
 import type { ComponentProps } from "react"
 import { createContext, useContext } from "react"

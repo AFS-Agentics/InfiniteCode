@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// External hook events understood by Devo configuration.
+/// External hook events understood by InfiniteCode configuration.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum HookEvent {
     PreToolUse,

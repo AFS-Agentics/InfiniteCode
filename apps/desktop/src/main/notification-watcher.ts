@@ -1,4 +1,4 @@
-import { createDevoClient, type DevoAcpTransport } from "@devo-ai/sdk/v2/client"
+import { createInfiniteCodeClient, type InfiniteCodeAcpTransport } from "@infinitecode-ai/sdk/v2/client"
 import { createLogger } from "./logger"
 import { setPermissionResponder, showNotification, updateBadgeCount } from "./notifications"
 
@@ -36,13 +36,13 @@ const changeListeners = new Set<() => void>()
 // ============================================================
 
 /**
- * Start watching the Devo server's ACP event stream
+ * Start watching the InfiniteCode server's ACP event stream
  * for notification-worthy events.
  *
  * This runs in the main process (Node.js) and is never throttled
  * by Chromium's background tab restrictions or macOS App Nap.
  */
-export function startNotificationWatcher(transport: DevoAcpTransport): void {
+export function startNotificationWatcher(transport: InfiniteCodeAcpTransport): void {
 	if (abortController) {
 		log.debug("Stopping existing watcher before restart")
 		abortController.abort()
@@ -51,7 +51,7 @@ export function startNotificationWatcher(transport: DevoAcpTransport): void {
 	abortController = new AbortController()
 	pendingCount = 0
 
-	const client = createDevoClient({ transport })
+	const client = createInfiniteCodeClient({ transport })
 	setPermissionResponder(async ({ sessionId, permissionId, response }) => {
 		await client.permission.respond({
 			sessionID: sessionId,
@@ -115,7 +115,7 @@ export function onStateChanged(listener: () => void): () => void {
 // ACP Connection + Retry Loop
 // ============================================================
 
-async function connectWithRetry(client: ReturnType<typeof createDevoClient>, signal: AbortSignal): Promise<void> {
+async function connectWithRetry(client: ReturnType<typeof createInfiniteCodeClient>, signal: AbortSignal): Promise<void> {
 	let retryDelay = 1_000
 
 	while (!signal.aborted) {
@@ -138,7 +138,7 @@ async function connectWithRetry(client: ReturnType<typeof createDevoClient>, sig
 	}
 }
 
-async function consumeAcpEvents(client: ReturnType<typeof createDevoClient>, signal: AbortSignal): Promise<void> {
+async function consumeAcpEvents(client: ReturnType<typeof createInfiniteCodeClient>, signal: AbortSignal): Promise<void> {
 	const result = await client.event.subscribe()
 	log.info("ACP event stream connected")
 	for await (const globalEvent of result.stream) {

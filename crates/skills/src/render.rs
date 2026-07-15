@@ -7,7 +7,7 @@ const DEFAULT_SKILL_METADATA_CHAR_BUDGET: usize = 8_000;
 const SKILL_METADATA_CONTEXT_WINDOW_PERCENT: usize = 2;
 const APPROX_BYTES_PER_TOKEN: usize = 4;
 
-pub const SKILL_DESCRIPTION_TRUNCATED_WARNING: &str = "Skill descriptions were shortened to fit the skills context budget. Devo can still see every skill, but some descriptions are shorter. Disable unused skills to leave more room for the rest.";
+pub const SKILL_DESCRIPTION_TRUNCATED_WARNING: &str = "Skill descriptions were shortened to fit the skills context budget. InfiniteCode can still see every skill, but some descriptions are shorter. Disable unused skills to leave more room for the rest.";
 pub const SKILL_DESCRIPTIONS_REMOVED_WARNING_PREFIX: &str =
     "Exceeded skills context budget. All skill descriptions were removed and";
 pub const SKILLS_INTRO_WITH_ABSOLUTE_PATHS: &str = "A skill is a set of local instructions to follow that is stored in a `SKILL.md` file. Below is the list of skills that can be used. Each entry includes a name, description, and file path so you can open the source for full instructions when using a specific skill.";
@@ -247,14 +247,14 @@ mod tests {
     #[test]
     fn render_available_skills_body_preserves_line_layout() {
         let body = render_available_skills_body(
-            &["- /repo/.devo/skills".to_string()],
+            &["- /repo/.infinitecode/skills".to_string()],
             &["- code-review: Review code (path: /skills/code-review/SKILL.md)".to_string()],
         );
 
         assert_eq!(
             body,
             format!(
-                "\n## Skills\n{SKILLS_INTRO_WITH_ABSOLUTE_PATHS}\n### Skill roots\n- /repo/.devo/skills\n### Available skills\n- code-review: Review code (path: /skills/code-review/SKILL.md)\n### How to use skills\n{SKILLS_HOW_TO_USE_WITH_ABSOLUTE_PATHS}\n"
+                "\n## Skills\n{SKILLS_INTRO_WITH_ABSOLUTE_PATHS}\n### Skill roots\n- /repo/.infinitecode/skills\n### Available skills\n- code-review: Review code (path: /skills/code-review/SKILL.md)\n### How to use skills\n{SKILLS_HOW_TO_USE_WITH_ABSOLUTE_PATHS}\n"
             )
         );
     }

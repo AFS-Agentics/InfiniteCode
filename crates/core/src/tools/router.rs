@@ -3,10 +3,10 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use devo_config::ResolvedLocalWebSearchConfig;
-use devo_safety::ResourceKind;
-use devo_tools::contracts::ToolBudgets;
-use devo_tools::contracts::ToolProgress;
+use infinitecode_config::ResolvedLocalWebSearchConfig;
+use infinitecode_safety::ResourceKind;
+use infinitecode_tools::contracts::ToolBudgets;
+use infinitecode_tools::contracts::ToolProgress;
 use futures::StreamExt;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
@@ -19,11 +19,11 @@ use crate::invocation::ToolContent;
 use crate::registry::ToolRegistry;
 use crate::tool_spec::ToolCapabilityTag;
 use crate::tools::deferred_loading::is_subagent_agent_coordination_tool;
-use devo_tools::AgentToolCoordinator;
-use devo_tools::ClientFilesystem;
-use devo_tools::ClientTerminal;
-use devo_tools::FileReadLedger;
-use devo_tools::ToolAgentScope;
+use infinitecode_tools::AgentToolCoordinator;
+use infinitecode_tools::ClientFilesystem;
+use infinitecode_tools::ClientTerminal;
+use infinitecode_tools::FileReadLedger;
+use infinitecode_tools::ToolAgentScope;
 use tokio_util::sync::CancellationToken;
 
 type ProgressCallback = dyn Fn(String, ToolProgress) -> BoxFuture<'static, ()> + Send + Sync;
@@ -425,7 +425,7 @@ impl ToolRuntime {
             && let Some(object) = input.as_object_mut()
             && let Ok(value) = serde_json::to_value(config)
         {
-            object.insert("__devo_local_web_search".to_string(), value);
+            object.insert("__infinitecode_local_web_search".to_string(), value);
         }
         input
     }
@@ -514,7 +514,7 @@ pub struct ToolRuntimeContext {
     pub turn_id: Option<String>,
     pub cwd: PathBuf,
     pub agent_scope: ToolAgentScope,
-    pub collaboration_mode: devo_protocol::CollaborationMode,
+    pub collaboration_mode: infinitecode_protocol::CollaborationMode,
     pub agent_coordinator: Option<Arc<dyn AgentToolCoordinator>>,
     pub client_filesystem: Option<Arc<dyn ClientFilesystem>>,
     pub client_terminal: Option<Arc<dyn ClientTerminal>>,
@@ -532,7 +532,7 @@ impl Default for ToolRuntimeContext {
             turn_id: None,
             cwd: PathBuf::new(),
             agent_scope: ToolAgentScope::default(),
-            collaboration_mode: devo_protocol::CollaborationMode::default(),
+            collaboration_mode: infinitecode_protocol::CollaborationMode::default(),
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: None,
@@ -1265,7 +1265,7 @@ mod tests {
 
         assert!(result.is_error);
         assert_eq!(request.tool_name, "read");
-        assert_eq!(request.resource, devo_safety::ResourceKind::FileRead);
+        assert_eq!(request.resource, infinitecode_safety::ResourceKind::FileRead);
         assert_eq!(
             request.path,
             Some(PathBuf::from("C:/workspace").join("src/lib.rs"))
@@ -1295,11 +1295,11 @@ mod tests {
                 turn_id: Some("turn-1".into()),
                 cwd: PathBuf::from("C:/workspace"),
                 agent_scope: ToolAgentScope::Parent,
-                collaboration_mode: devo_protocol::CollaborationMode::Build,
+                collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
                 agent_coordinator: None,
                 client_filesystem: None,
                 client_terminal: None,
-                file_read_ledger: std::sync::Arc::new(devo_tools::FileReadLedger::new()),
+                file_read_ledger: std::sync::Arc::new(infinitecode_tools::FileReadLedger::new()),
                 local_web_search: None,
                 hooks: None,
                 network_proxy: None,
@@ -1320,7 +1320,7 @@ mod tests {
         assert_eq!(request.tool_name, "write_tool");
         assert_eq!(request.session_id, "session-1");
         assert_eq!(request.turn_id, Some("turn-1".into()));
-        assert_eq!(request.resource, devo_safety::ResourceKind::FileWrite);
+        assert_eq!(request.resource, infinitecode_safety::ResourceKind::FileWrite);
     }
 
     #[tokio::test]
@@ -1366,7 +1366,7 @@ mod tests {
 
         assert!(result.is_error);
         assert_eq!(request.tool_name, "shell_command");
-        assert_eq!(request.resource, devo_safety::ResourceKind::ShellExec);
+        assert_eq!(request.resource, infinitecode_safety::ResourceKind::ShellExec);
         assert_eq!(request.target.as_deref(), Some("git status"));
         assert_eq!(
             request.command_prefix,
@@ -1479,7 +1479,7 @@ mod tests {
 
         assert!(result.is_error);
         assert_eq!(request.tool_name, "code_search");
-        assert_eq!(request.resource, devo_safety::ResourceKind::FileRead);
+        assert_eq!(request.resource, infinitecode_safety::ResourceKind::FileRead);
         assert_eq!(request.path, Some(PathBuf::from("C:/workspace").join(".")));
         assert!(result.content.into_string().contains("permission denied"));
     }
@@ -1551,7 +1551,7 @@ mod tests {
             cwd: std::path::PathBuf::new(),
             session_id: "session".into(),
             turn_id: Some("turn".into()),
-            resource: devo_safety::ResourceKind::Custom(tool_name.into()),
+            resource: infinitecode_safety::ResourceKind::Custom(tool_name.into()),
             action_summary: tool_name.into(),
             justification: None,
             path: None,
@@ -2057,39 +2057,39 @@ mod tests {
     struct FakeAgentCoordinator;
 
     #[async_trait]
-    impl devo_tools::AgentToolCoordinator for FakeAgentCoordinator {
+    impl infinitecode_tools::AgentToolCoordinator for FakeAgentCoordinator {
         async fn spawn_agent(
             self: Arc<Self>,
-            _params: devo_protocol::SpawnAgentParams,
-        ) -> Result<devo_protocol::SpawnAgentResult, ToolCallError> {
+            _params: infinitecode_protocol::SpawnAgentParams,
+        ) -> Result<infinitecode_protocol::SpawnAgentResult, ToolCallError> {
             Err(ToolCallError::InternalError("not used".to_string()))
         }
 
         async fn send_message(
             self: Arc<Self>,
-            _params: devo_protocol::AgentMessageParams,
-        ) -> Result<devo_protocol::AgentMessageResult, ToolCallError> {
+            _params: infinitecode_protocol::AgentMessageParams,
+        ) -> Result<infinitecode_protocol::AgentMessageResult, ToolCallError> {
             Err(ToolCallError::InternalError("not used".to_string()))
         }
 
         async fn wait_agent(
             self: Arc<Self>,
-            _params: devo_protocol::WaitAgentParams,
-        ) -> Result<devo_protocol::WaitAgentResult, ToolCallError> {
+            _params: infinitecode_protocol::WaitAgentParams,
+        ) -> Result<infinitecode_protocol::WaitAgentResult, ToolCallError> {
             Err(ToolCallError::InternalError("not used".to_string()))
         }
 
         async fn list_agents(
             self: Arc<Self>,
-            _params: devo_protocol::AgentListParams,
-        ) -> Result<Vec<devo_protocol::AgentInfo>, ToolCallError> {
+            _params: infinitecode_protocol::AgentListParams,
+        ) -> Result<Vec<infinitecode_protocol::AgentInfo>, ToolCallError> {
             Err(ToolCallError::InternalError("not used".to_string()))
         }
 
         async fn close_agent(
             self: Arc<Self>,
-            _params: devo_protocol::CloseAgentParams,
-        ) -> Result<devo_protocol::CloseAgentResult, ToolCallError> {
+            _params: infinitecode_protocol::CloseAgentParams,
+        ) -> Result<infinitecode_protocol::CloseAgentResult, ToolCallError> {
             Err(ToolCallError::InternalError("not used".to_string()))
         }
     }
@@ -2120,7 +2120,7 @@ mod tests {
             PermissionChecker::always_allow(),
             ToolRuntimeContext {
                 agent_coordinator: Some(
-                    Arc::new(FakeAgentCoordinator) as Arc<dyn devo_tools::AgentToolCoordinator>
+                    Arc::new(FakeAgentCoordinator) as Arc<dyn infinitecode_tools::AgentToolCoordinator>
                 ),
                 ..ToolRuntimeContext::default()
             },

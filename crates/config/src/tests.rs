@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use devo_protocol::PermissionPreset;
+use infinitecode_protocol::PermissionPreset;
 use pretty_assertions::assert_eq;
 
 use super::AppConfig;
@@ -31,16 +31,16 @@ use super::ToolsConfig;
 use super::UpdatesConfig;
 use crate::BundledSkillsConfig;
 use crate::SkillsConfig;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderVendor;
-use devo_protocol::ProviderWireApi;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderVendor;
+use infinitecode_protocol::ProviderWireApi;
 
 fn unique_temp_dir(name: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("system time")
         .as_nanos();
-    let path = std::env::temp_dir().join(format!("devo-{name}-{nanos}"));
+    let path = std::env::temp_dir().join(format!("infinitecode-{name}-{nanos}"));
     std::fs::create_dir_all(&path).expect("create temp dir");
     path
 }
@@ -48,10 +48,10 @@ fn unique_temp_dir(name: &str) -> PathBuf {
 #[test]
 fn loader_merges_user_project_and_cli_layers() {
     let root = unique_temp_dir("config-merge");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     let workspace = root.join("workspace");
     std::fs::create_dir_all(&home).expect("home config dir");
-    std::fs::create_dir_all(workspace.join(".devo")).expect("workspace config dir");
+    std::fs::create_dir_all(workspace.join(".infinitecode")).expect("workspace config dir");
 
     std::fs::write(
         home.join("config.toml"),
@@ -59,7 +59,7 @@ fn loader_merges_user_project_and_cli_layers() {
     )
     .expect("write user config");
     std::fs::write(
-        workspace.join(".devo").join("config.toml"),
+        workspace.join(".infinitecode").join("config.toml"),
         "enable_auxiliary_model = true\nproject_root_markers = ['.git', 'Cargo.toml']\n[context]\nauto_compact_percent = 80\n[logging]\njson = true\n[logging.file]\ndirectory = 'diagnostics'\nfilename_prefix = 'agent'\n[skills]\nenabled = true\nworkspace_roots = ['project-skills']\nwatch_for_changes = false\n",
     )
     .expect("write project config");
@@ -170,7 +170,7 @@ fn default_app_config_disables_server_auth() {
 #[test]
 fn loader_reads_server_auth_config() {
     let root = unique_temp_dir("config-server-auth");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -205,7 +205,7 @@ logout = false
 #[test]
 fn loader_rejects_empty_server_auth_method_id_when_enabled() {
     let root = unique_temp_dir("config-server-auth-empty-method");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -230,7 +230,7 @@ fn loader_rejects_empty_server_auth_method_id_when_enabled() {
 #[test]
 fn loader_rejects_empty_server_auth_name_when_enabled() {
     let root = unique_temp_dir("config-server-auth-empty-name");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -255,7 +255,7 @@ fn loader_rejects_empty_server_auth_name_when_enabled() {
 #[test]
 fn loader_accepts_experimental_code_search_kebab_key() {
     let root = unique_temp_dir("config-experimental-kebab");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -277,7 +277,7 @@ fn loader_accepts_experimental_code_search_kebab_key() {
 #[test]
 fn loader_accepts_experimental_code_search_snake_alias() {
     let root = unique_temp_dir("config-experimental-snake");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -299,17 +299,17 @@ fn loader_accepts_experimental_code_search_snake_alias() {
 #[test]
 fn loader_merges_experimental_config_in_normal_precedence_order() {
     let root = unique_temp_dir("config-experimental-merge");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     let workspace = root.join("workspace");
     std::fs::create_dir_all(&home).expect("home config dir");
-    std::fs::create_dir_all(workspace.join(".devo")).expect("workspace config dir");
+    std::fs::create_dir_all(workspace.join(".infinitecode")).expect("workspace config dir");
     std::fs::write(
         home.join("config.toml"),
         "[experimental]\ncode-search = false\n",
     )
     .expect("write user config");
     std::fs::write(
-        workspace.join(".devo").join("config.toml"),
+        workspace.join(".infinitecode").join("config.toml"),
         "[experimental]\ncode-search = true\n",
     )
     .expect("write project config");
@@ -331,7 +331,7 @@ fn loader_merges_experimental_config_in_normal_precedence_order() {
 #[test]
 fn loader_reads_hook_command_config() {
     let root = unique_temp_dir("config-hooks");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -380,10 +380,10 @@ statusMessage = "Checking tool use"
 #[test]
 fn loader_merges_provider_sections_with_provider_overlay_rules() {
     let root = unique_temp_dir("config-provider-merge");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     let workspace = root.join("workspace");
     std::fs::create_dir_all(&home).expect("home config dir");
-    std::fs::create_dir_all(workspace.join(".devo")).expect("workspace config dir");
+    std::fs::create_dir_all(workspace.join(".infinitecode")).expect("workspace config dir");
 
     std::fs::write(
         home.join("config.toml"),
@@ -410,7 +410,7 @@ invocation_method = "openai_responses"
     )
     .expect("write user config");
     std::fs::write(
-        workspace.join(".devo").join("config.toml"),
+        workspace.join(".infinitecode").join("config.toml"),
         r#"
 [provider_http]
 proxy_url = "http://workspace-proxy.example:8080"
@@ -478,10 +478,10 @@ invocation_method = "openai_responses"
 #[test]
 fn loader_provider_overlay_preserves_absent_defaulted_provider_fields() {
     let root = unique_temp_dir("config-provider-defaulted-overlay");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     let workspace = root.join("workspace");
     std::fs::create_dir_all(&home).expect("home config dir");
-    std::fs::create_dir_all(workspace.join(".devo")).expect("workspace config dir");
+    std::fs::create_dir_all(workspace.join(".infinitecode")).expect("workspace config dir");
 
     std::fs::write(
         home.join("config.toml"),
@@ -507,7 +507,7 @@ enabled = false
     )
     .expect("write user config");
     std::fs::write(
-        workspace.join(".devo").join("config.toml"),
+        workspace.join(".infinitecode").join("config.toml"),
         r#"
 [providers.main]
 name = "Project Provider"
@@ -565,7 +565,7 @@ request_model = "project/model"
 #[test]
 fn loader_applies_cli_provider_overrides_to_provider_section() {
     let root = unique_temp_dir("config-provider-cli-overlay");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
 
     std::fs::write(
@@ -648,10 +648,10 @@ enabled = false
 #[test]
 fn provider_upsert_writes_user_config_when_workspace_is_active() {
     let root = unique_temp_dir("provider-upsert-user");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     let workspace = root.join("workspace");
     std::fs::create_dir_all(&home).expect("home config dir");
-    std::fs::create_dir_all(workspace.join(".devo")).expect("workspace config dir");
+    std::fs::create_dir_all(workspace.join(".infinitecode")).expect("workspace config dir");
 
     let mut store = AppConfigStore::load(home.clone(), Some(&workspace)).expect("load store");
     let written_provider = store
@@ -661,7 +661,7 @@ fn provider_upsert_writes_user_config_when_workspace_is_active() {
                 name: "openrouter".to_string(),
                 base_url: Some("https://openrouter.ai/api/v1".to_string()),
                 credential: None,
-                headers: Some(r#"{"X-Devo":"yes"}"#.to_string()),
+                headers: Some(r#"{"X-InfiniteCode":"yes"}"#.to_string()),
                 wire_apis: vec![ProviderWireApi::OpenAIChatCompletions],
                 enabled: true,
             },
@@ -681,7 +681,7 @@ fn provider_upsert_writes_user_config_when_workspace_is_active() {
         .expect("upsert provider");
 
     let user_config = std::fs::read_to_string(home.join("config.toml")).expect("user config");
-    let workspace_config = workspace.join(".devo").join("config.toml");
+    let workspace_config = workspace.join(".infinitecode").join("config.toml");
     let document: toml::Value = toml::from_str(&user_config).expect("parse user config");
 
     assert!(user_config.contains("[providers.openrouter]"));
@@ -689,15 +689,15 @@ fn provider_upsert_writes_user_config_when_workspace_is_active() {
     assert!(user_config.contains("model_binding = \"qwen-openrouter\""));
     assert_eq!(
         document["providers"]["openrouter"]["headers"].as_str(),
-        Some(r#"{"X-Devo":"yes"}"#)
+        Some(r#"{"X-InfiniteCode":"yes"}"#)
     );
     assert_eq!(
         written_provider.headers,
-        Some(r#"{"X-Devo":"yes"}"#.to_string())
+        Some(r#"{"X-InfiniteCode":"yes"}"#.to_string())
     );
     assert_eq!(
         store.provider_vendors()[0].headers,
-        Some(r#"{"X-Devo":"yes"}"#.to_string())
+        Some(r#"{"X-InfiniteCode":"yes"}"#.to_string())
     );
     assert!(!workspace_config.exists());
 
@@ -707,7 +707,7 @@ fn provider_upsert_writes_user_config_when_workspace_is_active() {
 #[test]
 fn provider_upsert_migrates_legacy_model_name_to_request_model() {
     let root = unique_temp_dir("provider-upsert-existing-binding");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -778,7 +778,7 @@ provider = "Deepseek"
 #[test]
 fn loader_rejects_invalid_logging_file_prefix() {
     let root = unique_temp_dir("config-validation");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -800,7 +800,7 @@ fn loader_rejects_invalid_logging_file_prefix() {
 #[test]
 fn loader_rejects_duplicate_skill_roots() {
     let root = unique_temp_dir("config-skill-roots");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -822,7 +822,7 @@ fn loader_rejects_duplicate_skill_roots() {
 #[test]
 fn loader_reads_project_configs() {
     let root = unique_temp_dir("config-projects");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),
@@ -861,7 +861,7 @@ fn default_app_config_enables_startup_update_checks() {
 #[test]
 fn loader_rejects_invalid_update_check_interval() {
     let root = unique_temp_dir("config-update-interval");
-    let home = root.join("home").join(".devo");
+    let home = root.join("home").join(".infinitecode");
     std::fs::create_dir_all(&home).expect("home config dir");
     std::fs::write(
         home.join("config.toml"),

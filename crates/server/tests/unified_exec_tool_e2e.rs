@@ -5,11 +5,11 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use devo_protocol::{
+use infinitecode_protocol::{
     ModelRequest, ModelResponse, RequestContent, ResponseContent, ResponseMetadata, StopReason,
     StreamEvent, Usage,
 };
-use devo_provider::ModelProviderSDK;
+use infinitecode_provider::ModelProviderSDK;
 use futures::Stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;

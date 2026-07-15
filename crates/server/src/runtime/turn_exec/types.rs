@@ -1,14 +1,14 @@
-use devo_core::{ItemId, TurnId, TurnUsage};
+use infinitecode_core::{ItemId, TurnId, TurnUsage};
 
 /// Inputs captured at turn-start time and handed to the background turn executor.
 pub(crate) struct ExecuteTurnRequest {
     /// Runtime session that owns the turn and receives emitted items, usage, and status updates.
-    pub(crate) session_id: devo_core::SessionId,
+    pub(crate) session_id: infinitecode_core::SessionId,
     /// Pre-created turn metadata persisted at turn start; execution mutates a local copy to its
     /// terminal status before appending the final turn record.
     pub(crate) turn: crate::TurnMetadata,
     /// Resolved model, provider, reasoning, tool, web, and token-budget settings for this turn.
-    pub(crate) turn_config: devo_core::TurnConfig,
+    pub(crate) turn_config: infinitecode_core::TurnConfig,
     /// User-facing rendering of the submitted input. Visible turns persist this as the displayed
     /// user message; hidden continuation turns keep it out of the transcript.
     pub(crate) display_input: String,
@@ -20,7 +20,7 @@ pub(crate) struct ExecuteTurnRequest {
     pub(crate) input_messages: Vec<String>,
     /// Collaboration mode to install on the core session for this query; it also drives
     /// mode-specific stream handling such as proposed-plan parsing.
-    pub(crate) collaboration_mode: devo_protocol::CollaborationMode,
+    pub(crate) collaboration_mode: infinitecode_protocol::CollaborationMode,
     /// Controls whether this executor emits/pushes a visible user message or runs hidden work such
     /// as goal continuation, and carries the hidden goal context when needed.
     pub(crate) input_mode: super::super::TurnInputMode,
@@ -39,7 +39,7 @@ pub(crate) struct TurnEventStreamSummary {
     pub(crate) turn_usage: Option<TurnUsage>,
     /// Usage from the most recent individual model invocation.
     pub(crate) latest_query_usage: Option<TurnUsage>,
-    pub(crate) stop_reason: Option<devo_core::StopReason>,
+    pub(crate) stop_reason: Option<infinitecode_core::StopReason>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,7 +68,7 @@ pub(super) struct ToolStartItem {
 }
 
 pub(crate) struct TurnQueryOutcome {
-    pub(crate) result: Result<(), devo_core::AgentError>,
+    pub(crate) result: Result<(), infinitecode_core::AgentError>,
     pub(crate) session_total_input_tokens: usize,
     pub(crate) session_total_output_tokens: usize,
     pub(crate) session_total_tokens: usize,
@@ -82,7 +82,7 @@ pub(super) struct QueuedTurnInput {
     pub(super) display_input: String,
     pub(super) input_text: String,
     pub(super) input_messages: Vec<String>,
-    pub(super) collaboration_mode: devo_protocol::CollaborationMode,
+    pub(super) collaboration_mode: infinitecode_protocol::CollaborationMode,
     pub(super) model_selection: Option<String>,
-    pub(super) subagent_usage_owner: Option<(devo_core::SessionId, Option<TurnId>)>,
+    pub(super) subagent_usage_owner: Option<(infinitecode_core::SessionId, Option<TurnId>)>,
 }

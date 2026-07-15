@@ -13,8 +13,8 @@ use std::time::Instant;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
-use devo_core::ItemId;
-use devo_core::SessionId;
+use infinitecode_core::ItemId;
+use infinitecode_core::SessionId;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Stylize;
@@ -77,7 +77,7 @@ struct SubagentSessionView {
     transcript: Vec<MonitorTranscriptItem>,
     active_text: HashMap<String, MonitorTextItem>,
     active_tools: HashMap<String, MonitorToolItem>,
-    active_turn: Option<devo_core::TurnId>,
+    active_turn: Option<infinitecode_core::TurnId>,
     latest_preview: String,
     has_runtime_update: bool,
     last_activity_at: Option<Instant>,
@@ -242,7 +242,7 @@ impl ChatWidget {
 
     pub(crate) fn on_subagent_discovered(&mut self, agent: SubagentMonitorAgent) {
         tracing::debug!(
-            target: "devo_tui::subagent",
+            target: "infinitecode_tui::subagent",
             session_id = ?agent.session_id,
             parent_session_id = ?agent.parent_session_id,
             nickname = %agent.nickname,
@@ -299,7 +299,7 @@ impl ChatWidget {
         let has_runtime_update = view.is_some_and(|view| view.has_runtime_update);
         let transcript_len = view.map(|view| view.transcript.len()).unwrap_or(0);
         tracing::debug!(
-            target: "devo_tui::subagent",
+            target: "infinitecode_tui::subagent",
             ?session_id,
             event_kind,
             old_status = old_status.as_deref().unwrap_or(""),
@@ -460,7 +460,7 @@ impl ChatWidget {
         self.bottom_pane.set_subagent_hint_visible(has_active);
         self.prune_terminal_subagents(now);
         tracing::debug!(
-            target: "devo_tui::subagent",
+            target: "infinitecode_tui::subagent",
             has_active,
             has_visible,
             live_count = self.active_subagent_ids().len(),
@@ -1216,10 +1216,10 @@ fn normalize_terminal_subagent_status(status: &str) -> String {
     normalize_subagent_display_status(status)
 }
 
-fn normalize_runtime_status_for_subagent(status: devo_protocol::SessionRuntimeStatus) -> String {
+fn normalize_runtime_status_for_subagent(status: infinitecode_protocol::SessionRuntimeStatus) -> String {
     match status {
-        devo_protocol::SessionRuntimeStatus::ActiveTurn => "working".to_string(),
-        devo_protocol::SessionRuntimeStatus::Idle => "idle".to_string(),
+        infinitecode_protocol::SessionRuntimeStatus::ActiveTurn => "working".to_string(),
+        infinitecode_protocol::SessionRuntimeStatus::Idle => "idle".to_string(),
         other => format!("{other:?}").to_lowercase(),
     }
 }

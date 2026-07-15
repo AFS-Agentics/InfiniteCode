@@ -28,11 +28,11 @@ use ratatui::widgets::Paragraph;
 use ratatui::widgets::Widget;
 use ratatui::widgets::Wrap;
 
-use devo_protocol::Model;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderVendor;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ReasoningEffortPreset;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderVendor;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ReasoningEffortPreset;
 
 use crate::app_command::AppCommand;
 use crate::app_event::AppEvent;
@@ -568,7 +568,7 @@ impl OnboardingWidget {
         self.model_by_slug(slug).is_some_and(|model| {
             !matches!(
                 model.reasoning_capability,
-                devo_protocol::ReasoningCapability::Unsupported
+                infinitecode_protocol::ReasoningCapability::Unsupported
             )
         })
     }

@@ -4,12 +4,12 @@
 //! accounting, continuation triggers, and status transitions.
 
 use chrono::{DateTime, Utc};
-use devo_protocol::GoalCreateParams;
-use devo_protocol::SessionId;
-use devo_protocol::ThreadGoal;
-use devo_protocol::ThreadGoalStatus;
-use devo_protocol::validate_thread_goal_objective;
-use devo_protocol::validate_thread_goal_token_budget;
+use infinitecode_protocol::GoalCreateParams;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::ThreadGoal;
+use infinitecode_protocol::ThreadGoalStatus;
+use infinitecode_protocol::validate_thread_goal_objective;
+use infinitecode_protocol::validate_thread_goal_token_budget;
 use serde::{Deserialize, Serialize};
 
 // ── Goal State ──────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Goal {
     pub goal_id: GoalId,
-    pub durable_goal_id: devo_core::GoalId,
+    pub durable_goal_id: infinitecode_core::GoalId,
     pub session_id: SessionId,
     pub prompt: String,
     pub description: Option<String>,
@@ -44,10 +44,10 @@ impl Default for GoalId {
 
 impl GoalId {
     pub fn new() -> Self {
-        Self::from_durable(devo_core::GoalId::new())
+        Self::from_durable(infinitecode_core::GoalId::new())
     }
 
-    pub fn from_durable(goal_id: devo_core::GoalId) -> Self {
+    pub fn from_durable(goal_id: infinitecode_core::GoalId) -> Self {
         Self(format!("goal-{}", goal_id.0))
     }
 }
@@ -61,7 +61,7 @@ impl std::fmt::Display for GoalId {
 /// Reference to a turn by its id and sequence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TurnRef {
-    pub turn_id: devo_protocol::TurnId,
+    pub turn_id: infinitecode_protocol::TurnId,
     pub sequence: u32,
 }
 
@@ -169,7 +169,7 @@ impl Goal {
         validate_thread_goal_token_budget(params.token_budget)
             .map_err(GoalError::InvalidObjective)?;
         let now = Utc::now();
-        let durable_goal_id = devo_core::GoalId::new();
+        let durable_goal_id = infinitecode_core::GoalId::new();
         Ok(Self {
             goal_id: GoalId::from_durable(durable_goal_id),
             durable_goal_id,
@@ -206,7 +206,7 @@ impl Goal {
     }
 
     pub fn continuation_prompt(&self) -> Option<String> {
-        devo_core::render_goal_continuation_prompt(&self.to_thread_goal())
+        infinitecode_core::render_goal_continuation_prompt(&self.to_thread_goal())
     }
 
     pub fn token_budget_exhausted(&self) -> bool {
@@ -273,7 +273,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn make_active_goal() -> Goal {
-        let durable_goal_id = devo_core::GoalId::new();
+        let durable_goal_id = infinitecode_core::GoalId::new();
         Goal {
             goal_id: GoalId::from_durable(durable_goal_id),
             durable_goal_id,

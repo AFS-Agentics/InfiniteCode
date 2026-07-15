@@ -1,6 +1,6 @@
 "use client"
 
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import * as ResizablePrimitive from "react-resizable-panels"
 
 function ResizablePanelGroup({ className, ...props }: ResizablePrimitive.GroupProps) {

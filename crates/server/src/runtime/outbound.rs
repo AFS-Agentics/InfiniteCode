@@ -325,7 +325,7 @@ fn assistant_token_log_preview(text: &str) -> Option<String> {
 fn assistant_token_logging_enabled() -> bool {
     static ASSISTANT_TOKEN_LOGGING_ENABLED: OnceLock<bool> = OnceLock::new();
     *ASSISTANT_TOKEN_LOGGING_ENABLED.get_or_init(|| {
-        std::env::var("DEVO_LOG_ASSISTANT_TOKEN_TEXT")
+        std::env::var("INFINITECODE_LOG_ASSISTANT_TOKEN_TEXT")
             .ok()
             .is_some_and(|value| {
                 matches!(
@@ -339,7 +339,7 @@ fn assistant_token_logging_enabled() -> bool {
 fn assistant_token_log_max_chars() -> usize {
     static ASSISTANT_TOKEN_LOG_MAX_CHARS: OnceLock<usize> = OnceLock::new();
     *ASSISTANT_TOKEN_LOG_MAX_CHARS.get_or_init(|| {
-        std::env::var("DEVO_ASSISTANT_TOKEN_LOG_MAX_CHARS")
+        std::env::var("INFINITECODE_ASSISTANT_TOKEN_LOG_MAX_CHARS")
             .ok()
             .and_then(|value| value.parse::<usize>().ok())
             .filter(|value| *value > 0)

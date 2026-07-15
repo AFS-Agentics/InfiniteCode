@@ -22,7 +22,7 @@ use crate::ACP_SESSION_SET_CONFIG_OPTION_METHOD;
 use crate::ACP_SESSION_SET_MODE_METHOD;
 use crate::acp_auth_required_response;
 use crate::acp_notification_from_server_event;
-use crate::devo_extension_inner_method;
+use crate::infinitecode_extension_inner_method;
 
 use super::outbound::OutboundFrame;
 use super::outbound::enqueue_outbound;
@@ -276,7 +276,7 @@ impl ServerRuntime {
         }
 
         let client_method = ClientMethod::parse(&method)
-            .or_else(|| devo_extension_inner_method(&method).and_then(ClientMethod::parse));
+            .or_else(|| infinitecode_extension_inner_method(&method).and_then(ClientMethod::parse));
         let response = match client_method {
             None if method == "session/start" => {
                 let request_id = id?;
@@ -856,7 +856,7 @@ impl ServerRuntime {
             connection.next_client_request_id += 1;
             let (tx, rx) = oneshot::channel();
             connection.pending_client_requests.insert(request_id, tx);
-            let value = serde_json::to_value(devo_protocol::AcpClientRequest::new(
+            let value = serde_json::to_value(infinitecode_protocol::AcpClientRequest::new(
                 serde_json::json!(request_id),
                 method,
                 params,
@@ -1214,21 +1214,21 @@ mod tests {
     use crate::ItemDeltaPayload;
     use anyhow::Result;
     use async_trait::async_trait;
-    use devo_core::AppConfigStore;
-    use devo_core::BundledSkillsConfig;
-    use devo_core::FileSystemSkillCatalog;
-    use devo_core::PresetModelCatalog;
-    use devo_core::ProviderVendorCatalog;
-    use devo_core::SkillsConfig;
-    use devo_core::tools::ToolRegistry;
-    use devo_protocol::DEVO_ACTIVITY_AT_META;
-    use devo_protocol::DEVO_ITEM_ID_META;
-    use devo_protocol::DEVO_TURN_ID_META;
-    use devo_protocol::ModelRequest;
-    use devo_protocol::ModelResponse;
-    use devo_protocol::StreamEvent;
-    use devo_provider::ModelProviderSDK;
-    use devo_provider::SingleProviderRouter;
+    use infinitecode_core::AppConfigStore;
+    use infinitecode_core::BundledSkillsConfig;
+    use infinitecode_core::FileSystemSkillCatalog;
+    use infinitecode_core::PresetModelCatalog;
+    use infinitecode_core::ProviderVendorCatalog;
+    use infinitecode_core::SkillsConfig;
+    use infinitecode_core::tools::ToolRegistry;
+    use infinitecode_protocol::INFINITECODE_ACTIVITY_AT_META;
+    use infinitecode_protocol::INFINITECODE_ITEM_ID_META;
+    use infinitecode_protocol::INFINITECODE_TURN_ID_META;
+    use infinitecode_protocol::ModelRequest;
+    use infinitecode_protocol::ModelResponse;
+    use infinitecode_protocol::StreamEvent;
+    use infinitecode_provider::ModelProviderSDK;
+    use infinitecode_provider::SingleProviderRouter;
     use pretty_assertions::assert_eq;
     use tempfile::TempDir;
     use tokio_util::sync::CancellationToken;
@@ -1274,7 +1274,7 @@ mod tests {
                     bundled: Some(BundledSkillsConfig { enabled: false }),
                     ..SkillsConfig::default()
                 })),
-                devo_core::AgentsMdConfig::default(),
+                infinitecode_core::AgentsMdConfig::default(),
                 db,
                 Arc::new(std::sync::Mutex::new(
                     AppConfigStore::load(data_root.to_path_buf(), None)
@@ -1289,12 +1289,12 @@ mod tests {
         turn_id: TurnId,
         item_id: ItemId,
     ) {
-        assert!(update["_meta"][DEVO_ACTIVITY_AT_META].is_string());
+        assert!(update["_meta"][INFINITECODE_ACTIVITY_AT_META].is_string());
         let mut stable_update = update.clone();
         stable_update["_meta"]
             .as_object_mut()
             .expect("ACP update meta")
-            .remove(DEVO_ACTIVITY_AT_META);
+            .remove(INFINITECODE_ACTIVITY_AT_META);
         assert_eq!(
             stable_update,
             serde_json::json!({
@@ -1305,8 +1305,8 @@ mod tests {
                 },
                 "messageId": item_id.to_string(),
                 "_meta": {
-                    DEVO_TURN_ID_META: turn_id.to_string(),
-                    DEVO_ITEM_ID_META: item_id.to_string(),
+                    INFINITECODE_TURN_ID_META: turn_id.to_string(),
+                    INFINITECODE_ITEM_ID_META: item_id.to_string(),
                 },
             })
         );
@@ -1674,8 +1674,8 @@ mod tests {
     /// Verifies: connection-local search notifications deliver despite session-only subscriptions.
     #[tokio::test]
     async fn connection_local_search_notifications_ignore_session_subscriptions() -> Result<()> {
-        use devo_protocol::ReferenceSearchId;
-        use devo_protocol::ReferenceSearchSnapshot;
+        use infinitecode_protocol::ReferenceSearchId;
+        use infinitecode_protocol::ReferenceSearchSnapshot;
 
         let data_root = TempDir::new()?;
         let runtime = build_runtime(data_root.path());
@@ -1712,7 +1712,7 @@ mod tests {
         let owner_message = tokio::time::timeout(Duration::from_secs(1), owner_receiver.recv())
             .await?
             .expect("owner receives connection-local search notification");
-        assert_eq!(owner_message["method"], "_devo/search/completed");
+        assert_eq!(owner_message["method"], "_infinitecode/search/completed");
         assert!(
             tokio::time::timeout(Duration::from_millis(50), other_receiver.recv())
                 .await

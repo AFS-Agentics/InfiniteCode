@@ -1,4 +1,4 @@
-appId: com.devo.desktop
+appId: com.infinitecode.desktop
 productName: InfiniteCode
 copyright: Copyright (c) 2025 InfiniteCode Contributors
 directories:
@@ -11,10 +11,10 @@ files:
   # Must be included because externalizeDepsPlugin keeps it external.
   - "node_modules/electron-liquid-glass/**/*"
 
-# Bundle the private Devo runtime into the app package.
-# macOS: Contents/Resources/runtime/bin/devo
-# Linux: resources/runtime/bin/devo
-# Windows: resources/runtime/bin/devo.exe
+# Bundle the private InfiniteCode runtime into the app package.
+# macOS: Contents/Resources/runtime/bin/infinitecode
+# Linux: resources/runtime/bin/infinitecode
+# Windows: resources/runtime/bin/infinitecode.exe
 extraResources:
   - from: resources/runtime
     to: runtime
@@ -36,7 +36,7 @@ extraResources:
 # Rebuild native modules for Electron's Node.js ABI during packaging.
 npmRebuild: true
 
-artifactName: "devo-desktop-${version}-${os}-${arch}.${ext}"
+artifactName: "infinitecode-desktop-${version}-${os}-${arch}.${ext}"
 
 # Inject version from package.json into the built app
 extraMetadata:
@@ -60,14 +60,14 @@ win:
     - target: nsis
 
 linux:
-  executableName: devo
+  executableName: infinitecode
   icon: resources/linux-icons
   target:
     - target: AppImage
     - target: deb
     - target: rpm
   category: Development
-  maintainer: devo
+  maintainer: infinitecode
   desktop:
     entry:
       Name: InfiniteCode
@@ -83,5 +83,5 @@ nsis:
 publish:
   provider: github
   owner: 7df-lab
-  repo: devo
+  repo: infinitecode
   releaseType: draft

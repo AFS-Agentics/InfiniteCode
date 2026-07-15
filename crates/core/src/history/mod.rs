@@ -10,7 +10,7 @@ use std::fmt::Write as _;
 
 use serde::{Deserialize, Serialize};
 
-use devo_protocol::{InputModality, RequestContent, RequestMessage, Role, UserInput};
+use infinitecode_protocol::{InputModality, RequestContent, RequestMessage, Role, UserInput};
 
 use crate::context::ContextualUserFragment;
 use crate::response_item::ResponseItem;
@@ -302,7 +302,7 @@ impl History {
     pub fn remove_tail_user_message(&mut self) -> bool {
         // Find the last user Message from the end.
         let last_user_pos = self.items.iter().rposition(|item| match item {
-            ResponseItem::Message(msg) => msg.role == devo_protocol::Role::User,
+            ResponseItem::Message(msg) => msg.role == infinitecode_protocol::Role::User,
             _ => false,
         });
 
@@ -313,7 +313,7 @@ impl History {
         // If the preceding item is a compaction-summary fragment, remove it too.
         let truncate_at = if start > 0
             && matches!(&self.items[start - 1], ResponseItem::Message(msg) if msg.content.iter().any(|block| {
-                matches!(block, devo_protocol::ContentBlock::Text { text } if crate::context::compaction_summary::CompactionSummary::matches_text(text))
+                matches!(block, infinitecode_protocol::ContentBlock::Text { text } if crate::context::compaction_summary::CompactionSummary::matches_text(text))
             })) {
             start - 1
         } else {
@@ -379,7 +379,7 @@ impl History {
                 }
             }
             merge_consecutive_assistant_messages(&mut messages);
-            devo_protocol::normalize_tool_result_messages(&mut messages);
+            infinitecode_protocol::normalize_tool_result_messages(&mut messages);
             return messages;
         }
 
@@ -387,7 +387,7 @@ impl History {
         normalize::pair_tool_call_items(&mut items);
         let mut messages: Vec<RequestMessage> = items.into_iter().map(Into::into).collect();
         merge_consecutive_assistant_messages(&mut messages);
-        devo_protocol::normalize_tool_result_messages(&mut messages);
+        infinitecode_protocol::normalize_tool_result_messages(&mut messages);
         messages
     }
 
@@ -465,7 +465,7 @@ mod tests {
 
     use super::*;
     use crate::response_item::ResponseItem;
-    use devo_protocol::{ContentBlock, Message, Role};
+    use infinitecode_protocol::{ContentBlock, Message, Role};
 
     fn test_context() -> ContextView {
         ContextView::new(

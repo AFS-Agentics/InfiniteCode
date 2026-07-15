@@ -2,17 +2,17 @@
 
 [English](./configuration.md) | [简体中文](./configuration.zh-Hans.md) | [繁體中文](./configuration.zh-Hant.md) | [日本語](./configuration.ja.md) | [Русский](./configuration.ru.md)
 
-`devo onboard` - рекомендуемый путь настройки. Для ручной конфигурации Devo
+`infinitecode onboard` - рекомендуемый путь настройки. Для ручной конфигурации InfiniteCode
 объединяет настройки в таком порядке:
 
 1. Встроенные значения по умолчанию
-2. `DEVO_HOME/config.toml` - пользовательская конфигурация, по умолчанию
-   `~/.devo/config.toml` на macOS/Linux и
-   `C:\Users\yourname\.devo\config.toml` на Windows
-3. `<workspace>/.devo/config.toml` - конфигурация уровня проекта
+2. `INFINITECODE_HOME/config.toml` - пользовательская конфигурация, по умолчанию
+   `~/.infinitecode/config.toml` на macOS/Linux и
+   `C:\Users\yourname\.infinitecode\config.toml` на Windows
+3. `<workspace>/.infinitecode/config.toml` - конфигурация уровня проекта
 4. CLI flags
 
-Учетные данные хранятся отдельно в `DEVO_HOME/auth.json`; `config.toml` должен
+Учетные данные хранятся отдельно в `INFINITECODE_HOME/auth.json`; `config.toml` должен
 ссылаться на credential id, а не хранить API key напрямую.
 
 Минимальная структура:
@@ -40,7 +40,7 @@ default_reasoning_effort = "high"
 
 Важное разделение:
 
-- `model_slug` выбирает локальные метаданные модели Devo из `models.json`.
+- `model_slug` выбирает локальные метаданные модели InfiniteCode из `models.json`.
 - `provider` выбирает настроенную запись подключения.
 - `request_model` - строка модели, специфичная для поставщика и отправляемая по wire.
 - `invocation_method` выбирает протокол поставщика, например
@@ -55,14 +55,14 @@ default_reasoning_effort = "high"
 
 Пользовательский каталог моделей:
 
-- macOS/Linux: `~/.devo/models.json`
-- Windows: `C:\Users\yourname\.devo\models.json`
+- macOS/Linux: `~/.infinitecode/models.json`
+- Windows: `C:\Users\yourname\.infinitecode\models.json`
 
 Переопределения уровня проекта также можно поместить в
-`<workspace>/.devo/models.json`. В `models.json` поле `provider` является
+`<workspace>/.infinitecode/models.json`. В `models.json` поле `provider` является
 метаданными wire API по умолчанию для модели; фактический endpoint по-прежнему
 выбирается полем `provider` в `config.toml`.
-Если `base_instructions` опущено, Devo использует встроенные base instructions по
+Если `base_instructions` опущено, InfiniteCode использует встроенные base instructions по
 умолчанию. Явная пустая строка (`""`) означает, что у модели нет base instructions.
 
 Пример записи `models.json`:
@@ -80,7 +80,7 @@ default_reasoning_effort = "high"
     "effective_context_window_percent": 95,
     "max_tokens": 4096,
     "input_modalities": ["text"],
-    "base_instructions": "You are Devo, a coding agent. Help the user edit and understand code."
+    "base_instructions": "You are InfiniteCode, a coding agent. Help the user edit and understand code."
   }
 ]
 ```

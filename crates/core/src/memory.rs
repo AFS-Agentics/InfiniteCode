@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use devo_protocol::SessionId;
+use infinitecode_protocol::SessionId;
 
 // ── Memory Workspace ────────────────────────────────────────────────
 
@@ -24,7 +24,7 @@ impl MemoryWorkspace {
         let home = std::env::var("HOME")
             .or_else(|_| std::env::var("USERPROFILE"))
             .unwrap_or_else(|_| ".".into());
-        PathBuf::from(home).join(".devo").join("memories")
+        PathBuf::from(home).join(".infinitecode").join("memories")
     }
 
     pub fn new(root: PathBuf) -> Self {

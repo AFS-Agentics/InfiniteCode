@@ -1,8 +1,8 @@
 [package]
-description = "Shared client/server protocol types for Devo"
+description = "Shared client/server protocol types for InfiniteCode"
 edition.workspace = true
 license.workspace = true
-name = "devo-protocol"
+name = "infinitecode-protocol"
 version.workspace = true
 
 [lib]

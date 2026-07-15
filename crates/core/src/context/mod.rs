@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::{ItemId, ResponseItem, SessionId, SummaryModelSelection, TurnId};
-use devo_protocol::{ContentBlock, Message, Model, Role};
+use infinitecode_protocol::{ContentBlock, Message, Model, Role};
 
 // ---------------------------------------------------------------------------
 // Contextual user fragment traits and registration
@@ -406,7 +406,7 @@ mod tests {
         ByteTokenEstimator, ContextualUserFragment, PromptAssemblyInput, SnapshotPersistFailure,
         TokenBudget, TokenEstimator,
     };
-    use devo_protocol::Model;
+    use infinitecode_protocol::Model;
     use pretty_assertions::assert_eq;
     use std::hint::black_box;
     use std::time::Instant;

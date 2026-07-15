@@ -3,10 +3,10 @@ import {
 	optionMenuIconClass,
 	optionMenuItemClass,
 	optionMenuSeparatorClass,
-} from "@devo/ui/components/option-menu-styles"
-import { Popover, PopoverContent, PopoverTrigger } from "@devo/ui/components/popover"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/option-menu-styles"
+import { Popover, PopoverContent, PopoverTrigger } from "@infinitecode/ui/components/popover"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import {
 	ChevronRightIcon,
 	FolderIcon,

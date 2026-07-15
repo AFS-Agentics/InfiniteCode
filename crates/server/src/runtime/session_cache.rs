@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 
-use devo_protocol::SessionId;
+use infinitecode_protocol::SessionId;
 
 use crate::execution::RuntimeSession;
 use crate::runtime::ServerRuntime;

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use devo_core::{ItemId, SessionId, TurnId};
+use infinitecode_core::{ItemId, SessionId, TurnId};
 
 use super::super::ServerRuntime;
 use super::super::proposed_plan::ProposedPlanParser;
@@ -32,8 +32,8 @@ pub(crate) const QUERY_EVENT_CHANNEL_CAPACITY: usize = 8192;
 /// Other events may be dropped under pressure so coordination cannot wedge
 /// forever on a stalled consumer.
 pub(super) async fn enqueue_query_event(
-    event_tx: &mpsc::Sender<devo_core::QueryEvent>,
-    event: devo_core::QueryEvent,
+    event_tx: &mpsc::Sender<infinitecode_core::QueryEvent>,
+    event: infinitecode_core::QueryEvent,
 ) {
     let kind = query_event_trace_kind(&event);
     let must_deliver = matches!(
@@ -63,11 +63,11 @@ pub(crate) fn spawn_turn_event_stream(
     event_stream: Arc<tokio::sync::Mutex<SessionStreamState>>,
     session_id: SessionId,
     turn: crate::TurnMetadata,
-    collaboration_mode: devo_protocol::CollaborationMode,
-    event_tool_registry: Arc<devo_core::tools::ToolRegistry>,
+    collaboration_mode: infinitecode_protocol::CollaborationMode,
+    event_tool_registry: Arc<infinitecode_core::tools::ToolRegistry>,
     usage_parent_session_id: Option<SessionId>,
     usage_context_window: Option<u64>,
-    mut event_rx: tokio::sync::mpsc::Receiver<devo_core::QueryEvent>,
+    mut event_rx: tokio::sync::mpsc::Receiver<infinitecode_core::QueryEvent>,
 ) -> tokio::task::JoinHandle<TurnEventStreamSummary> {
     let turn_for_events = turn.clone();
     let turn_for_plan_updates = turn;
@@ -83,7 +83,7 @@ pub(crate) fn spawn_turn_event_stream(
         let mut pending_tool_calls: std::collections::HashMap<String, PendingToolCall> =
             std::collections::HashMap::new();
         let mut proposed_plan_parser = (collaboration_mode
-            == devo_protocol::CollaborationMode::Plan)
+            == infinitecode_protocol::CollaborationMode::Plan)
             .then(ProposedPlanParser::default);
         let mut proposed_plan_item = ProposedPlanStreamItem::default();
         let mut proposed_plan_leading_normal = String::new();
@@ -93,10 +93,10 @@ pub(crate) fn spawn_turn_event_stream(
         while let Some(event) = event_rx.recv().await {
             log_dequeued_query_event(&event);
             match event {
-                devo_core::QueryEvent::ProviderRetryStatus(status) => {
+                infinitecode_core::QueryEvent::ProviderRetryStatus(status) => {
                     runtime
                         .broadcast_event(ServerEvent::TurnProviderRetryStatus(
-                            devo_protocol::TurnProviderRetryStatusPayload {
+                            infinitecode_protocol::TurnProviderRetryStatusPayload {
                                 session_id,
                                 turn_id: turn_for_events.turn_id,
                                 attempt: status.attempt,
@@ -104,11 +104,11 @@ pub(crate) fn spawn_turn_event_stream(
                                 provider: status.provider,
                                 model: status.model,
                                 phase: match status.phase {
-                                    devo_core::QueryProviderRetryPhase::Scheduled => {
-                                        devo_protocol::ProviderRetryPhase::Scheduled
+                                    infinitecode_core::QueryProviderRetryPhase::Scheduled => {
+                                        infinitecode_protocol::ProviderRetryPhase::Scheduled
                                     }
-                                    devo_core::QueryProviderRetryPhase::Resumed => {
-                                        devo_protocol::ProviderRetryPhase::Resumed
+                                    infinitecode_core::QueryProviderRetryPhase::Resumed => {
+                                        infinitecode_protocol::ProviderRetryPhase::Resumed
                                     }
                                 },
                                 message: status.message,
@@ -116,7 +116,7 @@ pub(crate) fn spawn_turn_event_stream(
                         ))
                         .await;
                 }
-                devo_core::QueryEvent::TextDelta(text) => {
+                infinitecode_core::QueryEvent::TextDelta(text) => {
                     if let Some(parser) = proposed_plan_parser.as_mut() {
                         let segments = parser.push_str(&text);
                         handle_proposed_plan_segments(
@@ -148,7 +148,7 @@ pub(crate) fn spawn_turn_event_stream(
                         .await;
                     }
                 }
-                devo_core::QueryEvent::ReasoningDelta(text) => {
+                infinitecode_core::QueryEvent::ReasoningDelta(text) => {
                     handle_reasoning_delta(
                         &runtime,
                         &event_stream,
@@ -161,7 +161,7 @@ pub(crate) fn spawn_turn_event_stream(
                     )
                     .await;
                 }
-                devo_core::QueryEvent::ReasoningCompleted => {
+                infinitecode_core::QueryEvent::ReasoningCompleted => {
                     complete_open_reasoning_item(
                         &runtime,
                         session_id,
@@ -173,7 +173,7 @@ pub(crate) fn spawn_turn_event_stream(
                     )
                     .await;
                 }
-                devo_core::QueryEvent::ToolUseStart { id, name, input } => {
+                infinitecode_core::QueryEvent::ToolUseStart { id, name, input } => {
                     handle_tool_use_start(
                         &runtime,
                         session_id,
@@ -193,10 +193,10 @@ pub(crate) fn spawn_turn_event_stream(
                     )
                     .await;
                 }
-                devo_core::QueryEvent::ToolExecutionStart { id } => {
+                infinitecode_core::QueryEvent::ToolExecutionStart { id } => {
                     runtime
                         .broadcast_event(ServerEvent::ToolCallStatusUpdated(
-                            devo_protocol::ToolCallStatusUpdatedPayload {
+                            infinitecode_protocol::ToolCallStatusUpdatedPayload {
                                 session_id,
                                 turn_id: turn_for_events.turn_id,
                                 tool_call_id: id,
@@ -206,7 +206,7 @@ pub(crate) fn spawn_turn_event_stream(
                         ))
                         .await;
                 }
-                devo_core::QueryEvent::ToolResult {
+                infinitecode_core::QueryEvent::ToolResult {
                     tool_use_id,
                     tool_name: final_tool_name,
                     input: final_input,
@@ -233,7 +233,7 @@ pub(crate) fn spawn_turn_event_stream(
                     )
                     .await;
                 }
-                devo_core::QueryEvent::ToolProgress {
+                infinitecode_core::QueryEvent::ToolProgress {
                     tool_use_id,
                     progress,
                 } => {
@@ -247,8 +247,8 @@ pub(crate) fn spawn_turn_event_stream(
                     )
                     .await;
                 }
-                devo_core::QueryEvent::UsageDelta { usage } => {
-                    let usage = devo_core::TurnUsage::from_usage(&usage);
+                infinitecode_core::QueryEvent::UsageDelta { usage } => {
+                    let usage = infinitecode_core::TurnUsage::from_usage(&usage);
                     turn_usage = Some(usage.clone());
                     latest_query_usage = Some(usage.clone());
                     let kind = super::super::subagent_usage::UsageUpdateKind::InFlight;
@@ -275,8 +275,8 @@ pub(crate) fn spawn_turn_event_stream(
                         latest_query_usage = Some(snapshot.latest_query_usage.to_turn_usage());
                     }
                 }
-                devo_core::QueryEvent::Usage { usage } => {
-                    let usage = devo_core::TurnUsage::from_usage(&usage);
+                infinitecode_core::QueryEvent::Usage { usage } => {
+                    let usage = infinitecode_core::TurnUsage::from_usage(&usage);
                     turn_usage = Some(usage.clone());
                     latest_query_usage = Some(usage.clone());
                     let kind = super::super::subagent_usage::UsageUpdateKind::CompletedLeg;
@@ -303,7 +303,7 @@ pub(crate) fn spawn_turn_event_stream(
                         latest_query_usage = Some(snapshot.latest_query_usage.to_turn_usage());
                     }
                 }
-                devo_core::QueryEvent::TurnComplete {
+                infinitecode_core::QueryEvent::TurnComplete {
                     stop_reason: terminal_stop_reason,
                 } => {
                     stop_reason = Some(terminal_stop_reason);
@@ -364,7 +364,7 @@ pub(crate) fn spawn_turn_event_stream(
     })
 }
 
-fn log_dequeued_query_event(event: &devo_core::QueryEvent) {
+fn log_dequeued_query_event(event: &infinitecode_core::QueryEvent) {
     let assistant_token_text = query_event_trace_token_preview(event);
     if let Some(assistant_token_text) = assistant_token_text.as_deref() {
         tracing::debug!(
@@ -475,7 +475,7 @@ async fn handle_tool_use_start(
     assistant_item_id: &mut Option<ItemId>,
     assistant_item_seq: &mut Option<u64>,
     assistant_text: &mut String,
-    event_tool_registry: &Arc<devo_core::tools::ToolRegistry>,
+    event_tool_registry: &Arc<infinitecode_core::tools::ToolRegistry>,
 ) {
     tool_names_by_id.insert(id.clone(), name.clone());
     if let (Some(item_id), Some(item_seq)) = (reasoning_item_id.take(), reasoning_item_seq.take()) {
@@ -542,13 +542,13 @@ async fn handle_tool_result(
     tool_use_id: String,
     final_tool_name: String,
     final_input: serde_json::Value,
-    content: devo_core::tools::ToolContent,
+    content: infinitecode_core::tools::ToolContent,
     display_content: Option<String>,
     is_error: bool,
     summary: String,
     tool_names_by_id: &std::collections::HashMap<String, String>,
     pending_tool_calls: &mut std::collections::HashMap<String, PendingToolCall>,
-    event_tool_registry: &Arc<devo_core::tools::ToolRegistry>,
+    event_tool_registry: &Arc<infinitecode_core::tools::ToolRegistry>,
 ) {
     let tool_name = if final_tool_name.is_empty() {
         tool_names_by_id.get(&tool_use_id).cloned()
@@ -639,8 +639,8 @@ async fn complete_pending_tool_calls_as_interrupted(
             .get(&tool_use_id)
             .cloned()
             .unwrap_or_default();
-        let content = devo_core::tools::ToolContent::Text(
-            devo_core::tools::INTERRUPTED_TOOL_RESULT_MESSAGE.to_string(),
+        let content = infinitecode_core::tools::ToolContent::Text(
+            infinitecode_core::tools::INTERRUPTED_TOOL_RESULT_MESSAGE.to_string(),
         );
         let summary = if tool_name.is_empty() {
             "interrupted".to_string()
@@ -688,20 +688,20 @@ async fn handle_tool_progress(
     session_id: SessionId,
     turn_id: TurnId,
     tool_use_id: String,
-    progress: devo_core::tools::ToolProgress,
+    progress: infinitecode_core::tools::ToolProgress,
     pending_tool_calls: &std::collections::HashMap<String, PendingToolCall>,
 ) {
     let content = match progress {
-        devo_core::tools::ToolProgress::OutputDelta { delta } => Some(delta),
-        devo_core::tools::ToolProgress::StatusUpdate { message, percent } => Some(match percent {
+        infinitecode_core::tools::ToolProgress::OutputDelta { delta } => Some(delta),
+        infinitecode_core::tools::ToolProgress::StatusUpdate { message, percent } => Some(match percent {
             Some(percent) => format!("{message} ({percent}%)"),
             None => message,
         }),
-        devo_core::tools::ToolProgress::Completion { summary } => Some(summary),
-        devo_core::tools::ToolProgress::Terminal { terminal_id } => {
+        infinitecode_core::tools::ToolProgress::Completion { summary } => Some(summary),
+        infinitecode_core::tools::ToolProgress::Terminal { terminal_id } => {
             runtime
                 .broadcast_event(ServerEvent::ToolCallStatusUpdated(
-                    devo_protocol::ToolCallStatusUpdatedPayload {
+                    infinitecode_protocol::ToolCallStatusUpdatedPayload {
                         session_id,
                         turn_id,
                         tool_call_id: tool_use_id.clone(),

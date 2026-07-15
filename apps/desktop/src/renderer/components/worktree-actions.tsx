@@ -7,7 +7,7 @@
  * "Commit & Push" commits all changes and pushes the branch to origin.
  */
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Dialog,
 	DialogContent,
@@ -15,10 +15,10 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@devo/ui/components/dialog"
-import { Input } from "@devo/ui/components/input"
-import { Textarea } from "@devo/ui/components/textarea"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
+} from "@infinitecode/ui/components/dialog"
+import { Input } from "@infinitecode/ui/components/input"
+import { Textarea } from "@infinitecode/ui/components/textarea"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
 import {
 	ArrowDownToLineIcon,
 	ArrowUpFromLineIcon,
@@ -328,7 +328,7 @@ function CommitDialog({
 							<Input
 								value={branchName}
 								onChange={(e) => setBranchName(e.target.value)}
-								placeholder="devo/feature-name"
+								placeholder="infinitecode/feature-name"
 								className="text-sm"
 							/>
 						)}

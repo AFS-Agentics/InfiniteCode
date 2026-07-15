@@ -1,9 +1,9 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { Input } from "@devo/ui/components/input"
-import { Textarea } from "@devo/ui/components/textarea"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { Input } from "@infinitecode/ui/components/input"
+import { Textarea } from "@infinitecode/ui/components/textarea"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { cva, type VariantProps } from "class-variance-authority"
 import type * as React from "react"
 

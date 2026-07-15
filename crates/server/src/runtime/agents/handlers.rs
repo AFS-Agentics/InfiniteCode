@@ -8,7 +8,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        match serde_json::from_value::<devo_protocol::SpawnAgentParams>(params) {
+        match serde_json::from_value::<infinitecode_protocol::SpawnAgentParams>(params) {
             Ok(params) => match Arc::clone(self).spawn_agent(params).await {
                 Ok(result) => success_response(request_id, result),
                 Err(error) => self.tool_error_response(request_id, error),
@@ -26,7 +26,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        match serde_json::from_value::<devo_protocol::AgentMessageParams>(params) {
+        match serde_json::from_value::<infinitecode_protocol::AgentMessageParams>(params) {
             Ok(params) => match Arc::clone(self).send_message(params).await {
                 Ok(result) => success_response(request_id, result),
                 Err(error) => self.tool_error_response(request_id, error),
@@ -44,7 +44,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        match serde_json::from_value::<devo_protocol::WaitAgentParams>(params) {
+        match serde_json::from_value::<infinitecode_protocol::WaitAgentParams>(params) {
             Ok(params) => match Arc::clone(self).wait_agent(params).await {
                 Ok(result) => success_response(request_id, result),
                 Err(error) => self.tool_error_response(request_id, error),
@@ -62,10 +62,10 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        match serde_json::from_value::<devo_protocol::AgentListParams>(params) {
+        match serde_json::from_value::<infinitecode_protocol::AgentListParams>(params) {
             Ok(params) => match Arc::clone(self).list_agents(params).await {
                 Ok(agents) => {
-                    success_response(request_id, devo_protocol::AgentListResult { agents })
+                    success_response(request_id, infinitecode_protocol::AgentListResult { agents })
                 }
                 Err(error) => self.tool_error_response(request_id, error),
             },
@@ -82,7 +82,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        match serde_json::from_value::<devo_protocol::AgentStatusParams>(params) {
+        match serde_json::from_value::<infinitecode_protocol::AgentStatusParams>(params) {
             Ok(params) => match self.agent_info(params.session_id, &params.target).await {
                 Ok(agent) => success_response(request_id, agent),
                 Err(error) => self.tool_error_response(request_id, error),
@@ -100,7 +100,7 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        match serde_json::from_value::<devo_protocol::CloseAgentParams>(params) {
+        match serde_json::from_value::<infinitecode_protocol::CloseAgentParams>(params) {
             Ok(params) => match Arc::clone(self).close_agent(params).await {
                 Ok(result) => success_response(request_id, result),
                 Err(error) => self.tool_error_response(request_id, error),

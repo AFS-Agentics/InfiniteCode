@@ -3,12 +3,12 @@
  *
  * Discovers configuration files for all supported agent formats:
  * - Claude Code: ~/.claude/, legacy ~/.Claude/, ~/.claude.json, .claude/, .mcp.json, CLAUDE.md
- * - Devo: ~/.config/devo/, .devo/, devo.json, AGENTS.md
+ * - InfiniteCode: ~/.config/infinitecode/, .infinitecode/, infinitecode.json, AGENTS.md
  * - Cursor: ~/.cursor/, .cursor/, .cursorrules
  * - OpenCode: ~/.config/opencode/opencode.json, opencode.jsonc, auth.json
  */
 
-import type { DevoScanResult } from "../converter/to-canonical/devo"
+import type { InfiniteCodeScanResult } from "../converter/to-canonical/infinitecode"
 import type { AgentFormat } from "../types/canonical"
 import type { CursorScanResult } from "../types/cursor"
 import type { OpenCodeScanResult } from "../types/opencode"
@@ -16,7 +16,7 @@ import type { ScanOptions, ScanResult } from "../types/scan-result"
 import { scanGlobal, scanHistory, scanProject } from "./claude-config"
 import { scanCursorGlobal, scanCursorProject } from "./cursor-config"
 import { scanCursorHistory } from "./cursor-history"
-import { scanDevoGlobal, scanDevoProject } from "./devo-config"
+import { scanInfiniteCodeGlobal, scanInfiniteCodeProject } from "./infinitecode-config"
 import { scanOpenCode } from "./opencode-config"
 
 export { scanOpenCode } from "./opencode-config"
@@ -108,33 +108,33 @@ export async function scanCursor(options: CursorScanOptions = {}): Promise<Curso
 }
 
 // ============================================================
-// Devo scanner
+// InfiniteCode scanner
 // ============================================================
 
-export interface DevoScanOptions {
-	/** Scan global Devo config (~/.config/devo/) */
+export interface InfiniteCodeScanOptions {
+	/** Scan global InfiniteCode config (~/.config/infinitecode/) */
 	global?: boolean
 	/** Scan specific project path */
 	project?: string
 }
 
 /**
- * Scan for Devo configuration files.
+ * Scan for InfiniteCode configuration files.
  */
-export async function scanDevo(options: DevoScanOptions = {}): Promise<DevoScanResult> {
+export async function scanInfiniteCode(options: InfiniteCodeScanOptions = {}): Promise<InfiniteCodeScanResult> {
 	const { global: scanGlobalConfig = true, project } = options
 
-	const result: DevoScanResult = {
+	const result: InfiniteCodeScanResult = {
 		global: { agents: [], commands: [], skills: [] },
 		projects: [],
 	}
 
 	if (scanGlobalConfig) {
-		result.global = await scanDevoGlobal()
+		result.global = await scanInfiniteCodeGlobal()
 	}
 
 	if (project) {
-		const projectResult = await scanDevoProject(project)
+		const projectResult = await scanInfiniteCodeProject(project)
 		result.projects.push(projectResult)
 	}
 
@@ -165,7 +165,7 @@ export async function scanFormat(
 	options: UniversalScanOptions,
 ): Promise<
 	| { format: "claude-code"; data: ScanResult }
-	| { format: "devo"; data: DevoScanResult }
+	| { format: "infinitecode"; data: InfiniteCodeScanResult }
 	| { format: "cursor"; data: CursorScanResult }
 	| { format: "opencode"; data: OpenCodeScanResult }
 > {
@@ -179,12 +179,12 @@ export async function scanFormat(
 			})
 			return { format: "claude-code", data }
 		}
-		case "devo": {
-			const data = await scanDevo({
+		case "infinitecode": {
+			const data = await scanInfiniteCode({
 				global: options.global,
 				project: options.project,
 			})
-			return { format: "devo", data }
+			return { format: "infinitecode", data }
 		}
 		case "cursor": {
 			const data = await scanCursor({

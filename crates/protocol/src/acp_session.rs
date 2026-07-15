@@ -12,7 +12,7 @@ use crate::AcpSessionConfigOption;
 use crate::AcpSessionConfigValueId;
 use crate::AcpSessionModeId;
 use crate::AcpSessionModeState;
-use crate::DEVO_SESSION_META;
+use crate::INFINITECODE_SESSION_META;
 use crate::SessionId;
 use crate::SessionMetadata;
 
@@ -144,7 +144,7 @@ pub struct AcpSetConfigOptionResult {
 pub fn acp_session_info_from_metadata(session: &SessionMetadata) -> AcpSessionInfo {
     let mut meta = AcpMeta::new();
     meta.insert(
-        DEVO_SESSION_META.to_string(),
+        INFINITECODE_SESSION_META.to_string(),
         serde_json::to_value(session).expect("serialize session metadata"),
     );
     AcpSessionInfo {
@@ -167,7 +167,7 @@ mod tests {
     use crate::SessionTitleState;
 
     #[test]
-    fn session_info_uses_acp_field_names_and_preserves_devo_metadata() {
+    fn session_info_uses_acp_field_names_and_preserves_infinitecode_metadata() {
         let created_at = Utc::now();
         let updated_at = created_at + chrono::TimeDelta::minutes(2);
         let last_activity_at = created_at + chrono::TimeDelta::minutes(1);
@@ -214,8 +214,8 @@ mod tests {
             serde_json::json!(["/workspace/shared"])
         );
         assert_eq!(
-            serde_json::from_value::<SessionMetadata>(json["_meta"][DEVO_SESSION_META].clone())
-                .expect("decode Devo session metadata"),
+            serde_json::from_value::<SessionMetadata>(json["_meta"][INFINITECODE_SESSION_META].clone())
+                .expect("decode InfiniteCode session metadata"),
             session
         );
     }

@@ -1,12 +1,12 @@
 use std::path::PathBuf;
 
-use devo_protocol::ItemId;
-use devo_protocol::Model;
-use devo_protocol::SessionId;
-use devo_protocol::TurnId;
-use devo_server::ItemEnvelope;
-use devo_server::ItemEventPayload;
-use devo_server::ItemKind;
+use infinitecode_protocol::ItemId;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::TurnId;
+use infinitecode_server::ItemEnvelope;
+use infinitecode_server::ItemEventPayload;
+use infinitecode_server::ItemKind;
 use pretty_assertions::assert_eq;
 use tokio::sync::mpsc;
 
@@ -33,7 +33,7 @@ fn widget_with_model() -> ChatWidget {
             }),
         ),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -108,7 +108,7 @@ fn completed_context_compaction_item_emits_worker_event() {
     let (event_tx, mut event_rx) = mpsc::unbounded_channel();
     crate::worker::handle_completed_item(
         ItemEventPayload {
-            context: devo_server::EventContext {
+            context: infinitecode_server::EventContext {
                 session_id: SessionId::new(),
                 turn_id: Some(TurnId::new()),
                 item_id: None,

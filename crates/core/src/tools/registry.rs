@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 #[cfg(feature = "code-search")]
-use devo_code_search::CodeSearchService;
-use devo_protocol::ToolDefinition;
+use infinitecode_code_search::CodeSearchService;
+use infinitecode_protocol::ToolDefinition;
 
 use crate::contracts::ToolContext;
 use crate::contracts::ToolResult;
@@ -500,7 +500,7 @@ mod tests {
     use crate::tool_spec::ToolOutputMode;
     use crate::tool_spec::ToolSpec;
     use async_trait::async_trait;
-    use devo_tools::contracts::ToolBudgets;
+    use infinitecode_tools::contracts::ToolBudgets;
     use pretty_assertions::assert_eq;
     use tokio_util::sync::CancellationToken;
 
@@ -522,17 +522,17 @@ mod tests {
 
     fn test_ctx() -> ToolContext {
         ToolContext {
-            tool_call_id: devo_tools::ToolCallId("test-id".to_string()),
+            tool_call_id: infinitecode_tools::ToolCallId("test-id".to_string()),
             session_id: "test-session".to_string(),
             turn_id: Some("test-turn".to_string()),
-            workspace_root: PathBuf::from("~/user/devo"),
+            workspace_root: PathBuf::from("~/user/infinitecode"),
             budgets: ToolBudgets {
                 wall_time_limit_ms: Some(6_000),
                 output_limit_bytes: 32 * 1024,
             },
             cancel_token: CancellationToken::new(),
             agent_scope: crate::contracts::ToolAgentScope::Parent,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
             agent_coordinator: None,
             client_filesystem: None,
             client_terminal: None,

@@ -1,4 +1,4 @@
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { ChevronDownIcon } from "lucide-react"
 import type * as React from "react"
 

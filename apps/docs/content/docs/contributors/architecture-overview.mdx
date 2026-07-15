@@ -1,9 +1,9 @@
 ---
 title: Architecture Overview
-description: High-level map of Devo crates and runtime boundaries.
+description: High-level map of InfiniteCode crates and runtime boundaries.
 ---
 
-Devo is a Rust workspace built around one interactive path: the `devo` CLI
+InfiniteCode is a Rust workspace built around one interactive path: the `infinitecode` CLI
 starts the TUI, the TUI sends user actions to a background worker, the worker
 talks to the server protocol, and the server runtime drives sessions, tools,
 persistence, goals, subagents, and model providers.
@@ -14,7 +14,7 @@ Use this page as the first map before reading feature-specific code.
 
 ```mermaid
 flowchart TD
-  CLI["crates/cli<br/>devo command"]
+  CLI["crates/cli<br/>infinitecode command"]
   TUI["crates/tui<br/>terminal UI"]
   Worker["TUI worker<br/>server client loop"]
   Server["crates/server<br/>runtime and protocol"]
@@ -24,7 +24,7 @@ flowchart TD
   Protocol["crates/protocol<br/>shared DTOs"]
   Tools["crates/tools<br/>tool contracts"]
   MCP["crates/mcp<br/>MCP adapter"]
-  Store["devo.db + rollout files<br/>sessions and history"]
+  Store["infinitecode.db + rollout files<br/>sessions and history"]
 
   CLI --> TUI
   TUI --> Worker
@@ -47,39 +47,39 @@ and the agent execution model.
 
 | Crate | Responsibility |
 | --- | --- |
-| `devo-cli` | Parses `devo`, `devo onboard`, `devo resume`, `devo prompt`, `devo doctor`, `devo upgrade`, and `devo server`. |
-| `devo-arg0` | Lets one binary dispatch by executable name, so `devo` and server-style entrypoints can share one executable. |
-| `devo-tui` | Interactive terminal UI, composer, onboarding, model picker, slash commands, transcript rendering, and worker event handling. |
-| `devo-server` | Transport-neutral runtime, session lifecycle, event protocol, persistence, compaction, goals, subagents, reference search, shell execution, and provider/vendor APIs. |
-| `devo-core` | Agent loop, message/session model, context pipeline, instruction discovery, permissions, hooks, tool registry, query execution, and compaction helpers. |
-| `devo-provider` | Provider router and OpenAI/Anthropic-compatible streaming adapters. |
-| `devo-protocol` | Shared request, response, event, provider, permission, reference-search, command-exec, goal, and session types. |
-| `devo-config` | Serializable config contract for app, provider, server, tool, hook, MCP, skill, and logging settings. |
-| `devo-tools` | Tool contracts shared by core, server, and clients. |
-| `devo-mcp` | RMCP-backed MCP runtime adapter. |
-| `devo-code-search` | Local semantic code retrieval implementation. |
-| `devo-file-search` | Fuzzy file search used by composer reference search. |
-| `devo-safety` | Approval and sandbox policy contracts. |
+| `infinitecode-cli` | Parses `infinitecode`, `infinitecode onboard`, `infinitecode resume`, `infinitecode prompt`, `infinitecode doctor`, `infinitecode upgrade`, and `infinitecode server`. |
+| `infinitecode-arg0` | Lets one binary dispatch by executable name, so `infinitecode` and server-style entrypoints can share one executable. |
+| `infinitecode-tui` | Interactive terminal UI, composer, onboarding, model picker, slash commands, transcript rendering, and worker event handling. |
+| `infinitecode-server` | Transport-neutral runtime, session lifecycle, event protocol, persistence, compaction, goals, subagents, reference search, shell execution, and provider/vendor APIs. |
+| `infinitecode-core` | Agent loop, message/session model, context pipeline, instruction discovery, permissions, hooks, tool registry, query execution, and compaction helpers. |
+| `infinitecode-provider` | Provider router and OpenAI/Anthropic-compatible streaming adapters. |
+| `infinitecode-protocol` | Shared request, response, event, provider, permission, reference-search, command-exec, goal, and session types. |
+| `infinitecode-config` | Serializable config contract for app, provider, server, tool, hook, MCP, skill, and logging settings. |
+| `infinitecode-tools` | Tool contracts shared by core, server, and clients. |
+| `infinitecode-mcp` | RMCP-backed MCP runtime adapter. |
+| `infinitecode-code-search` | Local semantic code retrieval implementation. |
+| `infinitecode-file-search` | Fuzzy file search used by composer reference search. |
+| `infinitecode-safety` | Approval and sandbox policy contracts. |
 
 ## Startup Flow
 
-When a user runs `devo`:
+When a user runs `infinitecode`:
 
 1. `crates/cli/src/main.rs` parses the command.
 2. The default command calls `run_agent` in `crates/cli/src/agent_command.rs`.
-3. `run_agent` resolves the current working directory, `DEVO_HOME`, effective
+3. `run_agent` resolves the current working directory, `INFINITECODE_HOME`, effective
    config, model catalog, permission preset, provider settings, and saved model
    entries.
-4. `run_agent` calls `devo_tui::run_interactive_tui`.
+4. `run_agent` calls `infinitecode_tui::run_interactive_tui`.
 5. The TUI starts with an `InitialTuiSession` containing the current session id,
    model, model binding id, provider wire API, reasoning effort selection, permission
    preset, and working directory.
 
-`devo onboard` follows the same setup path, forces provider onboarding mode,
+`infinitecode onboard` follows the same setup path, forces provider onboarding mode,
 and exits after the provider/model binding is saved. The CLI then prompts the
-user to run `devo` so the next process starts from the freshly written config.
+user to run `infinitecode` so the next process starts from the freshly written config.
 
-`devo resume <session_id>` follows the same path with an initial session id.
+`infinitecode resume <session_id>` follows the same path with an initial session id.
 
 ## Interactive Turn Flow
 
@@ -123,8 +123,8 @@ restores persisted sessions before starting listeners.
 ## Tools And Permissions
 
 Tools are registered from config in the server bootstrap path and executed from
-the core query runtime. The shared tool contract lives in `devo-tools`; concrete
-runtime behavior lives under `devo-core/src/tools`.
+the core query runtime. The shared tool contract lives in `infinitecode-tools`; concrete
+runtime behavior lives under `infinitecode-core/src/tools`.
 
 Permission decisions are part of the server/core runtime, not just the TUI. The
 TUI displays approval requests and sends decisions back to the server. The
@@ -135,10 +135,10 @@ server applies those decisions to the active turn.
 Provider configuration starts as user config, then resolves into a provider and
 model binding:
 
-1. `devo-config` defines the serialized provider and model binding fields.
-2. `devo-core` resolves effective provider settings for the current workspace.
-3. `devo-server` builds the provider router during bootstrap.
-4. `devo-provider` sends requests through the selected wire API.
+1. `infinitecode-config` defines the serialized provider and model binding fields.
+2. `infinitecode-core` resolves effective provider settings for the current workspace.
+3. `infinitecode-server` builds the provider router during bootstrap.
+4. `infinitecode-provider` sends requests through the selected wire API.
 
 Current wire API names are defined in protocol/model code:
 
@@ -195,9 +195,9 @@ render command output in the transcript.
 
 ## Contributor Rule Of Thumb
 
-Keep UI state in `devo-tui`, runtime/session state in `devo-server`, agent and
-tool semantics in `devo-core`, provider-specific request/stream handling in
-`devo-provider`, and serialized config shapes in `devo-config`.
+Keep UI state in `infinitecode-tui`, runtime/session state in `infinitecode-server`, agent and
+tool semantics in `infinitecode-core`, provider-specific request/stream handling in
+`infinitecode-provider`, and serialized config shapes in `infinitecode-config`.
 
-When a feature crosses layers, change the shared DTO in `devo-protocol` first,
+When a feature crosses layers, change the shared DTO in `infinitecode-protocol` first,
 then update server handling, worker mapping, and TUI rendering in that order.

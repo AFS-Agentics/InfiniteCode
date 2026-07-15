@@ -1,12 +1,12 @@
 /**
  * Validator module.
  *
- * Validates conversion output against the Devo config schema.
- * Uses structural checks rather than importing Zod schemas from Devo
+ * Validates conversion output against the InfiniteCode config schema.
+ * Uses structural checks rather than importing Zod schemas from InfiniteCode
  * (which are not published as a separate package).
  */
 import type { ConversionResult } from "../types/conversion-result"
-import type { DevoConfig } from "../types/devo"
+import type { InfiniteCodeConfig } from "../types/infinitecode"
 import type { MigrationReport } from "../types/report"
 import { createEmptyReport } from "../types/report"
 
@@ -24,7 +24,7 @@ export interface ValidationError {
 }
 
 /**
- * Validate a conversion result against the Devo schema.
+ * Validate a conversion result against the InfiniteCode schema.
  *
  * @param conversion - Output from `convert()`
  * @returns Validation result with errors and warnings
@@ -76,10 +76,10 @@ export function validate(conversion: ConversionResult): ValidationResult {
 }
 
 /**
- * Validate a single Devo config object.
+ * Validate a single InfiniteCode config object.
  */
 function validateConfig(
-	config: Partial<DevoConfig>,
+	config: Partial<InfiniteCodeConfig>,
 	prefix: string,
 	errors: ValidationError[],
 	warnings: string[],

@@ -1,6 +1,6 @@
 ---
 title: 测试
-description: 为 Devo 变更选择验证命令。
+description: 为 InfiniteCode 变更选择验证命令。
 ---
 
 先使用能覆盖变更行为的最窄验证；当变更跨 crate 边界时，再扩大验证范围。
@@ -10,7 +10,7 @@ description: 为 Devo 变更选择验证命令。
 格式化变更过的 Rust package：
 
 ```bash
-cargo fmt --package devo-tui
+cargo fmt --package infinitecode-tui
 ```
 
 使用拥有相关文件的 package。
@@ -20,15 +20,15 @@ cargo fmt --package devo-tui
 当变更作用域清晰时，运行 package tests：
 
 ```bash
-cargo test -p devo-config
-cargo test -p devo-server
-cargo test -p devo-tui
+cargo test -p infinitecode-config
+cargo test -p infinitecode-server
+cargo test -p infinitecode-tui
 ```
 
 按名称运行单个 test：
 
 ```bash
-cargo test -p devo-tui status_indicator -- --nocapture
+cargo test -p infinitecode-tui status_indicator -- --nocapture
 ```
 
 迭代时优先跑聚焦测试；跨模块变更完成前，再运行更广的测试。
@@ -47,9 +47,9 @@ Provider schema、resolution 或 onboarding 变更应包含以下测试：
 有用的起始命令：
 
 ```bash
-cargo test -p devo-config provider
-cargo test -p devo-server provider
-cargo test -p devo-provider
+cargo test -p infinitecode-config provider
+cargo test -p infinitecode-server provider
+cargo test -p infinitecode-provider
 ```
 
 ## TUI 变更
@@ -57,8 +57,8 @@ cargo test -p devo-provider
 对 TUI rendering 或 command behavior，测试拥有代码的 package，并在终端中手动操作交互：
 
 ```bash
-cargo test -p devo-tui
-cargo run -p devo-cli
+cargo test -p infinitecode-tui
+cargo run -p infinitecode-cli
 ```
 
 检查 rendered behavior：
@@ -75,10 +75,10 @@ cargo run -p devo-cli
 
 ## Server Runtime 变更
 
-Session、turn、persistence、goal、subagent 或 command-exec 变更，从 `devo-server` tests 开始：
+Session、turn、persistence、goal、subagent 或 command-exec 变更，从 `infinitecode-server` tests 开始：
 
 ```bash
-cargo test -p devo-server
+cargo test -p infinitecode-server
 ```
 
 如果变更影响 shared DTOs，也测试消费这些 protocol types 的 downstream crates。

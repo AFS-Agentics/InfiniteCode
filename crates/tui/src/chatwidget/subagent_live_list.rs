@@ -1,6 +1,6 @@
 //! Inline live-list rendering for active direct sub-agents.
 
-use devo_core::SessionId;
+use infinitecode_core::SessionId;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
@@ -67,7 +67,7 @@ pub(super) fn render(
         .collect::<Vec<_>>()
         .join(" | ");
     tracing::debug!(
-        target: "devo_tui::subagent",
+        target: "infinitecode_tui::subagent",
         row_count = rows.len(),
         visible_start,
         visible_end,

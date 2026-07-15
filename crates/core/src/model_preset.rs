@@ -3,7 +3,7 @@
 //! Main focus:
 //! - deserialize bundled model definitions from `models.json`
 //! - preserve JSON compatibility and catalog-only metadata such as priority and API-config flags
-//! - convert raw presets into runtime `devo_protocol::Model` values
+//! - convert raw presets into runtime `infinitecode_protocol::Model` values
 //!
 //! Design:
 //! - `ModelPreset` is intentionally a core-only type because it exists to support catalog loading
@@ -15,13 +15,13 @@
 //! - turn execution should consume `Model`, not `ModelPreset`
 //! - loading policy and catalog access live in `model_catalog.rs`; this file only defines the raw shape
 //!
-use devo_protocol::InputModality;
-use devo_protocol::Model;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ReasoningCapability;
-use devo_protocol::ReasoningEffort;
-use devo_protocol::ReasoningImplementation;
-use devo_protocol::TruncationPolicyConfig;
+use infinitecode_protocol::InputModality;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ReasoningCapability;
+use infinitecode_protocol::ReasoningEffort;
+use infinitecode_protocol::ReasoningImplementation;
+use infinitecode_protocol::TruncationPolicyConfig;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -79,7 +79,7 @@ pub struct ModelPreset {
     /// Policy used when truncating content for requests.
     #[serde(
         default,
-        deserialize_with = "devo_protocol::deserialize_truncation_policy_config"
+        deserialize_with = "infinitecode_protocol::deserialize_truncation_policy_config"
     )]
     pub truncation_policy: TruncationPolicyConfig,
     /// Input types accepted by the model.

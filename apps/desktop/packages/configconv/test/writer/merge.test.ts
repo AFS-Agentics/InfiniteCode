@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import type { DevoConfig } from "../../src/types/devo"
+import type { InfiniteCodeConfig } from "../../src/types/infinitecode"
 import { mergeConfigs } from "../../src/writer/merge"
 
 describe("mergeConfigs", () => {
 	test("overwrite strategy replaces all top-level keys", () => {
-		const existing: Partial<DevoConfig> = {
+		const existing: Partial<InfiniteCodeConfig> = {
 			model: "anthropic/old-model",
 			theme: "dark",
 		}
-		const incoming: Partial<DevoConfig> = {
+		const incoming: Partial<InfiniteCodeConfig> = {
 			model: "anthropic/new-model",
 			autoupdate: true,
 		}
@@ -20,10 +20,10 @@ describe("mergeConfigs", () => {
 	})
 
 	test("preserve-existing keeps existing scalar values", () => {
-		const existing: Partial<DevoConfig> = {
+		const existing: Partial<InfiniteCodeConfig> = {
 			model: "anthropic/existing-model",
 		}
-		const incoming: Partial<DevoConfig> = {
+		const incoming: Partial<InfiniteCodeConfig> = {
 			model: "anthropic/new-model",
 			autoupdate: true,
 		}
@@ -34,12 +34,12 @@ describe("mergeConfigs", () => {
 	})
 
 	test("preserve-existing merges nested objects at key level", () => {
-		const existing: Partial<DevoConfig> = {
+		const existing: Partial<InfiniteCodeConfig> = {
 			mcp: {
 				server1: { type: "local", command: ["node", "existing.js"] },
 			},
 		}
-		const incoming: Partial<DevoConfig> = {
+		const incoming: Partial<InfiniteCodeConfig> = {
 			mcp: {
 				server1: { type: "local", command: ["node", "new.js"] }, // should be skipped
 				server2: { type: "local", command: ["node", "new2.js"] }, // should be added
@@ -53,13 +53,13 @@ describe("mergeConfigs", () => {
 	})
 
 	test("merge strategy deep-merges with existing precedence", () => {
-		const existing: Partial<DevoConfig> = {
+		const existing: Partial<InfiniteCodeConfig> = {
 			model: "anthropic/existing",
 			mcp: {
 				server1: { type: "local", command: ["node", "existing.js"] },
 			},
 		}
-		const incoming: Partial<DevoConfig> = {
+		const incoming: Partial<InfiniteCodeConfig> = {
 			model: "anthropic/new",
 			autoupdate: true,
 			mcp: {
@@ -76,10 +76,10 @@ describe("mergeConfigs", () => {
 	})
 
 	test("merge deduplicates arrays", () => {
-		const existing: Partial<DevoConfig> = {
+		const existing: Partial<InfiniteCodeConfig> = {
 			instructions: ["rule1.md", "rule2.md"],
 		}
-		const incoming: Partial<DevoConfig> = {
+		const incoming: Partial<InfiniteCodeConfig> = {
 			instructions: ["rule2.md", "rule3.md"],
 		}
 
@@ -88,15 +88,15 @@ describe("mergeConfigs", () => {
 	})
 
 	test("defaults to preserve-existing strategy", () => {
-		const existing: Partial<DevoConfig> = { model: "anthropic/existing" }
-		const incoming: Partial<DevoConfig> = { model: "anthropic/new" }
+		const existing: Partial<InfiniteCodeConfig> = { model: "anthropic/existing" }
+		const incoming: Partial<InfiniteCodeConfig> = { model: "anthropic/new" }
 
 		const result = mergeConfigs(existing, incoming)
 		expect(result.model).toBe("anthropic/existing")
 	})
 
 	test("handles empty existing config", () => {
-		const incoming: Partial<DevoConfig> = {
+		const incoming: Partial<InfiniteCodeConfig> = {
 			model: "anthropic/new",
 			autoupdate: true,
 		}
@@ -107,7 +107,7 @@ describe("mergeConfigs", () => {
 	})
 
 	test("handles empty incoming config", () => {
-		const existing: Partial<DevoConfig> = {
+		const existing: Partial<InfiniteCodeConfig> = {
 			model: "anthropic/existing",
 		}
 

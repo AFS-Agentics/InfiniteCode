@@ -3,7 +3,7 @@ title: 模型绑定
 description: 将一个支持的模型绑定到已配置的 provider。
 ---
 
-Model binding 把 Devo 本地的模型身份连接到实际发送给 provider 的模型名。
+Model binding 把 InfiniteCode 本地的模型身份连接到实际发送给 provider 的模型名。
 
 Binding 位于 `[model_bindings.<id>]` 下。
 
@@ -22,7 +22,7 @@ default_reasoning_effort = "high"
 
 | 字段 | 必需 | 含义 |
 | --- | --- | --- |
-| `model_slug` | 是 | Devo 的本地模型元数据 id。 |
+| `model_slug` | 是 | InfiniteCode 的本地模型元数据 id。 |
 | `provider` | 是 | `[providers.<id>]` 中的 provider id。 |
 | `request_model` | 是 | 发送给 provider 的模型字符串。 |
 | `display_name` | 否 | TUI 模型选择器和 header 中显示的标签。 |
@@ -34,11 +34,11 @@ default_reasoning_effort = "high"
 
 ## Slug 与模型名
 
-`model_slug` 是 Devo 侧的身份。它映射到本地模型元数据，例如 context window、reasoning 支持和显示默认值。
+`model_slug` 是 InfiniteCode 侧的身份。它映射到本地模型元数据，例如 context window、reasoning 支持和显示默认值。
 
 `request_model` 是 provider 侧的值，会放进 API 请求。
 
-两者通常相同，但不必须相同。当 gateway 需要 `openai/gpt-5.2` 这样的名称，而 Devo 仍应使用稳定本地 slug 时，可以使用不同值。
+两者通常相同，但不必须相同。当 gateway 需要 `openai/gpt-5.2` 这样的名称，而 InfiniteCode 仍应使用稳定本地 slug 时，可以使用不同值。
 
 ## Binding Id
 

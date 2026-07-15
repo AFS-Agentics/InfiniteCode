@@ -1,13 +1,13 @@
 import type {
-	DevoClient,
+	InfiniteCodeClient,
 	ProviderValidateParams,
 	ProviderVendor,
 	ProviderVendorUpsertParams,
 	ProviderWireApi,
-} from "@devo-ai/sdk/v2/client"
-import { Alert, AlertDescription } from "@devo/ui/components/alert"
-import { Button } from "@devo/ui/components/button"
-import { Checkbox } from "@devo/ui/components/checkbox"
+} from "@infinitecode-ai/sdk/v2/client"
+import { Alert, AlertDescription } from "@infinitecode/ui/components/alert"
+import { Button } from "@infinitecode/ui/components/button"
+import { Checkbox } from "@infinitecode/ui/components/checkbox"
 import {
 	Dialog,
 	DialogContent,
@@ -15,7 +15,7 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@devo/ui/components/dialog"
+} from "@infinitecode/ui/components/dialog"
 import {
 	Field,
 	FieldContent,
@@ -23,8 +23,8 @@ import {
 	FieldError,
 	FieldGroup,
 	FieldLabel,
-} from "@devo/ui/components/field"
-import { Input } from "@devo/ui/components/input"
+} from "@infinitecode/ui/components/field"
+import { Input } from "@infinitecode/ui/components/input"
 import {
 	Select,
 	SelectContent,
@@ -32,14 +32,14 @@ import {
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@devo/ui/components/select"
-import { ScrollArea } from "@devo/ui/components/scroll-area"
-import { Spinner } from "@devo/ui/components/spinner"
-import { Textarea } from "@devo/ui/components/textarea"
+} from "@infinitecode/ui/components/select"
+import { ScrollArea } from "@infinitecode/ui/components/scroll-area"
+import { Spinner } from "@infinitecode/ui/components/spinner"
+import { Textarea } from "@infinitecode/ui/components/textarea"
 import { useQueryClient } from "@tanstack/react-query"
 import { SaveIcon } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
-import { queryKeys } from "../../hooks/use-devo-data"
+import { queryKeys } from "../../hooks/use-infinitecode-data"
 import { createLogger } from "../../lib/logger"
 import { getBaseClient, invalidateConfigOptionCaches } from "../../services/connection-manager"
 
@@ -67,7 +67,7 @@ export interface ProviderVendorFormValues {
 }
 
 interface ProviderVendorClient {
-	provider: Pick<DevoClient["provider"], "validate" | "upsert">
+	provider: Pick<InfiniteCodeClient["provider"], "validate" | "upsert">
 }
 
 interface ProviderVendorDialogProps {
@@ -318,7 +318,7 @@ export function ProviderVendorDialog({
 										id="headers"
 										value={values.headers}
 										onChange={(event) => setValue("headers", event.target.value)}
-										placeholder='{"HTTP-Referer":"https://devo.ai"}'
+										placeholder='{"HTTP-Referer":"https://infinitecode.ai"}'
 										disabled={saving}
 									/>
 									<FieldDescription>Optional JSON object.</FieldDescription>

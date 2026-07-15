@@ -22,20 +22,20 @@ export interface PersistedModelRef {
 // ============================================================
 
 function migrateFromZustandPersist(): void {
-	const oldKey = "devo-preferences"
+	const oldKey = "infinitecode-preferences"
 	const raw = localStorage.getItem(oldKey)
 	if (!raw) return
 
 	try {
 		const { state } = JSON.parse(raw) // Zustand persist wraps in { state, version }
 		if (state.displayMode)
-			localStorage.setItem("devo:displayMode", JSON.stringify(state.displayMode))
-		if (state.theme) localStorage.setItem("devo:theme", JSON.stringify(state.theme))
+			localStorage.setItem("infinitecode:displayMode", JSON.stringify(state.displayMode))
+		if (state.theme) localStorage.setItem("infinitecode:theme", JSON.stringify(state.theme))
 		if (state.colorScheme)
-			localStorage.setItem("devo:colorScheme", JSON.stringify(state.colorScheme))
-		if (state.drafts) localStorage.setItem("devo:drafts", JSON.stringify(state.drafts))
+			localStorage.setItem("infinitecode:colorScheme", JSON.stringify(state.colorScheme))
+		if (state.drafts) localStorage.setItem("infinitecode:drafts", JSON.stringify(state.drafts))
 		if (state.projectModels)
-			localStorage.setItem("devo:projectModels", JSON.stringify(state.projectModels))
+			localStorage.setItem("infinitecode:projectModels", JSON.stringify(state.projectModels))
 
 		// Remove old key after successful migration
 		localStorage.removeItem(oldKey)
@@ -49,9 +49,9 @@ migrateFromZustandPersist()
 
 // Migrate removed "compact" display mode to "default"
 function migrateDisplayMode(): void {
-	const raw = localStorage.getItem("devo:displayMode")
+	const raw = localStorage.getItem("infinitecode:displayMode")
 	if (raw === '"compact"') {
-		localStorage.setItem("devo:displayMode", '"default"')
+		localStorage.setItem("infinitecode:displayMode", '"default"')
 	}
 }
 migrateDisplayMode()
@@ -61,19 +61,19 @@ migrateDisplayMode()
 // ============================================================
 
 export const displayModeAtom = atomWithStorage<DisplayMode>(
-	"devo:displayMode",
+	"infinitecode:displayMode",
 	DEFAULT_APPEARANCE_SETTINGS.displayMode,
 )
 
 export const hideThinkingWhileWorkingAtom = atomWithStorage<boolean>(
-	"devo:hideThinkingWhileWorking",
+	"infinitecode:hideThinkingWhileWorking",
 	DEFAULT_APPEARANCE_SETTINGS.hideThinkingWhileWorking,
 )
 
-export const themeAtom = atomWithStorage<string>("devo:theme", DEFAULT_APPEARANCE_SETTINGS.themeId)
+export const themeAtom = atomWithStorage<string>("infinitecode:theme", DEFAULT_APPEARANCE_SETTINGS.themeId)
 
 export const colorSchemeAtom = atomWithStorage<ColorScheme>(
-	"devo:colorScheme",
+	"infinitecode:colorScheme",
 	DEFAULT_APPEARANCE_SETTINGS.colorScheme,
 )
 
@@ -81,7 +81,7 @@ export const colorSchemeAtom = atomWithStorage<ColorScheme>(
  * Whether the user prefers opaque (non-transparent) windows.
  * When true, the renderer uses solid backgrounds instead of semi-transparent.
  */
-export const opaqueWindowsAtom = atomWithStorage<boolean>("devo:opaqueWindows", false)
+export const opaqueWindowsAtom = atomWithStorage<boolean>("infinitecode:opaqueWindows", false)
 
 /**
  * The active window chrome tier, set by the main process on load.
@@ -101,10 +101,10 @@ export const isTransparentAtom = atom((get) => {
 	return !opaque && (tier === "liquid-glass" || tier === "vibrancy" || tier === "transparent")
 })
 
-export const draftsAtom = atomWithStorage<Record<string, string>>("devo:drafts", {})
+export const draftsAtom = atomWithStorage<Record<string, string>>("infinitecode:drafts", {})
 
 export const projectModelsAtom = atomWithStorage<Record<string, PersistedModelRef>>(
-	"devo:projectModels",
+	"infinitecode:projectModels",
 	{},
 )
 
@@ -113,7 +113,7 @@ export const projectModelsAtom = atomWithStorage<Record<string, PersistedModelRe
  * Once dismissed, the banner never reappears.
  */
 export const automationsBannerDismissedAtom = atomWithStorage<boolean>(
-	"devo:automationsBannerDismissed",
+	"infinitecode:automationsBannerDismissed",
 	false,
 )
 

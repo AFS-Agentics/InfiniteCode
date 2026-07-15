@@ -13,10 +13,10 @@ function agent(): Agent {
 		name: "Greeting and Introduction",
 		status: "idle",
 		environment: "local",
-		project: "devo",
-		projectSlug: "devo-123",
-		directory: "/Users/tsiao/Desktop/devo",
-		projectDirectory: "/Users/tsiao/Desktop/devo",
+		project: "infinitecode",
+		projectSlug: "infinitecode-123",
+		directory: "/Users/tsiao/Desktop/infinitecode",
+		projectDirectory: "/Users/tsiao/Desktop/infinitecode",
 		branch: "main",
 		duration: "42m",
 		activities: [],
@@ -77,11 +77,11 @@ describe("session delete confirmation", () => {
 			deleteSessionNavigationTarget({
 				deletedSessionId: "session-1",
 				currentSessionId: "session-1",
-				projectSlug: "devo-123",
+				projectSlug: "infinitecode-123",
 			}),
 		).toEqual({
 			to: "/project/$projectSlug",
-			params: { projectSlug: "devo-123" },
+			params: { projectSlug: "infinitecode-123" },
 		})
 	})
 
@@ -90,7 +90,7 @@ describe("session delete confirmation", () => {
 			deleteSessionNavigationTarget({
 				deletedSessionId: "session-2",
 				currentSessionId: "session-1",
-				projectSlug: "devo-123",
+				projectSlug: "infinitecode-123",
 			}),
 		).toEqual(null)
 	})

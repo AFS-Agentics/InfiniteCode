@@ -176,7 +176,7 @@ fn acp_http_headers(
 mod tests {
     use std::path::PathBuf;
 
-    use devo_protocol::AcpEnvVariable;
+    use infinitecode_protocol::AcpEnvVariable;
     use pretty_assertions::assert_eq;
 
     use super::*;

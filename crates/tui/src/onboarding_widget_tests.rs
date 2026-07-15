@@ -3,12 +3,12 @@ use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use crossterm::event::KeyEventState;
 use crossterm::event::KeyModifiers;
-use devo_protocol::Model;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderVendor;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ReasoningCapability;
-use devo_protocol::ReasoningEffort;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderVendor;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ReasoningCapability;
+use infinitecode_protocol::ReasoningEffort;
 use pretty_assertions::assert_eq;
 use tokio::sync::mpsc;
 
@@ -85,13 +85,13 @@ fn next_shell_command(app_event_rx: &mut mpsc::UnboundedReceiver<AppEvent>) -> S
 }
 
 fn deepseek_model() -> Model {
-    devo_core::ModelPreset {
+    infinitecode_core::ModelPreset {
         slug: "deepseek-v4-flash".to_string(),
         display_name: "Deepseek V4 Flash".to_string(),
         reasoning_capability: ReasoningCapability::Toggle,
         supported_reasoning_levels: vec![ReasoningEffort::High, ReasoningEffort::Max],
         default_reasoning_effort: Some(ReasoningEffort::High),
-        ..devo_core::ModelPreset::default()
+        ..infinitecode_core::ModelPreset::default()
     }
     .into()
 }

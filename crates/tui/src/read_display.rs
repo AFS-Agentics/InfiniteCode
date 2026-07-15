@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use devo_protocol::parse_command::ParsedCommand;
+use infinitecode_protocol::parse_command::ParsedCommand;
 
 fn relativize_path_str(path_str: &str, cwd: &Path) -> String {
     let p = Path::new(path_str);

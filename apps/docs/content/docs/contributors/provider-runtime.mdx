@@ -3,7 +3,7 @@ title: Provider Runtime
 description: Understand provider routing and request adapters.
 ---
 
-This page explains how Devo turns config into provider requests.
+This page explains how InfiniteCode turns config into provider requests.
 
 ## Config Inputs
 
@@ -32,7 +32,7 @@ Resolution validates that:
 - required credentials exist in `auth.json`;
 - local web search config points to a known local provider and credential.
 
-If a CLI or runtime model override is present, Devo first tries to match it as a
+If a CLI or runtime model override is present, InfiniteCode first tries to match it as a
 binding id, then a model slug, then a provider model name.
 
 ## Router
@@ -62,7 +62,7 @@ The supported wire API strings are defined in protocol model code:
 | `openai_chat_completions` | OpenAI-compatible Chat Completions API. |
 | `openai_responses` | OpenAI Responses-compatible API. |
 
-Provider-specific HTTP streaming behavior belongs in `devo-provider`, not in
+Provider-specific HTTP streaming behavior belongs in `infinitecode-provider`, not in
 the TUI or server runtime.
 
 ## Request Model
@@ -77,7 +77,7 @@ request_model = "deepseek-v4-pro"
 invocation_method = "anthropic_messages"
 ```
 
-If `request_model` differs from `model_slug`, Devo can show the local slug in UI
+If `request_model` differs from `model_slug`, InfiniteCode can show the local slug in UI
 while sending the provider-specific model string to the API.
 
 ## Web Search And Fetch

@@ -52,7 +52,7 @@ export async function POST(request: Request) {
 
   try {
     await db.exec(
-      "CREATE TABLE IF NOT EXISTS waitlist (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, source TEXT NOT NULL DEFAULT 'devo-site', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);",
+      "CREATE TABLE IF NOT EXISTS waitlist (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, source TEXT NOT NULL DEFAULT 'infinitecode-site', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);",
     );
 
     await db.exec(
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       .prepare(
         "INSERT INTO waitlist (email, source) VALUES (?, ?) ON CONFLICT(email) DO NOTHING",
       )
-      .bind(email, "devo-site")
+      .bind(email, "infinitecode-site")
       .run();
   } catch (error) {
     console.error("Failed to write waitlist email", error);

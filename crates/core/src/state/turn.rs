@@ -1,4 +1,4 @@
-use devo_protocol::{PendingInputItem, TurnKind};
+use infinitecode_protocol::{PendingInputItem, TurnKind};
 
 #[derive(Debug)]
 pub(crate) struct TurnState {
@@ -48,7 +48,7 @@ mod tests {
 
     fn sample_item() -> PendingInputItem {
         PendingInputItem::new(
-            devo_protocol::PendingInputKind::UserText {
+            infinitecode_protocol::PendingInputKind::UserText {
                 text: "test".into(),
             },
             None,
@@ -78,7 +78,7 @@ mod tests {
         let mut state = TurnState::new(TurnKind::Regular);
         state.push_pending_input(sample_item());
         let extra = vec![PendingInputItem::new(
-            devo_protocol::PendingInputKind::UserText {
+            infinitecode_protocol::PendingInputKind::UserText {
                 text: "extra".into(),
             },
             None,
@@ -88,7 +88,7 @@ mod tests {
         let taken = state.take_pending_input();
         assert_eq!(taken.len(), 2);
         assert!(
-            matches!(taken[0].kind, devo_protocol::PendingInputKind::UserText { ref text } if text == "extra")
+            matches!(taken[0].kind, infinitecode_protocol::PendingInputKind::UserText { ref text } if text == "extra")
         );
     }
 

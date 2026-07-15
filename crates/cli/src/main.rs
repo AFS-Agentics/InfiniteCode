@@ -11,20 +11,20 @@ use clap::Parser;
 use clap::Subcommand;
 use clap::builder::PossibleValuesParser;
 use clap::builder::TypedValueParser as _;
-use devo_core::AppConfig;
-use devo_core::AppConfigLoader;
-use devo_core::FileSystemAppConfigLoader;
-use devo_core::LoggingBootstrap;
-use devo_core::LoggingRuntime;
-use devo_core::SessionId;
-use devo_core::UpdateCheckOutcome;
-use devo_core::UpdateChecker;
-use devo_core::format_update_notification;
-use devo_server::ServerProcessArgs;
-use devo_server::ServerProcessRunOptions;
-use devo_server::ServerTransportMode;
-use devo_server::run_server_process;
-use devo_util_paths::find_devo_home;
+use infinitecode_core::AppConfig;
+use infinitecode_core::AppConfigLoader;
+use infinitecode_core::FileSystemAppConfigLoader;
+use infinitecode_core::LoggingBootstrap;
+use infinitecode_core::LoggingRuntime;
+use infinitecode_core::SessionId;
+use infinitecode_core::UpdateCheckOutcome;
+use infinitecode_core::UpdateChecker;
+use infinitecode_core::format_update_notification;
+use infinitecode_server::ServerProcessArgs;
+use infinitecode_server::ServerProcessRunOptions;
+use infinitecode_server::ServerTransportMode;
+use infinitecode_server::run_server_process;
+use infinitecode_util_paths::find_infinitecode_home;
 use tracing_subscriber::filter::LevelFilter;
 
 mod agent_command;
@@ -38,7 +38,7 @@ use prompt_command::PromptOutputFormat;
 use prompt_command::run_prompt;
 use upgrade_command::run_upgrade;
 
-/// Top-level `devo` command that dispatches to interactive agent mode or one
+/// Top-level `infinitecode` command that dispatches to interactive agent mode or one
 /// of the supporting runtime subcommands.
 ///
 #[derive(Debug, Parser)]
@@ -70,7 +70,7 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
-    devo_arg0::run_as_with_early_dispatch(
+    infinitecode_arg0::run_as_with_early_dispatch(
         |_paths| async {
             let result = run_cli().await;
             tracing::info!(success = result.is_ok(), "run_cli future completed");
@@ -94,7 +94,7 @@ fn format_with_separators(value: usize) -> String {
     out
 }
 
-fn format_token_usage_line(exit: &devo_tui::AppExit, color_enabled: bool) -> Option<String> {
+fn format_token_usage_line(exit: &infinitecode_tui::AppExit, color_enabled: bool) -> Option<String> {
     let total = exit.total_tokens;
     let non_cached_input = exit
         .total_input_tokens
@@ -136,13 +136,13 @@ fn format_token_usage_line(exit: &devo_tui::AppExit, color_enabled: bool) -> Opt
     ))
 }
 
-fn exit_messages(exit: &devo_tui::AppExit, color_enabled: bool) -> Vec<String> {
+fn exit_messages(exit: &infinitecode_tui::AppExit, color_enabled: bool) -> Vec<String> {
     let mut lines = Vec::new();
     if let Some(line) = format_token_usage_line(exit, color_enabled) {
         lines.push(line);
     }
     if let Some(session_id) = exit.session_id {
-        let command = format!("devo resume {session_id}");
+        let command = format!("infinitecode resume {session_id}");
         let command = if color_enabled {
             format!("\u{1b}[1;36m{command}\u{1b}[0m")
         } else {
@@ -158,7 +158,7 @@ fn exit_messages(exit: &devo_tui::AppExit, color_enabled: bool) -> Vec<String> {
     lines
 }
 
-fn onboarding_exit_messages(exit: &devo_tui::AppExit, color_enabled: bool) -> Vec<String> {
+fn onboarding_exit_messages(exit: &infinitecode_tui::AppExit, color_enabled: bool) -> Vec<String> {
     if !exit.onboarding_completed {
         return Vec::new();
     }
@@ -168,9 +168,9 @@ fn onboarding_exit_messages(exit: &devo_tui::AppExit, color_enabled: bool) -> Ve
         "Configuration complete".to_string()
     };
     let command = if color_enabled {
-        "\u{1b}[1;36mdevo\u{1b}[0m".to_string()
+        "\u{1b}[1;36minfinitecode\u{1b}[0m".to_string()
     } else {
-        "devo".to_string()
+        "infinitecode".to_string()
     };
     vec![
         complete,
@@ -236,7 +236,7 @@ async fn run_cli() -> Result<()> {
             // Start tokio-console before file logging so the console subscriber
             // can capture task instrumentation. File logging will fall back
             // gracefully if a subscriber is already installed.
-            devo_arg0::maybe_init_tokio_console();
+            infinitecode_arg0::maybe_init_tokio_console();
             let args = server_process_args_from_cli(&cli).expect("server command args");
             let _logging = install_server_logging(&cli)?;
             run_server_process(args, ServerProcessRunOptions::default()).await
@@ -267,8 +267,8 @@ async fn run_cli() -> Result<()> {
     }
 }
 
-fn direct_server_early_dispatch() -> devo_arg0::EarlyDispatch {
-    devo_arg0::EarlyDispatch::Continue
+fn direct_server_early_dispatch() -> infinitecode_arg0::EarlyDispatch {
+    infinitecode_arg0::EarlyDispatch::Continue
 }
 
 fn server_process_args_from_cli(cli: &Cli) -> Option<ServerProcessArgs> {
@@ -328,7 +328,7 @@ enum Command {
 }
 
 async fn maybe_print_startup_update(cli: &Cli) {
-    let Ok(home_dir) = find_devo_home() else {
+    let Ok(home_dir) = find_infinitecode_home() else {
         return;
     };
     let app_config = FileSystemAppConfigLoader::new(home_dir.clone())
@@ -352,13 +352,13 @@ async fn maybe_print_startup_update(cli: &Cli) {
 }
 
 fn install_logging(cli: &Cli) -> Result<LoggingRuntime> {
-    let home_dir = find_devo_home()?;
-    let app_config = devo_core::FileSystemAppConfigLoader::new(home_dir.clone())
+    let home_dir = find_infinitecode_home()?;
+    let app_config = infinitecode_core::FileSystemAppConfigLoader::new(home_dir.clone())
         .with_cli_overrides(cli_logging_overrides(cli))
         .load(Some(std::env::current_dir()?.as_path()))
         .unwrap_or_else(|err| {
             eprintln!("warning: failed to load app config for logging: {err}");
-            devo_core::AppConfig::default()
+            infinitecode_core::AppConfig::default()
         });
     LoggingBootstrap {
         process_name: "cli",
@@ -370,12 +370,12 @@ fn install_logging(cli: &Cli) -> Result<LoggingRuntime> {
 }
 
 fn install_server_logging(cli: &Cli) -> Result<LoggingRuntime> {
-    let home_dir = find_devo_home()?;
-    let loader = devo_core::FileSystemAppConfigLoader::new(home_dir.clone())
+    let home_dir = find_infinitecode_home()?;
+    let loader = infinitecode_core::FileSystemAppConfigLoader::new(home_dir.clone())
         .with_cli_overrides(cli_logging_overrides(cli));
     let app_config = loader.load(/*workspace_root*/ None).unwrap_or_else(|err| {
         eprintln!("warning: failed to load app config for logging: {err}");
-        devo_core::AppConfig::default()
+        infinitecode_core::AppConfig::default()
     });
     LoggingBootstrap {
         process_name: "server",
@@ -403,7 +403,7 @@ fn cli_logging_overrides(cli: &Cli) -> toml::Value {
 #[cfg(test)]
 mod tests {
     use clap::Parser;
-    use devo_core::SessionId;
+    use infinitecode_core::SessionId;
     use pretty_assertions::assert_eq;
     use tracing_subscriber::filter::LevelFilter;
 
@@ -424,7 +424,7 @@ mod tests {
             ("warn", LevelFilter::WARN),
             ("error", LevelFilter::ERROR),
         ] {
-            let cli = Cli::try_parse_from(["devo", "--log-level", level]).expect("parse log level");
+            let cli = Cli::try_parse_from(["infinitecode", "--log-level", level]).expect("parse log level");
 
             assert!(cli.command.is_none());
             assert_eq!(cli.log_level, Some(expected));
@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn cli_parses_dangerously_skip_permissions_flag() {
-        let cli = Cli::try_parse_from(["devo", "--dangerously-skip-permissions"])
+        let cli = Cli::try_parse_from(["infinitecode", "--dangerously-skip-permissions"])
             .expect("parse dangerously-skip-permissions");
 
         assert!(cli.command.is_none());
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn cli_parses_yolo_alias_for_dangerously_skip_permissions() {
-        let cli = Cli::try_parse_from(["devo", "--yolo"]).expect("parse yolo");
+        let cli = Cli::try_parse_from(["infinitecode", "--yolo"]).expect("parse yolo");
 
         assert!(cli.command.is_none());
         assert!(cli.dangerously_skip_permissions);
@@ -451,7 +451,7 @@ mod tests {
     #[test]
     fn cli_parses_yolo_alias_on_resume_subcommand() {
         let session_id = SessionId::new();
-        let cli = Cli::try_parse_from(["devo", "resume", &session_id.to_string(), "--yolo"])
+        let cli = Cli::try_parse_from(["infinitecode", "resume", &session_id.to_string(), "--yolo"])
             .expect("parse resume with yolo");
 
         assert!(matches!(cli.command, Some(Command::Resume { .. })));
@@ -460,7 +460,7 @@ mod tests {
 
     #[test]
     fn cli_rejects_unsupported_log_levels() {
-        let err = Cli::try_parse_from(["devo", "--log-level", "off"]).expect_err("reject off");
+        let err = Cli::try_parse_from(["infinitecode", "--log-level", "off"]).expect_err("reject off");
 
         assert_eq!(err.kind(), clap::error::ErrorKind::InvalidValue);
     }
@@ -539,7 +539,7 @@ mod tests {
         };
         let server = Cli {
             command: Some(Command::Server {
-                transport: devo_server::ServerTransportMode::Config,
+                transport: infinitecode_server::ServerTransportMode::Config,
                 status: false,
                 shutdown: false,
             }),
@@ -568,7 +568,7 @@ mod tests {
     fn cli_parses_resume_subcommand() {
         let session_id = SessionId::new();
         let cli =
-            Cli::try_parse_from(["devo", "resume", &session_id.to_string()]).expect("parse resume");
+            Cli::try_parse_from(["infinitecode", "resume", &session_id.to_string()]).expect("parse resume");
 
         match cli.command {
             Some(Command::Resume { session_id: actual }) => assert_eq!(actual, session_id),
@@ -579,7 +579,7 @@ mod tests {
     #[test]
     fn cli_parses_prompt_jsonl_output_format() {
         let cli =
-            Cli::try_parse_from(["devo", "prompt", "--format", "jsonl", "hello"]).expect("parse");
+            Cli::try_parse_from(["infinitecode", "prompt", "--format", "jsonl", "hello"]).expect("parse");
 
         match cli.command {
             Some(Command::Prompt { input, format }) => {
@@ -592,7 +592,7 @@ mod tests {
 
     #[test]
     fn cli_parses_upgrade_subcommand() {
-        let cli = Cli::try_parse_from(["devo", "upgrade"]).expect("parse upgrade");
+        let cli = Cli::try_parse_from(["infinitecode", "upgrade"]).expect("parse upgrade");
 
         match cli.command {
             Some(Command::Upgrade) => {}
@@ -602,9 +602,9 @@ mod tests {
 
     #[test]
     fn cli_parses_server_status_and_shutdown_flags() {
-        let status = Cli::try_parse_from(["devo", "server", "--status"]).expect("parse status");
+        let status = Cli::try_parse_from(["infinitecode", "server", "--status"]).expect("parse status");
         let shutdown =
-            Cli::try_parse_from(["devo", "server", "--shutdown"]).expect("parse shutdown");
+            Cli::try_parse_from(["infinitecode", "server", "--shutdown"]).expect("parse shutdown");
 
         match status.command {
             Some(Command::Server {
@@ -612,7 +612,7 @@ mod tests {
                 status,
                 shutdown,
             }) => {
-                assert_eq!(transport, devo_server::ServerTransportMode::Config);
+                assert_eq!(transport, infinitecode_server::ServerTransportMode::Config);
                 assert_eq!([status, shutdown], [true, false]);
             }
             other => panic!("expected server command, got {other:?}"),
@@ -623,7 +623,7 @@ mod tests {
                 status,
                 shutdown,
             }) => {
-                assert_eq!(transport, devo_server::ServerTransportMode::Config);
+                assert_eq!(transport, infinitecode_server::ServerTransportMode::Config);
                 assert_eq!([status, shutdown], [false, true]);
             }
             other => panic!("expected server command, got {other:?}"),
@@ -632,12 +632,12 @@ mod tests {
 
     #[test]
     fn cli_parses_websocket_server_transport_override() {
-        let cli = Cli::try_parse_from(["devo", "server", "--transport", "websocket"])
+        let cli = Cli::try_parse_from(["infinitecode", "server", "--transport", "websocket"])
             .expect("parse websocket server transport");
 
         match cli.command {
             Some(Command::Server { transport, .. }) => {
-                assert_eq!(transport, devo_server::ServerTransportMode::WebSocket);
+                assert_eq!(transport, infinitecode_server::ServerTransportMode::WebSocket);
             }
             other => panic!("expected server command, got {other:?}"),
         }
@@ -646,12 +646,12 @@ mod tests {
     #[test]
     fn server_process_args_from_cli_extracts_stdio_server_command() {
         let cli =
-            Cli::try_parse_from(["devo", "server", "--transport", "stdio"]).expect("parse server");
+            Cli::try_parse_from(["infinitecode", "server", "--transport", "stdio"]).expect("parse server");
 
         assert_eq!(
             super::server_process_args_from_cli(&cli),
-            Some(devo_server::ServerProcessArgs {
-                transport: devo_server::ServerTransportMode::Stdio,
+            Some(infinitecode_server::ServerProcessArgs {
+                transport: infinitecode_server::ServerTransportMode::Stdio,
                 status: false,
                 shutdown: false,
             })
@@ -660,14 +660,14 @@ mod tests {
 
     #[test]
     fn server_process_args_from_cli_preserves_global_log_level_parse() {
-        let cli = Cli::try_parse_from(["devo", "--log-level", "debug", "server", "--status"])
+        let cli = Cli::try_parse_from(["infinitecode", "--log-level", "debug", "server", "--status"])
             .expect("parse server");
 
         assert_eq!(cli.log_level, Some(LevelFilter::DEBUG));
         assert_eq!(
             super::server_process_args_from_cli(&cli),
-            Some(devo_server::ServerProcessArgs {
-                transport: devo_server::ServerTransportMode::Config,
+            Some(infinitecode_server::ServerProcessArgs {
+                transport: infinitecode_server::ServerTransportMode::Config,
                 status: true,
                 shutdown: false,
             })
@@ -676,7 +676,7 @@ mod tests {
 
     #[test]
     fn server_process_args_from_cli_skips_non_server_command() {
-        let cli = Cli::try_parse_from(["devo", "doctor"]).expect("parse doctor");
+        let cli = Cli::try_parse_from(["infinitecode", "doctor"]).expect("parse doctor");
 
         assert_eq!(super::server_process_args_from_cli(&cli), None);
     }
@@ -684,7 +684,7 @@ mod tests {
     #[test]
     fn exit_messages_includes_usage_and_resume_hint() {
         let session_id = SessionId::new();
-        let exit = devo_tui::AppExit {
+        let exit = infinitecode_tui::AppExit {
             session_id: Some(session_id),
             onboarding_completed: false,
             turn_count: 1,
@@ -701,14 +701,14 @@ mod tests {
         );
         assert_eq!(
             lines[1],
-            format!("To continue this session, run devo resume {session_id}")
+            format!("To continue this session, run infinitecode resume {session_id}")
         );
     }
 
     #[test]
     fn colorized_exit_messages_include_ansi_sequences() {
         let session_id = SessionId::new();
-        let exit = devo_tui::AppExit {
+        let exit = infinitecode_tui::AppExit {
             session_id: Some(session_id),
             onboarding_completed: false,
             turn_count: 1,
@@ -727,7 +727,7 @@ mod tests {
 
     #[test]
     fn exit_usage_uses_accumulated_display_total() {
-        let exit = devo_tui::AppExit {
+        let exit = infinitecode_tui::AppExit {
             session_id: Some(SessionId::new()),
             onboarding_completed: false,
             turn_count: 1,
@@ -746,7 +746,7 @@ mod tests {
     #[test]
     fn onboarding_exit_messages_include_next_step_after_success() {
         let session_id = SessionId::new();
-        let exit = devo_tui::AppExit {
+        let exit = infinitecode_tui::AppExit {
             session_id: Some(session_id),
             onboarding_completed: true,
             turn_count: 0,
@@ -764,16 +764,16 @@ mod tests {
                 "Configuration complete".to_string(),
                 String::new(),
                 "Next step:".to_string(),
-                "  devo".to_string(),
+                "  infinitecode".to_string(),
             ]
         );
-        assert_eq!(lines.iter().any(|line| line.contains("devo resume")), false);
+        assert_eq!(lines.iter().any(|line| line.contains("infinitecode resume")), false);
     }
 
     #[test]
     fn onboarding_exit_messages_are_empty_without_success() {
         let session_id = SessionId::new();
-        let exit = devo_tui::AppExit {
+        let exit = infinitecode_tui::AppExit {
             session_id: Some(session_id),
             onboarding_completed: false,
             turn_count: 0,
@@ -791,7 +791,7 @@ mod tests {
 
     #[test]
     fn colorized_onboarding_exit_messages_include_ansi_sequences() {
-        let exit = devo_tui::AppExit {
+        let exit = infinitecode_tui::AppExit {
             session_id: None,
             onboarding_completed: true,
             turn_count: 0,

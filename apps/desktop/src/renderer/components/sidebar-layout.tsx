@@ -2,16 +2,16 @@
  * Sidebar shell layout: wraps child routes with the sidebar + SidebarInset chrome.
  * Reads from SidebarSlotContext to allow child routes to override sidebar content.
  */
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Sidebar,
 	SidebarHeader,
 	SidebarInset,
 	SidebarProvider,
 	useSidebar,
-} from "@devo/ui/components/sidebar"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/sidebar"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { Outlet, useNavigate, useParams, useRouterState } from "@tanstack/react-router"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import { type MouseEvent, useCallback, useEffect, useRef, useState } from "react"

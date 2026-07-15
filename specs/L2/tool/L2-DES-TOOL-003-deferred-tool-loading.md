@@ -25,7 +25,7 @@ The agent execution engine can expose 25+ built-in tools and an unbounded number
 - **Deferred**: Listed in a `<system-reminder>` block by name and one-line description only. The model must call `ToolSearch` with `select:<name>` to load their full schemas before use.
 - **Hidden**: Never sent to the model and never listed. Reserved for internal lifecycle tools gated by session mode.
 
-The deferred set is dynamic per effective Devo configuration, MCP server availability, enabled skills, feature flags, and session mode. The model receives the exact set of deferred tools applicable to the current session and loads them incrementally as needed.
+The deferred set is dynamic per effective InfiniteCode configuration, MCP server availability, enabled skills, feature flags, and session mode. The model receives the exact set of deferred tools applicable to the current session and loads them incrementally as needed.
 
 ## Source Requirements
 
@@ -100,7 +100,7 @@ The mechanism must:
 
 ## Tool Classification
 
-Every tool registered in the server-owned tool registry has a prompt loading policy. At session start, the deferred tool splitter partitions all available tools into three groups based on the effective Devo configuration, mode gates, feature flags, MCP availability, and the session's previously-loaded deferred set.
+Every tool registered in the server-owned tool registry has a prompt loading policy. At session start, the deferred tool splitter partitions all available tools into three groups based on the effective InfiniteCode configuration, mode gates, feature flags, MCP availability, and the session's previously-loaded deferred set.
 
 ### Group 1: Pre-loaded (Core) — Always in Prompt
 
@@ -124,7 +124,7 @@ These tools are included in every model turn when registered by the effective co
 
 These tools resolve to a `deferred` prompt loading policy and are withheld from the initial prompt. Their names and one-line descriptions appear in the `<system-reminder>` block. The model loads them explicitly via `ToolSearch("select:<name>")`. Once loaded, their full schemas are included in subsequent turns.
 
-The exact set of deferred tools varies by effective Devo configuration. Representative deferred tools include:
+The exact set of deferred tools varies by effective InfiniteCode configuration. Representative deferred tools include:
 
 | Tool | Category | Purpose |
 |---|---|---|
@@ -371,7 +371,7 @@ The alias map is server-side only. The model is still instructed to use exact na
 
 ## Availability and Configuration
 
-### Effective Devo Configuration
+### Effective InfiniteCode Configuration
 
 The set of deferred tools is determined from the effective configuration after merging the user-scoped and workspace-scoped `config.toml` files described by `L2-DES-APP-005`.
 
@@ -385,7 +385,7 @@ Configuration may choose a conservative default and then override individual too
 
 MCP tools are conditionally deferred. Each MCP server can define a tool loading policy that propagates to tools from that server. When an MCP server is deferred, its tools appear in the deferred reminder after the server's available tool list is known. When loaded via `ToolSearch`, the selected MCP tool schemas become available according to the server's trust, startup, and permission policies.
 
-### Devo Configuration File
+### InfiniteCode Configuration File
 
 In user or project `config.toml`:
 
@@ -436,7 +436,7 @@ The exact TOML keys should be reflected in `L2-DES-APP-005` when this design bec
 | related-to | L2-DES-TOOL-002 | 1 | specs/L2/tool/L2-DES-TOOL-002-parallel-tool-orchestration.md | Parallel orchestration interacts with deferred loading. |
 | related-to | L2-DES-AGENT-001 | 1 | specs/L2/agent/L2-DES-AGENT-001-execution-engine.md | The execution engine dispatches ToolSearch like any other tool. |
 | related-to | L2-DES-CONV-001 | 1 | specs/L2/conv/L2-DES-CONV-001-session-jsonl-data-model.md | Session data model stores loaded deferred state per session. |
-| related-to | L2-DES-APP-005 | 2 | specs/L2/app/L2-DES-APP-005-config-toml-schema.md | Deferred loading policy is durable Devo configuration. |
+| related-to | L2-DES-APP-005 | 2 | specs/L2/app/L2-DES-APP-005-config-toml-schema.md | Deferred loading policy is durable InfiniteCode configuration. |
 | specified-by | L3-BEH-TOOLS-004 | 2 | specs/L3/tools/L3-BEH-TOOLS-004-deferred-tool-loading.md | L3 defines ToolSearch classification, executor behavior, loaded-tool tracking, prompt integration, aliases, and metrics. |
 
 ## Revision Notes
@@ -444,4 +444,4 @@ The exact TOML keys should be reflected in `L2-DES-APP-005` when this design bec
 | Revision | Date | Author | Change Type | Notes |
 |---:|---|---|---|---|
 | 1 | 2026-05-26 | Assistant | Initial | Initial deferred tool loading design, covering ToolSearch architecture, three-group classification, executor logic, session state, token economics, and alias mapping. |
-| 2 | 2026-05-26 | Assistant | Revision | Removed non-Devo tool/configuration terminology and aligned deferred loading with Devo `config.toml`, server-owned tool registry, MCP configuration, and client projection boundaries. |
+| 2 | 2026-05-26 | Assistant | Revision | Removed non-InfiniteCode tool/configuration terminology and aligned deferred loading with InfiniteCode `config.toml`, server-owned tool registry, MCP configuration, and client projection boundaries. |

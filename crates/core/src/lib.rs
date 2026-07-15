@@ -57,10 +57,10 @@ pub use context::*;
 pub use context_pipeline::*;
 pub use conversation::*;
 #[allow(ambiguous_glob_reexports)]
-pub use devo_config::*;
+pub use infinitecode_config::*;
 #[allow(ambiguous_glob_reexports)]
-pub use devo_protocol::*;
-pub use devo_protocol::{ContentBlock, Message, Role};
+pub use infinitecode_protocol::*;
+pub use infinitecode_protocol::{ContentBlock, Message, Role};
 pub use durable_record::*;
 pub use error::*;
 #[allow(ambiguous_glob_reexports)]

@@ -1,8 +1,8 @@
 [package]
-description = "Single-binary dispatch via argv[0]: alias symlinks/bat scripts so devo and devo-server share one exe"
+description = "Single-binary dispatch via argv[0]: alias symlinks/bat scripts so infinitecode and infinitecode-server share one exe"
 edition.workspace = true
 license.workspace = true
-name = "devo-arg0"
+name = "infinitecode-arg0"
 version.workspace = true
 
 [lib]
@@ -12,9 +12,9 @@ path = "src/lib.rs"
 anyhow = { workspace = true }
 clap = { workspace = true }
 console-subscriber = { version = "0.5", optional = true }
-devo-core = { workspace = true }
-devo-server = { workspace = true }
-devo-util-paths = { workspace = true }
+infinitecode-core = { workspace = true }
+infinitecode-server = { workspace = true }
+infinitecode-util-paths = { workspace = true }
 dotenvy = "0.15"
 fs2 = { workspace = true }
 tempfile = { workspace = true }

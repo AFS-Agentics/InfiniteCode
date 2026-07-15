@@ -2,10 +2,10 @@
  * Agent definition converter.
  *
  * Claude Code: .claude/agents/*.md with {name, description, tools, model}
- * Devo: .devo/agents/*.md with {description, mode, model, temperature, permission, ...}
+ * InfiniteCode: .infinitecode/agents/*.md with {description, mode, model, temperature, permission, ...}
  */
 
-import type { DevoAgentFrontmatter } from "../types/devo"
+import type { InfiniteCodeAgentFrontmatter } from "../types/infinitecode"
 import type { MigrationReport } from "../types/report"
 import { createEmptyReport } from "../types/report"
 import type { AgentFile } from "../types/scan-result"
@@ -26,7 +26,7 @@ export interface AgentConversionResult {
 }
 
 /**
- * Convert Claude Code agent definitions to Devo format.
+ * Convert Claude Code agent definitions to InfiniteCode format.
  */
 export function convertAgents(input: AgentConversionInput): AgentConversionResult {
 	const agents = new Map<string, string>()
@@ -58,7 +58,7 @@ function convertSingleAgent(
 	modelOverrides?: Record<string, string>,
 ): string {
 	const fm = agent.frontmatter
-	const ocFm: DevoAgentFrontmatter = {}
+	const ocFm: InfiniteCodeAgentFrontmatter = {}
 
 	// Description (required in OC)
 	ocFm.description = (fm.description as string) ?? agent.name

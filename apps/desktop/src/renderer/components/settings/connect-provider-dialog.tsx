@@ -7,7 +7,7 @@
  * env-var instructions with copy buttons and docs links.
  */
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Dialog,
 	DialogContent,
@@ -15,10 +15,10 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@devo/ui/components/dialog"
-import { Input } from "@devo/ui/components/input"
-import { Label } from "@devo/ui/components/label"
-import { Spinner } from "@devo/ui/components/spinner"
+} from "@infinitecode/ui/components/dialog"
+import { Input } from "@infinitecode/ui/components/input"
+import { Label } from "@infinitecode/ui/components/label"
+import { Spinner } from "@infinitecode/ui/components/spinner"
 import {
 	AlertCircleIcon,
 	CheckCircle2Icon,
@@ -34,7 +34,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import type {
 	CatalogProvider,
 	SdkProviderAuthMethod as ProviderAuthMethod,
-} from "../../hooks/use-devo-data"
+} from "../../hooks/use-infinitecode-data"
 import { createLogger } from "../../lib/logger"
 import { PROVIDER_KEY_URLS, ZEN_PROVIDER_ID, ZEN_SIGNUP_URL } from "../../lib/providers"
 import { getBaseClient } from "../../services/connection-manager"
@@ -94,7 +94,7 @@ interface ConfigurableProvider {
 	id: string
 	/** Form fields in display order */
 	fields: ProviderField[]
-	/** Devo docs anchor (appended to https://devo.ai/docs/providers/#) */
+	/** InfiniteCode docs anchor (appended to https://infinitecode.ai/docs/providers/#) */
 	docsAnchor?: string
 }
 
@@ -181,7 +181,7 @@ const CONFIGURABLE_PROVIDERS: ConfigurableProvider[] = [
 const CONFIGURABLE_PROVIDER_MAP = new Map(CONFIGURABLE_PROVIDERS.map((p) => [p.id, p]))
 
 /**
- * Devo docs anchors for providers that are NOT configurable via form.
+ * InfiniteCode docs anchors for providers that are NOT configurable via form.
  * Used to link to provider-specific setup instructions.
  */
 const PROVIDER_DOCS_ANCHORS: Record<string, string> = {
@@ -202,7 +202,7 @@ function getProviderDocsUrl(providerId: string): string | null {
 	const configurable = CONFIGURABLE_PROVIDER_MAP.get(providerId)
 	const anchor = configurable?.docsAnchor ?? PROVIDER_DOCS_ANCHORS[providerId]
 	if (!anchor) return null
-	return `https://devo.ai/docs/providers/#${anchor}`
+	return `https://infinitecode.ai/docs/providers/#${anchor}`
 }
 
 // ============================================================
@@ -258,7 +258,7 @@ export function ConnectProviderDialog({
 		if (open) {
 			setState({ status: "idle" })
 
-			// Devo Zen: show the special Zen setup view
+			// InfiniteCode Zen: show the special Zen setup view
 			if (provider?.id === ZEN_PROVIDER_ID) {
 				setStep({ type: "zen-setup" })
 				return
@@ -502,7 +502,7 @@ function EnvSetupView({ provider, onCancel }: { provider: CatalogProvider; onCan
 					className="flex items-center gap-1.5 text-xs text-primary hover:underline"
 				>
 					<ExternalLinkIcon className="size-3" aria-hidden="true" />
-					View setup guide on devo.ai
+					View setup guide on infinitecode.ai
 				</a>
 			)}
 
@@ -638,7 +638,7 @@ function ConfigureProviderView({
 						className="flex items-center gap-1.5 text-xs text-primary hover:underline"
 					>
 						<ExternalLinkIcon className="size-3" aria-hidden="true" />
-						View setup guide on devo.ai
+						View setup guide on infinitecode.ai
 					</a>
 				)}
 
@@ -1134,7 +1134,7 @@ function ZenSetupView({
 						className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
 					>
 						<SparklesIcon className="size-3" aria-hidden="true" />
-						Get an API key at devo.ai/zen
+						Get an API key at infinitecode.ai/zen
 						<ExternalLinkIcon className="size-2.5" aria-hidden="true" />
 					</a>
 				</div>

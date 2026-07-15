@@ -1,7 +1,7 @@
 "use client"
 
-import { useControllableState } from "@devo/ui/hooks/use-controllable-state"
-import { cn } from "@devo/ui/lib/utils"
+import { useControllableState } from "@infinitecode/ui/hooks/use-controllable-state"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { Experimental_TranscriptionResult as TranscriptionResult } from "ai"
 import type { ComponentProps, ReactNode } from "react"
 import { createContext, useCallback, useContext, useMemo } from "react"

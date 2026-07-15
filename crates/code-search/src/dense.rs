@@ -1,7 +1,7 @@
 //! Dense embedding providers and vector math.
 //!
 //! Production search uses model2vec with the Semble-compatible
-//! `minishlab/potion-code-16M` model cached under the local Devo model
+//! `minishlab/potion-code-16M` model cached under the local InfiniteCode model
 //! directory. Missing model files are fetched on first use; load/download
 //! failures become typed `ModelUnavailable` errors so the tool can report a
 //! recoverable cache/model problem instead of panicking. Tests use a deterministic
@@ -10,8 +10,8 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use devo_network_proxy::NetworkProxyConfig;
-use devo_util_paths::find_devo_home;
+use infinitecode_network_proxy::NetworkProxyConfig;
+use infinitecode_util_paths::find_infinitecode_home;
 use hf_hub::HFClient;
 use hf_hub::HFClientSync;
 use model2vec::model::Model2Vec;
@@ -27,7 +27,7 @@ const MODEL_FILES: [&str; 3] = ["tokenizer.json", "model.safetensors", "config.j
 
 #[derive(Debug)]
 struct DefaultModelCacheInputs {
-    devo_home: std::io::Result<PathBuf>,
+    infinitecode_home: std::io::Result<PathBuf>,
     temp_dir: PathBuf,
 }
 
@@ -56,12 +56,12 @@ pub struct Model2VecEmbeddingProvider {
 }
 
 impl Model2VecEmbeddingProvider {
-    /// Creates a provider that uses Devo's default local model cache.
+    /// Creates a provider that uses InfiniteCode's default local model cache.
     pub fn default_cached() -> Self {
         Self::default_cached_with_network_proxy(NetworkProxyConfig::default())
     }
 
-    /// Creates a provider that uses Devo's default local model cache and HTTP policy.
+    /// Creates a provider that uses InfiniteCode's default local model cache and HTTP policy.
     pub fn default_cached_with_network_proxy(network_proxy: NetworkProxyConfig) -> Self {
         let model_dir = default_model_cache_dir();
         Self {
@@ -288,15 +288,15 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
 /// Computes the on-disk directory for the default model.
 fn default_model_cache_dir() -> PathBuf {
     default_model_cache_dir_from_inputs(DefaultModelCacheInputs {
-        devo_home: find_devo_home(),
+        infinitecode_home: find_infinitecode_home(),
         temp_dir: std::env::temp_dir(),
     })
 }
 
 fn default_model_cache_dir_from_inputs(inputs: DefaultModelCacheInputs) -> PathBuf {
     let base_dir = inputs
-        .devo_home
-        .unwrap_or_else(|_| inputs.temp_dir.join(".devo"));
+        .infinitecode_home
+        .unwrap_or_else(|_| inputs.temp_dir.join(".infinitecode"));
     base_dir
         .join(LOCAL_MODELS_DIR)
         .join(DEFAULT_MODEL_ID.replace('/', "--"))
@@ -392,26 +392,26 @@ mod tests {
     }
 
     #[test]
-    fn default_model_cache_dir_uses_resolved_devo_home() {
-        let devo_home = PathBuf::from("devo-home");
+    fn default_model_cache_dir_uses_resolved_infinitecode_home() {
+        let infinitecode_home = PathBuf::from("infinitecode-home");
         let inputs = DefaultModelCacheInputs {
-            devo_home: Ok(devo_home.clone()),
+            infinitecode_home: Ok(infinitecode_home.clone()),
             temp_dir: PathBuf::from("temp"),
         };
 
         assert_eq!(
             default_model_cache_dir_from_inputs(inputs),
-            devo_home
+            infinitecode_home
                 .join(LOCAL_MODELS_DIR)
                 .join("minishlab--potion-code-16M")
         );
     }
 
     #[test]
-    fn default_model_cache_dir_falls_back_to_temp_when_devo_home_is_unavailable() {
+    fn default_model_cache_dir_falls_back_to_temp_when_infinitecode_home_is_unavailable() {
         let temp_dir = PathBuf::from("temp");
         let inputs = DefaultModelCacheInputs {
-            devo_home: Err(std::io::Error::new(
+            infinitecode_home: Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "home unavailable",
             )),
@@ -421,7 +421,7 @@ mod tests {
         assert_eq!(
             default_model_cache_dir_from_inputs(inputs),
             temp_dir
-                .join(".devo")
+                .join(".infinitecode")
                 .join(LOCAL_MODELS_DIR)
                 .join("minishlab--potion-code-16M")
         );
@@ -429,7 +429,7 @@ mod tests {
 
     #[test]
     fn hf_client_builder_accepts_configured_proxy_and_no_proxy() {
-        let config = devo_network_proxy::NetworkProxyConfig {
+        let config = infinitecode_network_proxy::NetworkProxyConfig {
             proxy_url: Some("socks5h://127.0.0.1:7890".to_string()),
             no_proxy: Some("localhost,127.0.0.1,::1".to_string()),
         };
@@ -439,7 +439,7 @@ mod tests {
 
     #[test]
     fn hf_client_builder_rejects_invalid_proxy_url() {
-        let config = devo_network_proxy::NetworkProxyConfig {
+        let config = infinitecode_network_proxy::NetworkProxyConfig {
             proxy_url: Some("not a proxy url".to_string()),
             no_proxy: None,
         };

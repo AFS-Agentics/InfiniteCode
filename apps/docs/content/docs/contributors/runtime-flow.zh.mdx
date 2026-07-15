@@ -1,21 +1,21 @@
 ---
 title: 运行时流程
-description: 跟踪一条用户消息如何经过 Devo。
+description: 跟踪一条用户消息如何经过 InfiniteCode。
 ---
 
-这页跟踪一个普通用户 prompt 如何经过 Devo。
+这页跟踪一个普通用户 prompt 如何经过 InfiniteCode。
 
 ## Turn Path
 
 ```mermaid
 sequenceDiagram
   participant User
-  participant TUI as devo-tui
+  participant TUI as infinitecode-tui
   participant Worker as TUI worker
-  participant Server as devo-server
-  participant Core as devo-core
+  participant Server as infinitecode-server
+  participant Core as infinitecode-core
   participant Tools as tools
-  participant Provider as devo-provider
+  participant Provider as infinitecode-provider
 
   User->>TUI: submit prompt
   TUI->>Worker: AppCommand
@@ -69,7 +69,7 @@ Server handlers 位于 `crates/server/src/runtime/handlers` 下。
 
 ## 4. Core Query
 
-Server 将 agent execution 委托给 `devo-core`。
+Server 将 agent execution 委托给 `infinitecode-core`。
 
 Core 拥有：
 
@@ -99,7 +99,7 @@ Server 持久化 durable records，并转发 events 给已订阅的 clients。Wo
 
 ## 7. Persistence 和 Resume
 
-Interactive sessions 会持久化足够的 metadata 和 records，使 `devo resume` 和 `/resume` 能重建历史。Resume 使用同一条 interactive startup path，但会把 initial session id 传入 TUI 和 worker。
+Interactive sessions 会持久化足够的 metadata 和 records，使 `infinitecode resume` 和 `/resume` 能重建历史。Resume 使用同一条 interactive startup path，但会把 initial session id 传入 TUI 和 worker。
 
 修改 persistence 或 event shape 时，同时检查 new-session 和 resumed-session 行为。
 

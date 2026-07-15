@@ -57,7 +57,7 @@ fn dirs_user_skill_root() -> PathBuf {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join(".devo").join("skills")
+    PathBuf::from(home).join(".infinitecode").join("skills")
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,16 +106,16 @@ impl ManagedMetadata {
             installed_hash: installed_hash.to_string(),
             installed_at: now.clone(),
             last_synced_at: now,
-            managed_by: "devo".to_string(),
+            managed_by: "infinitecode".to_string(),
         }
     }
 
     fn metadata_path(package_dir: &Path) -> PathBuf {
-        package_dir.join(".devo").join("default-skill.toml")
+        package_dir.join(".infinitecode").join("default-skill.toml")
     }
 
     fn write(&self, package_dir: &Path) -> Result<(), String> {
-        let meta_dir = package_dir.join(".devo");
+        let meta_dir = package_dir.join(".infinitecode");
         std::fs::create_dir_all(&meta_dir)
             .map_err(|e| format!("failed to create metadata dir: {}", e))?;
         let path = Self::metadata_path(package_dir);
@@ -369,7 +369,7 @@ mod tests {
         assert!(root.join("code-review").join("SKILL.md").exists());
         assert!(
             root.join("code-review")
-                .join(".devo")
+                .join(".infinitecode")
                 .join("default-skill.toml")
                 .exists()
         );
@@ -460,7 +460,7 @@ mod tests {
             installed_hash: "abc123".into(),
             installed_at: chrono::Utc::now().to_rfc3339(),
             last_synced_at: chrono::Utc::now().to_rfc3339(),
-            managed_by: "devo".into(),
+            managed_by: "infinitecode".into(),
         };
         meta.write(&root.join("code-review")).expect("write meta");
 
@@ -485,7 +485,7 @@ mod tests {
         let read = read.unwrap();
         assert_eq!(read.default_skill_id, "test.id");
         assert_eq!(read.bundle_version, "1.0");
-        assert_eq!(read.managed_by, "devo");
+        assert_eq!(read.managed_by, "infinitecode");
     }
 
     #[test]
@@ -521,7 +521,7 @@ mod tests {
         );
         assert!(!root.join("outside.txt").exists());
         assert!(!root.join("code-review").join("SKILL.md").exists());
-        assert!(!root.join("code-review").join(".devo").exists());
+        assert!(!root.join("code-review").join(".infinitecode").exists());
     }
 
     #[cfg(unix)]

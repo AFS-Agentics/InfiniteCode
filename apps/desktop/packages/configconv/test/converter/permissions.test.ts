@@ -35,7 +35,7 @@ describe("parseToolPattern", () => {
 })
 
 describe("mapToolName", () => {
-	test("maps known Claude Code tools to Devo", () => {
+	test("maps known Claude Code tools to InfiniteCode", () => {
 		expect(mapToolName("Read")).toBe("read")
 		expect(mapToolName("Write")).toBe("write")
 		expect(mapToolName("Edit")).toBe("edit")

@@ -2,12 +2,12 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
-use devo_core::SessionConfig;
-use devo_core::SessionRecord;
-use devo_core::SessionState;
-use devo_core::TurnId;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::SessionId;
+use infinitecode_core::SessionConfig;
+use infinitecode_core::SessionRecord;
+use infinitecode_core::SessionState;
+use infinitecode_core::TurnId;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::SessionId;
 
 use crate::execution::PersistedTurnItem;
 use crate::runtime::RuntimeSession;
@@ -28,8 +28,8 @@ pub(crate) struct SpawnSnapshot {
     pub(crate) parent_active_turn_id: Option<TurnId>,
     pub(crate) parent_tool_registry: Option<Arc<ToolRegistry>>,
     pub(crate) runtime_context: Arc<SessionRuntimeContext>,
-    pub(crate) pending_turn_queue: Arc<StdMutex<VecDeque<devo_protocol::PendingInputItem>>>,
-    pub(crate) btw_input_queue: Arc<StdMutex<VecDeque<devo_protocol::PendingInputItem>>>,
+    pub(crate) pending_turn_queue: Arc<StdMutex<VecDeque<infinitecode_protocol::PendingInputItem>>>,
+    pub(crate) btw_input_queue: Arc<StdMutex<VecDeque<infinitecode_protocol::PendingInputItem>>>,
 }
 
 /// Approval caches cloned at turn start for permission checks while the actor
@@ -42,8 +42,8 @@ pub(crate) struct ApprovalCacheSnapshot {
 
 #[derive(Clone, Default)]
 pub(crate) struct DeferredItems {
-    pub(crate) assistant: Option<(devo_core::ItemId, u64, String)>,
-    pub(crate) reasoning: Option<(devo_core::ItemId, u64, String)>,
+    pub(crate) assistant: Option<(infinitecode_core::ItemId, u64, String)>,
+    pub(crate) reasoning: Option<(infinitecode_core::ItemId, u64, String)>,
 }
 
 use tokio::sync::Mutex as TokioMutex;
@@ -51,8 +51,8 @@ use tokio::sync::Mutex as TokioMutex;
 /// Streaming-era mutable fields touched by the turn event bridge.
 #[derive(Default)]
 pub(crate) struct SessionStreamState {
-    pub(crate) deferred_assistant: Option<(devo_core::ItemId, u64, String)>,
-    pub(crate) deferred_reasoning: Option<(devo_core::ItemId, u64, String)>,
+    pub(crate) deferred_assistant: Option<(infinitecode_core::ItemId, u64, String)>,
+    pub(crate) deferred_reasoning: Option<(infinitecode_core::ItemId, u64, String)>,
     pub(crate) turn_inline: Option<TurnInlineState>,
 }
 
@@ -78,16 +78,16 @@ pub(crate) struct SessionActorState {
     pub(crate) loaded_item_count: u64,
     pub(crate) history_items: Vec<SessionHistoryItem>,
     pub(crate) persisted_turn_items: Vec<PersistedTurnItem>,
-    pub(crate) latest_compaction_snapshot: Option<devo_core::CompactionSnapshotLine>,
-    pub(crate) pending_turn_queue: Arc<StdMutex<VecDeque<devo_protocol::PendingInputItem>>>,
-    pub(crate) btw_input_queue: Arc<StdMutex<VecDeque<devo_protocol::PendingInputItem>>>,
-    pub(crate) agent_tool_policy: devo_protocol::AgentToolPolicy,
+    pub(crate) latest_compaction_snapshot: Option<infinitecode_core::CompactionSnapshotLine>,
+    pub(crate) pending_turn_queue: Arc<StdMutex<VecDeque<infinitecode_protocol::PendingInputItem>>>,
+    pub(crate) btw_input_queue: Arc<StdMutex<VecDeque<infinitecode_protocol::PendingInputItem>>>,
+    pub(crate) agent_tool_policy: infinitecode_protocol::AgentToolPolicy,
     pub(crate) max_turns: Option<u32>,
     pub(crate) next_item_seq: u64,
     pub(crate) first_user_input: Option<String>,
     pub(crate) tool_registry: Option<Arc<ToolRegistry>>,
     /// Session-scoped ledger of files read/written by tools (used by `edit`).
-    pub(crate) file_read_ledger: Arc<devo_core::tools::FileReadLedger>,
+    pub(crate) file_read_ledger: Arc<infinitecode_core::tools::FileReadLedger>,
     pub(crate) session_approval_cache: crate::execution::ApprovalGrantCache,
     pub(crate) turn_approval_cache: crate::execution::ApprovalGrantCache,
     pub(crate) session_context_recorded: bool,

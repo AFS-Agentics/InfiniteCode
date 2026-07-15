@@ -17,9 +17,9 @@ use crate::tool_io_cell::tool_input_lines;
 use crate::wrapping::RtOptions;
 use crate::wrapping::adaptive_wrap_line;
 use crate::wrapping::adaptive_wrap_lines;
-use devo_protocol::parse_command::ParsedCommand;
-use devo_protocol::protocol::ExecCommandSource;
-use devo_util_shell_command::bash::extract_bash_command;
+use infinitecode_protocol::parse_command::ParsedCommand;
+use infinitecode_protocol::protocol::ExecCommandSource;
+use infinitecode_util_shell_command::bash::extract_bash_command;
 use itertools::Itertools;
 use ratatui::prelude::*;
 use ratatui::style::Modifier;
@@ -849,7 +849,7 @@ const EXEC_DISPLAY_LAYOUT: ExecDisplayLayout = ExecDisplayLayout::new(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use devo_protocol::protocol::ExecCommandSource;
+    use infinitecode_protocol::protocol::ExecCommandSource;
     use pretty_assertions::assert_eq;
 
     fn render_line_text(line: &Line<'static>) -> String {

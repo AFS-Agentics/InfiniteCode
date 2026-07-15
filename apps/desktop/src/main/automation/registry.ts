@@ -2,7 +2,7 @@
  * Automation config file registry.
  *
  * Manages automation definitions stored as JSON + prompt.md files
- * on disk at $DEVO_HOME/automations/<id>/. Provides CRUD operations
+ * on disk at $INFINITECODE_HOME/automations/<id>/. Provides CRUD operations
  * with atomic writes and validation.
  */
 

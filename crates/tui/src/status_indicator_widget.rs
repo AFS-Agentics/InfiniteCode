@@ -36,12 +36,12 @@ const DETAILS_PREFIX: &str = "  └ ";
 const STATUS_ANIMATION_INTERVAL: Duration = Duration::from_millis(80);
 const TIP_ROTATION_INTERVAL: Duration = Duration::from_secs(6);
 const WORKING_TIPS: &[&str] = &[
-    "You can type your next message while Devo is working; it will be queued.",
+    "You can type your next message while InfiniteCode is working; it will be queued.",
     "Press ESC twice to stop the current turn.",
     "Use /model to switch models for the next turn.",
     "Use /compact when a long session starts losing focus.",
-    "Enter '@' to mention file paths when you want Devo to edit specific files.",
-    "Queue follow-up instructions while Devo is working; they will run next.",
+    "Enter '@' to mention file paths when you want InfiniteCode to edit specific files.",
+    "Queue follow-up instructions while InfiniteCode is working; they will run next.",
     "Use /resume to continue a previous session.",
     "Use /new to start fresh when the current session has too much context.",
     "Keep prompts narrow when you want a small, low-risk code change.",

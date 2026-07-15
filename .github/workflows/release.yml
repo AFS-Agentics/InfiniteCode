@@ -59,30 +59,30 @@ jobs:
 
       - name: Build release binary (x86_64 Linux)
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: cargo zigbuild --release --target ${{ matrix.target }} -p devo-cli
+        run: cargo zigbuild --release --target ${{ matrix.target }} -p infinitecode-cli
 
       - name: Build release binary (Linux ARM64)
         if: matrix.target == 'aarch64-unknown-linux-musl'
-        run: cargo zigbuild --release --target ${{ matrix.target }} -p devo-cli
+        run: cargo zigbuild --release --target ${{ matrix.target }} -p infinitecode-cli
 
       - name: Build release binary (macOS)
         if: runner.os == 'macOS'
-        run: cargo build --release --target ${{ matrix.target }} -p devo-cli
+        run: cargo build --release --target ${{ matrix.target }} -p infinitecode-cli
 
       - name: Build release binary (Windows)
         if: runner.os == 'Windows'
-        run: cargo build --release --target ${{ matrix.target }} -p devo-cli
+        run: cargo build --release --target ${{ matrix.target }} -p infinitecode-cli
 
       - name: Strip symbols (macOS)
         if: runner.os == 'macOS'
-        run: strip target/${{ matrix.target }}/release/devo${{ matrix.ext }}
+        run: strip target/${{ matrix.target }}/release/infinitecode${{ matrix.ext }}
 
       - name: Prepare staging directory
         shell: bash
         run: |
-          staging=devo-${{ github.ref_name }}-${{ matrix.target }}
+          staging=infinitecode-${{ github.ref_name }}-${{ matrix.target }}
           mkdir -p "$staging"
-          cp target/${{ matrix.target }}/release/devo${{ matrix.ext }} "$staging/"
+          cp target/${{ matrix.target }}/release/infinitecode${{ matrix.ext }} "$staging/"
           cp README.md LICENSE "$staging/" 2>/dev/null || true
           echo "STAGING=$staging" >> "$GITHUB_ENV"
 
@@ -99,8 +99,8 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: devo-${{ github.ref_name }}-${{ matrix.target }}
-          path: devo-${{ github.ref_name }}-${{ matrix.target }}.*
+          name: infinitecode-${{ github.ref_name }}-${{ matrix.target }}
+          path: infinitecode-${{ github.ref_name }}-${{ matrix.target }}.*
 
   # ── Desktop app builds ───────────────────────────────────────────────────
   desktop:
@@ -190,7 +190,7 @@ jobs:
           fi
           chmod +x "$rg_bin"
           file "$rg_bin" || true
-          echo "DEVO_DESKTOP_RUNTIME_RG_BIN=$rg_bin" >> "$GITHUB_ENV"
+          echo "INFINITECODE_DESKTOP_RUNTIME_RG_BIN=$rg_bin" >> "$GITHUB_ENV"
 
       - name: Download ripgrep sidecar (Windows)
         if: runner.os == 'Windows'
@@ -211,7 +211,7 @@ jobs:
               throw "rg.exe not found in $archive"
           }
           Get-Item $rg.FullName | Select-Object FullName, Length
-          "DEVO_DESKTOP_RUNTIME_RG_BIN=$($rg.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "INFINITECODE_DESKTOP_RUNTIME_RG_BIN=$($rg.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install desktop dependencies
         working-directory: apps/desktop
@@ -225,7 +225,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: devo-desktop-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}
+          name: infinitecode-desktop-${{ github.ref_name }}-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             apps/desktop/release/*.AppImage
             apps/desktop/release/*.blockmap
@@ -277,13 +277,13 @@ jobs:
           ### Linux / macOS
 
           ```bash
-          curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
+          curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh
           ```
 
           ### Windows
 
           ```powershell
-          irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
+          irm 'https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1' | iex
           ```
           ---
           NOTES

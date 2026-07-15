@@ -5,12 +5,12 @@
  * for the split layout and drives the data pipeline via useAutomationData().
  */
 
-import { Alert, AlertAction, AlertDescription } from "@devo/ui/components/alert"
+import { Alert, AlertAction, AlertDescription } from "@infinitecode/ui/components/alert"
 import {
 	ResizableHandle,
 	ResizablePanel,
 	ResizablePanelGroup,
-} from "@devo/ui/components/resizable"
+} from "@infinitecode/ui/components/resizable"
 import { Outlet } from "@tanstack/react-router"
 import { useAtom } from "jotai"
 import { XIcon } from "lucide-react"

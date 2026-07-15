@@ -2,12 +2,12 @@
  * Onboarding: Provider Setup.
  *
  * Allows users to connect AI providers during onboarding.
- * Devo Zen is featured prominently as the built-in provider with free models.
+ * InfiniteCode Zen is featured prominently as the built-in provider with free models.
  * Reuses ConnectProviderDialog for the actual auth flows.
  */
 
-import { Button } from "@devo/ui/components/button"
-import { Spinner } from "@devo/ui/components/spinner"
+import { Button } from "@infinitecode/ui/components/button"
+import { Spinner } from "@infinitecode/ui/components/spinner"
 import { useQueryClient } from "@tanstack/react-query"
 import { CheckIcon, ExternalLinkIcon, LinkIcon, SparklesIcon, ZapIcon } from "lucide-react"
 import { motion } from "motion/react"
@@ -18,7 +18,7 @@ import {
 	useAllProviders,
 	useConnectedProviders,
 	useProviderAuthMethods,
-} from "../../../hooks/use-devo-data"
+} from "../../../hooks/use-infinitecode-data"
 import { useServerConnection } from "../../../hooks/use-server"
 import {
 	compareConnectedFirst,
@@ -262,7 +262,7 @@ function ZenFeaturedCard({
 								rel="noopener noreferrer"
 								className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
 							>
-								Get a key at devo.ai
+								Get a key at infinitecode.ai
 								<ExternalLinkIcon className="size-2.5" aria-hidden="true" />
 							</a>
 						)}

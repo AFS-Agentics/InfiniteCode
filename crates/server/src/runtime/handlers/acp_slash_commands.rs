@@ -4,17 +4,17 @@ use std::sync::Arc;
 
 use super::acp::legacy_error_to_acp;
 
-use devo_protocol::GoalClearParams;
-use devo_protocol::GoalClearResult;
-use devo_protocol::GoalSetParams;
-use devo_protocol::GoalSetResult;
-use devo_protocol::GoalStatusParams;
-use devo_protocol::GoalStatusResult;
-use devo_protocol::SessionId;
-use devo_protocol::SlashCommand;
-use devo_protocol::ThreadGoal;
-use devo_protocol::ThreadGoalStatus;
-use devo_protocol::acp_available_slash_commands;
+use infinitecode_protocol::GoalClearParams;
+use infinitecode_protocol::GoalClearResult;
+use infinitecode_protocol::GoalSetParams;
+use infinitecode_protocol::GoalSetResult;
+use infinitecode_protocol::GoalStatusParams;
+use infinitecode_protocol::GoalStatusResult;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::SlashCommand;
+use infinitecode_protocol::ThreadGoal;
+use infinitecode_protocol::ThreadGoalStatus;
+use infinitecode_protocol::acp_available_slash_commands;
 
 use crate::ACP_SESSION_UPDATE_METHOD;
 use crate::AcpClientNotification;

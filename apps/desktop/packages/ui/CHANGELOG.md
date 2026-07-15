@@ -1,28 +1,28 @@
-# @devo/ui
+# @infinitecode/ui
 
 ## 0.6.0
 
 ### Patch Changes
 
-- [`f7c84b5`](https://github.com/tsiao/devo/commit/f7c84b5b4162824de5b4d31e860a6658f875e65e) Thanks [@ItsWendell](https://github.com/ItsWendell)! - Apply thin scrollbar styles globally to prevent ugly native scrollbars across all scrollable areas
+- [`f7c84b5`](https://github.com/tsiao/infinitecode/commit/f7c84b5b4162824de5b4d31e860a6658f875e65e) Thanks [@ItsWendell](https://github.com/ItsWendell)! - Apply thin scrollbar styles globally to prevent ugly native scrollbars across all scrollable areas
 
 ## 0.5.3
 
 ### Patch Changes
 
-- [`8171dee`](https://github.com/tsiao/devo/commit/8171deee90b638ea92604a20ab323da3f739b627) Thanks [@ItsWendell](https://github.com/ItsWendell)! - Fix horizontal overflow and clipping in the desktop app at narrow window widths. Add `min-w-0` and `overflow-hidden` throughout the flex layout chain (SidebarInset, content area, conversation container, chat view, prompt toolbar) and make the session app bar collapse responsively with Tailwind breakpoints.
+- [`8171dee`](https://github.com/tsiao/infinitecode/commit/8171deee90b638ea92604a20ab323da3f739b627) Thanks [@ItsWendell](https://github.com/ItsWendell)! - Fix horizontal overflow and clipping in the desktop app at narrow window widths. Add `min-w-0` and `overflow-hidden` throughout the flex layout chain (SidebarInset, content area, conversation container, chat view, prompt toolbar) and make the session app bar collapse responsively with Tailwind breakpoints.
 
 ## 0.3.0
 
 ### Minor Changes
 
-- [`594e4b7`](https://github.com/tsiao/devo/commit/594e4b7e299dee6ba507f990001f505f6afd22c5) Thanks [@ItsWendell](https://github.com/ItsWendell)! - ### New Features
+- [`594e4b7`](https://github.com/tsiao/infinitecode/commit/594e4b7e299dee6ba507f990001f505f6afd22c5) Thanks [@ItsWendell](https://github.com/ItsWendell)! - ### New Features
 
   - **Session metrics**: comprehensive per-session work time, cost, tokens, model distribution, cache efficiency, and tool breakdown
   - **Per-turn metadata**: display model, duration, and cost after each response
   - **Live turn timer**: show elapsed time on submit button while agent is working
   - **Prompt toolbar selector**: enhanced model/provider selector UI
-  - **Devo API integration**: replace disk-based discovery and messages with Devo server API
+  - **InfiniteCode API integration**: replace disk-based discovery and messages with InfiniteCode server API
 
   ### Performance
 
@@ -40,7 +40,7 @@
 
   ### Fixes
 
-  - Support Devo XML read output format in tool card parser
+  - Support InfiniteCode XML read output format in tool card parser
   - Migrate tooltips from Radix asChild to Base UI render prop pattern
   - Stabilize sidebar atom references to prevent cascading re-renders
 
@@ -48,7 +48,7 @@
 
 ### Patch Changes
 
-- [`d2d6f2b`](https://github.com/tsiao/devo/commit/d2d6f2b3013ad0fa3bb9ac08ad9b8ff91517ffc5) Thanks [@ItsWendell](https://github.com/ItsWendell)! - ### New Features
+- [`d2d6f2b`](https://github.com/tsiao/infinitecode/commit/d2d6f2b3013ad0fa3bb9ac08ad9b8ff91517ffc5) Thanks [@ItsWendell](https://github.com/ItsWendell)! - ### New Features
 
   - Add provider management with icons, catalog, and onboarding integration
   - Add git worktree backend with lifecycle management and UI

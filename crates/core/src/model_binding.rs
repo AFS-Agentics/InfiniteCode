@@ -7,7 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use devo_protocol::ReasoningEffort;
+use infinitecode_protocol::ReasoningEffort;
 
 use crate::durable_record::{InvocationMethod, ModelBindingId, ProviderId};
 

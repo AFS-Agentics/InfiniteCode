@@ -5,24 +5,24 @@ use std::sync::Mutex;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderRouter;
-use devo_provider::SingleProviderRouter;
-use devo_provider::error::ProviderError;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderRouter;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_provider::error::ProviderError;
 use futures::Stream;
 use futures::stream;
 use pretty_assertions::assert_eq;
@@ -78,7 +78,7 @@ impl RecordingRouter {
 impl ProviderRouter for RecordingRouter {
     async fn stream(
         &self,
-        _route: devo_provider::ProviderRoute,
+        _route: infinitecode_provider::ProviderRoute,
         _request: ModelRequest,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<StreamEvent>> + Send>>, ProviderError> {
         Ok(Box::pin(stream::iter(vec![Ok(StreamEvent::MessageDone {
@@ -88,7 +88,7 @@ impl ProviderRouter for RecordingRouter {
 
     async fn complete(
         &self,
-        _route: devo_provider::ProviderRoute,
+        _route: infinitecode_provider::ProviderRoute,
         request: ModelRequest,
     ) -> Result<ModelResponse, ProviderError> {
         self.requests
@@ -131,7 +131,7 @@ async fn restore_seeds_sqlite_metadata_before_initial_stats() -> Result<()> {
         .await
         .context("session/new response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_protocol::AcpNewSessionResult>,
+        infinitecode_server::SuccessResponse<infinitecode_protocol::AcpNewSessionResult>,
     >(start_response.clone())
     .with_context(|| format!("session/new returned {start_response}"))?
     .result
@@ -162,9 +162,9 @@ async fn restore_seeds_sqlite_metadata_before_initial_stats() -> Result<()> {
 #[tokio::test]
 async fn title_generation_uses_resolved_provider_request_model() -> Result<()> {
     let data_root = TempDir::new()?;
-    std::fs::create_dir_all(data_root.path().join(".devo"))?;
+    std::fs::create_dir_all(data_root.path().join(".infinitecode"))?;
     std::fs::write(
-        data_root.path().join(".devo").join("models.json"),
+        data_root.path().join(".infinitecode").join("models.json"),
         r#"
 [
   {
@@ -224,7 +224,7 @@ async fn title_generation_uses_resolved_provider_request_model() -> Result<()> {
         .await
         .context("session/new response")?;
     let session_id = serde_json::from_value::<
-        devo_server::SuccessResponse<devo_protocol::AcpNewSessionResult>,
+        infinitecode_server::SuccessResponse<infinitecode_protocol::AcpNewSessionResult>,
     >(start_response.clone())
     .with_context(|| format!("session/new returned {start_response}"))?
     .result
@@ -265,13 +265,13 @@ fn build_runtime(
     provider: Arc<dyn ModelProviderSDK>,
     provider_router: Arc<dyn ProviderRouter>,
 ) -> Result<(
-    Arc<devo_server::ServerRuntime>,
-    Arc<devo_server::db::Database>,
+    Arc<infinitecode_server::ServerRuntime>,
+    Arc<infinitecode_server::db::Database>,
 )> {
-    let db = Arc::new(devo_server::db::Database::open(data_root.join(db_name))?);
-    let runtime = devo_server::ServerRuntime::new(
+    let db = Arc::new(infinitecode_server::db::Database::open(data_root.join(db_name))?);
+    let runtime = infinitecode_server::ServerRuntime::new(
         data_root.to_path_buf(),
-        devo_server::ServerRuntimeDependencies::new(
+        infinitecode_server::ServerRuntimeDependencies::new(
             provider,
             provider_router,
             Arc::new(ToolRegistry::new()),
@@ -282,7 +282,7 @@ fn build_runtime(
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             Arc::clone(&db),
             Arc::new(Mutex::new(AppConfigStore::load(
                 data_root.to_path_buf(),
@@ -294,11 +294,11 @@ fn build_runtime(
 }
 
 async fn initialize_connection(
-    runtime: &Arc<devo_server::ServerRuntime>,
+    runtime: &Arc<infinitecode_server::ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(4096);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
-        .register_connection(devo_server::ClientTransportKind::Stdio, notifications_tx)
+        .register_connection(infinitecode_server::ClientTransportKind::Stdio, notifications_tx)
         .await;
     let initialize_response = runtime
         .handle_incoming(
@@ -322,7 +322,7 @@ async fn initialize_connection(
     let response: serde_json::Value = initialize_response;
     assert_eq!(
         response["result"]["agentInfo"]["name"],
-        serde_json::json!("devo-server")
+        serde_json::json!("infinitecode-server")
     );
     Ok((connection_id, notifications_rx))
 }

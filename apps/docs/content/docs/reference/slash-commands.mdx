@@ -1,6 +1,6 @@
 ---
 title: Slash Commands
-description: Reference Devo slash commands and composer triggers.
+description: Reference InfiniteCode slash commands and composer triggers.
 ---
 
 Slash commands are entered in the TUI composer. Some commands are available
@@ -19,12 +19,12 @@ current task is idle.
 | `/resume` | Resume a saved chat. | Not available during generation. |
 | `/new` | Start a new chat. | Not available during generation. |
 | `/status` | Show current session config and token usage. | Includes model, reasoning effort, cwd, turns, and tokens. |
-| `/permissions` | Choose what Devo is allowed to do. | Alias: `/approvals`. |
+| `/permissions` | Choose what InfiniteCode is allowed to do. | Alias: `/approvals`. |
 | `/clear` | Clear the transcript view. | Does not change files. |
 | `/diff` | Show git diff, including untracked files. | Not available during generation. |
 | `/goal` | Set or view the goal for long-running work. | Accepts subcommands and inline objective text. |
 | `/btw` | Ask a side question without interrupting the main conversation. | Requires a question. |
-| `/exit` | Exit Devo. | Shuts down the interactive session. |
+| `/exit` | Exit InfiniteCode. | Shuts down the interactive session. |
 
 ## `/goal`
 
@@ -49,7 +49,7 @@ Subcommands:
 | `/goal resume` | Resume a paused goal. |
 | `/goal clear` | Clear the goal. |
 
-Goal text is length-limited by the protocol. If it is too long, Devo reports the
+Goal text is length-limited by the protocol. If it is too long, InfiniteCode reports the
 limit instead of setting it.
 
 ## `/btw`
@@ -72,5 +72,5 @@ These are not slash commands, but they are part of the same prompt surface.
 | `@` | Open fuzzy file search and insert a selected path into the prompt. |
 | `!` | Enter SHELL mode and run a shell command from the composer. |
 
-See [Fuzzy File Search](../using-devo/fuzzy-file-search) and
-[Shell Mode](../using-devo/shell-mode) for workflow details.
+See [Fuzzy File Search](../using-infinitecode/fuzzy-file-search) and
+[Shell Mode](../using-infinitecode/shell-mode) for workflow details.

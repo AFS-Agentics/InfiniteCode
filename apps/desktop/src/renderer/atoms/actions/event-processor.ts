@@ -27,7 +27,7 @@ import { applyWorkspaceChangesUpdatedAtom } from "../workspace-changes"
 const log = createLogger("event-processor")
 
 /**
- * Invalidate all Devo data queries for a specific directory.
+ * Invalidate all InfiniteCode data queries for a specific directory.
  * Called when an instance is disposed so the UI re-fetches config, agents, providers, etc.
  */
 function invalidateDirectoryQueries(directory: string): void {
@@ -38,11 +38,11 @@ function invalidateDirectoryQueries(directory: string): void {
 }
 
 /**
- * Invalidate all Devo data queries across all directories.
+ * Invalidate all InfiniteCode data queries across all directories.
  * Called when a global dispose event occurs (e.g. global config change).
  */
 function invalidateAllQueries(): void {
-	log.info("Invalidating all Devo queries (global dispose)")
+	log.info("Invalidating all InfiniteCode queries (global dispose)")
 	for (const key of ["config", "providers", "agents", "commands", "vcs"]) {
 		queryClient.invalidateQueries({ queryKey: [key] })
 	}
@@ -325,7 +325,7 @@ export function processEvent(event: Event): void {
 			set(applyWorkspaceChangesUpdatedAtom, event.properties)
 			break
 
-		// --- Worktree lifecycle events (from Devo experimental API) ---
+		// --- Worktree lifecycle events (from InfiniteCode experimental API) ---
 
 		case "worktree.ready":
 			log.info("Worktree ready", {

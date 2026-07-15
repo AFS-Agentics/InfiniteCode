@@ -1,6 +1,6 @@
 //! Styled Ctrl+X selector for live direct sub-agents.
 
-use devo_core::SessionId;
+use infinitecode_core::SessionId;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;

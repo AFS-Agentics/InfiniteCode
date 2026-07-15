@@ -69,9 +69,9 @@ const defaultSettings: AppSettings = {
 describe("renderer settings sync", () => {
 	test("builds a one-time migration patch from existing renderer localStorage", () => {
 		const storage = new MemoryStorage()
-		storage.setItem("devo:colorScheme", JSON.stringify("system"))
-		storage.setItem("devo:theme", JSON.stringify("cortex"))
-		storage.setItem("devo:displayMode", JSON.stringify("verbose"))
+		storage.setItem("infinitecode:colorScheme", JSON.stringify("system"))
+		storage.setItem("infinitecode:theme", JSON.stringify("cortex"))
+		storage.setItem("infinitecode:displayMode", JSON.stringify("verbose"))
 
 		const patch = buildRendererPreferencesMigrationPatch(defaultSettings, storage)
 

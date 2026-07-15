@@ -7,35 +7,35 @@
 use anyhow::Context;
 use anyhow::Result;
 
-use devo_core::AUTH_CONFIG_FILE_NAME;
-use devo_core::AppConfig;
-use devo_core::LegacyModelProviderConfig;
-use devo_core::ModelCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderConfigSection;
-use devo_core::ProviderHttpConfig;
-use devo_core::ProviderWireApi;
-use devo_core::UserAuthConfigFile;
-use devo_core::read_user_auth_config;
-use devo_core::resolve_model_binding;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::StreamEvent;
-use devo_provider::ModelProviderSDK;
-use devo_provider::MultiProviderRouter;
-use devo_provider::ProviderHttpOptions;
-use devo_provider::ProviderRoute;
-use devo_provider::ProviderRouter;
-use devo_provider::SingleProviderRouter;
-use devo_provider::anthropic::AnthropicProvider;
-use devo_provider::openai::OpenAIProvider;
-use devo_provider::openai::OpenAIResponsesProvider;
+use infinitecode_core::AUTH_CONFIG_FILE_NAME;
+use infinitecode_core::AppConfig;
+use infinitecode_core::LegacyModelProviderConfig;
+use infinitecode_core::ModelCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderConfigSection;
+use infinitecode_core::ProviderHttpConfig;
+use infinitecode_core::ProviderWireApi;
+use infinitecode_core::UserAuthConfigFile;
+use infinitecode_core::read_user_auth_config;
+use infinitecode_core::resolve_model_binding;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::MultiProviderRouter;
+use infinitecode_provider::ProviderHttpOptions;
+use infinitecode_provider::ProviderRoute;
+use infinitecode_provider::ProviderRouter;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_provider::anthropic::AnthropicProvider;
+use infinitecode_provider::openai::OpenAIProvider;
+use infinitecode_provider::openai::OpenAIResponsesProvider;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
 const NO_PROVIDER_CONFIGURED_MESSAGE: &str =
-    "No provider configured. Run `devo onboard` to complete setup.";
+    "No provider configured. Run `infinitecode onboard` to complete setup.";
 
 /// Resolved provider bootstrap owned by the server runtime.
 pub struct ResolvedServerProvider {
@@ -272,7 +272,7 @@ fn build_provider_route(
     wire_api: ProviderWireApi,
     base_url: Option<String>,
     provider_id: &str,
-    provider: &devo_core::ProviderVendorConfig,
+    provider: &infinitecode_core::ProviderVendorConfig,
     auth: &UserAuthConfigFile,
     provider_http: &ProviderHttpConfig,
 ) -> Result<Arc<dyn ModelProviderSDK>> {
@@ -300,7 +300,7 @@ struct ServerProviderSettings {
 fn resolve_server_provider_settings(
     file_config: &ProviderConfigSection,
     default_model: Option<&str>,
-    auth: &devo_core::UserAuthConfigFile,
+    auth: &infinitecode_core::UserAuthConfigFile,
 ) -> Result<ServerProviderSettings> {
     if let Some(binding) = resolve_model_binding(file_config, /*requested_model*/ None) {
         let provider = file_config
@@ -343,8 +343,8 @@ fn resolve_server_provider_settings(
 
 fn resolve_provider_api_key(
     provider_id: &str,
-    provider: &devo_core::ProviderVendorConfig,
-    auth: &devo_core::UserAuthConfigFile,
+    provider: &infinitecode_core::ProviderVendorConfig,
+    auth: &infinitecode_core::UserAuthConfigFile,
 ) -> Result<Option<String>> {
     let Some(credential_id) = provider.credential.as_deref() else {
         return Ok(None);
@@ -411,7 +411,7 @@ fn resolve_legacy_server_provider_settings(
 fn select_configured_model<'a>(
     profile: &'a LegacyModelProviderConfig,
     requested: Option<&str>,
-) -> Option<&'a devo_core::ConfiguredModel> {
+) -> Option<&'a infinitecode_core::ConfiguredModel> {
     match requested {
         Some(model) => profile.models.iter().find(|entry| entry.model == model),
         None => profile
@@ -458,20 +458,20 @@ pub(crate) fn normalize_openai_base_url(url: &str) -> String {
 mod tests {
     use std::collections::BTreeMap;
 
-    use devo_core::AppConfig;
-    use devo_core::AuthCredentialConfig;
-    use devo_core::AuthCredentialKind;
-    use devo_core::ModelBindingConfig;
-    use devo_core::ProviderConfigSection;
-    use devo_core::ProviderDefaultsConfig;
-    use devo_core::ProviderVendorConfig;
-    use devo_core::UserAuthConfigFile;
+    use infinitecode_core::AppConfig;
+    use infinitecode_core::AuthCredentialConfig;
+    use infinitecode_core::AuthCredentialKind;
+    use infinitecode_core::ModelBindingConfig;
+    use infinitecode_core::ProviderConfigSection;
+    use infinitecode_core::ProviderDefaultsConfig;
+    use infinitecode_core::ProviderVendorConfig;
+    use infinitecode_core::UserAuthConfigFile;
     use pretty_assertions::assert_eq;
 
     use super::load_server_provider;
     use super::normalize_openai_base_url;
     use super::resolve_server_provider_settings;
-    use devo_protocol::ProviderWireApi;
+    use infinitecode_protocol::ProviderWireApi;
 
     #[test]
     fn preserves_explicit_openai_compatible_paths() {
@@ -491,7 +491,7 @@ mod tests {
 
     #[tokio::test]
     async fn empty_provider_config_loads_missing_provider_for_onboarding() {
-        let config = devo_core::AppConfig::default();
+        let config = infinitecode_core::AppConfig::default();
         let dir = tempfile::tempdir().expect("temp dir");
 
         let actual = load_server_provider(&config, Some("onboard-model"), dir.path())
@@ -501,15 +501,15 @@ mod tests {
         assert_eq!(actual.provider.name(), "missing-provider");
         let error = actual
             .provider
-            .completion(devo_protocol::ModelRequest {
-                model_slug: devo_protocol::ModelProfileKey::Generic,
+            .completion(infinitecode_protocol::ModelRequest {
+                model_slug: infinitecode_protocol::ModelProfileKey::Generic,
                 model: "onboard-model".to_string(),
                 system: None,
                 messages: Vec::new(),
                 max_tokens: 1,
                 tools: None,
                 hosted_tools: Vec::new(),
-                sampling: devo_protocol::SamplingControls::default(),
+                sampling: infinitecode_protocol::SamplingControls::default(),
                 request_thinking: None,
                 reasoning_effort: None,
                 extra_body: None,
@@ -519,7 +519,7 @@ mod tests {
 
         assert_eq!(
             error.to_string(),
-            "No provider configured. Run `devo onboard` to complete setup."
+            "No provider configured. Run `infinitecode onboard` to complete setup."
         );
     }
 

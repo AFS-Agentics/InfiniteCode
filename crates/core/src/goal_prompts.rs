@@ -6,7 +6,7 @@
 
 use std::borrow::Cow;
 
-use devo_protocol::{ThreadGoal, ThreadGoalStatus};
+use infinitecode_protocol::{ThreadGoal, ThreadGoalStatus};
 
 const CONTINUATION_TEMPLATE: &str = include_str!("../prompts/goals/continuation.md");
 const BUDGET_LIMIT_TEMPLATE: &str = include_str!("../prompts/goals/budget_limit.md");
@@ -82,7 +82,7 @@ fn token_budget_exhausted(goal: &ThreadGoal) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use devo_protocol::SessionId;
+    use infinitecode_protocol::SessionId;
 
     fn active_goal(objective: &str, token_budget: Option<i64>) -> ThreadGoal {
         ThreadGoal {

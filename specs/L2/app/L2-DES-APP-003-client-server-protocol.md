@@ -431,9 +431,9 @@ Rules:
 
 ## Future Destructive Deletion And Forks
 
-The Devo-native client-server protocol does not currently define a destructive session deletion request. ACP `session/delete` is the supported session-history removal method and only specifies user-facing removal from `session/list` results.
+The InfiniteCode-native client-server protocol does not currently define a destructive session deletion request. ACP `session/delete` is the supported session-history removal method and only specifies user-facing removal from `session/list` results.
 
-If a future Devo-native destructive deletion endpoint is added, it must preserve user-visible consistency for forks.
+If a future InfiniteCode-native destructive deletion endpoint is added, it must preserve user-visible consistency for forks.
 
 Rules:
 

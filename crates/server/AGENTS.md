@@ -40,8 +40,8 @@ The server runtime uses **one session actor per session**. Durable session state
 
 ### Session persistence layers
 
-- **Rollout JSONL** under `~/.devo/sessions/` is the canonical conversation history.
-- **SQLite** (`devo.db` `sessions` table) stores a lightweight index (`rollout_path`, `parent_session_id`, title, cwd, timestamps) used by `session/list` and resume decisions.
+- **Rollout JSONL** under `~/.infinitecode/sessions/` is the canonical conversation history.
+- **SQLite** (`infinitecode.db` `sessions` table) stores a lightweight index (`rollout_path`, `parent_session_id`, title, cwd, timestamps) used by `session/list` and resume decisions.
 - **In-memory session actors** are loaded on demand via `get_or_load_parent_session`; root sessions are LRU-evicted (capacity 16) when unpinned.
 - **`session/list`** returns durable user-visible sessions only (non-ephemeral, no `agent_path`; includes forks with `parent_session_id`); subagent rows are indexed but hidden from list.
 - **`session/resume`** loads parent sessions lazily from rollout files. Subagent session ids cannot be resumed directly; missing rollout files fail with an explicit restore error.

@@ -1,4 +1,4 @@
-//! Shared wire and persistence types exchanged between Devo crates.
+//! Shared wire and persistence types exchanged between InfiniteCode crates.
 //!
 //! The crate keeps provider requests, runtime events, sessions, permissions,
 //! and tool payloads in one serialization boundary so other crates can depend

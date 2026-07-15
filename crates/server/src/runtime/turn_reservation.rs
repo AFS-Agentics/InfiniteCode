@@ -88,20 +88,20 @@ mod tests {
 
     use anyhow::Result;
     use async_trait::async_trait;
-    use devo_core::AppConfigStore;
-    use devo_core::BundledSkillsConfig;
-    use devo_core::FileSystemSkillCatalog;
-    use devo_core::PresetModelCatalog;
-    use devo_core::ProviderVendorCatalog;
-    use devo_core::SkillsConfig;
-    use devo_core::tools::ToolRegistry;
-    use devo_protocol::ErrorResponse;
-    use devo_protocol::ModelRequest;
-    use devo_protocol::ModelResponse;
-    use devo_protocol::StreamEvent;
-    use devo_protocol::SuccessResponse;
-    use devo_provider::ModelProviderSDK;
-    use devo_provider::SingleProviderRouter;
+    use infinitecode_core::AppConfigStore;
+    use infinitecode_core::BundledSkillsConfig;
+    use infinitecode_core::FileSystemSkillCatalog;
+    use infinitecode_core::PresetModelCatalog;
+    use infinitecode_core::ProviderVendorCatalog;
+    use infinitecode_core::SkillsConfig;
+    use infinitecode_core::tools::ToolRegistry;
+    use infinitecode_protocol::ErrorResponse;
+    use infinitecode_protocol::ModelRequest;
+    use infinitecode_protocol::ModelResponse;
+    use infinitecode_protocol::StreamEvent;
+    use infinitecode_protocol::SuccessResponse;
+    use infinitecode_provider::ModelProviderSDK;
+    use infinitecode_provider::SingleProviderRouter;
     use pretty_assertions::assert_eq;
     use tempfile::TempDir;
 
@@ -145,7 +145,7 @@ mod tests {
                     bundled: Some(BundledSkillsConfig { enabled: false }),
                     ..SkillsConfig::default()
                 })),
-                devo_core::AgentsMdConfig::default(),
+                infinitecode_core::AgentsMdConfig::default(),
                 db,
                 Arc::new(std::sync::Mutex::new(
                     AppConfigStore::load(data_root.to_path_buf(), None)
@@ -231,7 +231,7 @@ mod tests {
             session_id,
             sequence: 1,
             status: TurnStatus::Running,
-            kind: devo_core::TurnKind::Regular,
+            kind: infinitecode_core::TurnKind::Regular,
             model: "test-model".to_string(),
             model_binding_id: None,
             reasoning_effort_selection: None,
@@ -254,7 +254,7 @@ mod tests {
                 serde_json::json!(2),
                 TurnStartParams {
                     session_id,
-                    input: vec![devo_protocol::InputItem::Text {
+                    input: vec![infinitecode_protocol::InputItem::Text {
                         text: "must not queue".to_string(),
                     }],
                     model: None,
@@ -263,8 +263,8 @@ mod tests {
                     sandbox: None,
                     approval_policy: None,
                     cwd: None,
-                    collaboration_mode: devo_protocol::CollaborationMode::Build,
-                    execution_mode: devo_protocol::TurnExecutionMode::Regular,
+                    collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
+                    execution_mode: infinitecode_protocol::TurnExecutionMode::Regular,
                 },
                 TurnStartQueuePolicy::RejectActive,
             )

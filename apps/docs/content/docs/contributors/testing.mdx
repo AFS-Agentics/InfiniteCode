@@ -1,6 +1,6 @@
 ---
 title: Testing
-description: Choose validation commands for Devo changes.
+description: Choose validation commands for InfiniteCode changes.
 ---
 
 Use the narrowest validation that covers the changed behavior, then broaden
@@ -11,7 +11,7 @@ when the change crosses crate boundaries.
 Format changed Rust packages:
 
 ```bash
-cargo fmt --package devo-tui
+cargo fmt --package infinitecode-tui
 ```
 
 Use the package that owns the changed files.
@@ -21,15 +21,15 @@ Use the package that owns the changed files.
 Run package tests when a change is scoped:
 
 ```bash
-cargo test -p devo-config
-cargo test -p devo-server
-cargo test -p devo-tui
+cargo test -p infinitecode-config
+cargo test -p infinitecode-server
+cargo test -p infinitecode-tui
 ```
 
 Run one test by name:
 
 ```bash
-cargo test -p devo-tui status_indicator -- --nocapture
+cargo test -p infinitecode-tui status_indicator -- --nocapture
 ```
 
 Prefer focused tests while iterating, then run broader tests before finishing a
@@ -49,9 +49,9 @@ For provider schema, resolution, or onboarding changes, include tests around:
 Useful starting commands:
 
 ```bash
-cargo test -p devo-config provider
-cargo test -p devo-server provider
-cargo test -p devo-provider
+cargo test -p infinitecode-config provider
+cargo test -p infinitecode-server provider
+cargo test -p infinitecode-provider
 ```
 
 ## TUI Changes
@@ -60,8 +60,8 @@ For TUI rendering or command behavior, test the owning package and manually
 exercise the interaction in a terminal:
 
 ```bash
-cargo test -p devo-tui
-cargo run -p devo-cli
+cargo test -p infinitecode-tui
+cargo run -p infinitecode-cli
 ```
 
 Check rendered behavior for:
@@ -79,10 +79,10 @@ Check rendered behavior for:
 ## Server Runtime Changes
 
 For session, turn, persistence, goal, subagent, or command-exec changes, start
-with `devo-server` tests:
+with `infinitecode-server` tests:
 
 ```bash
-cargo test -p devo-server
+cargo test -p infinitecode-server
 ```
 
 If the change affects shared DTOs, also test downstream crates that consume

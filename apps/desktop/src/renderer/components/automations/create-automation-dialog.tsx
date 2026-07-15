@@ -5,8 +5,8 @@
  * pre-fills fields from the automation, and shows Delete/Test/Pause actions.
  */
 
-import { Badge } from "@devo/ui/components/badge"
-import { Button } from "@devo/ui/components/button"
+import { Badge } from "@infinitecode/ui/components/badge"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Combobox,
 	ComboboxContent,
@@ -14,18 +14,18 @@ import {
 	ComboboxInput,
 	ComboboxItem,
 	ComboboxList,
-} from "@devo/ui/components/combobox"
+} from "@infinitecode/ui/components/combobox"
 import {
 	Dialog,
 	DialogContent,
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@devo/ui/components/dialog"
-import { Input } from "@devo/ui/components/input"
-import { Label } from "@devo/ui/components/label"
-import { Separator } from "@devo/ui/components/separator"
-import { Textarea } from "@devo/ui/components/textarea"
+} from "@infinitecode/ui/components/dialog"
+import { Input } from "@infinitecode/ui/components/input"
+import { Label } from "@infinitecode/ui/components/label"
+import { Separator } from "@infinitecode/ui/components/separator"
+import { Textarea } from "@infinitecode/ui/components/textarea"
 import { useAtomValue } from "jotai"
 import {
 	FolderIcon,
@@ -42,9 +42,9 @@ import { discoveryProjectsAtom } from "../../atoms/discovery"
 import {
 	getModelVariants,
 	type ModelRef,
-	useDevoAgents,
+	useInfiniteCodeAgents,
 	useProviders,
-} from "../../hooks/use-devo-data"
+} from "../../hooks/use-infinitecode-data"
 import {
 	createAutomation,
 	deleteAutomation,
@@ -122,7 +122,7 @@ export function CreateAutomationDialog({
 	const directory = workspaces[0] ?? null
 
 	const { data: providers } = useProviders(directory)
-	const { agents } = useDevoAgents(directory)
+	const { agents } = useInfiniteCodeAgents(directory)
 
 	// Compute available variants for the selected model
 	const variants = useMemo(() => {
@@ -233,7 +233,7 @@ export function CreateAutomationDialog({
 		buildExecutionPatch,
 	])
 
-	// Discovered projects from Devo SDK
+	// Discovered projects from InfiniteCode SDK
 	const discoveredProjects = useAtomValue(discoveryProjectsAtom)
 	const availableProjects = useMemo(
 		() =>

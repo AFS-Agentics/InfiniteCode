@@ -74,7 +74,7 @@ impl ServerRuntime {
 
     async fn session_is_plan_mode(&self, session_id: SessionId) -> bool {
         self.session_collaboration_mode(session_id).await
-            == Some(devo_protocol::CollaborationMode::Plan)
+            == Some(infinitecode_protocol::CollaborationMode::Plan)
     }
 }
 
@@ -115,7 +115,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     fn goal_with_budget(max_tokens: i64) -> crate::goal::Goal {
-        crate::goal::Goal::from_create_params(devo_protocol::GoalCreateParams {
+        crate::goal::Goal::from_create_params(infinitecode_protocol::GoalCreateParams {
             session_id: SessionId::new(),
             objective: "finish accounting".to_string(),
             token_budget: Some(max_tokens),

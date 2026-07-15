@@ -1,11 +1,11 @@
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@devo/ui/components/hover-card"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@infinitecode/ui/components/hover-card"
 import {
 	optionMenuContentClass,
 	optionMenuItemClass,
 	optionMenuSeparatorClass,
-} from "@devo/ui/components/option-menu-styles"
-import { Separator } from "@devo/ui/components/separator"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/option-menu-styles"
+import { Separator } from "@infinitecode/ui/components/separator"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { useCallback, useState } from "react"
 import {

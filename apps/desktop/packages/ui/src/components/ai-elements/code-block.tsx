@@ -1,14 +1,14 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@devo/ui/components/select"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/select"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { CheckIcon, CopyIcon } from "lucide-react"
 import type { ComponentProps, CSSProperties, HTMLAttributes } from "react"
 import {

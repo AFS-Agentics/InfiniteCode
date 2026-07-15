@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use devo_core::TurnId;
-use devo_protocol::ApprovalDecisionValue;
-use devo_protocol::SessionId;
+use infinitecode_core::TurnId;
+use infinitecode_protocol::ApprovalDecisionValue;
+use infinitecode_protocol::SessionId;
 use tokio::sync::Mutex;
 use tokio::sync::oneshot;
 

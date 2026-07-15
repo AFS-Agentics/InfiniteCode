@@ -56,7 +56,7 @@ The resume hint has two distinct visual roles: explanatory text that sets contex
 
 **Decision**: The resume line uses:
 - **dimmed** text for `To continue this session, run` (ANSI `SGR 2`)
-- **bright white** for the `devo resume <session-id>` command (ANSI `SGR 97`)
+- **bright white** for the `infinitecode resume <session-id>` command (ANSI `SGR 97`)
 
 The bright white color for the command draws the eye to the actionable part. The dimmed prefix provides context without competing visually.
 
@@ -103,7 +103,7 @@ Token usage: total=1,889,658 input=111,103 (+ 1,758,464 cached) output=20,091
 The session resume line is printed on a single line after the token usage line (when present):
 
 ```
-To continue this session, run devo resume 019e3b7c-b19c-7f93-bd7a-de19f460dfa9
+To continue this session, run infinitecode resume 019e3b7c-b19c-7f93-bd7a-de19f460dfa9
 ```
 
 **Format spec**:
@@ -112,7 +112,7 @@ To continue this session, run devo resume 019e3b7c-b19c-7f93-bd7a-de19f460dfa9
 |-----------|---------|-------|
 | Instructional prefix | `To continue this session, run` | dimmed |
 | Space separator | ` ` | default |
-| Resume command | `devo resume <session-id>` | bright white |
+| Resume command | `infinitecode resume <session-id>` | bright white |
 
 **Suppression**: The resume line is suppressed when `session_id` is `None` (no session was created) or when `turn_count` is zero (session was created and immediately discarded without use).
 
@@ -122,7 +122,7 @@ When the user completes work with multiple turns filled with model calls:
 
 ```
 Token usage: total=1,889,658 input=111,103 (+ 1,758,464 cached) output=20,091
-To continue this session, run devo resume 019e3b7c-b19c-7f93-bd7a-de19f460dfa9
+To continue this session, run infinitecode resume 019e3b7c-b19c-7f93-bd7a-de19f460dfa9
 ```
 
 When the user launches and immediately exits without sending any message:
@@ -135,7 +135,7 @@ When the user completes work with no cached tokens:
 
 ```
 Token usage: total=5,200 input=3,100 output=2,100
-To continue this session, run devo resume 019e3b7c-b19c-7f93-bd7a-de19f460dfa9
+To continue this session, run infinitecode resume 019e3b7c-b19c-7f93-bd7a-de19f460dfa9
 ```
 
 ## Data Contract
@@ -195,7 +195,7 @@ The color palette is chosen to be visually distinct on both light and dark termi
 | `1;33` / `33` | Bold/Normal Yellow | `cached` value and label | Cache benefit: yellow suggests optimization / savings |
 | `1;35` | Bold Magenta | `output` | Output: magenta is visually distinct from input green |
 | `2` | Dim | `To continue this session, run` | Instructional text: dimmed to de-emphasize |
-| `97` | Bright White | `devo resume <id>` | Command: bright white draws attention to the actionable string |
+| `97` | Bright White | `infinitecode resume <id>` | Command: bright white draws attention to the actionable string |
 
 These codes are standard ANSI SGR sequences compatible with all modern terminal emulators. No 24-bit or 256-color codes are used, ensuring compatibility with basic terminal environments.
 
@@ -205,12 +205,12 @@ The `exit_messages` function is called after `run_agent()` returns, in every CLI
 
 | CLI path | Calls exit_messages? |
 |----------|---------------------|
-| `devo` (no subcommand, new session) | Yes |
-| `devo --onboard` | Yes |
-| `devo resume <id>` | Yes |
-| `devo prompt "..."` | No (non-interactive) |
-| `devo doctor` | No (diagnostic) |
-| `devo server` | No (daemon) |
+| `infinitecode` (no subcommand, new session) | Yes |
+| `infinitecode --onboard` | Yes |
+| `infinitecode resume <id>` | Yes |
+| `infinitecode prompt "..."` | No (non-interactive) |
+| `infinitecode doctor` | No (diagnostic) |
+| `infinitecode server` | No (daemon) |
 
 ## Traceability
 

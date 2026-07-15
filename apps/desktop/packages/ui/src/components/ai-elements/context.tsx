@@ -1,9 +1,9 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@devo/ui/components/hover-card"
-import { Progress } from "@devo/ui/components/progress"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@infinitecode/ui/components/hover-card"
+import { Progress } from "@infinitecode/ui/components/progress"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { LanguageModelUsage } from "ai"
 import type { ComponentProps } from "react"
 import { createContext, useContext, useMemo } from "react"

@@ -51,15 +51,15 @@ describe("desktop chrome CSS", () => {
 			":root:not(.dark)",
 		);
 
-		expect(lightDeclarations["--devo-chrome-background"]).toBe("#f5f5f5");
-		expect(lightDeclarations["--devo-transcript-background"]).toBe(
+		expect(lightDeclarations["--infinitecode-chrome-background"]).toBe("#f5f5f5");
+		expect(lightDeclarations["--infinitecode-transcript-background"]).toBe(
 			"var(--background)",
 		);
 		expect(contentAreaDeclarations).toEqual({
-			background: "var(--devo-transcript-background)",
+			background: "var(--infinitecode-transcript-background)",
 		});
 		expect(lightModeDeclarations).toEqual({
-			"--sidebar": "var(--devo-chrome-background)",
+			"--sidebar": "var(--infinitecode-chrome-background)",
 		});
 		expect(contentAreaDeclarations.border).toBeUndefined();
 	});
@@ -68,14 +68,14 @@ describe("desktop chrome CSS", () => {
 		const css = await readFile(cssPath, "utf8");
 		const darkDeclarations = declarationsForSelector(css, ":root.dark");
 
-		expect(darkDeclarations["--devo-chrome-background"]).toBe(
+		expect(darkDeclarations["--infinitecode-chrome-background"]).toBe(
 			"color-mix( in srgb, var(--background) 92%, var(--foreground) 8% )",
 		);
-		expect(darkDeclarations["--devo-transcript-background"]).toBe(
+		expect(darkDeclarations["--infinitecode-transcript-background"]).toBe(
 			"var(--background)",
 		);
 		expect(darkDeclarations["--sidebar"]).toBe(
-			"var(--devo-chrome-background)",
+			"var(--infinitecode-chrome-background)",
 		);
 	});
 
@@ -91,11 +91,11 @@ describe("desktop chrome CSS", () => {
 		).toEqual([
 			{
 				background:
-					"color-mix( in srgb, var(--devo-transcript-background) var(--glass-content), transparent )",
+					"color-mix( in srgb, var(--infinitecode-transcript-background) var(--glass-content), transparent )",
 			},
 			{
 				background:
-					"color-mix( in srgb, var(--devo-transcript-background) var(--glass-content), transparent )",
+					"color-mix( in srgb, var(--infinitecode-transcript-background) var(--glass-content), transparent )",
 			},
 		]);
 	});
@@ -141,9 +141,9 @@ describe("desktop chrome CSS", () => {
 		);
 
 		expect(lightDeclarations).toEqual({
-			"--devo-titlebar-height": "40px",
-			"--devo-windows-focus-chrome-bg": "var(--devo-chrome-background)",
-			"--devo-windows-unfocused-chrome-bg": "var(--devo-chrome-background)",
+			"--infinitecode-titlebar-height": "40px",
+			"--infinitecode-windows-focus-chrome-bg": "var(--infinitecode-chrome-background)",
+			"--infinitecode-windows-unfocused-chrome-bg": "var(--infinitecode-chrome-background)",
 		});
 		expect(darkDeclarations).toEqual({});
 	});
@@ -164,10 +164,10 @@ describe("desktop chrome CSS", () => {
 		);
 
 		expect(sidebarInsetDeclarations.background).toBe(
-			"var(--devo-windows-chrome-bg) !important",
+			"var(--infinitecode-windows-chrome-bg) !important",
 		);
 		expect(contentAreaDeclarations).toEqual({
-			background: "var(--devo-transcript-background)",
+			background: "var(--infinitecode-transcript-background)",
 		});
 		expect(windowsContentAreaDeclarations).toEqual({});
 	});
@@ -184,10 +184,10 @@ describe("desktop chrome CSS", () => {
 		);
 
 		expect(titlebarDeclarations["background-color"]).toBe(
-			"var(--devo-windows-chrome-bg)",
+			"var(--infinitecode-windows-chrome-bg)",
 		);
 		expect(sidebarInsetDeclarations["background-color"]).toBe(
-			"var(--devo-windows-chrome-bg) !important",
+			"var(--infinitecode-windows-chrome-bg) !important",
 		);
 		expect(css).not.toContain("data-opening-route");
 	});

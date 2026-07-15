@@ -32,7 +32,7 @@ impl ServerRuntime {
 
     pub(crate) async fn persist_turn_line_deduped(
         self: &Arc<Self>,
-        session_id: devo_core::SessionId,
+        session_id: infinitecode_core::SessionId,
         turn: &crate::TurnMetadata,
     ) -> anyhow::Result<()> {
         let handle = self
@@ -63,7 +63,7 @@ impl ServerRuntime {
                 state.session_id(),
                 turn.turn_id,
                 crate::ItemKind::UserMessage,
-                devo_core::TurnItem::UserMessage(devo_core::TextItem {
+                infinitecode_core::TurnItem::UserMessage(infinitecode_core::TextItem {
                     text: display_input.to_string(),
                 }),
                 serde_json::json!({ "title": "You", "text": display_input }),
@@ -75,7 +75,7 @@ impl ServerRuntime {
     pub(in crate::runtime) fn tool_registry_for_actor_state(
         &self,
         state: &SessionActorState,
-    ) -> Arc<devo_core::tools::ToolRegistry> {
+    ) -> Arc<infinitecode_core::tools::ToolRegistry> {
         state
             .tool_registry
             .clone()

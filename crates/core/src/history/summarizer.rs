@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use devo_protocol::{Model, ModelRequest, RequestMessage, ResponseContent, SamplingControls};
-use devo_provider::ModelProviderSDK;
+use infinitecode_protocol::{Model, ModelRequest, RequestMessage, ResponseContent, SamplingControls};
+use infinitecode_provider::ModelProviderSDK;
 use tracing::debug;
 
 use super::compaction::{CompactionError, HistorySummarizer};
@@ -71,7 +71,7 @@ fn should_keep_summary_line(line: &str) -> bool {
 impl HistorySummarizer for DefaultHistorySummarizer {
     async fn summarize(&self, messages: Vec<RequestMessage>) -> Result<String, CompactionError> {
         let request = ModelRequest {
-            model_slug: devo_protocol::ModelProfileKey::CatalogSlug(self.model_slug.clone()),
+            model_slug: infinitecode_protocol::ModelProfileKey::CatalogSlug(self.model_slug.clone()),
             model: self.request_model.clone(),
             system: None,
             messages,

@@ -9,9 +9,9 @@ use ratatui::style::Stylize;
 use ratatui::text::Line;
 use ratatui::text::Span;
 
-use devo_core::ItemId;
-use devo_protocol::CollaborationMode;
-use devo_protocol::InputItem;
+use infinitecode_core::ItemId;
+use infinitecode_protocol::CollaborationMode;
+use infinitecode_protocol::InputItem;
 
 use crate::app_command::AppCommand;
 use crate::app_event::AppEvent;
@@ -74,7 +74,7 @@ impl ChatWidget {
 
     pub(super) fn set_default_placeholder(&mut self) {
         self.bottom_pane
-            .set_placeholder_text("Ask Devo".to_string());
+            .set_placeholder_text("Ask InfiniteCode".to_string());
     }
 
     pub(super) fn on_plan_updated(&mut self, explanation: Option<String>, steps: Vec<PlanStep>) {

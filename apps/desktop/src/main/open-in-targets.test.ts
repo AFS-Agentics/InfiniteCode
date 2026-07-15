@@ -162,7 +162,7 @@ describe("open-in-targets preferences", () => {
 
 	test("detects Windows VS Code from uninstall registry install location", async () => {
 		setPlatform("win32")
-		const installDir = mkdtempSync(join(tmpdir(), "devo-vscode-"))
+		const installDir = mkdtempSync(join(tmpdir(), "infinitecode-vscode-"))
 		const codePath = join(installDir, "Code.exe")
 		writeFileSync(codePath, "")
 		try {

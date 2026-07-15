@@ -1,13 +1,13 @@
 "use client"
 
-import { Avatar, AvatarFallback } from "@devo/ui/components/avatar"
-import { Button } from "@devo/ui/components/button"
+import { Avatar, AvatarFallback } from "@infinitecode/ui/components/avatar"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
-} from "@devo/ui/components/collapsible"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/collapsible"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { CheckIcon, CopyIcon, FileIcon, GitCommitIcon, MinusIcon, PlusIcon } from "lucide-react"
 import type { ComponentProps, HTMLAttributes } from "react"
 import { useCallback, useEffect, useRef, useState } from "react"

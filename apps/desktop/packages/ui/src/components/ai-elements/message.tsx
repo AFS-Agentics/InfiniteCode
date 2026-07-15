@@ -1,14 +1,14 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { ButtonGroup, ButtonGroupText } from "@devo/ui/components/button-group"
+import { Button } from "@infinitecode/ui/components/button"
+import { ButtonGroup, ButtonGroupText } from "@infinitecode/ui/components/button-group"
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipProvider,
 	TooltipTrigger,
-} from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { cjk } from "@streamdown/cjk"
 import { code } from "@streamdown/code"
 import { math } from "@streamdown/math"
@@ -302,7 +302,7 @@ function TranscriptMarkdownHeading({
 
 type TranscriptMarkdownRuleProps = ComponentProps<"hr"> & { node?: unknown }
 
-function TranscriptMarkdownRule({ node: _node, ..._props }: TranscriptMarkdownRuleProps) {
+function TranscriptMarkdownRule(_props: TranscriptMarkdownRuleProps) {
 	return null
 }
 
@@ -323,7 +323,7 @@ export const MessageResponse = memo(
 	({ className, ...props }: MessageResponseProps) => (
 		<Streamdown
 			className={cn(
-				"devo-message-response size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+				"infinitecode-message-response size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
 				className,
 			)}
 			components={transcriptMarkdownComponents}

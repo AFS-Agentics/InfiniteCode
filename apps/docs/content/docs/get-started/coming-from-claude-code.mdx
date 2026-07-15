@@ -1,19 +1,19 @@
 ---
 title: Coming From Claude Code
-description: Map familiar Claude Code workflows to Devo.
+description: Map familiar Claude Code workflows to InfiniteCode.
 ---
 
-This page maps Claude Code-style workflows to Devo. It keeps the comparison to
-workflow surfaces so you can get started without learning every Devo concept
+This page maps Claude Code-style workflows to InfiniteCode. It keeps the comparison to
+workflow surfaces so you can get started without learning every InfiniteCode concept
 first.
 
 ## Main Difference
 
-Devo is model-neutral. Instead of being tied to one hosted model family, Devo
+InfiniteCode is model-neutral. Instead of being tied to one hosted model family, InfiniteCode
 uses provider records and model bindings:
 
 - provider: endpoint, credential, and supported wire API;
-- model binding: local Devo model id plus provider model name;
+- model binding: local InfiniteCode model id plus provider model name;
 - active model: the binding selected by config or `/model`.
 
 This means your first important setup choice is provider configuration. For many
@@ -22,10 +22,10 @@ through the Anthropic-compatible provider method.
 
 ## First Setup
 
-Install Devo, then run:
+Install InfiniteCode, then run:
 
 ```bash
-devo onboard
+infinitecode onboard
 ```
 
 Onboarding collects provider details, stores credentials, and creates model
@@ -33,10 +33,10 @@ bindings. After setup:
 
 ```bash
 cd /path/to/project
-devo
+infinitecode
 ```
 
-Give Devo a small read-only first task before asking it to edit code:
+Give InfiniteCode a small read-only first task before asking it to edit code:
 
 ```text
 Explain this repository's structure. Do not edit files yet.
@@ -44,9 +44,9 @@ Explain this repository's structure. Do not edit files yet.
 
 ## Workflow Map
 
-| Familiar workflow | Devo surface |
+| Familiar workflow | InfiniteCode surface |
 | --- | --- |
-| Open an agent in the current repository | `devo` |
+| Open an agent in the current repository | `infinitecode` |
 | Choose a model | `/model` |
 | Set a task objective | `/goal <objective>` |
 | Ask a side question | `/btw <question>` |
@@ -54,15 +54,15 @@ Explain this repository's structure. Do not edit files yet.
 | Start a planning pass | plan mode |
 | Search for files while prompting | `@` |
 | Run shell commands from the composer | `!` |
-| Resume previous work | `devo resume` or `/resume` |
+| Resume previous work | `infinitecode resume` or `/resume` |
 | List MCP servers | `/mcp` |
 | List skills | `/skills` |
 
-See [Using Devo](../using-devo) for the TUI workflow pages.
+See [Using InfiniteCode](../using-infinitecode) for the TUI workflow pages.
 
 ## Permissions
 
-Devo surfaces permission decisions in the TUI. Use:
+InfiniteCode surfaces permission decisions in the TUI. Use:
 
 ```text
 /permissions
@@ -72,11 +72,11 @@ The exact approval flow depends on the selected preset and the requested action.
 For a new repository, keep approvals visible until the project command patterns
 are familiar.
 
-See [Permissions](../using-devo/permissions).
+See [Permissions](../using-infinitecode/permissions).
 
 ## Planning And Side Questions
 
-Use plan mode when you want Devo to reason about the approach before editing.
+Use plan mode when you want InfiniteCode to reason about the approach before editing.
 Plan mode is useful for tasks with uncertain scope, risky migrations, or
 ambiguous requirements.
 
@@ -91,14 +91,14 @@ main transcript.
 
 ## Config And Portability
 
-Devo config is file-based. User-level config lives under `DEVO_HOME`, and a
+InfiniteCode config is file-based. User-level config lives under `INFINITECODE_HOME`, and a
 workspace can add repository-local config when needed.
 
-Default `DEVO_HOME` paths:
+Default `INFINITECODE_HOME` paths:
 
 | Platform | Default |
 | --- | --- |
-| macOS/Linux | `~/.devo` |
-| Windows | `C:/Users/your-username/.devo` |
+| macOS/Linux | `~/.infinitecode` |
+| Windows | `C:/Users/your-username/.infinitecode` |
 
 Read [Config Basics](../configuration/config-basics) before hand-editing config.

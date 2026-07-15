@@ -1,4 +1,4 @@
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Dialog,
 	DialogContent,
@@ -6,7 +6,7 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from "@devo/ui/components/dialog"
+} from "@infinitecode/ui/components/dialog"
 import {
 	SearchableListPopover,
 	SearchableListPopoverContent,
@@ -17,7 +17,7 @@ import {
 	SearchableListPopoverSearch,
 	SearchableListPopoverTrigger,
 	useSearchableListPopoverSearch,
-} from "@devo/ui/components/searchable-list-popover"
+} from "@infinitecode/ui/components/searchable-list-popover"
 import {
 	AlertTriangleIcon,
 	CheckIcon,

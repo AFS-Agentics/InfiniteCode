@@ -1,9 +1,9 @@
 ---
 title: Code Search
-description: 理解 Devo 的本地语义代码搜索。
+description: 理解 InfiniteCode 的本地语义代码搜索。
 ---
 
-`code_search` 是 Devo 内置的只读 retrieval tool，用于按语义、identifier 和相关位置查找代码。
+`code_search` 是 InfiniteCode 内置的只读 retrieval tool，用于按语义、identifier 和相关位置查找代码。
 
 它不同于 shell search。Shell search 是精确文本搜索。Code search 会构建 workspace 本地索引，并用 hybrid semantic 和 sparse matching 对 chunks 排序。
 
@@ -20,7 +20,7 @@ Code-search engine 处理：
 - warm in-memory indexes；
 - disk cache refresh。
 
-它只读取 workspace。写入只发生在 Devo cache directory 下的 cache files。
+它只读取 workspace。写入只发生在 InfiniteCode cache directory 下的 cache files。
 
 ## Operations
 
@@ -44,11 +44,11 @@ Search requests 可以按这些条件限定：
 
 Production code search 使用本地 model2vec embedding provider 和 `minishlab/potion-code-16M` 模型。模型会在第一次 embedding call 时 lazy load。
 
-如果模型文件缺失，Devo 会在首次使用时尝试获取它们。离线环境中，应先预置 local model cache，再依赖 `code_search`；否则 tool 会报告可恢复的 model-unavailable configuration error。
+如果模型文件缺失，InfiniteCode 会在首次使用时尝试获取它们。离线环境中，应先预置 local model cache，再依赖 `code_search`；否则 tool 会报告可恢复的 model-unavailable configuration error。
 
 ## Cache 行为
 
-Devo 会为每个 workspace root、content filter 和 embedding model identity 保留一个 in-memory index。它也保存 disk cache metadata 和 embedding rows，避免重复 query 总是重建整个 index。
+InfiniteCode 会为每个 workspace root、content filter 和 embedding model identity 保留一个 in-memory index。它也保存 disk cache metadata 和 embedding rows，避免重复 query 总是重建整个 index。
 
 Service 优先 correctness：
 
@@ -74,4 +74,4 @@ Service 优先 correctness：
 - 需要完整 match 列表；
 - 需要 command-line flags 或 file-glob control。
 
-Devo 可能在同一任务中同时使用两者：shell search 用于精确确认，code search 用于更广泛导航。
+InfiniteCode 可能在同一任务中同时使用两者：shell search 用于精确确认，code search 用于更广泛导航。

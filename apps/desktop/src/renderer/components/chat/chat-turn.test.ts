@@ -34,7 +34,7 @@ const eventProcessorSource = readFileSync(
   "utf8",
 );
 const clientSource = readFileSync(
-  new URL("../../../../packages/devo-ai-sdk/src/v2/client.ts", import.meta.url),
+  new URL("../../../../packages/infinitecode-ai-sdk/src/v2/client.ts", import.meta.url),
   "utf8",
 );
 const sharedReasoningSource = readFileSync(

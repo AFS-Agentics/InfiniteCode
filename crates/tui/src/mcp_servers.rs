@@ -1,8 +1,8 @@
 //! Render current MCP server configuration into transcript-friendly markdown.
 
-use devo_core::McpConfig;
-use devo_core::McpStartupPolicy;
-use devo_core::McpTransportConfig;
+use infinitecode_core::McpConfig;
+use infinitecode_core::McpStartupPolicy;
+use infinitecode_core::McpTransportConfig;
 
 pub(crate) fn render_mcp_servers_markdown(config: &McpConfig) -> String {
     if config.servers.is_empty() {
@@ -52,8 +52,8 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use devo_core::McpServerId;
-    use devo_core::McpServerRecord;
+    use infinitecode_core::McpServerId;
+    use infinitecode_core::McpServerRecord;
 
     #[test]
     fn render_mcp_servers_markdown_handles_empty_config() {

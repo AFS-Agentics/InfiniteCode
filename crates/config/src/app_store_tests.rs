@@ -11,7 +11,7 @@ fn unique_temp_dir(label: &str) -> std::path::PathBuf {
         .expect("system time after epoch")
         .as_nanos();
     std::env::temp_dir().join(format!(
-        "devo-config-{label}-{}-{nonce}",
+        "infinitecode-config-{label}-{}-{nonce}",
         std::process::id()
     ))
 }
@@ -19,7 +19,7 @@ fn unique_temp_dir(label: &str) -> std::path::PathBuf {
 #[test]
 fn model_config_option_writes_model_default_projection() {
     let root = unique_temp_dir("model-default");
-    let home = root.join(".devo");
+    let home = root.join(".infinitecode");
     fs::create_dir_all(&home).expect("create config dir");
     fs::write(
         home.join(APP_CONFIG_FILE_NAME),
@@ -83,7 +83,7 @@ enabled = true
 #[test]
 fn model_config_option_writes_reasoning_effort_selection() {
     let root = unique_temp_dir("reasoning-default");
-    let home = root.join(".devo");
+    let home = root.join(".infinitecode");
     fs::create_dir_all(&home).expect("create config dir");
     fs::write(
         home.join(APP_CONFIG_FILE_NAME),

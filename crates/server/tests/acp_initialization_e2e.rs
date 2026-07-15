@@ -22,17 +22,17 @@ async fn stdio_acp_initialize_negotiates_capabilities_and_allows_session_setup()
     write_test_config(&home_dir, &["stdio://"])?;
     let test_cwd = home_dir.path().to_string_lossy().into_owned();
 
-    let mut command = devo_command()?;
+    let mut command = infinitecode_command()?;
     let mut child = command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", home_dir.path().join(".devo"))
+        .env("INFINITECODE_HOME", home_dir.path().join(".infinitecode"))
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn devo child process in server mode")?;
+        .context("spawn infinitecode child process in server mode")?;
 
     let mut stdin = child.stdin.take().context("capture child stdin")?;
     let stdout = child.stdout.take().context("capture child stdout")?;
@@ -112,11 +112,11 @@ async fn stdio_acp_initialize_negotiates_capabilities_and_allows_session_setup()
     assert!(auth_methods.is_null() || auth_methods == &serde_json::json!([]));
     assert_eq!(
         initialize_response["result"]["agentInfo"]["name"],
-        serde_json::json!("devo-server")
+        serde_json::json!("infinitecode-server")
     );
     assert_eq!(
         initialize_response["result"]["agentInfo"]["title"],
-        serde_json::json!("Devo")
+        serde_json::json!("InfiniteCode")
     );
     assert!(
         initialize_response["result"]["agentInfo"]["version"]
@@ -177,17 +177,17 @@ logout = true
     )?;
     let test_cwd = home_dir.path().to_string_lossy().into_owned();
 
-    let mut command = devo_command()?;
+    let mut command = infinitecode_command()?;
     let mut child = command
         .arg("server")
         .arg("--transport")
         .arg("stdio")
-        .env("DEVO_HOME", home_dir.path().join(".devo"))
+        .env("INFINITECODE_HOME", home_dir.path().join(".infinitecode"))
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .context("spawn devo child process in server mode")?;
+        .context("spawn infinitecode child process in server mode")?;
 
     let mut stdin = child.stdin.take().context("capture child stdin")?;
     let stdout = child.stdout.take().context("capture child stdout")?;
@@ -400,7 +400,7 @@ fn write_test_config(home_dir: &TempDir, listen: &[&str]) -> Result<()> {
 }
 
 fn write_test_config_with_extra(home_dir: &TempDir, listen: &[&str], extra: &str) -> Result<()> {
-    let config_dir = home_dir.path().join(".devo");
+    let config_dir = home_dir.path().join(".infinitecode");
 
     std::fs::create_dir_all(&config_dir)?;
     let listen_entries = listen
@@ -507,14 +507,14 @@ async fn parse_stdio_json_line(
     })
 }
 
-fn devo_command() -> Result<Command> {
-    if let Some(binary_path) = std::env::var_os("CARGO_BIN_EXE_devo").map(PathBuf::from)
+fn infinitecode_command() -> Result<Command> {
+    if let Some(binary_path) = std::env::var_os("CARGO_BIN_EXE_infinitecode").map(PathBuf::from)
         && binary_path.is_file()
     {
         return Ok(Command::new(binary_path));
     }
 
-    let binary_path = devo_binary_path()?;
+    let binary_path = infinitecode_binary_path()?;
     if binary_path.is_file() {
         return Ok(Command::new(binary_path));
     }
@@ -528,16 +528,16 @@ fn devo_command() -> Result<Command> {
         .arg("run")
         .arg("--quiet")
         .arg("-p")
-        .arg("devo-cli")
+        .arg("infinitecode-cli")
         .arg("--bin")
-        .arg("devo")
+        .arg("infinitecode")
         .arg("--");
     Ok(command)
 }
 
-fn devo_binary_path() -> Result<PathBuf> {
+fn infinitecode_binary_path() -> Result<PathBuf> {
     let workspace = workspace_root()?;
-    Ok(target_debug_binary(&workspace, "devo"))
+    Ok(target_debug_binary(&workspace, "infinitecode"))
 }
 
 fn workspace_root() -> Result<PathBuf> {

@@ -1,11 +1,11 @@
 /**
  * Onboarding Step 2: Environment Check.
  *
- * Verifies the bundled Devo runtime used by the private stdio ACP child process.
+ * Verifies the bundled InfiniteCode runtime used by the private stdio ACP child process.
  */
 
-import { Button } from "@devo/ui/components/button"
-import { Spinner } from "@devo/ui/components/spinner"
+import { Button } from "@infinitecode/ui/components/button"
+import { Spinner } from "@infinitecode/ui/components/spinner"
 import {
 	AlertCircleIcon,
 	ArrowRightIcon,
@@ -34,7 +34,7 @@ export function EnvironmentCheckStep({ onComplete }: EnvironmentCheckStepProps) 
 		{ id: "locate", label: "Locating bundled InfiniteCode runtime", status: "pending" },
 		{ id: "version", label: "Checking version compatibility", status: "pending" },
 	])
-	const [devoResult, setDevoResult] = useState<InfiniteCodeCheckResult | null>(null)
+	const [infinitecodeResult, setInfiniteCodeResult] = useState<InfiniteCodeCheckResult | null>(null)
 	const [allDone, setAllDone] = useState(false)
 	const hasRun = useRef(false)
 	const isElectron = typeof window !== "undefined" && "infinitecode" in window
@@ -46,7 +46,7 @@ export function EnvironmentCheckStep({ onComplete }: EnvironmentCheckStepProps) 
 	const runChecks = useCallback(async () => {
 		if (!isElectron) return
 		setAllDone(false)
-		setDevoResult(null)
+		setInfiniteCodeResult(null)
 		setChecks([
 			{ id: "locate", label: "Locating bundled InfiniteCode runtime", status: "running" },
 			{ id: "version", label: "Checking version compatibility", status: "pending" },
@@ -54,7 +54,7 @@ export function EnvironmentCheckStep({ onComplete }: EnvironmentCheckStepProps) 
 
 		try {
 			const result = await window.infinitecode.onboarding.checkInfiniteCode()
-			setDevoResult(result)
+			setInfiniteCodeResult(result)
 
 			if (!result.installed) {
 				updateCheck("locate", {
@@ -155,7 +155,7 @@ export function EnvironmentCheckStep({ onComplete }: EnvironmentCheckStepProps) 
 					{allDone && (
 						<Button
 							size="default"
-							onClick={() => onComplete(devoResult?.version ?? null)}
+							onClick={() => onComplete(infinitecodeResult?.version ?? null)}
 							className="gap-2"
 						>
 							Continue

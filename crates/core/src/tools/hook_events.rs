@@ -6,7 +6,7 @@ use crate::hooks::HookRuntimeContext;
 use crate::tools::ToolCall;
 use crate::tools::ToolCallResult;
 use crate::tools::ToolContent;
-use devo_config::HookEvent;
+use infinitecode_config::HookEvent;
 
 pub(super) async fn pre_tool_use_block_reason(
     hooks: Option<&HookRuntimeContext>,

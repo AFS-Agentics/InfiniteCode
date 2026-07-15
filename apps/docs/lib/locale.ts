@@ -1,4 +1,4 @@
-export const localeCookieName = "devo-locale";
+export const localeCookieName = "infinitecode-locale";
 
 export const supportedLocales = ["en", "zh"] as const;
 

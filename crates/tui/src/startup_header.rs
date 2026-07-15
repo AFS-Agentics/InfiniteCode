@@ -16,7 +16,7 @@ pub(crate) const STARTUP_HEADER_ANIMATION_INTERVAL: Duration = Duration::from_mi
 const STARTUP_HEADER_MAX_TOTAL_WIDTH: usize = 62;
 const STARTUP_HEADER_MIN_FULL_WIDTH: usize = 44;
 const DIRECTORY_LABEL: &str = "Workspace  ";
-const DEVO_LOGO: [&str; 6] = [
+const INFINITECODE_LOGO: [&str; 6] = [
     "██████╗  ███████╗██╗   ██╗ ██████╗",
     "██╔══██╗ ██╔════╝██║   ██║██╔═══██╗",
     "██║  ██║ █████╗  ██║   ██║██║   ██║",
@@ -53,7 +53,7 @@ pub(crate) fn build_startup_header(data: StartupHeaderData<'_>, width: u16) -> V
     }
 }
 
-pub(crate) fn build_devo_logo_intro(width: u16, accent_color: Color) -> Vec<Line<'static>> {
+pub(crate) fn build_infinitecode_logo_intro(width: u16, accent_color: Color) -> Vec<Line<'static>> {
     let available_width = usize::from(width);
     if available_width == 0 {
         return Vec::new();
@@ -66,7 +66,7 @@ pub(crate) fn build_devo_logo_intro(width: u16, accent_color: Color) -> Vec<Line
     }
 
     let logo_style = Style::default().fg(accent_color).bold();
-    DEVO_LOGO
+    INFINITECODE_LOGO
         .iter()
         .map(|logo_line| {
             Line::from(Span::styled(
@@ -85,7 +85,7 @@ fn build_full_header(data: StartupHeaderData<'_>, inner_width: usize) -> Vec<Lin
     let mut lines = Vec::with_capacity(10);
 
     lines.push(border_line('┏', '━', '┓', inner_width, border_style));
-    for (idx, logo_line) in DEVO_LOGO.iter().enumerate() {
+    for (idx, logo_line) in INFINITECODE_LOGO.iter().enumerate() {
         lines.push(content_line(
             build_logo_row(
                 logo_line,
@@ -331,7 +331,7 @@ mod tests {
             80,
             "gpt-5-high",
             "medium",
-            Path::new("/Users/tester/Desktop/devo"),
+            Path::new("/Users/tester/Desktop/infinitecode"),
         );
         assert_eq!(10, rows.len());
         assert!(rows[0].starts_with('┏'));
@@ -349,10 +349,10 @@ mod tests {
             40,
             "gpt-5-high",
             "medium",
-            Path::new("/Users/tester/Desktop/devo"),
+            Path::new("/Users/tester/Desktop/infinitecode"),
         );
         assert_eq!(5, rows.len());
-        assert!(rows[1].contains("Devo v0.1.3"));
+        assert!(rows[1].contains("InfiniteCode v0.1.3"));
         assert!(rows[3].contains('/'));
     }
 
@@ -362,7 +362,7 @@ mod tests {
             60,
             "gpt-5-ultra-long-model-name-with-many-suffixes",
             "medium",
-            Path::new("/Users/tester/Desktop/projects/devo/some/really/long/path"),
+            Path::new("/Users/tester/Desktop/projects/infinitecode/some/really/long/path"),
         );
         assert!(rows[8].contains('…'));
         assert!(rows[8].contains("long/path"));
@@ -378,7 +378,7 @@ mod tests {
             60,
             "gpt-5-high",
             "",
-            Path::new(r"C:\Users\tester\Desktop\devo\long\workspace"),
+            Path::new(r"C:\Users\tester\Desktop\infinitecode\long\workspace"),
         );
         assert!(rows[8].contains("workspace"));
         assert!(
@@ -394,7 +394,7 @@ mod tests {
                 width,
                 "gpt-5-high",
                 "medium",
-                Path::new("/Users/tester/Desktop/devo"),
+                Path::new("/Users/tester/Desktop/infinitecode"),
             );
             assert!(!rows.is_empty());
             assert!(

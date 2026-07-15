@@ -90,9 +90,9 @@ User and project scopes follow configuration precedence from `L2-DES-APP-002`. W
 
 Discovery roots are configuration-driven. Recommended default roots:
 
-- User native root: `~/.devo/skills/`
+- User native root: `~/.infinitecode/skills/`
 - User interoperability root: `~/.agents/skills/`
-- Workspace native root: `<workspace>/.devo/skills/`
+- Workspace native root: `<workspace>/.infinitecode/skills/`
 - Workspace interoperability root: `<workspace>/.agents/skills/`
 - Plugin-provided skill directories from installed plugin metadata.
 

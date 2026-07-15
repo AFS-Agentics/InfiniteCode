@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use devo_protocol::{
+use infinitecode_protocol::{
     AgentInfo, AgentListParams, AgentMessageParams, AgentMessageResult, AwaitTaskParams,
     AwaitTaskResult, CancelTaskParams, CancelTaskResult, CloseAgentParams, CloseAgentResult,
     ListTasksParams, ListTasksResult, RequestUserInputArgs, RequestUserInputResponse,

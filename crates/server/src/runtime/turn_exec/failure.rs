@@ -1,26 +1,26 @@
-use devo_protocol::{TurnErrorPayload, TurnFailureReason};
-use devo_provider::error::ProviderError;
+use infinitecode_protocol::{TurnErrorPayload, TurnFailureReason};
+use infinitecode_provider::error::ProviderError;
 
 pub(super) fn turn_failure_reason_from_error(
-    error: &devo_core::AgentError,
+    error: &infinitecode_core::AgentError,
 ) -> Option<TurnFailureReason> {
     match error {
-        devo_core::AgentError::MaxTurnsExceeded(_) => Some(TurnFailureReason::MaxTurnRequests),
-        devo_core::AgentError::Provider(_)
-        | devo_core::AgentError::ContextTooLong
-        | devo_core::AgentError::Aborted => None,
+        infinitecode_core::AgentError::MaxTurnsExceeded(_) => Some(TurnFailureReason::MaxTurnRequests),
+        infinitecode_core::AgentError::Provider(_)
+        | infinitecode_core::AgentError::ContextTooLong
+        | infinitecode_core::AgentError::Aborted => None,
     }
 }
 
-pub(super) fn turn_error_payload_from_error(error: &devo_core::AgentError) -> TurnErrorPayload {
+pub(super) fn turn_error_payload_from_error(error: &infinitecode_core::AgentError) -> TurnErrorPayload {
     let code = match error {
-        devo_core::AgentError::Provider(source) => source
+        infinitecode_core::AgentError::Provider(source) => source
             .chain()
             .find_map(|cause| cause.downcast_ref::<ProviderError>())
             .map_or("PROVIDER_ERROR", ProviderError::error_code),
-        devo_core::AgentError::MaxTurnsExceeded(_) => "MAX_TURNS_EXCEEDED",
-        devo_core::AgentError::ContextTooLong => "CONTEXT_TOO_LONG",
-        devo_core::AgentError::Aborted => "ABORTED",
+        infinitecode_core::AgentError::MaxTurnsExceeded(_) => "MAX_TURNS_EXCEEDED",
+        infinitecode_core::AgentError::ContextTooLong => "CONTEXT_TOO_LONG",
+        infinitecode_core::AgentError::Aborted => "ABORTED",
     };
     TurnErrorPayload {
         code: code.to_string(),
@@ -36,7 +36,7 @@ mod tests {
 
     #[test]
     fn preserves_structured_provider_error_code() {
-        let error = devo_core::AgentError::Provider(anyhow::Error::new(
+        let error = infinitecode_core::AgentError::Provider(anyhow::Error::new(
             ProviderError::ProviderServerError {
                 message: "Internal server error".to_string(),
                 status_code: Some(500),

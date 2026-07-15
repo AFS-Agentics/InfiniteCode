@@ -1,15 +1,15 @@
 [package]
 edition.workspace = true
 license.workspace = true
-name = "devo-file-search"
+name = "infinitecode-file-search"
 version.workspace = true
 
 [[bin]]
-name = "devo-file-search"
+name = "infinitecode-file-search"
 path = "src/main.rs"
 
 [lib]
-name = "devo_file_search"
+name = "infinitecode_file_search"
 path = "src/lib.rs"
 
 [dependencies]

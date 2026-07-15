@@ -1,37 +1,37 @@
 pub mod contracts {
-    pub use devo_tools::contracts::*;
+    pub use infinitecode_tools::contracts::*;
 }
 
 pub(crate) mod client_terminal_shell;
 pub mod deferred_loading;
 pub mod errors {
-    pub use devo_tools::errors::*;
+    pub use infinitecode_tools::errors::*;
 }
 pub mod events {
-    pub use devo_tools::events::*;
+    pub use infinitecode_tools::events::*;
 }
 pub mod handler_kind {
-    pub use devo_tools::handler_kind::*;
+    pub use infinitecode_tools::handler_kind::*;
 }
 pub mod handlers;
 mod hook_events;
 pub mod invocation {
-    pub use devo_tools::invocation::*;
+    pub use infinitecode_tools::invocation::*;
 }
 pub mod json_schema {
-    pub use devo_tools::json_schema::*;
+    pub use infinitecode_tools::json_schema::*;
 }
 pub mod registry;
 pub mod registry_plan;
 pub mod router;
 pub mod tool_handler {
-    pub use devo_tools::tool_handler::*;
+    pub use infinitecode_tools::tool_handler::*;
 }
 pub mod tool_spec {
-    pub use devo_tools::tool_spec::*;
+    pub use infinitecode_tools::tool_spec::*;
 }
 pub mod tool_summary {
-    pub use devo_tools::tool_summary::*;
+    pub use infinitecode_tools::tool_summary::*;
 }
 pub mod unified_exec;
 
@@ -45,7 +45,7 @@ pub use contracts::{
     ToolProgress, ToolProgressSender, ToolResult, ToolResultContent, ToolTerminalStatus,
 };
 pub use deferred_loading::*;
-pub use devo_tools::{
+pub use infinitecode_tools::{
     AgentToolCoordinator, ClientFilesystem, ClientTerminal, ClientTerminalCreate,
     ClientTerminalCreateRequest, ClientTerminalEnv, ClientTerminalExitStatus, ClientTerminalOutput,
     ClientTerminalRequest, ClientTextFileRead, ClientTextFileWrite, FileReadFreshnessError,

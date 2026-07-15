@@ -1,6 +1,6 @@
-# devo-client
+# infinitecode-client
 
-`devo-client` contains client transports for talking to the Devo runtime server.
+`infinitecode-client` contains client transports for talking to the InfiniteCode runtime server.
 It exposes a stdio client that spawns a server process, and a WebSocket client
 that connects to an already-running server. Both transports send JSON-RPC
 request/notification messages and read responses/events from the same
@@ -24,7 +24,7 @@ connection.
 Start a WebSocket-only server with:
 
 ```sh
-devo server --transport websocket
+infinitecode server --transport websocket
 ```
 
 Configure explicit listeners with `server.listen = ["ws://127.0.0.1:3210"]`.

@@ -2,8 +2,8 @@
  * Settings tab for environment setup, migration management, and re-running onboarding.
  */
 
-import { Button } from "@devo/ui/components/button"
-import { Spinner } from "@devo/ui/components/spinner"
+import { Button } from "@infinitecode/ui/components/button"
+import { Spinner } from "@infinitecode/ui/components/spinner"
 import { useAtomValue, useSetAtom } from "jotai"
 import {
 	AlertCircleIcon,
@@ -27,7 +27,7 @@ const isElectron = typeof window !== "undefined" && "infinitecode" in window
 const PROVIDER_LABELS: Record<string, string> = {
 	"claude-code": "Claude Code",
 	cursor: "Cursor",
-	devo: "InfiniteCode",
+	infinitecode: "InfiniteCode",
 	opencode: "OpenCode",
 }
 
@@ -38,7 +38,7 @@ export function SetupSettings() {
 				<h2 className="text-xl font-semibold">Setup</h2>
 			</div>
 
-			<DevoStatusSection />
+			<InfiniteCodeStatusSection />
 			<MigrationSection />
 			<OnboardingSection />
 		</div>
@@ -46,10 +46,10 @@ export function SetupSettings() {
 }
 
 // ============================================================
-// Devo runtime status
+// InfiniteCode runtime status
 // ============================================================
 
-function DevoStatusSection() {
+function InfiniteCodeStatusSection() {
 	const [checking, setChecking] = useState(false)
 	const [result, setResult] = useState<InfiniteCodeCheckResult | null>(null)
 
@@ -210,7 +210,7 @@ function OnboardingSection() {
 			skippedSteps: [],
 			migrationPerformed: false,
 			migratedFrom: [],
-			devoVersion: null,
+			infinitecodeVersion: null,
 			providersConnected: 0,
 		})
 		// Relaunch the app to show onboarding fresh

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use devo_protocol::parse_command::ParsedCommand;
+use infinitecode_protocol::parse_command::ParsedCommand;
 
 pub(crate) fn exploration_actions_from_tool_input(
     tool_name: &str,

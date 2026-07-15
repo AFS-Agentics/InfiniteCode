@@ -3,7 +3,7 @@ title: Models and Providers
 description: Understand model definitions, providers, and model bindings.
 ---
 
-Devo separates model capability metadata from provider connection details. This
+InfiniteCode separates model capability metadata from provider connection details. This
 is what lets one model-facing experience work across OpenAI, Anthropic,
 DeepSeek, OpenRouter, local gateways, and other compatible providers.
 
@@ -19,11 +19,11 @@ Model profiles should stay pure. They should not contain API keys, provider
 URLs, or invocation methods.
 
 Provider vendors describe how to reach a service. Model bindings describe which
-provider and model name to use for a Devo model slug.
+provider and model name to use for a InfiniteCode model slug.
 
 ## Model Profile
 
-A model profile is the capability record Devo uses to render the UI and shape
+A model profile is the capability record InfiniteCode uses to render the UI and shape
 requests. It includes fields like:
 
 - stable model slug;
@@ -61,18 +61,18 @@ A model binding joins the model profile to a provider vendor. It answers:
 
 - Which provider serves this model?
 - What model name should be sent to that provider?
-- Which wire API should Devo use?
+- Which wire API should InfiniteCode use?
 - What display name should the UI show?
 - What default reasoning effort should be selected?
 
-For example, a DeepSeek binding can use a Devo model slug like
+For example, a DeepSeek binding can use a InfiniteCode model slug like
 `deepseek-v4-flash`, send the provider model name required by DeepSeek, and use
 the `anthropic_messages` wire API against DeepSeek's Anthropic-compatible base
 URL.
 
 ## Wire APIs
 
-Devo currently models these provider wire APIs:
+InfiniteCode currently models these provider wire APIs:
 
 | Wire API | Meaning |
 | --- | --- |
@@ -81,12 +81,12 @@ Devo currently models these provider wire APIs:
 | `anthropic_messages` | Anthropic-compatible Messages API requests. |
 
 Choose the wire API that matches the endpoint, not just the company name. For
-DeepSeek's official API, Devo recommends the Anthropic-compatible path because
+DeepSeek's official API, InfiniteCode recommends the Anthropic-compatible path because
 hosted `web_search` and `web_fetch` are available through that provider route.
 
 ## Resolution
 
-At startup and when a turn begins, Devo resolves an active model binding. The
+At startup and when a turn begins, InfiniteCode resolves an active model binding. The
 runtime combines:
 
 - the selected model slug;
@@ -95,10 +95,10 @@ runtime combines:
 - any session or turn override from `/model`;
 - the selected reasoning effort.
 
-The result is the concrete provider request Devo sends for that turn.
+The result is the concrete provider request InfiniteCode sends for that turn.
 
-If no provider is configured, Devo cannot run model requests and points you to:
+If no provider is configured, InfiniteCode cannot run model requests and points you to:
 
 ```bash
-devo onboard
+infinitecode onboard
 ```

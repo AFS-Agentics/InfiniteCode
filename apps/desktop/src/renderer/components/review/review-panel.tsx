@@ -10,7 +10,7 @@
  * 6. Stable memoized objects prevent @pierre/diffs re-parsing unchanged content
  * 7. Only the active theme (light/dark) is rendered, not both
  */
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { PatchDiff, useWorkerPool, WorkerPoolContextProvider } from "@pierre/diffs/react"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"

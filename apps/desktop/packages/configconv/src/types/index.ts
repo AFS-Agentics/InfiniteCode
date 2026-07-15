@@ -4,7 +4,7 @@ export type * from "./claude-code"
 export type * from "./conversion-result"
 export type * from "./cursor"
 export { determineCursorRuleMode } from "./cursor"
-export * from "./devo"
+export * from "./infinitecode"
 export type { MigrationItem, MigrationReport } from "./report"
 export {
 	createEmptyReport as createEmptyMigrationReport,

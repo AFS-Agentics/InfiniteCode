@@ -22,7 +22,7 @@ impl ServerRuntime {
         session_id: SessionId,
         turn_id: TurnId,
         permission_mode: PermissionMode,
-        permission_profile: devo_safety::RuntimePermissionProfile,
+        permission_profile: infinitecode_safety::RuntimePermissionProfile,
     ) -> PermissionChecker {
         let runtime = Arc::clone(self);
         PermissionChecker::new(move |request| {
@@ -47,7 +47,7 @@ impl ServerRuntime {
         session_id: SessionId,
         turn_id: TurnId,
         permission_mode: PermissionMode,
-        permission_profile: devo_safety::RuntimePermissionProfile,
+        permission_profile: infinitecode_safety::RuntimePermissionProfile,
         request: ToolPermissionRequest,
     ) -> Result<(), String> {
         if let Some(result) = permission_mode_authorization(permission_mode) {
@@ -76,7 +76,7 @@ impl ServerRuntime {
                 }
                 if matches!(
                     permission_profile.reviewer,
-                    devo_safety::ApprovalsReviewer::AutoReview
+                    infinitecode_safety::ApprovalsReviewer::AutoReview
                 ) {
                     match self
                         .auto_review_tool_request(session_id, turn_id, &request)
@@ -111,7 +111,7 @@ impl ServerRuntime {
         let report = self
             .run_session_hook(
                 session_id,
-                devo_core::HookEvent::PermissionRequest,
+                infinitecode_core::HookEvent::PermissionRequest,
                 permission_tool_extra(request),
             )
             .await;
@@ -130,7 +130,7 @@ impl ServerRuntime {
             serde_json::json!(request.tool_call_id),
         );
         extra.insert("reason".to_string(), serde_json::json!(reason));
-        self.run_session_hook(session_id, devo_core::HookEvent::PermissionDenied, extra)
+        self.run_session_hook(session_id, infinitecode_core::HookEvent::PermissionDenied, extra)
             .await;
     }
 
@@ -374,7 +374,7 @@ impl ServerRuntime {
         let response = match self
             .send_request_to_connection_cancellable(
                 connection_id,
-                devo_protocol::ACP_SESSION_REQUEST_PERMISSION_METHOD,
+                infinitecode_protocol::ACP_SESSION_REQUEST_PERMISSION_METHOD,
                 serde_json::to_value(request_params)
                     .expect("serialize ACP permission request params"),
                 cancel_token,
@@ -389,7 +389,7 @@ impl ServerRuntime {
                 return Err(format!("permission request failed: {error}"));
             }
         };
-        let response: devo_protocol::AcpRequestPermissionResponse =
+        let response: infinitecode_protocol::AcpRequestPermissionResponse =
             match serde_json::from_value(response) {
                 Ok(response) => response,
                 Err(error) => {
@@ -448,7 +448,7 @@ impl ServerRuntime {
 }
 
 fn policy_decision(
-    profile: &devo_safety::RuntimePermissionProfile,
+    profile: &infinitecode_safety::RuntimePermissionProfile,
     request: &ToolPermissionRequest,
 ) -> PolicyAuthorization {
     if profile.auto_approve {
@@ -458,21 +458,21 @@ fn policy_decision(
         return PolicyAuthorization::Ask;
     }
     match request.resource {
-        devo_safety::ResourceKind::Network => {
+        infinitecode_safety::ResourceKind::Network => {
             if profile.allow_network {
                 PolicyAuthorization::Allow
             } else {
                 PolicyAuthorization::Ask
             }
         }
-        devo_safety::ResourceKind::ShellExec => {
+        infinitecode_safety::ResourceKind::ShellExec => {
             if profile.allow_shell_commands {
                 PolicyAuthorization::Allow
             } else {
                 PolicyAuthorization::Ask
             }
         }
-        devo_safety::ResourceKind::FileRead => {
+        infinitecode_safety::ResourceKind::FileRead => {
             let Some(path) = request.path.as_ref() else {
                 return PolicyAuthorization::Ask;
             };
@@ -484,7 +484,7 @@ fn policy_decision(
                 PolicyAuthorization::Ask
             }
         }
-        devo_safety::ResourceKind::FileWrite => {
+        infinitecode_safety::ResourceKind::FileWrite => {
             let Some(path) = request.path.as_ref() else {
                 return PolicyAuthorization::Ask;
             };
@@ -494,7 +494,7 @@ fn policy_decision(
                 PolicyAuthorization::Ask
             }
         }
-        devo_safety::ResourceKind::Custom(_) => PolicyAuthorization::Allow,
+        infinitecode_safety::ResourceKind::Custom(_) => PolicyAuthorization::Allow,
     }
 }
 
@@ -521,14 +521,14 @@ fn acp_request_permission_params(
     session_id: SessionId,
     request: &ToolPermissionRequest,
     available_scopes: &[String],
-) -> devo_protocol::AcpRequestPermissionParams {
-    devo_protocol::AcpRequestPermissionParams {
+) -> infinitecode_protocol::AcpRequestPermissionParams {
+    infinitecode_protocol::AcpRequestPermissionParams {
         session_id,
-        tool_call: devo_protocol::AcpToolCallUpdate {
+        tool_call: infinitecode_protocol::AcpToolCallUpdate {
             tool_call_id: request.tool_call_id.clone(),
             title: Some(request.action_summary.clone()),
             kind: Some(acp_tool_kind_for_permission_request(request)),
-            status: Some(devo_protocol::AcpToolCallStatus::Pending),
+            status: Some(infinitecode_protocol::AcpToolCallStatus::Pending),
             raw_input: Some(request.input.clone()),
             raw_output: None,
             content: Vec::new(),
@@ -536,7 +536,7 @@ fn acp_request_permission_params(
                 .path
                 .as_ref()
                 .map(|path| {
-                    vec![devo_protocol::AcpToolCallLocation {
+                    vec![infinitecode_protocol::AcpToolCallLocation {
                         path: path.clone(),
                         line: None,
                     }]
@@ -549,25 +549,25 @@ fn acp_request_permission_params(
     }
 }
 
-fn acp_permission_options_for_scopes(scopes: &[String]) -> Vec<devo_protocol::AcpPermissionOption> {
-    let mut options = vec![devo_protocol::AcpPermissionOption {
+fn acp_permission_options_for_scopes(scopes: &[String]) -> Vec<infinitecode_protocol::AcpPermissionOption> {
+    let mut options = vec![infinitecode_protocol::AcpPermissionOption {
         option_id: "allow_once".to_string(),
         name: "Allow once".to_string(),
-        kind: devo_protocol::AcpPermissionOptionKind::AllowOnce,
+        kind: infinitecode_protocol::AcpPermissionOptionKind::AllowOnce,
         meta: None,
     }];
     if scopes.iter().any(|scope| scope == "session") {
-        options.push(devo_protocol::AcpPermissionOption {
+        options.push(infinitecode_protocol::AcpPermissionOption {
             option_id: "allow_session".to_string(),
             name: "Allow for session".to_string(),
-            kind: devo_protocol::AcpPermissionOptionKind::AllowAlways,
+            kind: infinitecode_protocol::AcpPermissionOptionKind::AllowAlways,
             meta: None,
         });
     }
-    options.push(devo_protocol::AcpPermissionOption {
+    options.push(infinitecode_protocol::AcpPermissionOption {
         option_id: "reject_once".to_string(),
         name: "Reject".to_string(),
-        kind: devo_protocol::AcpPermissionOptionKind::RejectOnce,
+        kind: infinitecode_protocol::AcpPermissionOptionKind::RejectOnce,
         meta: None,
     });
     options
@@ -575,27 +575,27 @@ fn acp_permission_options_for_scopes(scopes: &[String]) -> Vec<devo_protocol::Ac
 
 fn acp_tool_kind_for_permission_request(
     request: &ToolPermissionRequest,
-) -> devo_protocol::AcpToolKind {
+) -> infinitecode_protocol::AcpToolKind {
     match request.resource {
-        devo_safety::ResourceKind::FileRead => devo_protocol::AcpToolKind::Read,
-        devo_safety::ResourceKind::FileWrite => devo_protocol::AcpToolKind::Edit,
-        devo_safety::ResourceKind::ShellExec => devo_protocol::AcpToolKind::Execute,
-        devo_safety::ResourceKind::Network => devo_protocol::AcpToolKind::Fetch,
-        devo_safety::ResourceKind::Custom(_) => devo_protocol::AcpToolKind::Other,
+        infinitecode_safety::ResourceKind::FileRead => infinitecode_protocol::AcpToolKind::Read,
+        infinitecode_safety::ResourceKind::FileWrite => infinitecode_protocol::AcpToolKind::Edit,
+        infinitecode_safety::ResourceKind::ShellExec => infinitecode_protocol::AcpToolKind::Execute,
+        infinitecode_safety::ResourceKind::Network => infinitecode_protocol::AcpToolKind::Fetch,
+        infinitecode_safety::ResourceKind::Custom(_) => infinitecode_protocol::AcpToolKind::Other,
     }
 }
 
 fn approval_decision_from_acp_outcome(
-    outcome: devo_protocol::AcpPermissionOutcome,
+    outcome: infinitecode_protocol::AcpPermissionOutcome,
 ) -> Result<(ApprovalDecisionValue, ApprovalScopeValue), String> {
     match outcome {
-        devo_protocol::AcpPermissionOutcome::Selected { option_id } => match option_id.as_str() {
+        infinitecode_protocol::AcpPermissionOutcome::Selected { option_id } => match option_id.as_str() {
             "allow_once" => Ok((ApprovalDecisionValue::Approve, ApprovalScopeValue::Once)),
             "allow_session" => Ok((ApprovalDecisionValue::Approve, ApprovalScopeValue::Session)),
             "reject_once" => Ok((ApprovalDecisionValue::Deny, ApprovalScopeValue::Once)),
             _ => Err(format!("unknown permission option selected: {option_id}")),
         },
-        devo_protocol::AcpPermissionOutcome::Cancelled => {
+        infinitecode_protocol::AcpPermissionOutcome::Cancelled => {
             Ok((ApprovalDecisionValue::Cancel, ApprovalScopeValue::Once))
         }
     }
@@ -769,11 +769,11 @@ mod tests {
         cache.path_prefixes.insert(root.clone());
 
         let mut escaped = test_permission_request("write");
-        escaped.resource = devo_safety::ResourceKind::FileWrite;
+        escaped.resource = infinitecode_safety::ResourceKind::FileWrite;
         escaped.path = Some(root.join("..").join("outside.txt"));
 
         let mut allowed = test_permission_request("write");
-        allowed.resource = devo_safety::ResourceKind::FileWrite;
+        allowed.resource = infinitecode_safety::ResourceKind::FileWrite;
         allowed.path = Some(root.join("..").join("generated").join("file.txt"));
 
         assert!(!cache_allows(&cache, &escaped));
@@ -783,12 +783,12 @@ mod tests {
     #[test]
     fn policy_allows_file_read_inside_readable_roots() {
         let root = abs_path(&["workspace"]);
-        let profile = devo_safety::RuntimePermissionProfile::from_preset(
-            devo_safety::PermissionPreset::ReadOnly,
+        let profile = infinitecode_safety::RuntimePermissionProfile::from_preset(
+            infinitecode_safety::PermissionPreset::ReadOnly,
             root.clone(),
         );
         let mut request = test_permission_request("read");
-        request.resource = devo_safety::ResourceKind::FileRead;
+        request.resource = infinitecode_safety::ResourceKind::FileRead;
         request.path = Some(root.join("Cargo.toml"));
 
         assert!(matches!(
@@ -800,12 +800,12 @@ mod tests {
     #[test]
     fn policy_asks_for_file_read_outside_readable_roots() {
         let root = abs_path(&["workspace"]);
-        let profile = devo_safety::RuntimePermissionProfile::from_preset(
-            devo_safety::PermissionPreset::ReadOnly,
+        let profile = infinitecode_safety::RuntimePermissionProfile::from_preset(
+            infinitecode_safety::PermissionPreset::ReadOnly,
             root,
         );
         let mut request = test_permission_request("read");
-        request.resource = devo_safety::ResourceKind::FileRead;
+        request.resource = infinitecode_safety::ResourceKind::FileRead;
         request.path = Some(abs_path(&["outside", "secret.txt"]));
 
         assert!(matches!(
@@ -822,7 +822,7 @@ mod tests {
             cwd: std::path::PathBuf::new(),
             session_id: "session".into(),
             turn_id: Some("turn".into()),
-            resource: devo_safety::ResourceKind::ShellExec,
+            resource: infinitecode_safety::ResourceKind::ShellExec,
             action_summary: tool_name.into(),
             justification: None,
             path: None,

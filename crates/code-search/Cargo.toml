@@ -1,19 +1,19 @@
 [package]
-description = "Semble-style hybrid code retrieval for Devo workspace tools"
+description = "Semble-style hybrid code retrieval for InfiniteCode workspace tools"
 edition.workspace = true
 license.workspace = true
-name = "devo-code-search"
+name = "infinitecode-code-search"
 version.workspace = true
 
 [lib]
-name = "devo_code_search"
+name = "infinitecode_code_search"
 path = "src/lib.rs"
 
 [dependencies]
 anyhow = { workspace = true }
 bm25 = { workspace = true }
-devo-network-proxy = { workspace = true }
-devo-util-paths = { workspace = true }
+infinitecode-network-proxy = { workspace = true }
+infinitecode-util-paths = { workspace = true }
 dirs = { workspace = true }
 hf-hub = { workspace = true }
 hnsw_rs = { workspace = true }

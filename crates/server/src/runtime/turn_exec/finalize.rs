@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use devo_core::{SessionId, TurnError, TurnStatus, TurnUsage};
-use devo_protocol::{SessionHistoryItem, SessionHistoryItemKind, TurnFailedPayload};
+use infinitecode_core::{SessionId, TurnError, TurnStatus, TurnUsage};
+use infinitecode_protocol::{SessionHistoryItem, SessionHistoryItemKind, TurnFailedPayload};
 
 use super::super::ServerRuntime;
 use super::super::subagent_usage::ParentUsageSnapshot;
@@ -87,7 +87,7 @@ impl ServerRuntime {
         let terminal_error = result
             .as_ref()
             .err()
-            .filter(|error| !matches!(error, devo_core::AgentError::Aborted))
+            .filter(|error| !matches!(error, infinitecode_core::AgentError::Aborted))
             .map(turn_error_payload_from_error)
             .map(|error| TurnError {
                 code: error.code,
@@ -107,7 +107,7 @@ impl ServerRuntime {
                 self.run_session_hook_for_actor_state(
                     state,
                     session_id,
-                    devo_core::HookEvent::Stop,
+                    infinitecode_core::HookEvent::Stop,
                     serde_json::Map::from_iter([(
                         "stop_hook_active".to_string(),
                         serde_json::Value::Bool(false),
@@ -119,7 +119,7 @@ impl ServerRuntime {
                 self.run_session_hook_for_actor_state(
                     state,
                     session_id,
-                    devo_core::HookEvent::StopFailure,
+                    infinitecode_core::HookEvent::StopFailure,
                     serde_json::Map::from_iter([
                         (
                             "error".to_string(),
@@ -191,10 +191,10 @@ impl ServerRuntime {
         state: &mut SessionActorState,
         session_id: SessionId,
         turn: &crate::TurnMetadata,
-        result: &Result<(), devo_core::AgentError>,
-        turn_usage: Option<devo_core::TurnUsage>,
-        latest_query_usage: Option<devo_core::TurnUsage>,
-        terminal_stop_reason: Option<devo_core::StopReason>,
+        result: &Result<(), infinitecode_core::AgentError>,
+        turn_usage: Option<infinitecode_core::TurnUsage>,
+        latest_query_usage: Option<infinitecode_core::TurnUsage>,
+        terminal_stop_reason: Option<infinitecode_core::StopReason>,
         session_total_input_tokens: usize,
         session_total_output_tokens: usize,
         session_total_tokens: usize,
@@ -207,7 +207,7 @@ impl ServerRuntime {
         final_turn.completed_at = Some(Utc::now());
         final_turn.status = match result {
             Ok(()) => TurnStatus::Completed,
-            Err(devo_core::AgentError::Aborted) => TurnStatus::Interrupted,
+            Err(infinitecode_core::AgentError::Aborted) => TurnStatus::Interrupted,
             Err(_) => TurnStatus::Failed,
         };
         final_turn.usage = turn_usage;
@@ -289,7 +289,7 @@ impl ServerRuntime {
         state: &mut SessionActorState,
         session_id: SessionId,
         final_turn: &crate::TurnMetadata,
-        latest_query_usage: Option<devo_core::TurnUsage>,
+        latest_query_usage: Option<infinitecode_core::TurnUsage>,
         terminal_error: Option<TurnError>,
     ) {
         let record = state.record.clone();
@@ -314,11 +314,11 @@ impl ServerRuntime {
         state: &SessionActorState,
         session_id: SessionId,
         final_turn: &crate::TurnMetadata,
-        result: &Result<(), devo_core::AgentError>,
+        result: &Result<(), infinitecode_core::AgentError>,
         terminal_error: Option<&TurnError>,
     ) {
         if let Err(error) = result {
-            if matches!(error, devo_core::AgentError::Aborted) {
+            if matches!(error, infinitecode_core::AgentError::Aborted) {
                 tracing::info!(
                     session_id = %session_id,
                     turn_id = %final_turn.turn_id,
@@ -341,7 +341,7 @@ impl ServerRuntime {
                 self.broadcast_event(crate::ServerEvent::TurnFailed(TurnFailedPayload {
                     session_id,
                     turn: final_turn.clone(),
-                    error: terminal_error.map(|error| devo_protocol::TurnErrorPayload {
+                    error: terminal_error.map(|error| infinitecode_protocol::TurnErrorPayload {
                         code: error.code.clone(),
                         message: error.message.clone(),
                     }),
@@ -412,7 +412,7 @@ fn append_terminal_history_items(
 
 #[cfg(test)]
 mod tests {
-    use devo_core::{SessionId, TurnId, TurnUsage};
+    use infinitecode_core::{SessionId, TurnId, TurnUsage};
     use pretty_assertions::assert_eq;
 
     use super::super::super::subagent_usage::{ParentUsageSnapshot, UsageTotals};

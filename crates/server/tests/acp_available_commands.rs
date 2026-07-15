@@ -4,29 +4,29 @@ use std::sync::Arc;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::AcpNewSessionResult;
-use devo_protocol::Model;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::SessionId;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::SingleProviderRouter;
-use devo_server::AcpSuccessResponse;
-use devo_server::ClientTransportKind;
-use devo_server::OutboundFrame;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::AcpNewSessionResult;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::SingleProviderRouter;
+use infinitecode_server::AcpSuccessResponse;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::OutboundFrame;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
 use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
@@ -64,7 +64,7 @@ impl ModelProviderSDK for NoopProvider {
 async fn acp_available_commands_are_session_update_after_session_response() -> Result<()> {
     let data_root = TempDir::new()?;
     let runtime = build_runtime(data_root.path())?;
-    let (outgoing_tx, mut outgoing_rx) = devo_server::test_outbound_channel(4096);
+    let (outgoing_tx, mut outgoing_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, outgoing_tx.clone())
         .await;
@@ -202,7 +202,7 @@ fn assert_available_command_names(message: &serde_json::Value) -> Result<()> {
 
 fn build_runtime(data_root: &Path) -> Result<Arc<ServerRuntime>> {
     let provider: Arc<dyn ModelProviderSDK> = Arc::new(NoopProvider);
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         data_root.join("acp_available_commands.db"),
     )?);
     Ok(ServerRuntime::new(
@@ -222,7 +222,7 @@ fn build_runtime(data_root: &Path) -> Result<Arc<ServerRuntime>> {
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 data_root.to_path_buf(),

@@ -53,7 +53,7 @@ invocation_method = "anthropic_messages"
 default_reasoning_effort = "high"
 ```
 
-将 API key 存入 `<DEVO_HOME>/auth.json`：
+将 API key 存入 `<INFINITECODE_HOME>/auth.json`：
 
 ```json
 {
@@ -86,7 +86,7 @@ default_reasoning_effort = "high"
 
 ## 为什么先用 Anthropic-Compatible
 
-先使用 Anthropic-compatible provider method，因为这条路径让 Devo 可以使用 provider-hosted `web_search` 和 `web_fetch`。
+先使用 Anthropic-compatible provider method，因为这条路径让 InfiniteCode 可以使用 provider-hosted `web_search` 和 `web_fetch`。
 
 OpenAI-compatible path 可以运行模型请求，但 web search 通常需要额外的本地或第三方配置。
 
@@ -135,10 +135,10 @@ max_results = 5
 运行：
 
 ```bash
-devo doctor
+infinitecode doctor
 ```
 
-然后启动 Devo，并发送一个只读的第一条 prompt：
+然后启动 InfiniteCode，并发送一个只读的第一条 prompt：
 
 ```text
 Explain the project structure. Do not edit files yet.

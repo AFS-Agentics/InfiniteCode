@@ -1,13 +1,13 @@
 "use client"
 
-import { Badge } from "@devo/ui/components/badge"
+import { Badge } from "@infinitecode/ui/components/badge"
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
-} from "@devo/ui/components/collapsible"
-import { useControllableState } from "@devo/ui/hooks/use-controllable-state"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/collapsible"
+import { useControllableState } from "@infinitecode/ui/hooks/use-controllable-state"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { LucideIcon } from "lucide-react"
 import { BrainIcon, ChevronDownIcon, DotIcon } from "lucide-react"
 import type { ComponentProps, ReactNode } from "react"

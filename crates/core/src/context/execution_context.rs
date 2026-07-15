@@ -6,11 +6,11 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
-use devo_protocol::CollaborationMode;
-use devo_protocol::Message;
-use devo_protocol::Model;
-use devo_protocol::ReasoningEffort;
-use devo_protocol::UserInput;
+use infinitecode_protocol::CollaborationMode;
+use infinitecode_protocol::Message;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ReasoningEffort;
+use infinitecode_protocol::UserInput;
 
 use crate::SessionState;
 use crate::TurnConfig;
@@ -468,7 +468,7 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
 
-    use devo_protocol::UserInput;
+    use infinitecode_protocol::UserInput;
     use pretty_assertions::assert_eq;
 
     use super::AgentsMdDiffFragment;
@@ -587,7 +587,7 @@ mod tests {
             reasoning_effort_selection: Some("enabled".into()),
             reasoning_effort: Some(ReasoningEffort::Medium),
             observed_agents_snapshot: None,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
         };
         let current = TurnContext {
             environment: EnvironmentContext {
@@ -605,7 +605,7 @@ mod tests {
             reasoning_effort_selection: Some("disabled".into()),
             reasoning_effort: None,
             observed_agents_snapshot: None,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
         };
 
         let diff = current
@@ -636,14 +636,14 @@ mod tests {
             reasoning_effort_selection: None,
             reasoning_effort: None,
             observed_agents_snapshot: None,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
         };
         let fragment = context
             .context_changes_since(None)
             .expect("first turn should emit context changes");
 
         let message = fragment.to_message();
-        assert_eq!(message.role, devo_protocol::Role::User);
+        assert_eq!(message.role, infinitecode_protocol::Role::User);
         assert_eq!(message.content.len(), 1);
     }
 
@@ -666,10 +666,10 @@ mod tests {
             reasoning_effort_selection: None,
             reasoning_effort: None,
             observed_agents_snapshot: None,
-            collaboration_mode: devo_protocol::CollaborationMode::Plan,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Plan,
         };
         let current = TurnContext {
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
             ..previous.clone()
         };
 
@@ -706,7 +706,7 @@ mod tests {
             reasoning_effort_selection: None,
             reasoning_effort: None,
             observed_agents_snapshot: None,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
         };
         let current = previous.clone();
 

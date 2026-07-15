@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
-use devo_core::DurableRecord;
-use devo_protocol::Usage;
+use infinitecode_core::DurableRecord;
+use infinitecode_protocol::Usage;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 
@@ -48,7 +48,7 @@ async fn goal_clear_interrupts_active_hidden_continuation_turn() -> Result<()> {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 120,
-                "method": "_devo/goal/clear",
+                "method": "_infinitecode/goal/clear",
                 "params": {
                     "sessionId": session_id
                 }
@@ -89,7 +89,7 @@ async fn goal_complete_interrupts_active_hidden_continuation_turn() -> Result<()
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 121,
-                "method": "_devo/goal/complete",
+                "method": "_infinitecode/goal/complete",
                 "params": {
                     "sessionId": session_id,
                     "status": "complete"
@@ -141,7 +141,7 @@ async fn goal_cancel_interrupts_active_hidden_continuation_turn() -> Result<()> 
         )
         .await
         .context("goal/cancel response")?;
-    let _response: devo_server::SuccessResponse<devo_protocol::GoalSetStatusResult> =
+    let _response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalSetStatusResult> =
         serde_json::from_value(cancel_response)?;
 
     let notifications = collect_until_turn_completed(&mut notifications_rx).await?;
@@ -190,7 +190,7 @@ async fn replacing_goal_interrupts_old_hidden_turn_and_starts_new_goal_cleanly()
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 122,
-                "method": "_devo/goal/status",
+                "method": "_infinitecode/goal/status",
                 "params": {
                     "sessionId": session_id
                 }
@@ -198,7 +198,7 @@ async fn replacing_goal_interrupts_old_hidden_turn_and_starts_new_goal_cleanly()
         )
         .await
         .context("goal/status response")?;
-    let response: devo_server::SuccessResponse<devo_protocol::GoalStatusResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalStatusResult> =
         serde_json::from_value(status_response)?;
     assert_eq!(
         response
@@ -207,7 +207,7 @@ async fn replacing_goal_interrupts_old_hidden_turn_and_starts_new_goal_cleanly()
             .map(|goal| { (goal.objective, goal.status, goal.tokens_used,) }),
         Some((
             "new replacement goal".to_string(),
-            devo_protocol::ThreadGoalStatus::Active,
+            infinitecode_protocol::ThreadGoalStatus::Active,
             0,
         ))
     );
@@ -240,7 +240,7 @@ async fn pausing_budget_limited_wrapup_preserves_budget_limited_status() -> Resu
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 123,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "objective": "preserve budget-limited status",
@@ -264,7 +264,7 @@ async fn pausing_budget_limited_wrapup_preserves_budget_limited_status() -> Resu
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 124,
-                "method": "_devo/goal/set",
+                "method": "_infinitecode/goal/set",
                 "params": {
                     "sessionId": session_id,
                     "status": "paused"
@@ -273,11 +273,11 @@ async fn pausing_budget_limited_wrapup_preserves_budget_limited_status() -> Resu
         )
         .await
         .context("goal pause response")?;
-    let response: devo_server::SuccessResponse<devo_protocol::GoalSetResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalSetResult> =
         serde_json::from_value(pause_response)?;
     assert_eq!(
         response.result.goal.status,
-        devo_protocol::ThreadGoalStatus::BudgetLimited
+        infinitecode_protocol::ThreadGoalStatus::BudgetLimited
     );
 
     let notifications = collect_until_turn_completed(&mut notifications_rx).await?;
@@ -286,9 +286,9 @@ async fn pausing_budget_limited_wrapup_preserves_budget_limited_status() -> Resu
 }
 
 async fn start_created_goal(
-    runtime: &Arc<devo_server::ServerRuntime>,
+    runtime: &Arc<infinitecode_server::ServerRuntime>,
     connection_id: u64,
-    session_id: devo_protocol::SessionId,
+    session_id: infinitecode_protocol::SessionId,
     objective: &str,
     replace_existing: bool,
 ) -> Result<()> {
@@ -298,7 +298,7 @@ async fn start_created_goal(
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 125,
-                "method": "_devo/goal/create",
+                "method": "_infinitecode/goal/create",
                 "params": {
                     "sessionId": session_id,
                     "objective": objective,
@@ -335,7 +335,7 @@ fn assert_turn_interrupted(notifications: &[serde_json::Value], turn_id: &serde_
 
 fn persisted_goal_id(
     data_root: &std::path::Path,
-    session_id: devo_protocol::SessionId,
+    session_id: infinitecode_protocol::SessionId,
 ) -> Result<String> {
     let path = data_root
         .join("goal-records")

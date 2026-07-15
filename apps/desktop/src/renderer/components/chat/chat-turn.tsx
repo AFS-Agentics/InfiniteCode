@@ -4,9 +4,9 @@ import {
 	MessageActions,
 	MessageContent,
 	MessageResponse,
-} from "@devo/ui/components/ai-elements/message"
-import { Shimmer } from "@devo/ui/components/ai-elements/shimmer"
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@devo/ui/components/dialog"
+} from "@infinitecode/ui/components/ai-elements/message"
+import { Shimmer } from "@infinitecode/ui/components/ai-elements/shimmer"
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@infinitecode/ui/components/dialog"
 
 import {
 	ArrowUpToLineIcon,
@@ -53,8 +53,8 @@ import { PermissionItem } from "./chat-permission"
 // Utility functions
 // ============================================================
 
-const DEVO_ITEM_KIND_META = "devo/itemKind"
-const DEVO_RESEARCH_ARTIFACT_TITLE_META = "devo/researchArtifactTitle"
+const INFINITECODE_ITEM_KIND_META = "infinitecode/itemKind"
+const INFINITECODE_RESEARCH_ARTIFACT_TITLE_META = "infinitecode/researchArtifactTitle"
 
 /**
  * Formats a timestamp (milliseconds) to relative or absolute time.
@@ -343,8 +343,8 @@ function splitCompletedTurnParts(orderedParts: RenderablePart[]): {
 
 function researchArtifactTitle(item: TextRenderablePart): string | undefined {
 	const metadata = item.metadata
-	if (metadata?.[DEVO_ITEM_KIND_META] !== "research_artifact") return undefined
-	const title = metadata[DEVO_RESEARCH_ARTIFACT_TITLE_META]
+	if (metadata?.[INFINITECODE_ITEM_KIND_META] !== "research_artifact") return undefined
+	const title = metadata[INFINITECODE_RESEARCH_ARTIFACT_TITLE_META]
 	return typeof title === "string" && title.trim() ? title : undefined
 }
 
@@ -413,9 +413,9 @@ function messageEntryFingerprint(entry: ChatMessageEntry): string {
 			textLen += part.text.length
 			if (part.type === "text") {
 				const metadata = (part as { metadata?: Record<string, unknown> }).metadata
-				if (metadata?.[DEVO_ITEM_KIND_META] === "research_artifact") {
+				if (metadata?.[INFINITECODE_ITEM_KIND_META] === "research_artifact") {
 					textMetadataSegments.push(
-						`${part.id}:${metadata[DEVO_ITEM_KIND_META]}:${metadata[DEVO_RESEARCH_ARTIFACT_TITLE_META] ?? ""}`,
+						`${part.id}:${metadata[INFINITECODE_ITEM_KIND_META]}:${metadata[INFINITECODE_RESEARCH_ARTIFACT_TITLE_META] ?? ""}`,
 					)
 				}
 			}

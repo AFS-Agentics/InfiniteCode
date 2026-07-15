@@ -1,5 +1,5 @@
 {
-	"name": "@devo/configconv",
+	"name": "@infinitecode/configconv",
 	"version": "0.5.2",
 	"private": true,
 	"license": "MIT",
@@ -28,13 +28,13 @@
 		"clean": "rm -rf node_modules .turbo"
 	},
 	"dependencies": {
-		"@devo-ai/sdk": "file:../devo-ai-sdk",
+		"@infinitecode-ai/sdk": "file:../infinitecode-ai-sdk",
 		"jsonc-parser": "^3.3.1",
 		"yaml": "^2.7.1",
 		"zod": "^3.24.4"
 	},
 	"devDependencies": {
-		"@devo-ai/plugin": "file:../devo-ai-plugin",
+		"@infinitecode-ai/plugin": "file:../infinitecode-ai-plugin",
 		"@types/bun": "latest",
 		"typescript": "^5.8.3"
 	}

@@ -1,7 +1,7 @@
 use std::sync::OnceLock;
 use std::time::Instant;
 
-use devo_core::QueryEvent;
+use infinitecode_core::QueryEvent;
 
 pub(super) fn stream_trace_elapsed_ms() -> u128 {
     static STREAM_TRACE_START: OnceLock<Instant> = OnceLock::new();
@@ -32,13 +32,13 @@ pub(super) fn query_event_trace_delta_len(event: &QueryEvent) -> usize {
         QueryEvent::TextDelta(text) | QueryEvent::ReasoningDelta(text) => text.len(),
         QueryEvent::ToolProgress {
             progress:
-                devo_core::tools::ToolProgress::OutputDelta { delta }
-                | devo_core::tools::ToolProgress::StatusUpdate { message: delta, .. }
-                | devo_core::tools::ToolProgress::Completion { summary: delta },
+                infinitecode_core::tools::ToolProgress::OutputDelta { delta }
+                | infinitecode_core::tools::ToolProgress::StatusUpdate { message: delta, .. }
+                | infinitecode_core::tools::ToolProgress::Completion { summary: delta },
             ..
         } => delta.len(),
         QueryEvent::ToolProgress {
-            progress: devo_core::tools::ToolProgress::Terminal { .. },
+            progress: infinitecode_core::tools::ToolProgress::Terminal { .. },
             ..
         }
         | QueryEvent::ProviderRetryStatus(_)
@@ -67,7 +67,7 @@ fn assistant_token_log_preview(text: &str) -> Option<String> {
 fn assistant_token_logging_enabled() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
     *ENABLED.get_or_init(|| {
-        std::env::var("DEVO_LOG_ASSISTANT_TOKENS")
+        std::env::var("INFINITECODE_LOG_ASSISTANT_TOKENS")
             .ok()
             .is_some_and(|value| {
                 matches!(
@@ -81,7 +81,7 @@ fn assistant_token_logging_enabled() -> bool {
 fn assistant_token_log_max_chars() -> usize {
     static MAX_CHARS: OnceLock<usize> = OnceLock::new();
     *MAX_CHARS.get_or_init(|| {
-        std::env::var("DEVO_LOG_ASSISTANT_TOKENS_MAX_CHARS")
+        std::env::var("INFINITECODE_LOG_ASSISTANT_TOKENS_MAX_CHARS")
             .ok()
             .and_then(|value| value.parse().ok())
             .filter(|&max_chars| max_chars > 0)

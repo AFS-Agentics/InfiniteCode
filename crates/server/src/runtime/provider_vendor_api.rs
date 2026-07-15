@@ -1,25 +1,25 @@
 use anyhow::Context;
-use devo_core::AUTH_CONFIG_FILE_NAME;
-use devo_core::Model;
-use devo_core::ModelCatalog;
-use devo_core::ProviderHttpConfig;
-use devo_core::ProviderValidateParams;
-use devo_core::ProviderValidateResult;
-use devo_core::ProviderVendorConfig;
-use devo_core::ProviderVendorListParams;
-use devo_core::ProviderVendorListResult;
-use devo_core::ProviderVendorUpsertParams;
-use devo_core::ProviderVendorUpsertResult;
-use devo_core::UserAuthConfigFile;
-use devo_core::read_user_auth_config;
-use devo_core::test_model_connection;
-use devo_protocol::ModelProfileKey;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderHttpOptions;
-use devo_provider::anthropic::AnthropicProvider;
-use devo_provider::openai::OpenAIProvider;
-use devo_provider::openai::OpenAIResponsesProvider;
-use devo_util_paths::current_user_config_file;
+use infinitecode_core::AUTH_CONFIG_FILE_NAME;
+use infinitecode_core::Model;
+use infinitecode_core::ModelCatalog;
+use infinitecode_core::ProviderHttpConfig;
+use infinitecode_core::ProviderValidateParams;
+use infinitecode_core::ProviderValidateResult;
+use infinitecode_core::ProviderVendorConfig;
+use infinitecode_core::ProviderVendorListParams;
+use infinitecode_core::ProviderVendorListResult;
+use infinitecode_core::ProviderVendorUpsertParams;
+use infinitecode_core::ProviderVendorUpsertResult;
+use infinitecode_core::UserAuthConfigFile;
+use infinitecode_core::read_user_auth_config;
+use infinitecode_core::test_model_connection;
+use infinitecode_protocol::ModelProfileKey;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderHttpOptions;
+use infinitecode_provider::anthropic::AnthropicProvider;
+use infinitecode_provider::openai::OpenAIProvider;
+use infinitecode_provider::openai::OpenAIResponsesProvider;
+use infinitecode_util_paths::current_user_config_file;
 use std::time::Duration;
 
 use crate::ProtocolErrorCode;
@@ -249,7 +249,7 @@ async fn validate_provider_candidate(
 
 fn resolve_validation_model(
     catalog: &dyn ModelCatalog,
-    wire_api: devo_core::ProviderWireApi,
+    wire_api: infinitecode_core::ProviderWireApi,
     model_slug: &str,
 ) -> (Model, ModelProfileKey) {
     if let Some(entry) = catalog.get(model_slug) {
@@ -297,13 +297,13 @@ fn resolve_validation_api_key(
 }
 
 fn build_validation_provider(
-    wire_api: devo_core::ProviderWireApi,
+    wire_api: infinitecode_core::ProviderWireApi,
     base_url: Option<String>,
     api_key: Option<String>,
     http_options: ProviderHttpOptions,
 ) -> anyhow::Result<Box<dyn ModelProviderSDK>> {
     match wire_api {
-        devo_core::ProviderWireApi::AnthropicMessages => {
+        infinitecode_core::ProviderWireApi::AnthropicMessages => {
             let api_key = api_key.context("anthropic provider requires an API key")?;
             let base_url = base_url.unwrap_or_else(|| "https://api.anthropic.com".to_string());
             Ok(Box::new(
@@ -312,7 +312,7 @@ fn build_validation_provider(
                     .with_api_key(api_key),
             ))
         }
-        devo_core::ProviderWireApi::OpenAIChatCompletions => {
+        infinitecode_core::ProviderWireApi::OpenAIChatCompletions => {
             let base_url = normalize_openai_base_url(
                 &base_url.unwrap_or_else(|| "https://api.openai.com".to_string()),
             );
@@ -322,7 +322,7 @@ fn build_validation_provider(
             }
             Ok(Box::new(provider))
         }
-        devo_core::ProviderWireApi::OpenAIResponses => {
+        infinitecode_core::ProviderWireApi::OpenAIResponses => {
             let base_url = normalize_openai_base_url(
                 &base_url.unwrap_or_else(|| "https://api.openai.com".to_string()),
             );
@@ -362,11 +362,11 @@ fn resolve_provider_api_key(
 
 #[cfg(test)]
 mod tests {
-    use devo_core::PresetModelCatalog;
-    use devo_core::ProviderWireApi;
-    use devo_protocol::ProviderModelBinding;
-    use devo_protocol::ProviderValidateParams;
-    use devo_protocol::ProviderVendor;
+    use infinitecode_core::PresetModelCatalog;
+    use infinitecode_core::ProviderWireApi;
+    use infinitecode_protocol::ProviderModelBinding;
+    use infinitecode_protocol::ProviderValidateParams;
+    use infinitecode_protocol::ProviderVendor;
     use pretty_assertions::assert_eq;
 
     use super::*;

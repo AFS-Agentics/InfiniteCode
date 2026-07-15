@@ -1,4 +1,4 @@
-//! Transcript/history cells for the Devo TUI.
+//! Transcript/history cells for the InfiniteCode TUI.
 //!
 //! A `HistoryCell` is the unit of display in the conversation UI, representing both committed
 //! transcript entries and, transiently, an in-flight active cell that can mutate in place while
@@ -36,11 +36,11 @@ use crate::version::CLI_VERSION;
 use crate::wrapping::RtOptions;
 use crate::wrapping::adaptive_wrap_line;
 use crate::wrapping::adaptive_wrap_lines;
-use devo_protocol::ReasoningCapability;
-use devo_protocol::ReasoningEffort;
-use devo_protocol::ReasoningImplementation;
-use devo_protocol::protocol::FileChange;
-use devo_protocol::user_input::TextElement;
+use infinitecode_protocol::ReasoningCapability;
+use infinitecode_protocol::ReasoningEffort;
+use infinitecode_protocol::ReasoningImplementation;
+use infinitecode_protocol::protocol::FileChange;
+use infinitecode_protocol::user_input::TextElement;
 use image::DynamicImage;
 use ratatui::prelude::*;
 use ratatui::style::Color;
@@ -904,7 +904,7 @@ pub fn new_guardian_denied_patch_request(files: Vec<String>) -> Box<dyn HistoryC
     let mut summary = vec![
         "Request ".into(),
         "denied".bold(),
-        " for Devo to apply ".into(),
+        " for InfiniteCode to apply ".into(),
     ];
     if files.len() == 1 {
         summary.push("a patch touching ".into());
@@ -1653,7 +1653,7 @@ impl HistoryCell for FinalMessageSeparator {
 
 /// End-of-turn summary showing ▣ symbol, input mode, model name, and outcome.
 ///
-/// Inspired by opencode's assistant message footer, with Devo's mode label included:
+/// Inspired by opencode's assistant message footer, with InfiniteCode's mode label included:
 /// `▣ BUILD · model-name · 4m17s`, `▣ PLAN · model-name · interrupted`, or
 /// `▣ BUILD · model-name · failed`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

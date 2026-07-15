@@ -2,9 +2,9 @@
 //!
 use std::path::PathBuf;
 
-use devo_core::ItemId;
-use devo_core::SessionId;
-use devo_protocol::ReferenceSearchSnapshot;
+use infinitecode_core::ItemId;
+use infinitecode_core::SessionId;
+use infinitecode_protocol::ReferenceSearchSnapshot;
 
 use crate::app_command::AppCommand;
 use crate::events::PlanStep;

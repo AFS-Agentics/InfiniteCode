@@ -2,7 +2,7 @@
 import type {
 	PermissionRequest as SdkPermissionRequest,
 	QuestionRequest as SdkQuestionRequest,
-} from "@devo-ai/sdk/v2/client"
+} from "@infinitecode-ai/sdk/v2/client"
 import type { DesktopFolderStatus } from "../../preload/api"
 
 // Re-export all SDK types from v2
@@ -23,7 +23,7 @@ export type {
 	Message,
 	Part,
 	PermissionRequest,
-	Project as DevoProject,
+	Project as InfiniteCodeProject,
 	QuestionAnswer,
 	QuestionInfo,
 	QuestionOption,
@@ -49,7 +49,7 @@ export type {
 	WorkspaceChangesReadResult,
 	WorkspaceChangesUpdatedEventProperties,
 	WorkspaceDiffDetail,
-} from "@devo-ai/sdk/v2/client"
+} from "@infinitecode-ai/sdk/v2/client"
 
 // ============================================================
 // File attachment types
@@ -70,7 +70,7 @@ export interface FileAttachment {
 // App-specific types
 // ============================================================
 
-/** An Devo server instance we're managing */
+/** An InfiniteCode server instance we're managing */
 export interface ServerInstance {
 	/** Unique ID for this server */
 	id: string
@@ -88,7 +88,7 @@ export type EnvironmentType = "local" | "cloud" | "vm"
 /** Derived agent status for UI display, mapped from SessionStatus */
 export type AgentStatus = "running" | "waiting" | "paused" | "completed" | "failed" | "idle"
 
-/** Project in the sidebar — aggregates from Devo projects */
+/** Project in the sidebar — aggregates from InfiniteCode projects */
 export interface ProjectInfo {
 	id: string
 	name: string
@@ -98,7 +98,7 @@ export interface ProjectInfo {
 
 /** Enriched project for the unified sidebar (includes directory for auto-start) */
 export interface SidebarProject {
-	/** Devo project ID (root commit hash) or hash of directory as fallback */
+	/** InfiniteCode project ID (root commit hash) or hash of directory as fallback */
 	id: string
 	/** URL-safe slug: always `{name}-{id.slice(0,12)}` for stability */
 	slug: string
@@ -122,7 +122,7 @@ export interface Activity {
 }
 
 /**
- * Agent is our UI-facing representation of an Devo session.
+ * Agent is our UI-facing representation of an InfiniteCode session.
  * It merges Session data + SessionStatus + derived activity info.
  *
  * Note: Metrics (cost, tokens, work time, exchange count) are NOT included here.
@@ -149,7 +149,7 @@ export interface Agent {
 	duration: string
 	currentActivity?: string
 	activities: Activity[]
-	/** The underlying Devo session ID */
+	/** The underlying InfiniteCode session ID */
 	sessionId: string
 	/** Pending permission requests for this agent */
 	permissions: SdkPermissionRequest[]
@@ -159,7 +159,7 @@ export interface Agent {
 	parentId?: string
 	/** If set, the session runs in a git worktree at this root path */
 	worktreePath?: string
-	/** The branch name auto-created for the worktree (e.g. "devo/fix-auth-bug") */
+	/** The branch name auto-created for the worktree (e.g. "infinitecode/fix-auth-bug") */
 	worktreeBranch?: string
 	/** Timestamp (ms) of session creation — stable, never changes */
 	createdAt: number

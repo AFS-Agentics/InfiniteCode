@@ -1,5 +1,5 @@
 import { type LandingCopy } from "./data";
-import { renderWithDevoMark } from "./devo-word";
+import { renderWithInfiniteCodeMark } from "./infinitecode-word";
 
 type ProofSectionProps = {
   rows: LandingCopy["proofRows"];
@@ -18,10 +18,10 @@ export function ProofSection({ rows }: ProofSectionProps) {
               {item.eyebrow}
             </p>
             <h2 className="mt-4 text-2xl font-semibold tracking-normal text-white">
-              {renderWithDevoMark(item.title)}
+              {renderWithInfiniteCodeMark(item.title)}
             </h2>
             <p className="mt-4 text-base leading-7 text-white/58">
-              {renderWithDevoMark(item.body)}
+              {renderWithInfiniteCodeMark(item.body)}
             </p>
           </article>
         ))}

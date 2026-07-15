@@ -4,24 +4,24 @@ use std::time::Instant;
 
 use crate::app_command::InputHistoryDirection;
 use crate::bottom_pane::SkillMetadata;
-use devo_core::ItemId;
-use devo_core::SessionId;
-use devo_protocol::AcpAvailableCommand;
-use devo_protocol::AcpCost;
-use devo_protocol::AcpSessionConfigOption;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderRetryPhase;
-use devo_protocol::ProviderVendor;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ReasoningEffort;
-use devo_protocol::ReferenceSearchSnapshot;
-use devo_protocol::RequestUserInputQuestion;
-use devo_protocol::SessionHistoryItem;
-use devo_protocol::SessionRuntimeStatus;
-use devo_protocol::ThreadGoal;
-use devo_protocol::parse_command::ParsedCommand;
-use devo_protocol::protocol::ExecCommandSource;
-use devo_protocol::protocol::FileChange;
+use infinitecode_core::ItemId;
+use infinitecode_core::SessionId;
+use infinitecode_protocol::AcpAvailableCommand;
+use infinitecode_protocol::AcpCost;
+use infinitecode_protocol::AcpSessionConfigOption;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderRetryPhase;
+use infinitecode_protocol::ProviderVendor;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ReasoningEffort;
+use infinitecode_protocol::ReferenceSearchSnapshot;
+use infinitecode_protocol::RequestUserInputQuestion;
+use infinitecode_protocol::SessionHistoryItem;
+use infinitecode_protocol::SessionRuntimeStatus;
+use infinitecode_protocol::ThreadGoal;
+use infinitecode_protocol::parse_command::ParsedCommand;
+use infinitecode_protocol::protocol::ExecCommandSource;
+use infinitecode_protocol::protocol::FileChange;
 const TOOL_RESULT_FOLD_FINAL_STAGE: u8 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -155,7 +155,7 @@ pub struct SavedModelEntry {
     pub api_key: Option<String>,
 }
 
-use devo_protocol::TurnId;
+use infinitecode_protocol::TurnId;
 
 /// One event emitted by the background query worker into the interactive UI.
 #[derive(Debug, Clone, PartialEq)]

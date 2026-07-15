@@ -2,15 +2,15 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::Context;
-use devo_protocol::ApprovalScopeValue;
-use devo_protocol::CollaborationMode;
-use devo_protocol::PendingInputItem;
-use devo_protocol::SessionId;
-use devo_protocol::ThreadGoal;
+use infinitecode_protocol::ApprovalScopeValue;
+use infinitecode_protocol::CollaborationMode;
+use infinitecode_protocol::PendingInputItem;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::ThreadGoal;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
-use devo_safety::PermissionMode;
+use infinitecode_safety::PermissionMode;
 
 use super::commands::SessionCommand;
 use super::snapshots::{
@@ -25,10 +25,10 @@ use crate::runtime::subagent_usage::ParentUsageSnapshot;
 use crate::runtime::turn_exec::ExecuteTurnRequest;
 use crate::session::SessionMetadata;
 use crate::turn::TurnMetadata;
-use devo_core::SessionRecord;
-use devo_core::SessionTitleState;
-use devo_core::TurnConfig;
-use devo_core::TurnId;
+use infinitecode_core::SessionRecord;
+use infinitecode_core::SessionTitleState;
+use infinitecode_core::TurnConfig;
+use infinitecode_core::TurnId;
 
 const SESSION_MAILBOX_CAPACITY: usize = 64;
 
@@ -449,7 +449,7 @@ impl SessionHandle {
 
     pub(crate) async fn remove_queued_turn_input(
         &self,
-        queued_input_id: devo_core::PendingInputId,
+        queued_input_id: infinitecode_core::PendingInputId,
     ) -> Option<bool> {
         let (reply_tx, reply_rx) = oneshot::channel();
         if !self
@@ -577,7 +577,7 @@ impl SessionHandle {
 
     pub(crate) async fn apply_permission_profile(
         &self,
-        profile: devo_safety::RuntimePermissionProfile,
+        profile: infinitecode_safety::RuntimePermissionProfile,
     ) -> bool {
         let (reply_tx, reply_rx) = oneshot::channel();
         if !self
@@ -611,7 +611,7 @@ impl SessionHandle {
 
     pub(crate) async fn set_tool_registry(
         &self,
-        tool_registry: Option<Arc<devo_core::tools::ToolRegistry>>,
+        tool_registry: Option<Arc<infinitecode_core::tools::ToolRegistry>>,
     ) -> bool {
         let (reply_tx, reply_rx) = oneshot::channel();
         if !self

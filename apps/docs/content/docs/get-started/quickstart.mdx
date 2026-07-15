@@ -1,27 +1,27 @@
 ---
 title: Quickstart
-description: The fastest path to a working Devo session.
+description: The fastest path to a working InfiniteCode session.
 ---
 
-This page gets Devo running in an existing repository with a model provider
+This page gets InfiniteCode running in an existing repository with a model provider
 connected.
 
-For a first setup, use DeepSeek official API through Devo's
+For a first setup, use DeepSeek official API through InfiniteCode's
 Anthropic-compatible provider path. That path is the simplest default when you
 want provider-hosted tools such as `web_search` and `web_fetch`.
 
-## 1. Install Devo
+## 1. Install InfiniteCode
 
 Linux or macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
+irm 'https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1' | iex
 ```
 
 For source builds and offline machines, see [Install](/docs/get-started/install).
@@ -29,7 +29,7 @@ For source builds and offline machines, see [Install](/docs/get-started/install)
 Check that the binary is available:
 
 ```bash
-devo --version
+infinitecode --version
 ```
 
 ## 2. Create A DeepSeek API Key
@@ -55,11 +55,11 @@ DeepSeek lists current base URLs and model names in its official docs:
 
 ## 3. Run Onboarding
 
-Open the repository you want Devo to work in:
+Open the repository you want InfiniteCode to work in:
 
 ```bash
 cd /path/to/your/repo
-devo onboard
+infinitecode onboard
 ```
 
 When onboarding asks for provider details, choose:
@@ -74,23 +74,23 @@ When onboarding asks for provider details, choose:
 For manual config and the OpenAI-compatible DeepSeek path, see
 [Connect DeepSeek](/docs/get-started/connect-deepseek).
 
-## 4. Start Devo
+## 4. Start InfiniteCode
 
-Run Devo from the repository root:
+Run InfiniteCode from the repository root:
 
 ```bash
-devo
+infinitecode
 ```
 
-If onboarding has already configured a provider, Devo opens the TUI directly. If
-no provider is configured, Devo starts onboarding.
+If onboarding has already configured a provider, InfiniteCode opens the TUI directly. If
+no provider is configured, InfiniteCode starts onboarding.
 
 The first screen should give you a composer at the bottom and a transcript area
 above it.
 
 ## 5. Ask A Read-Only First Prompt
 
-Start with a prompt that proves Devo can read the repository before asking it to
+Start with a prompt that proves InfiniteCode can read the repository before asking it to
 edit files:
 
 ```text
@@ -121,12 +121,12 @@ When you know the exact command, use `!` shell mode:
 !npm run lint
 ```
 
-See [@ Fuzzy File Search](/docs/using-devo/fuzzy-file-search) and
-[! Shell Mode](/docs/using-devo/shell-mode) for the exact composer behavior.
+See [@ Fuzzy File Search](/docs/using-infinitecode/fuzzy-file-search) and
+[! Shell Mode](/docs/using-infinitecode/shell-mode) for the exact composer behavior.
 
 ## 7. Verify The Change
 
-Ask Devo to run the relevant checks:
+Ask InfiniteCode to run the relevant checks:
 
 ```text
 Run the checks for this docs change and tell me what passed or failed.
@@ -138,5 +138,5 @@ Then inspect the working tree:
 !git status --short
 ```
 
-Review the diff before committing or continuing. Devo can help explain the diff,
+Review the diff before committing or continuing. InfiniteCode can help explain the diff,
 but the repository state is still yours to accept.

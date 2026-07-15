@@ -1,12 +1,12 @@
 import {
 	extractOpenCodeProviderSettings,
 	formatOpenCodeProviderSettingsPreview,
-} from "@devo/configconv"
+} from "@infinitecode/configconv"
 import type {
 	OpenCodeImportedProvider,
 	OpenCodeProviderSettings,
 	OpenCodeScanResult,
-} from "@devo/configconv"
+} from "@infinitecode/configconv"
 
 interface MigrationFilePreview {
 	path: string

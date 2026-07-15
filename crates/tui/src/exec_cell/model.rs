@@ -8,8 +8,8 @@
 use std::time::Duration;
 use std::time::Instant;
 
-use devo_protocol::parse_command::ParsedCommand;
-use devo_protocol::protocol::ExecCommandSource;
+use infinitecode_protocol::parse_command::ParsedCommand;
+use infinitecode_protocol::protocol::ExecCommandSource;
 use serde_json::Value;
 
 #[derive(Clone, Debug, Default)]

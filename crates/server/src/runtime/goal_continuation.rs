@@ -62,7 +62,7 @@ impl ServerRuntime {
                     .as_ref()
                     .map_or(1, |turn| turn.sequence + 1),
                 status: TurnStatus::Running,
-                kind: devo_core::TurnKind::Regular,
+                kind: infinitecode_core::TurnKind::Regular,
                 model: turn_config.model.slug.clone(),
                 model_binding_id: turn_config.model_binding_id.clone(),
                 reasoning_effort_selection: turn_config.reasoning_effort_selection.clone(),
@@ -200,7 +200,7 @@ impl ServerRuntime {
                                     display_input: String::new(),
                                     input: String::new(),
                                     input_messages: Vec::new(),
-                                    collaboration_mode: devo_protocol::CollaborationMode::Build,
+                                    collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
                                     input_mode: TurnInputMode::HiddenGoalContinuation {
                                         goal: task_goal,
                                     },
@@ -238,7 +238,7 @@ impl ServerRuntime {
         if reservation.active_turn.is_some() {
             return false;
         }
-        if session_handle.collaboration_mode().await == Some(devo_protocol::CollaborationMode::Plan)
+        if session_handle.collaboration_mode().await == Some(infinitecode_protocol::CollaborationMode::Plan)
         {
             return false;
         }
@@ -652,7 +652,7 @@ mod tests {
             session_id: SessionId::new(),
             sequence: 1,
             status,
-            kind: devo_core::TurnKind::Regular,
+            kind: infinitecode_core::TurnKind::Regular,
             model: "model-a".into(),
             model_binding_id: None,
             reasoning_effort_selection: None,

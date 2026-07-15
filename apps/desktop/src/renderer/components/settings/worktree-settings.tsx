@@ -1,7 +1,7 @@
 /**
  * Worktree management settings page.
  *
- * Lists all worktrees across connected projects using the Devo worktree API.
+ * Lists all worktrees across connected projects using the InfiniteCode worktree API.
  * Provides remove and reset actions for each worktree.
  *
  * To avoid excessive API requests, the fetch is gated on a stable "directory key"
@@ -11,7 +11,7 @@
  * per project per re-render.
  */
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import { GitForkIcon, Loader2Icon, RotateCcwIcon, TrashIcon } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useProjectList } from "../../hooks/use-agents"

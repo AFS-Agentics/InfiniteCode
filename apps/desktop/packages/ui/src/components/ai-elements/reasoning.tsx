@@ -4,9 +4,9 @@ import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
-} from "@devo/ui/components/collapsible"
-import { useControllableState } from "@devo/ui/hooks/use-controllable-state"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/collapsible"
+import { useControllableState } from "@infinitecode/ui/hooks/use-controllable-state"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { cjk } from "@streamdown/cjk"
 import { code } from "@streamdown/code"
 import { math } from "@streamdown/math"

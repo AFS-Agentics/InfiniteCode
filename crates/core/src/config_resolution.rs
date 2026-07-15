@@ -27,7 +27,7 @@ pub struct ConfigFilePath {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserAuthPath {
-    /// ~/.devo on macOS/Linux, C:\Users\username\.devo on Windows
+    /// ~/.infinitecode on macOS/Linux, C:\Users\username\.infinitecode on Windows
     pub config_dir: PathBuf,
     /// Always <user-config-dir>/auth.json
     pub auth_path: PathBuf,
@@ -246,16 +246,16 @@ mod tests {
         let user_cfg = LoadedConfigFile {
             path: ConfigFilePath {
                 scope: ConfigScope::User,
-                config_dir: PathBuf::from("/home/user/.devo"),
-                config_path: PathBuf::from("/home/user/.devo/config.toml"),
+                config_dir: PathBuf::from("/home/user/.infinitecode"),
+                config_path: PathBuf::from("/home/user/.infinitecode/config.toml"),
             },
             config: None,
             diagnostics: vec![],
         };
         let user_auth = LoadedUserAuth {
             path: UserAuthPath {
-                config_dir: PathBuf::from("/home/user/.devo"),
-                auth_path: PathBuf::from("/home/user/.devo/auth.json"),
+                config_dir: PathBuf::from("/home/user/.infinitecode"),
+                auth_path: PathBuf::from("/home/user/.infinitecode/auth.json"),
             },
             document: None,
             diagnostics: vec![],
@@ -271,11 +271,11 @@ mod tests {
     #[test]
     fn user_auth_path_always_user_scope() {
         let auth_path = UserAuthPath {
-            config_dir: PathBuf::from("/home/user/.devo"),
-            auth_path: PathBuf::from("/home/user/.devo/auth.json"),
+            config_dir: PathBuf::from("/home/user/.infinitecode"),
+            auth_path: PathBuf::from("/home/user/.infinitecode/auth.json"),
         };
         assert!(auth_path.auth_path.ends_with("auth.json"));
-        assert!(auth_path.config_dir.ends_with(".devo"));
+        assert!(auth_path.config_dir.ends_with(".infinitecode"));
     }
 
     #[test]

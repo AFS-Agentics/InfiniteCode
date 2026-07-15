@@ -2,8 +2,8 @@
  * Compact local runtime indicator for the sidebar footer.
  */
 
-import { Popover, PopoverContent, PopoverTrigger } from "@devo/ui/components/popover"
-import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@devo/ui/components/sidebar"
+import { Popover, PopoverContent, PopoverTrigger } from "@infinitecode/ui/components/popover"
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@infinitecode/ui/components/sidebar"
 import { useNavigate } from "@tanstack/react-router"
 import { useAtomValue } from "jotai"
 import { MonitorIcon, SettingsIcon, TerminalIcon } from "lucide-react"
@@ -28,7 +28,7 @@ export function ServerIndicator() {
 					<PopoverTrigger
 						render={
 							<SidebarMenuButton
-								tooltip={connected ? "Devo runtime connected" : "Devo runtime offline"}
+								tooltip={connected ? "InfiniteCode runtime connected" : "InfiniteCode runtime offline"}
 								className={
 									connected
 										? "h-8 gap-2.5 rounded-lg px-1.5 py-0 text-sm font-normal text-muted-foreground hover:bg-black/[0.04] active:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:active:bg-white/[0.06]"

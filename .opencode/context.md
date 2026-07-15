@@ -1,13 +1,16 @@
 # Project Context
 
-## Completed
-1. **Theme hidden** — ThemeRow kept in source, not rendered. Dark is default.
-2. **apps/website/** — Vite + React 19 + Tailwind v4 + ShadCN marketing site
-3. **apps/web → apps/docs** — Renamed to avoid confusion
-4. **Landing page** — Hero, replaces-paid-tools, feature grid, comparison table (incl. Freebuff), CLI, Desktop, stats, FAQ
-5. **CI fix** — actions/checkout@v4→v5 for Node.js 20 deprecation
-6. **Vercel deploy** — Live at website-l4z64zbsj...vercel.app
-7. **vercel.json** — ignoreCommand: only deploy when apps/website/ changes
+## Stack
+- Monorepo: apps/ (desktop, docs, website), crates/ (Rust agent backend)
+- Website: apps/website — Vite+React19+Tailwindv4+ShadCN, deployed to Vercel
+- Agent backend: Rust binary (infinitecode CLI) — native, cannot run in WebContainer
+
+## New Mission: Actual InfiniteCode Web version
+- Build apps/web: real web client (chat + terminal + file tree)
+- Backend: Node WebSocket server that spawns the infinitecode CLI in a sandbox and streams I/O
+- Wire "Try on Web" button -> deployed web app URL
+- Deploy frontend to Vercel; backend needs a host with the CLI installed
 
 ## Notes
-- WebSection with browser mockup + "Try on Web" button added to landing page
+- WebContainer approach REJECTED: CLI is native Rust, won't run in-browser
+- Use backend WS server + web UI instead

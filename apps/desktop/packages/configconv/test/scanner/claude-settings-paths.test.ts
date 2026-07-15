@@ -26,7 +26,7 @@ const { scanGlobal } = await import("../../src/scanner/claude-config")
 beforeEach(async () => {
 	testDir = join(
 		tmpdir(),
-		`devo-configconv-claude-settings-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		`infinitecode-configconv-claude-settings-${Date.now()}-${Math.random().toString(36).slice(2)}`,
 	)
 	await mkdir(testDir, { recursive: true })
 })

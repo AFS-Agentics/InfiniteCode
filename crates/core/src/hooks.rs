@@ -4,9 +4,9 @@ mod command;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use devo_config::HookCommandConfig;
-use devo_config::HookEvent;
-use devo_config::HooksConfig;
+use infinitecode_config::HookCommandConfig;
+use infinitecode_config::HookEvent;
+use infinitecode_config::HooksConfig;
 use serde_json::Map;
 use serde_json::Value;
 use tracing::warn;
@@ -284,9 +284,9 @@ fn matches_pattern(query: &str, matcher: &str) -> bool {
 mod tests {
     use std::collections::BTreeMap;
 
-    use devo_config::CommandHookConfig;
-    use devo_config::HookCommandConfig;
-    use devo_config::HookMatcherConfig;
+    use infinitecode_config::CommandHookConfig;
+    use infinitecode_config::HookCommandConfig;
+    use infinitecode_config::HookMatcherConfig;
     use pretty_assertions::assert_eq;
 
     use super::*;

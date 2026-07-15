@@ -2,10 +2,10 @@
  * Permission system converter.
  *
  * Claude Code: trust-based with allow/deny/ask lists of "ToolName(pattern)" strings
- * Devo: granular per-tool rules with allow/deny/ask actions and glob patterns
+ * InfiniteCode: granular per-tool rules with allow/deny/ask actions and glob patterns
  */
 import type { ClaudePermissions } from "../types/claude-code"
-import type { DevoPermissionAction } from "../types/devo"
+import type { InfiniteCodePermissionAction } from "../types/infinitecode"
 
 /**
  * Internal mutable permission map.
@@ -14,13 +14,13 @@ import type { DevoPermissionAction } from "../types/devo"
  */
 type PermissionMap = Record<
 	string,
-	DevoPermissionAction | Record<string, DevoPermissionAction>
+	InfiniteCodePermissionAction | Record<string, InfiniteCodePermissionAction>
 >
 
 import type { MigrationReport } from "../types/report"
 import { createEmptyReport } from "../types/report"
 
-/** Tool name mapping: Claude Code -> Devo */
+/** Tool name mapping: Claude Code -> InfiniteCode */
 const TOOL_NAME_MAP: Record<string, string> = {
 	Read: "read",
 	Write: "write",
@@ -56,7 +56,7 @@ export function parseToolPattern(raw: string): ParsedToolPattern | null {
 }
 
 /**
- * Map a Claude Code tool name to an Devo permission key.
+ * Map a Claude Code tool name to an InfiniteCode permission key.
  */
 export function mapToolName(ccToolName: string): string | null {
 	return TOOL_NAME_MAP[ccToolName] ?? null
@@ -68,7 +68,7 @@ export interface PermissionConversionResult {
 }
 
 /**
- * Convert Claude Code permissions to Devo permission format.
+ * Convert Claude Code permissions to InfiniteCode permission format.
  */
 export function convertPermissions(
 	ccPermissions?: ClaudePermissions,
@@ -118,7 +118,7 @@ export function convertPermissions(
 
 function processToolPatterns(
 	patterns: string[],
-	action: DevoPermissionAction,
+	action: InfiniteCodePermissionAction,
 	permission: PermissionMap,
 	report: MigrationReport,
 ): void {
@@ -184,7 +184,7 @@ function simplifyPermissions(permission: PermissionMap): void {
 }
 
 /**
- * Convert a Claude Code tool list (from agent frontmatter) to Devo permissions.
+ * Convert a Claude Code tool list (from agent frontmatter) to InfiniteCode permissions.
  * Example: "Read, Edit, Bash, Grep" -> { read: "allow", edit: "allow", bash: "ask", ... }
  */
 export function convertToolListToPermissions(toolList: string): PermissionMap {

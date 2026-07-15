@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use devo_protocol::CollaborationMode;
+use infinitecode_protocol::CollaborationMode;
 use serde_json::json;
 
 use crate::contracts::{

@@ -1,7 +1,7 @@
 use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
 
-use devo_core::{
+use infinitecode_core::{
     FileRestoreOutcome, RestoreFileStatus, ToolResultItem, TurnId, TurnItem,
     TurnWorkspaceRestoreCompletedRecord, TurnWorkspaceRestoreStartedRecord, WorkspaceRestorePolicy,
 };
@@ -589,8 +589,8 @@ mod tests {
         let turn_id = TurnId::new();
         let item = PersistedTurnItem {
             turn_id,
-            turn_kind: devo_core::TurnKind::Regular,
-            item_id: devo_core::ItemId::new(),
+            turn_kind: infinitecode_core::TurnKind::Regular,
+            item_id: infinitecode_core::ItemId::new(),
             turn_item: TurnItem::ToolResult(ToolResultItem {
                 tool_call_id: "call-1".to_string(),
                 tool_name: Some("apply_patch".to_string()),
@@ -631,8 +631,8 @@ mod tests {
         let turn_id = TurnId::new();
         let item = PersistedTurnItem {
             turn_id,
-            turn_kind: devo_core::TurnKind::Regular,
-            item_id: devo_core::ItemId::new(),
+            turn_kind: infinitecode_core::TurnKind::Regular,
+            item_id: infinitecode_core::ItemId::new(),
             turn_item: TurnItem::ToolResult(ToolResultItem {
                 tool_call_id: "call-1".to_string(),
                 tool_name: Some("apply_patch".to_string()),
@@ -681,8 +681,8 @@ mod tests {
         let turn_id = TurnId::new();
         let item = PersistedTurnItem {
             turn_id,
-            turn_kind: devo_core::TurnKind::Regular,
-            item_id: devo_core::ItemId::new(),
+            turn_kind: infinitecode_core::TurnKind::Regular,
+            item_id: infinitecode_core::ItemId::new(),
             turn_item: TurnItem::ToolResult(ToolResultItem {
                 tool_call_id: "call-1".to_string(),
                 tool_name: Some("apply_patch".to_string()),

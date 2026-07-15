@@ -6,5 +6,5 @@ fn main() -> std::io::Result<()> {
         std::process::exit(2);
     };
 
-    devo_protocol::acp_ts::write_acp_typescript_dir(PathBuf::from(output_dir))
+    infinitecode_protocol::acp_ts::write_acp_typescript_dir(PathBuf::from(output_dir))
 }

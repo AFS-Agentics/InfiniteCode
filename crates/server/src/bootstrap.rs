@@ -3,16 +3,16 @@ use std::sync::Arc;
 use anyhow::Result;
 use clap::Parser;
 use clap::ValueEnum;
-use devo_core::AgentsMdConfig;
-use devo_core::AppConfigStore;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::ModelCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::tools::ToolPlanConfig;
-use devo_core::tools::handlers;
-use devo_mcp::manager::RmcpMcpManager;
-use devo_util_paths::FileSystemConfigPathResolver;
+use infinitecode_core::AgentsMdConfig;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::ModelCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::tools::ToolPlanConfig;
+use infinitecode_core::tools::handlers;
+use infinitecode_mcp::manager::RmcpMcpManager;
+use infinitecode_util_paths::FileSystemConfigPathResolver;
 
 use crate::ListenTarget;
 use crate::ServerRuntime;
@@ -40,7 +40,7 @@ pub enum ServerTransportMode {
 
 /// Command-line arguments accepted by the standalone server process entrypoint.
 #[derive(Debug, Clone, PartialEq, Eq, Parser)]
-#[command(name = "devo-server", version, about)]
+#[command(name = "infinitecode-server", version, about)]
 pub struct ServerProcessArgs {
     /// Override the transport mode used by this server process.
     #[arg(long, value_enum, hide = true, default_value_t = ServerTransportMode::Config)]
@@ -83,7 +83,7 @@ pub struct ServerProcessRunOptions {
 ///
 /// ## Singleton server (`singleton.rs`)
 ///
-/// Devo allows at most **one real server process** per `DEVO_HOME`. Coordination
+/// InfiniteCode allows at most **one real server process** per `INFINITECODE_HOME`. Coordination
 /// uses a file lock (`server.lock`) plus metadata (`server.lock.json`) that
 /// records pid, a loopback WebSocket endpoint, and an auth token.
 ///
@@ -100,10 +100,10 @@ pub struct ServerProcessRunOptions {
 /// The real server exposes an extra **loopback-only** WebSocket listener
 /// (`127.0.0.1:0`, ephemeral port). It is used for:
 ///
-/// 1. **Stdio proxy clients** — a second `devo server --transport stdio` connects
+/// 1. **Stdio proxy clients** — a second `infinitecode server --transport stdio` connects
 ///    here and pipes stdin/stdout through WebSocket frames (see `run_stdio_proxy`).
-/// 2. **Control plane** — `devo server --status` / `--shutdown` send
-///    `_devo/server/status` or `_devo/server/shutdown` after token auth.
+/// 2. **Control plane** — `infinitecode server --status` / `--shutdown` send
+///    `_infinitecode/server/status` or `_infinitecode/server/shutdown` after token auth.
 ///
 /// The published `endpoint` in `server.lock.json` is this internal proxy URL, not
 /// the public config WebSocket address.
@@ -114,14 +114,14 @@ pub async fn run_server_process(
     let resolver = FileSystemConfigPathResolver::from_env()?;
     let action = args.action()?;
     // Decide whether this process is the one true server or a lightweight proxy/
-    // control client. Lock file lives under DEVO_HOME (see singleton.rs).
+    // control client. Lock file lives under INFINITECODE_HOME (see singleton.rs).
     let singleton_role = acquire_singleton_role(&resolver.user_config_dir())?;
     let real_server_guard = match singleton_role {
         SingletonRole::Real(guard) => match action {
             ServerProcessAction::Run => guard,
             ServerProcessAction::Status | ServerProcessAction::Shutdown => {
                 // We hold the lock but were not asked to run — no metadata file yet.
-                println!("devo server is not running");
+                println!("infinitecode server is not running");
                 return Ok(());
             }
         },
@@ -138,7 +138,7 @@ pub async fn run_server_process(
             // Non-stdio second instances are rejected (would duplicate listeners).
             ServerProcessAction::Run => {
                 print_existing_server_status(&metadata, "already running");
-                println!("Use `devo server --shutdown` to stop it.");
+                println!("Use `infinitecode server --shutdown` to stop it.");
                 return Ok(());
             }
             // `--status` / `--shutdown`: one-shot WebSocket control, then exit.
@@ -207,7 +207,7 @@ pub async fn run_server_process(
     let default_model = model_catalog.resolve_for_turn(None)?.slug.clone();
     if !config.has_provider_configuration() {
         tracing::warn!(
-            "No provider configured. Run `devo onboard` to complete setup; continuing with onboarding-capable server"
+            "No provider configured. Run `infinitecode onboard` to complete setup; continuing with onboarding-capable server"
         );
     }
     let provider = load_server_provider(
@@ -215,14 +215,14 @@ pub async fn run_server_process(
         Some(default_model.as_str()),
         &resolver.user_config_dir(),
     )?;
-    let skill_catalog = Box::new(FileSystemSkillCatalog::with_devo_home(
+    let skill_catalog = Box::new(FileSystemSkillCatalog::with_infinitecode_home(
         config.skills.clone(),
         resolver.user_config_dir(),
         std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from(".")),
         config.project_root_markers.clone(),
     ));
     // Initialize SQLite database
-    let db_path = resolver.user_config_dir().join("devo.db");
+    let db_path = resolver.user_config_dir().join("infinitecode.db");
     tracing::info!(db_path = %db_path.display(), "opening database");
     let db = Arc::new(Database::open(db_path)?);
 
@@ -248,7 +248,7 @@ pub async fn run_server_process(
     );
     runtime
         .run_global_hook(
-            devo_core::HookEvent::Setup,
+            infinitecode_core::HookEvent::Setup,
             serde_json::Map::from_iter([("trigger".to_string(), serde_json::json!("init"))]),
         )
         .await;
@@ -262,7 +262,7 @@ pub async fn run_server_process(
 
     // Concurrent listeners: configured stdio/ws targets + internal proxy task.
     // Returns when any listener exits; shutdown also via Ctrl+C, external token,
-    // or internal-proxy `_devo/server/shutdown` (cancels shutdown_signal).
+    // or internal-proxy `_infinitecode/server/shutdown` (cancels shutdown_signal).
     tokio::select! {
         result = run_listeners_with_internal_proxy(
             runtime.clone(),
@@ -293,7 +293,7 @@ pub async fn run_server_process(
 }
 
 fn print_existing_server_status(metadata: &crate::singleton::ServerLockMetadata, status: &str) {
-    println!("devo server {status}");
+    println!("infinitecode server {status}");
     println!("pid: {}", metadata.pid);
     println!("endpoint: {}", metadata.endpoint);
     println!("started_at: {}", metadata.started_at);
@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn server_process_args_default_to_config_transport() {
-        let args = ServerProcessArgs::parse_from(["devo-server"]);
+        let args = ServerProcessArgs::parse_from(["infinitecode-server"]);
 
         assert_eq!(args.transport, ServerTransportMode::Config);
         assert_eq!(
@@ -330,7 +330,7 @@ mod tests {
 
     #[test]
     fn server_process_args_accept_stdio_transport_override() {
-        let args = ServerProcessArgs::parse_from(["devo-server", "--transport", "stdio"]);
+        let args = ServerProcessArgs::parse_from(["infinitecode-server", "--transport", "stdio"]);
 
         assert_eq!(args.transport, ServerTransportMode::Stdio);
         assert_eq!(
@@ -341,7 +341,7 @@ mod tests {
 
     #[test]
     fn server_process_args_accept_websocket_transport_override() {
-        let args = ServerProcessArgs::parse_from(["devo-server", "--transport", "websocket"]);
+        let args = ServerProcessArgs::parse_from(["infinitecode-server", "--transport", "websocket"]);
 
         assert_eq!(args.transport, ServerTransportMode::WebSocket);
         assert_eq!(
@@ -352,7 +352,7 @@ mod tests {
 
     #[test]
     fn server_process_args_accept_status_action() {
-        let args = ServerProcessArgs::parse_from(["devo-server", "--status"]);
+        let args = ServerProcessArgs::parse_from(["infinitecode-server", "--status"]);
 
         assert_eq!(
             args.action().expect("action"),
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn server_process_args_accept_shutdown_action() {
-        let args = ServerProcessArgs::parse_from(["devo-server", "--shutdown"]);
+        let args = ServerProcessArgs::parse_from(["infinitecode-server", "--shutdown"]);
 
         assert_eq!(
             args.action().expect("action"),
@@ -372,7 +372,7 @@ mod tests {
 
     #[test]
     fn server_process_args_reject_conflicting_actions() {
-        let args = ServerProcessArgs::parse_from(["devo-server", "--status", "--shutdown"]);
+        let args = ServerProcessArgs::parse_from(["infinitecode-server", "--status", "--shutdown"]);
 
         assert_eq!(
             args.action().expect_err("conflicting actions").to_string(),
@@ -382,7 +382,7 @@ mod tests {
 
     #[test]
     fn server_process_args_reject_working_root() {
-        let error = ServerProcessArgs::try_parse_from(["devo-server", "--working-root", "."])
+        let error = ServerProcessArgs::try_parse_from(["infinitecode-server", "--working-root", "."])
             .expect_err("working root is no longer a server bootstrap parameter");
 
         assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);

@@ -85,9 +85,9 @@ describe("StdioAcpClient", () => {
 		})
 
 		expect(env).toMatchObject({
-			DEVO_DESKTOP_NETWORK_PROXY_MODE: "custom",
-			DEVO_DESKTOP_NETWORK_PROXY_URL: "socks5h://127.0.0.1:7890",
-			DEVO_DESKTOP_NETWORK_NO_PROXY: "localhost,127.0.0.1,::1",
+			INFINITECODE_DESKTOP_NETWORK_PROXY_MODE: "custom",
+			INFINITECODE_DESKTOP_NETWORK_PROXY_URL: "socks5h://127.0.0.1:7890",
+			INFINITECODE_DESKTOP_NETWORK_NO_PROXY: "localhost,127.0.0.1,::1",
 			HTTP_PROXY: "socks5h://127.0.0.1:7890",
 			HTTPS_PROXY: "socks5h://127.0.0.1:7890",
 			ALL_PROXY: "socks5h://127.0.0.1:7890",
@@ -118,7 +118,7 @@ describe("StdioAcpClient", () => {
 		})
 
 		expect(env).toMatchObject({
-			DEVO_DESKTOP_NETWORK_PROXY_MODE: "off",
+			INFINITECODE_DESKTOP_NETWORK_PROXY_MODE: "off",
 		})
 		expect(env).not.toHaveProperty("HTTP_PROXY")
 		expect(env).not.toHaveProperty("HTTPS_PROXY")
@@ -147,7 +147,7 @@ describe("StdioAcpClient", () => {
 
 		expect(env).toMatchObject({
 			HTTP_PROXY: "http://proxy.example:8080",
-			DEVO_DESKTOP_NETWORK_PROXY_MODE: "system",
+			INFINITECODE_DESKTOP_NETWORK_PROXY_MODE: "system",
 		})
 	})
 

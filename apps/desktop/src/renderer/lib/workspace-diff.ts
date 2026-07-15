@@ -2,7 +2,7 @@ import type {
 	WorkspaceChangedFile,
 	WorkspaceChangedFileStatus,
 	WorkspaceChangeView,
-} from "@devo-ai/sdk/v2/client"
+} from "@infinitecode-ai/sdk/v2/client"
 
 export type ReviewFileStatus = "added" | "deleted" | "modified"
 

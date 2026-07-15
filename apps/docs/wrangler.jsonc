@@ -1,7 +1,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"main": ".open-next/worker.js",
-	"name": "devo-website",
+	"name": "infinitecode-website",
 	"compatibility_date": "2026-05-31",
 	"compatibility_flags": [
 		"nodejs_compat",
@@ -16,7 +16,7 @@
 			// Self-reference service binding, the service name must match the worker name
 			// see https://opennext.js.org/cloudflare/caching
 			"binding": "WORKER_SELF_REFERENCE",
-			"service": "devo-website"
+			"service": "infinitecode-website"
 		}
 	],
 	"r2_buckets": [
@@ -27,13 +27,13 @@
 			// Create the bucket before deploying
 			// You can change the bucket name if you want
 			// See https://developers.cloudflare.com/workers/wrangler/commands/#r2-bucket-create
-			"bucket_name": "devo"
+			"bucket_name": "infinitecode"
 		}
 	],
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "devo-waitlist",
+			"database_name": "infinitecode-waitlist",
 			"database_id": "04326f60-d327-4848-9567-3e52cc0665a3"
 		}
 	],

@@ -1,24 +1,24 @@
 <div align="center">
 
-<img src="./.github/assets/devo-readme-brand.svg" alt="Devo desktop coding agent app icon and wordmark" width="360" />
+<img src="./.github/assets/infinitecode-readme-brand.svg" alt="InfiniteCode desktop coding agent app icon and wordmark" width="360" />
 
 </div>
 
 <div align="center">
 
-**Devo is an open-source coding agent with a Desktop app, terminal TUI/CLI, and model-neutral Rust runtime for private, enterprise, and OpenAI-compatible model environments. Connect DeepSeek, Qwen, Kimi, Anthropic-compatible APIs, local gateways, or your own model endpoint.**
+**InfiniteCode is an open-source coding agent with a Desktop app, terminal TUI/CLI, and model-neutral Rust runtime for private, enterprise, and OpenAI-compatible model environments. Connect DeepSeek, Qwen, Kimi, Anthropic-compatible APIs, local gateways, or your own model endpoint.**
 
-[![Stars](https://img.shields.io/github/stars/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/stargazers)
+[![Stars](https://img.shields.io/github/stars/AFS-Agentics/InfiniteCode?style=flat-square)](https://github.com/AFS-Agentics/InfiniteCode/stargazers)
 [![Language](https://img.shields.io/badge/language-Rust-E57324?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/7df-lab/devo/pulls)
-[![CI](https://img.shields.io/github/actions/workflow/status/7df-lab/devo/ci.yml?branch=main&style=flat-square)](https://github.com/7df-lab/devo/actions)
-[![Release](https://img.shields.io/github/v/release/7df-lab/devo?style=flat-square)](https://github.com/7df-lab/devo/releases)
-[![AUR version](https://img.shields.io/aur/version/devo-bin?color=%231793d1&label=AUR&logo=arch-linux&logoColor=%23fff&style=flat-square)](https://aur.archlinux.org/packages/devo-bin/)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square)](https://github.com/AFS-Agentics/InfiniteCode/pulls)
+[![CI](https://img.shields.io/github/actions/workflow/status/AFS-Agentics/InfiniteCode/ci.yml?branch=main&style=flat-square)](https://github.com/AFS-Agentics/InfiniteCode/actions)
+[![Release](https://img.shields.io/github/v/release/AFS-Agentics/InfiniteCode?style=flat-square)](https://github.com/AFS-Agentics/InfiniteCode/releases)
+[![AUR version](https://img.shields.io/aur/version/infinitecode-bin?color=%231793d1&label=AUR&logo=arch-linux&logoColor=%23fff&style=flat-square)](https://aur.archlinux.org/packages/infinitecode-bin/)
 
 [English](./README.md) | [简体中文](./README.zh-Hans.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-[Why Devo](#why-devo) · [Screenshots](#screenshots) · [Features](#features) · [Tested Models](#tested-models) · [Tested Platforms](#tested-platforms) · [Install](#installation) · [Quick Start](#quick-start) · [Docs](#docs)
+[Why InfiniteCode](#why-infinitecode) · [Screenshots](#screenshots) · [Features](#features) · [Tested Models](#tested-models) · [Tested Platforms](#tested-platforms) · [Install](#installation) · [Quick Start](#quick-start) · [Docs](#docs)
 
 </div>
 
@@ -27,16 +27,16 @@
 ## Screenshots
 
 <p align="center">
-  <img width="100%" alt="Devo desktop coding agent app showing a repository conversation, project sidebar, and model controls" src="./.github/assets/devo-desktop-coding-agent-screenshot.png" />
+  <img width="100%" alt="InfiniteCode desktop coding agent app showing a repository conversation, project sidebar, and model controls" src="./.github/assets/infinitecode-desktop-coding-agent-screenshot.png" />
 </p>
 
 <p align="center">
-  <img width="100%" alt="Devo terminal TUI coding agent running in a local repository with model, context, and token status" src="./.github/assets/devo-terminal-tui-coding-agent-screenshot.png" />
+  <img width="100%" alt="InfiniteCode terminal TUI coding agent running in a local repository with model, context, and token status" src="./.github/assets/infinitecode-terminal-tui-coding-agent-screenshot.png" />
 </p>
 
-## Why Devo
+## Why InfiniteCode
 
-Devo is for teams that need a coding agent outside a single hosted model
+InfiniteCode is for teams that need a coding agent outside a single hosted model
 ecosystem. It keeps the desktop experience, terminal workflow, model choice,
 runtime behavior, and workspace execution under your control.
 
@@ -44,7 +44,7 @@ runtime behavior, and workspace execution under your control.
   OpenAI-compatible Responses, Anthropic Messages, DeepSeek, Qwen, Kimi, or
   private model gateways through provider/model bindings.
 - **Works in private and intranet environments** - Run a single local Rust
-  binary, support offline installation paths, and point Devo at internal
+  binary, support offline installation paths, and point InfiniteCode at internal
   endpoints without depending on a hosted agent service.
 - **One agent across Desktop and terminal** - Use the Desktop app for visual
   onboarding and daily coding, or the CLI/TUI for terminal-native automation,
@@ -65,7 +65,7 @@ runtime behavior, and workspace execution under your control.
   [Model Context Protocol](https://modelcontextprotocol.io/) servers.
 - **Skill support** - Package repeatable workflows, instructions, scripts, and
   references as reusable [Agent Skills](https://agentskills.io/).
-- **Long-running task support** - Let Devo manage context automatically across
+- **Long-running task support** - Let InfiniteCode manage context automatically across
   multi-turn work instead of losing the thread as tasks grow.
 - **Multi-agent support** - Split work across specialized agents while keeping
   coordination visible in the session.
@@ -92,7 +92,7 @@ runtime behavior, and workspace execution under your control.
   <img alt="Kimi K2.5" src="https://img.shields.io/badge/Kimi-K2.5-111111?style=flat-square&logo=moonshotai&logoColor=white" />
 </p>
 
-Devo's built-in model catalog includes tested model definitions for Qwen, Kimi,
+InfiniteCode's built-in model catalog includes tested model definitions for Qwen, Kimi,
 MiniMax, GLM, and DeepSeek. Provider endpoints remain configurable through
 provider/model bindings.
 
@@ -104,7 +104,7 @@ provider/model bindings.
   <img alt="Windows tested" src="https://img.shields.io/badge/Windows-tested-0078D4?style=flat-square&logo=windows&logoColor=white" />
 </p>
 
-Devo has been tested on macOS, Linux, Windows, and Kylin OS.
+InfiniteCode has been tested on macOS, Linux, Windows, and Kylin OS.
 
 ### For Chinese Enterprise Users
 
@@ -120,47 +120,47 @@ welcome to build, test, and publish releases for that platform.
 
 ## Installation
 
-Devo can be installed in two forms. Pick the Desktop app for a graphical coding
+InfiniteCode can be installed in two forms. Pick the Desktop app for a graphical coding
 agent workspace, the terminal-native TUI/CLI for shell-first development, or
 install both on the same machine.
 
 ### Option 1: Desktop App
 
-Start here if you want the graphical Devo experience. Download the latest Devo
-Desktop package from [GitHub Releases](https://github.com/7df-lab/devo/releases/latest),
+Start here if you want the graphical InfiniteCode experience. Download the latest InfiniteCode
+Desktop package from [GitHub Releases](https://github.com/AFS-Agentics/InfiniteCode/releases/latest),
 then choose the asset that matches your operating system and architecture:
 
-- **macOS** - download the `devo-desktop-...-mac-...` `.dmg` or `.zip` asset.
-- **Windows** - download the `devo-desktop-...-windows-...` `.exe` asset.
-- **Linux** - download the `devo-desktop-...-linux-...` `.AppImage`, `.deb`, or
+- **macOS** - download the `infinitecode-desktop-...-mac-...` `.dmg` or `.zip` asset.
+- **Windows** - download the `infinitecode-desktop-...-windows-...` `.exe` asset.
+- **Linux** - download the `infinitecode-desktop-...-linux-...` `.AppImage`, `.deb`, or
   `.rpm` asset.
 
-**If macOS reports that `Devo.app` is damaged and cannot be opened, this is
+**If macOS reports that `InfiniteCode.app` is damaged and cannot be opened, this is
 expected.** Current macOS Desktop builds are unsigned, so after installing,
 run the following command so macOS can launch the app:
 
 ```bash
-sudo xattr -dr com.apple.quarantine /Applications/Devo.app
+sudo xattr -dr com.apple.quarantine /Applications/InfiniteCode.app
 ```
 
 ### Option 2: TUI / CLI
 
-Install the terminal-native `devo` command if you prefer the TUI, want shell
-automation, or want to use Devo alongside the Desktop app.
+Install the terminal-native `infinitecode` command if you prefer the TUI, want shell
+automation, or want to use InfiniteCode alongside the Desktop app.
 
 Linux / macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh
 ```
 
 Windows:
 
 ```powershell
-irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
+irm 'https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1' | iex
 ```
 
-The online installer places `devo` under the Devo home directory, installs the
+The online installer places `infinitecode` under the InfiniteCode home directory, installs the
 `rg` sidecar used for fast repository search, and supports optional setup for
 the local model used by `code_search`.
 
@@ -172,13 +172,13 @@ Use this only if you want the Hugging Face model downloaded during installation.
 Linux / macOS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/7df-lab/devo/main/install.sh | sh -s -- --install-code-search-model
+curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh -s -- --install-code-search-model
 ```
 
 Windows:
 
 ```powershell
-$env:DEVO_INSTALL_CODE_SEARCH_MODEL = "1"; irm 'https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1' | iex
+$env:INFINITECODE_INSTALL_CODE_SEARCH_MODEL = "1"; irm 'https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1' | iex
 ```
 
 </details>
@@ -186,7 +186,7 @@ $env:DEVO_INSTALL_CODE_SEARCH_MODEL = "1"; irm 'https://raw.githubusercontent.co
 Upgrade an existing installation to the latest release:
 
 ```bash
-devo upgrade
+infinitecode upgrade
 ```
 
 The upgrade command runs the same platform installer, and the installer prints
@@ -201,19 +201,19 @@ Configure a provider, open a repository, and start the TUI:
 
 ```bash
 cd /path/to/your/repo
-devo onboard
+infinitecode onboard
 ```
 
 Useful commands:
 
 ```bash
-devo                         # start the interactive TUI in the current repo
-devo resume <session-id>
+infinitecode                         # start the interactive TUI in the current repo
+infinitecode resume <session-id>
 ```
 
 ## Configuration
 
-`devo onboard` is the recommended setup path. For manual `config.toml` paths,
+`infinitecode onboard` is the recommended setup path. For manual `config.toml` paths,
 provider/model binding fields, and custom model catalog examples, see
 [Configuration](./docs/configuration.md).
 
@@ -226,7 +226,7 @@ provider/model binding fields, and custom model catalog examples, see
 
 ### What is the project status?
 
-Devo is pre-1.0 and actively developed. It is ready for local evaluation,
+InfiniteCode is pre-1.0 and actively developed. It is ready for local evaluation,
 experiments, and contributor use; public APIs and configuration may still
 change.
 
@@ -242,7 +242,7 @@ provider/model bindings.
 Use the Desktop app when you want visual onboarding, session browsing, and a
 graphical coding workspace. Use the TUI/CLI when you want terminal-native
 automation, remote shell workflows, or a coding agent that stays inside your
-existing command-line setup. Both surfaces target the same local Devo runtime.
+existing command-line setup. Both surfaces target the same local InfiniteCode runtime.
 
 ## Contributing
 
@@ -258,11 +258,11 @@ Open an issue or pull request to discuss changes.
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=7df-lab%2Fdevo&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=7df-lab%2Finfinitecode&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=7df-lab/devo&type=date&theme=dark&legend=top-left&sealed_token=MnUnrvz2y0jVX7ra8V0X5Z6AvrYDpTndpzZkHP-0ilm9g4EpwuNEvvmJfE8I2qMI8tDhAkn5a2T5dks7vIrGvP1eVw3ov01-m4_l7zJyWuuAFP-f4MSHSvyRJVhkhWmoioiwBNutxCcNuvDtZkufcwHISOkZglpGH7tZhIZDj-ITupTBDzZmBVfI-_DU" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=7df-lab/devo&type=date&legend=top-left&sealed_token=MnUnrvz2y0jVX7ra8V0X5Z6AvrYDpTndpzZkHP-0ilm9g4EpwuNEvvmJfE8I2qMI8tDhAkn5a2T5dks7vIrGvP1eVw3ov01-m4_l7zJyWuuAFP-f4MSHSvyRJVhkhWmoioiwBNutxCcNuvDtZkufcwHISOkZglpGH7tZhIZDj-ITupTBDzZmBVfI-_DU" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=7df-lab/devo&type=date&legend=top-left&sealed_token=MnUnrvz2y0jVX7ra8V0X5Z6AvrYDpTndpzZkHP-0ilm9g4EpwuNEvvmJfE8I2qMI8tDhAkn5a2T5dks7vIrGvP1eVw3ov01-m4_l7zJyWuuAFP-f4MSHSvyRJVhkhWmoioiwBNutxCcNuvDtZkufcwHISOkZglpGH7tZhIZDj-ITupTBDzZmBVfI-_DU" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=AFS-Agentics/InfiniteCode&type=date&theme=dark&legend=top-left&sealed_token=MnUnrvz2y0jVX7ra8V0X5Z6AvrYDpTndpzZkHP-0ilm9g4EpwuNEvvmJfE8I2qMI8tDhAkn5a2T5dks7vIrGvP1eVw3ov01-m4_l7zJyWuuAFP-f4MSHSvyRJVhkhWmoioiwBNutxCcNuvDtZkufcwHISOkZglpGH7tZhIZDj-ITupTBDzZmBVfI-_DU" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=AFS-Agentics/InfiniteCode&type=date&legend=top-left&sealed_token=MnUnrvz2y0jVX7ra8V0X5Z6AvrYDpTndpzZkHP-0ilm9g4EpwuNEvvmJfE8I2qMI8tDhAkn5a2T5dks7vIrGvP1eVw3ov01-m4_l7zJyWuuAFP-f4MSHSvyRJVhkhWmoioiwBNutxCcNuvDtZkufcwHISOkZglpGH7tZhIZDj-ITupTBDzZmBVfI-_DU" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=AFS-Agentics/InfiniteCode&type=date&legend=top-left&sealed_token=MnUnrvz2y0jVX7ra8V0X5Z6AvrYDpTndpzZkHP-0ilm9g4EpwuNEvvmJfE8I2qMI8tDhAkn5a2T5dks7vIrGvP1eVw3ov01-m4_l7zJyWuuAFP-f4MSHSvyRJVhkhWmoioiwBNutxCcNuvDtZkufcwHISOkZglpGH7tZhIZDj-ITupTBDzZmBVfI-_DU" />
  </picture>
 </a>
 
@@ -272,4 +272,4 @@ This project is licensed under the [MIT License](./LICENSE).
 
 ---
 
-**If you find Devo useful, please consider giving it a star.**
+**If you find InfiniteCode useful, please consider giving it a star.**

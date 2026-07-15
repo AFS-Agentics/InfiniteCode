@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use devo_core::tools::{
+use infinitecode_core::tools::{
     ToolAgentScope, ToolCall, ToolCallResult, ToolContent, ToolExecutionOptions, ToolRuntime,
     ToolRuntimeContext,
 };
-use devo_core::{CommandExecutionItem, SessionId, TurnItem};
-use devo_protocol::TurnFailedPayload;
-use devo_util_shell_command::parse_command::parse_command;
+use infinitecode_core::{CommandExecutionItem, SessionId, TurnItem};
+use infinitecode_protocol::TurnFailedPayload;
+use infinitecode_util_shell_command::parse_command::parse_command;
 use tokio_util::sync::CancellationToken;
 
 use super::super::*;
@@ -90,7 +90,7 @@ impl ServerRuntime {
                 turn_id: Some(turn.turn_id.to_string()),
                 cwd,
                 agent_scope: ToolAgentScope::Parent,
-                collaboration_mode: devo_protocol::CollaborationMode::Build,
+                collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
                 agent_coordinator: None,
                 client_filesystem: None,
                 client_terminal: None,
@@ -108,7 +108,7 @@ impl ServerRuntime {
                     Box::pin(async move {
                         runtime
                             .broadcast_event(ServerEvent::ToolCallStatusUpdated(
-                                devo_protocol::ToolCallStatusUpdatedPayload {
+                                infinitecode_protocol::ToolCallStatusUpdatedPayload {
                                     session_id: tool_execution_start_session_id,
                                     turn_id: tool_execution_start_turn_id,
                                     tool_call_id,

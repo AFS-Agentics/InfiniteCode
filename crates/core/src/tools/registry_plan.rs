@@ -6,7 +6,7 @@ use crate::tool_spec::{
     ToolCapabilityTag, ToolExecutionMode, ToolOutputMode, ToolPreparationFeedback, ToolSpec,
 };
 use crate::tools::websearch_prompt::web_search_prompt;
-use devo_config::AppConfig;
+use infinitecode_config::AppConfig;
 
 const BASH_DESCRIPTION: &str = include_str!("bash.txt");
 const READ_DESCRIPTION: &str = include_str!("read.txt");
@@ -520,34 +520,34 @@ fn webfetch_schema() -> JsonSchema {
 }
 
 fn app_config_uses_local_web_search(config: &AppConfig) -> bool {
-    config.tools.web_search.mode == devo_config::WebSearchMode::Local
+    config.tools.web_search.mode == infinitecode_config::WebSearchMode::Local
         || config.provider.providers.values().any(|provider| {
             provider
                 .web_search
                 .as_ref()
-                .is_some_and(|web_search| web_search.mode == devo_config::WebSearchMode::Local)
+                .is_some_and(|web_search| web_search.mode == infinitecode_config::WebSearchMode::Local)
         })
         || config.provider.model_bindings.values().any(|binding| {
             binding
                 .web_search
                 .as_ref()
-                .is_some_and(|web_search| web_search.mode == devo_config::WebSearchMode::Local)
+                .is_some_and(|web_search| web_search.mode == infinitecode_config::WebSearchMode::Local)
         })
 }
 
 fn app_config_uses_local_web_fetch(config: &AppConfig) -> bool {
-    config.tools.web_fetch.mode == devo_config::WebFetchMode::Local
+    config.tools.web_fetch.mode == infinitecode_config::WebFetchMode::Local
         || config.provider.providers.values().any(|provider| {
             provider
                 .web_fetch
                 .as_ref()
-                .is_some_and(|web_fetch| web_fetch.mode == devo_config::WebFetchMode::Local)
+                .is_some_and(|web_fetch| web_fetch.mode == infinitecode_config::WebFetchMode::Local)
         })
         || config.provider.model_bindings.values().any(|binding| {
             binding
                 .web_fetch
                 .as_ref()
-                .is_some_and(|web_fetch| web_fetch.mode == devo_config::WebFetchMode::Local)
+                .is_some_and(|web_fetch| web_fetch.mode == infinitecode_config::WebFetchMode::Local)
         })
 }
 
@@ -1014,7 +1014,7 @@ mod tests {
     #[test]
     fn config_from_app_config_copies_disabled_code_search() {
         let app_config = AppConfig {
-            experimental: devo_config::ExperimentalConfig { code_search: false },
+            experimental: infinitecode_config::ExperimentalConfig { code_search: false },
             ..AppConfig::default()
         };
         let config = ToolPlanConfig::from_app_config(&app_config);

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use devo_safety::{
+use infinitecode_safety::{
     ApprovalCache, ApprovalScope, EffectiveSandboxPolicy, FileSystemPolicyRecord, NetworkPolicy,
     PermissionDecision, PermissionPolicy, PermissionRequest, PolicyModelSelection, PolicySnapshot,
     ResourceKind, SafetyPolicyMode, SandboxMode, SandboxPolicyRecord, StaticPermissionPolicy,

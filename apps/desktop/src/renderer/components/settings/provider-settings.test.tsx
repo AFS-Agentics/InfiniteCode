@@ -1,11 +1,11 @@
 import { describe, expect, mock, test } from "bun:test"
-import type { ProviderVendor } from "@devo-ai/sdk/v2/client"
+import type { ProviderVendor } from "@infinitecode-ai/sdk/v2/client"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import type React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 import type { ProviderVendorFormValues } from "./provider-vendor-dialog"
 
-mock.module("@devo/ui/components/dialog", () => ({
+mock.module("@infinitecode/ui/components/dialog", () => ({
 	Dialog: ({ children }: { children: React.ReactNode }) => <div data-slot="dialog">{children}</div>,
 	DialogContent: ({ children, ...props }: React.ComponentProps<"div">) => (
 		<div data-slot="dialog-content" {...props}>

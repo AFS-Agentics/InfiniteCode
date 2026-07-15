@@ -2,15 +2,15 @@
 description = "Git helper utilities"
 edition.workspace = true
 license.workspace = true
-name = "devo-util-git"
+name = "infinitecode-util-git"
 version.workspace = true
 
 [lib]
-name = "devo_util_git"
+name = "infinitecode_util_git"
 path = "src/lib.rs"
 
 [dependencies]
-devo-util-paths = { workspace = true }
+infinitecode-util-paths = { workspace = true }
 futures = { workspace = true, features = ["alloc"] }
 once_cell = { workspace = true }
 regex = { workspace = true }

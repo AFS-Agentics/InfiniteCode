@@ -1,7 +1,7 @@
 import {
 	PromptInputHeader,
 	usePromptInputAttachments,
-} from "@devo/ui/components/ai-elements/prompt-input"
+} from "@infinitecode/ui/components/ai-elements/prompt-input"
 import { AlertTriangleIcon, FileIcon, XIcon } from "lucide-react"
 import { memo, useMemo } from "react"
 

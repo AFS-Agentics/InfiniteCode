@@ -1,7 +1,7 @@
 /**
  * Hooks -> Plugin stub converter.
  *
- * Claude Code hooks (PreToolUse, PostToolUse, etc.) -> Devo plugin stubs.
+ * Claude Code hooks (PreToolUse, PostToolUse, etc.) -> InfiniteCode plugin stubs.
  * This generates TypeScript plugin files that replicate hook behavior.
  */
 import type { ClaudeHookEntry, ClaudeHooks } from "../types/claude-code"
@@ -15,7 +15,7 @@ export interface HookConversionResult {
 }
 
 /**
- * Convert Claude Code hooks to Devo plugin stubs.
+ * Convert Claude Code hooks to InfiniteCode plugin stubs.
  */
 export function convertHooks(hooks?: ClaudeHooks): HookConversionResult {
 	const plugins = new Map<string, string>()
@@ -47,9 +47,9 @@ export function convertHooks(hooks?: ClaudeHooks): HookConversionResult {
 	}
 
 	report.manualActions.push(
-		"Hook plugin stubs were generated in .devo/plugins/cc-hooks.ts. " +
+		"Hook plugin stubs were generated in .infinitecode/plugins/cc-hooks.ts. " +
 			"Review the generated code and customize as needed. " +
-			"Some hooks may not have exact Devo equivalents.",
+			"Some hooks may not have exact InfiniteCode equivalents.",
 	)
 
 	return { plugins, report }
@@ -72,13 +72,13 @@ function generatePluginCode(hookEntries: { type: string; entries: ClaudeHookEntr
  * Auto-generated plugin from Claude Code hooks.
  * Review and customize this file as needed.
  *
- * Claude Code hooks converted to Devo plugin hooks:
+ * Claude Code hooks converted to InfiniteCode plugin hooks:
  * - PreToolUse / PostToolUse -> tool.execute.before / tool.execute.after
  * - UserPromptSubmit -> chat.message
  * - SessionStart -> (run on plugin load)
  * - Stop -> (no direct equivalent)
  */
-import type { PluginInput } from "@devo-ai/plugin"
+import type { PluginInput } from "@infinitecode-ai/plugin"
 
 export default async (input: PluginInput) => {
 	const { $ } = input
@@ -133,7 +133,7 @@ function generateCommandHook(
 \t\t},`
 
 		default:
-			return `\t\t// ${hookType} hook (no direct Devo equivalent)${matcherComment}
+			return `\t\t// ${hookType} hook (no direct InfiniteCode equivalent)${matcherComment}
 \t\t// Original command: ${command}
 \t\t// TODO: Implement manually`
 	}

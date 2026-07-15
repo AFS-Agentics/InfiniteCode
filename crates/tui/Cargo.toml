@@ -1,12 +1,12 @@
 [package]
-description = "Interactive terminal UI for Devo"
+description = "Interactive terminal UI for InfiniteCode"
 edition.workspace = true
 license.workspace = true
-name = "devo-tui"
+name = "infinitecode-tui"
 version.workspace = true
 
 [lib]
-name = "devo_tui"
+name = "infinitecode_tui"
 path = "src/lib.rs"
 
 [dependencies]
@@ -17,15 +17,15 @@ base64 = { workspace = true }
 chrono = "0.4.43"
 crossterm = { workspace = true }
 derive_more = { workspace = true, features = ["is_variant"] }
-devo-core = { workspace = true }
-devo-client = { workspace = true }
-devo-protocol = { workspace = true }
-devo-provider = { workspace = true }
-devo-server = { workspace = true }
-devo-util-fuzzy = { workspace = true }
-devo-util-git = { workspace = true }
-devo-util-paths = { workspace = true }
-devo-util-shell-command = { workspace = true }
+infinitecode-core = { workspace = true }
+infinitecode-client = { workspace = true }
+infinitecode-protocol = { workspace = true }
+infinitecode-provider = { workspace = true }
+infinitecode-server = { workspace = true }
+infinitecode-util-fuzzy = { workspace = true }
+infinitecode-util-git = { workspace = true }
+infinitecode-util-paths = { workspace = true }
+infinitecode-util-shell-command = { workspace = true }
 diffy = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }

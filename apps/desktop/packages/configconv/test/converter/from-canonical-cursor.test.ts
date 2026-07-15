@@ -117,7 +117,7 @@ describe("canonicalToCursor", () => {
 			mcpServers: {},
 			rules: [
 				{
-					path: "/test/project/.devo/rules/api.md",
+					path: "/test/project/.infinitecode/rules/api.md",
 					name: "api-rules",
 					content: "Use NestJS patterns for the API.",
 					globs: "api/src/**/*.ts",
@@ -151,7 +151,7 @@ describe("canonicalToCursor", () => {
 			commands: [],
 			agents: [
 				{
-					path: "/test/project/.devo/agents/build.md",
+					path: "/test/project/.infinitecode/agents/build.md",
 					name: "build",
 					content: "---\ndescription: Build agent\n---\n\nYou are a build agent.",
 					frontmatter: { description: "Build agent" },
@@ -181,7 +181,7 @@ describe("canonicalToCursor", () => {
 			agents: [],
 			commands: [
 				{
-					path: "/test/project/.devo/commands/commit.md",
+					path: "/test/project/.infinitecode/commands/commit.md",
 					name: "commit",
 					content: "---\ndescription: Commit changes\n---\n\nCommit all staged changes.",
 					frontmatter: { description: "Commit changes" },
@@ -263,7 +263,7 @@ describe("canonicalToCursor", () => {
 			skills: [],
 			commands: [
 				{
-					path: "/test/.devo/commands/test.md",
+					path: "/test/.infinitecode/commands/test.md",
 					name: "test",
 					content: "Run tests",
 					frontmatter: {},

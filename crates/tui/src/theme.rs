@@ -26,7 +26,7 @@ impl ThemeSet {
         Self {
             themes: vec![
                 Theme {
-                    name: "devo (default)".into(),
+                    name: "infinitecode (default)".into(),
                     accent_color: Color::Rgb(0x58, 0xA6, 0xFF), // blue
                     cell_line_color: Color::Rgb(0x8B, 0x94, 0x9E), // gray
                     error_color: Color::Rgb(0xF8, 0x51, 0x49),  // red
@@ -66,7 +66,7 @@ impl ThemeSet {
     }
 
     pub(crate) fn default_theme() -> &'static str {
-        "devo (default)"
+        "infinitecode (default)"
     }
 
     pub(crate) fn tips() -> &'static [&'static str] {

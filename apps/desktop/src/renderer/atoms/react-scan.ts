@@ -9,7 +9,7 @@
 import { atom } from "jotai"
 import { atomWithStorage } from "jotai/utils"
 
-const STORAGE_KEY = "devo:reactScan"
+const STORAGE_KEY = "infinitecode:reactScan"
 
 /**
  * Persisted toggle for React Scan.

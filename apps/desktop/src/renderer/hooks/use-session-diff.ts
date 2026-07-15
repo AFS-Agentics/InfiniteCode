@@ -9,7 +9,7 @@ import {
 } from "../atoms/ui"
 import type { FileDiff } from "../lib/types"
 import { getProjectClient } from "../services/connection-manager"
-import { getSessionDiff } from "../services/devo"
+import { getSessionDiff } from "../services/infinitecode"
 
 /**
  * Hook that fetches session diffs and subscribes to real-time updates

@@ -1,5 +1,5 @@
-import { Button } from "@devo/ui/components/button"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { cn } from "@infinitecode/ui/lib/utils"
 import useEmblaCarousel, { type UseEmblaCarouselType } from "embla-carousel-react"
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import * as React from "react"

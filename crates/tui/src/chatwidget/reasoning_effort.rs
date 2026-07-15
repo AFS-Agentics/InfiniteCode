@@ -1,10 +1,10 @@
 //! Reasoning-effort picker data for the chat widget.
 //!
-//! Model capability resolution stays in `devo_protocol::Model`; this module
+//! Model capability resolution stays in `infinitecode_protocol::Model`; this module
 //! only converts those protocol choices into labels and list entries for the UI.
 
-use devo_protocol::Model;
-use devo_protocol::ReasoningEffort;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ReasoningEffort;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ReasoningEffortListEntry {
@@ -91,7 +91,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use devo_protocol::ReasoningCapability;
+    use infinitecode_protocol::ReasoningCapability;
 
     #[test]
     fn status_line_reasoning_effort_labels_are_compact() {

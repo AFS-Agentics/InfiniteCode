@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use devo_protocol::ProviderWireApi;
+use infinitecode_protocol::ProviderWireApi;
 use serde::Deserialize;
 use serde::Serialize;
 

@@ -1,2 +1,2 @@
-# devo-core
+# infinitecode-core
 

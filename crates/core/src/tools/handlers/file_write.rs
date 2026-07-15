@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use devo_tools::ClientTextFileRead;
-use devo_tools::ClientTextFileWrite;
+use infinitecode_tools::ClientTextFileRead;
+use infinitecode_tools::ClientTextFileWrite;
 use tracing::debug;
 use tracing::info;
 
@@ -162,7 +162,7 @@ mod tests {
     use std::sync::Arc;
     use std::sync::Mutex;
 
-    use devo_tools::ClientFilesystem;
+    use infinitecode_tools::ClientFilesystem;
     use pretty_assertions::assert_eq;
     use tokio_util::sync::CancellationToken;
 
@@ -200,7 +200,7 @@ mod tests {
                     },
                     cancel_token: CancellationToken::new(),
                     agent_scope: crate::contracts::ToolAgentScope::Parent,
-                    collaboration_mode: devo_protocol::CollaborationMode::Build,
+                    collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
                     agent_coordinator: None,
                     client_filesystem: Some(client_filesystem),
                     client_terminal: None,

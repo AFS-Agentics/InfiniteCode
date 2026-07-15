@@ -1,6 +1,6 @@
 use super::*;
 
-const ACP_SESSION_LIST_CURSOR_PREFIX: &str = "devo-session-list-v1:";
+const ACP_SESSION_LIST_CURSOR_PREFIX: &str = "infinitecode-session-list-v1:";
 
 impl ServerRuntime {
     pub(super) async fn validate_acp_existing_session_cwd(
@@ -40,7 +40,7 @@ impl ServerRuntime {
         method: &str,
         mcp_servers: &[AcpMcpServer],
         cwd: &Path,
-    ) -> Result<Option<Arc<devo_core::tools::ToolRegistry>>, String> {
+    ) -> Result<Option<Arc<infinitecode_core::tools::ToolRegistry>>, String> {
         if mcp_servers.is_empty() {
             return Ok(None);
         }
@@ -64,7 +64,7 @@ impl ServerRuntime {
         };
         let mcp_manager = Arc::new(RmcpMcpManager::new(mcp_config, oauth_store_mode));
         let registry =
-            devo_core::tools::handlers::build_registry_from_plan_with_mcp(&tool_plan, mcp_manager)
+            infinitecode_core::tools::handlers::build_registry_from_plan_with_mcp(&tool_plan, mcp_manager)
                 .await;
 
         Ok(Some(Arc::new(registry)))
@@ -91,7 +91,7 @@ impl ServerRuntime {
         updated_summary.updated_at = updated_at;
 
         // Apply new permission roots so tool authorization uses the updated workspace.
-        let profile = devo_safety::RuntimePermissionProfile::from_preset(
+        let profile = infinitecode_safety::RuntimePermissionProfile::from_preset(
             snapshot.config.permission_profile.preset,
             updated_summary.cwd.clone(),
         )
@@ -159,7 +159,7 @@ impl ServerRuntime {
 }
 
 pub(super) fn history_limit_from_meta(meta: &Option<AcpMeta>) -> Option<usize> {
-    let value = meta.as_ref()?.get("devo/historyLimit")?;
+    let value = meta.as_ref()?.get("infinitecode/historyLimit")?;
     let limit = value.as_u64()?;
     usize::try_from(limit).ok().filter(|limit| *limit > 0)
 }
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn history_limit_meta_accepts_positive_integer() {
         let mut meta = AcpMeta::new();
-        meta.insert("devo/historyLimit".to_string(), serde_json::json!(30));
+        meta.insert("infinitecode/historyLimit".to_string(), serde_json::json!(30));
 
         assert_eq!(history_limit_from_meta(&Some(meta)), Some(30));
     }

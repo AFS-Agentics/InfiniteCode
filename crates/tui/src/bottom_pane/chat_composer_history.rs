@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::app_event::AppEvent;
 use crate::app_event_sender::AppEventSender;
 use crate::bottom_pane::MentionBinding;
-use devo_protocol::user_input::TextElement;
+use infinitecode_protocol::user_input::TextElement;
 
 struct DecodedHistoryMentions {
     text: String,

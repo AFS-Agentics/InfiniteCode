@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use devo_util_paths::absolute_path::AbsolutePathBuf;
+use infinitecode_util_paths::absolute_path::AbsolutePathBuf;
 
 use crate::shell_command::shell_detect::ShellType;
 use crate::shell_command::shell_detect::detect_shell_type;

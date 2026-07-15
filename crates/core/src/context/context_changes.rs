@@ -5,7 +5,7 @@
 //! explicit so small formatting changes do not leak into the conversation
 //! history or prompt normalization paths.
 
-use devo_protocol::{CollaborationMode, Message};
+use infinitecode_protocol::{CollaborationMode, Message};
 
 use crate::context::ContextualUserFragment;
 

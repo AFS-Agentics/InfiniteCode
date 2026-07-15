@@ -2,11 +2,11 @@
 description = "Process, pipe, and PTY helpers"
 edition.workspace = true
 license.workspace = true
-name = "devo-util-process"
+name = "infinitecode-util-process"
 version.workspace = true
 
 [lib]
-name = "devo_util_process"
+name = "infinitecode_util_process"
 path = "src/lib.rs"
 
 [dependencies]

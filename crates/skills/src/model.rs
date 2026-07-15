@@ -17,7 +17,7 @@ pub enum SkillScope {
     Repo,
     /// Skills installed for the current user.
     User,
-    /// Skills shipped with Devo.
+    /// Skills shipped with InfiniteCode.
     System,
     /// Skills provided by administrator-level configuration.
     Admin,

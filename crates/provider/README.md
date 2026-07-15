@@ -1,4 +1,4 @@
-# `devo-provider`
+# `infinitecode-provider`
 
 Shared provider layer for model invocation.
 
@@ -14,7 +14,7 @@ This crate defines:
 The crate is organized around two main building blocks plus the provider-neutral
 protocol dependency:
 
-- `devo_protocol`
+- `infinitecode_protocol`
   Owns the normalized provider-agnostic model I/O IR:
   - `ModelRequest`
   - `RequestMessage`
@@ -40,9 +40,9 @@ protocol dependency:
   - `ProviderFamily`
   - `ProviderCapabilities`
 
-In short, higher layers construct a `devo_protocol::ModelRequest`, send it
+In short, higher layers construct a `infinitecode_protocol::ModelRequest`, send it
 through a `ModelProviderSDK`, and receive either a complete
-`devo_protocol::ModelResponse` or a stream of `devo_protocol::StreamEvent`
+`infinitecode_protocol::ModelResponse` or a stream of `infinitecode_protocol::StreamEvent`
 values.
 
 ## Provider families
@@ -150,14 +150,14 @@ Those concerns belong in higher-level crates such as `core`, `server`, and
 
 The crate root re-exports the provider traits and capability types:
 
-- `devo_provider::ModelProviderSDK`
-- `devo_provider::ProviderAdapter`
-- `devo_provider::ProviderCapabilities`
+- `infinitecode_provider::ModelProviderSDK`
+- `infinitecode_provider::ProviderAdapter`
+- `infinitecode_provider::ProviderCapabilities`
 
 It also exposes the provider family modules:
 
-- `devo_provider::openai`
-- `devo_provider::anthropic`
+- `infinitecode_provider::openai`
+- `infinitecode_provider::anthropic`
 
 ## Current scope
 

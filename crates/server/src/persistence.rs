@@ -15,46 +15,46 @@ use chrono::SecondsFormat;
 use chrono::Utc;
 use tokio::sync::Mutex;
 
-use devo_core::CommandExecutionItem;
-use devo_core::CompactionSnapshotLine;
-use devo_core::ContentBlock;
-use devo_core::ItemId;
-use devo_core::ItemLine;
-use devo_core::ItemRecord;
-use devo_core::Message;
-use devo_core::MessageEditRecordedLine;
-use devo_core::MessageEditRecordedRecord;
-use devo_core::Role;
-use devo_core::RolloutLine;
-use devo_core::SessionContext;
-use devo_core::SessionContextUpdatedLine;
-use devo_core::SessionId;
-use devo_core::SessionMetaLine;
-use devo_core::SessionRecord;
-use devo_core::SessionRollbackLine;
-use devo_core::SessionTitleFinalSource;
-use devo_core::SessionTitleState;
-use devo_core::SessionTitleUpdatedLine;
-use devo_core::TextItem;
-use devo_core::ToolCallItem;
-use devo_core::ToolResultItem;
-use devo_core::TurnId;
-use devo_core::TurnItem;
-use devo_core::TurnKind;
-use devo_core::TurnLine;
-use devo_core::TurnRecord;
-use devo_core::TurnStatus;
-use devo_core::TurnSupersededLine;
-use devo_core::TurnSupersededRecord;
-use devo_core::TurnWorkspaceChangeRecordedLine;
-use devo_core::TurnWorkspaceChangeRecordedRecord;
-use devo_core::TurnWorkspaceCheckpointRecordedLine;
-use devo_core::TurnWorkspaceCheckpointRecordedRecord;
-use devo_core::TurnWorkspaceRestoreCompletedLine;
-use devo_core::TurnWorkspaceRestoreCompletedRecord;
-use devo_core::TurnWorkspaceRestoreStartedLine;
-use devo_core::TurnWorkspaceRestoreStartedRecord;
-use devo_core::Worklog;
+use infinitecode_core::CommandExecutionItem;
+use infinitecode_core::CompactionSnapshotLine;
+use infinitecode_core::ContentBlock;
+use infinitecode_core::ItemId;
+use infinitecode_core::ItemLine;
+use infinitecode_core::ItemRecord;
+use infinitecode_core::Message;
+use infinitecode_core::MessageEditRecordedLine;
+use infinitecode_core::MessageEditRecordedRecord;
+use infinitecode_core::Role;
+use infinitecode_core::RolloutLine;
+use infinitecode_core::SessionContext;
+use infinitecode_core::SessionContextUpdatedLine;
+use infinitecode_core::SessionId;
+use infinitecode_core::SessionMetaLine;
+use infinitecode_core::SessionRecord;
+use infinitecode_core::SessionRollbackLine;
+use infinitecode_core::SessionTitleFinalSource;
+use infinitecode_core::SessionTitleState;
+use infinitecode_core::SessionTitleUpdatedLine;
+use infinitecode_core::TextItem;
+use infinitecode_core::ToolCallItem;
+use infinitecode_core::ToolResultItem;
+use infinitecode_core::TurnId;
+use infinitecode_core::TurnItem;
+use infinitecode_core::TurnKind;
+use infinitecode_core::TurnLine;
+use infinitecode_core::TurnRecord;
+use infinitecode_core::TurnStatus;
+use infinitecode_core::TurnSupersededLine;
+use infinitecode_core::TurnSupersededRecord;
+use infinitecode_core::TurnWorkspaceChangeRecordedLine;
+use infinitecode_core::TurnWorkspaceChangeRecordedRecord;
+use infinitecode_core::TurnWorkspaceCheckpointRecordedLine;
+use infinitecode_core::TurnWorkspaceCheckpointRecordedRecord;
+use infinitecode_core::TurnWorkspaceRestoreCompletedLine;
+use infinitecode_core::TurnWorkspaceRestoreCompletedRecord;
+use infinitecode_core::TurnWorkspaceRestoreStartedLine;
+use infinitecode_core::TurnWorkspaceRestoreStartedRecord;
+use infinitecode_core::Worklog;
 
 use crate::execution::PersistedTurnItem;
 use crate::execution::RuntimeSession;
@@ -616,7 +616,7 @@ struct ReplayState {
     session: Option<SessionRecord>,
     latest_turn: Option<TurnRecord>,
     latest_turn_metadata: Option<TurnMetadata>,
-    latest_query_usage: Option<devo_protocol::TurnUsage>,
+    latest_query_usage: Option<infinitecode_protocol::TurnUsage>,
     turn_records_by_id: HashMap<TurnId, TurnRecord>,
     loaded_item_count: u64,
     next_item_seq: u64,
@@ -628,11 +628,11 @@ struct ReplayState {
     total_cache_read_tokens: usize,
     last_input_tokens: usize,
     last_turn_tokens: usize,
-    session_context: Option<devo_core::SessionContext>,
+    session_context: Option<infinitecode_core::SessionContext>,
     /// Session context loaded from a dedicated `SessionContextUpdated` rollout line.
     /// Preserved across rollback because that line is session-scoped, not turn-scoped.
-    recorded_session_context: Option<devo_core::SessionContext>,
-    latest_turn_context: Option<devo_core::TurnContext>,
+    recorded_session_context: Option<infinitecode_core::SessionContext>,
+    latest_turn_context: Option<infinitecode_core::TurnContext>,
     session_context_recorded: bool,
     turn_kinds_by_id: HashMap<TurnId, TurnKind>,
     messages: Vec<Message>,
@@ -909,7 +909,7 @@ impl ReplayState {
             .map(|message| serde_json::to_string(message).map_or(0, |json| json.len()))
             .sum::<usize>();
         core_session.prompt_token_estimate =
-            devo_protocol::approx_tokens_from_byte_count(prompt_bytes)
+            infinitecode_protocol::approx_tokens_from_byte_count(prompt_bytes)
                 .try_into()
                 .unwrap_or(usize::MAX);
         core_session.last_input_tokens = self
@@ -920,7 +920,7 @@ impl ReplayState {
         core_session.last_turn_tokens = self
             .latest_query_usage
             .as_ref()
-            .map(devo_protocol::TurnUsage::display_total_tokens)
+            .map(infinitecode_protocol::TurnUsage::display_total_tokens)
             .unwrap_or(core_session.prompt_token_estimate);
         let pending_turn_queue = std::sync::Arc::clone(&core_session.pending_turn_queue);
         let btw_input_queue = std::sync::Arc::clone(&core_session.btw_input_queue);
@@ -1002,7 +1002,7 @@ impl ReplayState {
             last_query_total_tokens: self
                 .latest_query_usage
                 .as_ref()
-                .map(devo_protocol::TurnUsage::display_total_tokens)
+                .map(infinitecode_protocol::TurnUsage::display_total_tokens)
                 .unwrap_or(0),
             status: SessionRuntimeStatus::Idle,
         };
@@ -1029,7 +1029,7 @@ impl ReplayState {
             next_item_seq: self.next_item_seq.max(1),
             first_user_input: None,
             tool_registry: None,
-            file_read_ledger: std::sync::Arc::new(devo_core::tools::FileReadLedger::new()),
+            file_read_ledger: std::sync::Arc::new(infinitecode_core::tools::FileReadLedger::new()),
             session_approval_cache: crate::execution::ApprovalGrantCache::default(),
             turn_approval_cache: crate::execution::ApprovalGrantCache::default(),
             session_context_recorded: self.session_context_recorded,
@@ -1794,9 +1794,9 @@ fn collect_rollout_files(root: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
 /// Creates one canonical persisted turn record from the transport-facing runtime state.
 pub(crate) fn build_turn_record(
     turn: &TurnMetadata,
-    session_context: Option<devo_core::SessionContext>,
-    turn_context: Option<devo_core::TurnContext>,
-    latest_query_usage: Option<devo_core::TurnUsage>,
+    session_context: Option<infinitecode_core::SessionContext>,
+    turn_context: Option<infinitecode_core::TurnContext>,
+    latest_query_usage: Option<infinitecode_core::TurnUsage>,
 ) -> TurnRecord {
     TurnRecord {
         id: turn.turn_id,
@@ -1856,7 +1856,7 @@ fn turn_metadata_from_record(turn: &TurnRecord) -> TurnMetadata {
 pub(crate) fn build_item_record(
     session_id: SessionId,
     turn_id: TurnId,
-    item_id: devo_core::ItemId,
+    item_id: infinitecode_core::ItemId,
     seq: u64,
     item: TurnItem,
     turn_status: Option<TurnStatus>,
@@ -1893,40 +1893,40 @@ mod tests {
     use super::build_prompt_messages_from_snapshot;
     use crate::execution::PersistedTurnItem;
     use crate::persistence::apply_turn_item;
-    use devo_core::CompactionSnapshotLine;
-    use devo_core::ContentPart;
-    use devo_core::EditId;
-    use devo_core::EditState;
-    use devo_core::EnvironmentContext;
-    use devo_core::ItemId;
-    use devo_core::ItemLine;
-    use devo_core::ItemRecord;
-    use devo_core::LanguageContext;
-    use devo_core::Message;
-    use devo_core::MessageEditRecordedLine;
-    use devo_core::MessageEditRecordedRecord;
-    use devo_core::Model;
-    use devo_core::Persona;
-    use devo_core::RolloutLine;
-    use devo_core::SessionContext;
-    use devo_core::SessionId;
-    use devo_core::SessionMetaLine;
-    use devo_core::SessionRecord;
-    use devo_core::SessionRollbackLine;
-    use devo_core::SessionTitleState;
-    use devo_core::TextItem;
-    use devo_core::ToolCallItem;
-    use devo_core::ToolResultItem;
-    use devo_core::TurnContext;
-    use devo_core::TurnId;
-    use devo_core::TurnItem;
-    use devo_core::TurnKind;
-    use devo_core::TurnLine;
-    use devo_core::TurnRecord;
-    use devo_core::TurnStatus;
-    use devo_core::TurnSupersededLine;
-    use devo_core::TurnSupersededRecord;
-    use devo_core::WorkspaceRestorePolicy;
+    use infinitecode_core::CompactionSnapshotLine;
+    use infinitecode_core::ContentPart;
+    use infinitecode_core::EditId;
+    use infinitecode_core::EditState;
+    use infinitecode_core::EnvironmentContext;
+    use infinitecode_core::ItemId;
+    use infinitecode_core::ItemLine;
+    use infinitecode_core::ItemRecord;
+    use infinitecode_core::LanguageContext;
+    use infinitecode_core::Message;
+    use infinitecode_core::MessageEditRecordedLine;
+    use infinitecode_core::MessageEditRecordedRecord;
+    use infinitecode_core::Model;
+    use infinitecode_core::Persona;
+    use infinitecode_core::RolloutLine;
+    use infinitecode_core::SessionContext;
+    use infinitecode_core::SessionId;
+    use infinitecode_core::SessionMetaLine;
+    use infinitecode_core::SessionRecord;
+    use infinitecode_core::SessionRollbackLine;
+    use infinitecode_core::SessionTitleState;
+    use infinitecode_core::TextItem;
+    use infinitecode_core::ToolCallItem;
+    use infinitecode_core::ToolResultItem;
+    use infinitecode_core::TurnContext;
+    use infinitecode_core::TurnId;
+    use infinitecode_core::TurnItem;
+    use infinitecode_core::TurnKind;
+    use infinitecode_core::TurnLine;
+    use infinitecode_core::TurnRecord;
+    use infinitecode_core::TurnStatus;
+    use infinitecode_core::TurnSupersededLine;
+    use infinitecode_core::TurnSupersededRecord;
+    use infinitecode_core::WorkspaceRestorePolicy;
 
     #[test]
     fn replay_orders_items_by_sequence_before_timestamp() {
@@ -2010,7 +2010,7 @@ mod tests {
 
     #[test]
     fn replay_preserves_latest_query_usage_when_latest_turn_has_no_usage() {
-        use devo_protocol::TurnUsage;
+        use infinitecode_protocol::TurnUsage;
 
         let now = Utc.with_ymd_and_hms(2026, 7, 8, 10, 0, 0).unwrap();
         let session_id = SessionId::new();
@@ -2072,7 +2072,7 @@ mod tests {
                     usage: None,
                     latest_query_usage: None,
                     stop_reason: None,
-                    failure_reason: Some(devo_protocol::TurnFailureReason::MaxTurnRequests),
+                    failure_reason: Some(infinitecode_protocol::TurnFailureReason::MaxTurnRequests),
                     error: None,
                     session_context: None,
                     turn_context: None,
@@ -2088,7 +2088,7 @@ mod tests {
 
     #[test]
     fn replay_does_not_promote_aggregate_turn_usage_to_latest_query_usage() {
-        use devo_protocol::TurnUsage;
+        use infinitecode_protocol::TurnUsage;
 
         let now = Utc.with_ymd_and_hms(2026, 7, 8, 10, 0, 0).unwrap();
         let session_id = SessionId::new();
@@ -2366,9 +2366,9 @@ mod tests {
     #[test]
     fn index_rollout_metadata_overwrites_stale_sqlite_title_when_rollout_has_title() {
         use chrono::Utc;
-        use devo_protocol::SessionMetadata;
-        use devo_protocol::SessionRuntimeStatus;
-        use devo_protocol::SessionTitleState;
+        use infinitecode_protocol::SessionMetadata;
+        use infinitecode_protocol::SessionRuntimeStatus;
+        use infinitecode_protocol::SessionTitleState;
         use pretty_assertions::assert_eq;
         use tempfile::TempDir;
 
@@ -2396,7 +2396,7 @@ mod tests {
             .append_title_update(
                 &record,
                 "Canonical rollout title".into(),
-                SessionTitleState::Final(devo_core::SessionTitleFinalSource::ModelGenerated),
+                SessionTitleState::Final(infinitecode_core::SessionTitleFinalSource::ModelGenerated),
                 None,
             )
             .expect("append title update");
@@ -2412,7 +2412,7 @@ mod tests {
                 last_activity_at: now,
                 title: Some("Existing title".into()),
                 title_state: SessionTitleState::Final(
-                    devo_core::SessionTitleFinalSource::ModelGenerated,
+                    infinitecode_core::SessionTitleFinalSource::ModelGenerated,
                 ),
                 parent_session_id: None,
                 agent_path: None,
@@ -2454,8 +2454,8 @@ mod tests {
     #[test]
     fn index_rollout_metadata_reads_session_title_updates() {
         use chrono::Utc;
-        use devo_core::SessionTitleFinalSource;
-        use devo_core::SessionTitleState;
+        use infinitecode_core::SessionTitleFinalSource;
+        use infinitecode_core::SessionTitleState;
         use pretty_assertions::assert_eq;
         use tempfile::TempDir;
 
@@ -2625,8 +2625,8 @@ mod tests {
         assert_eq!(
             messages.last(),
             Some(&Message {
-                role: devo_core::Role::User,
-                content: vec![devo_core::ContentBlock::ToolResult {
+                role: infinitecode_core::Role::User,
+                content: vec![infinitecode_core::ContentBlock::ToolResult {
                     tool_use_id: "call-1".to_string(),
                     content: "<content>canonical</content>".to_string(),
                     is_error: false,
@@ -2722,7 +2722,7 @@ mod tests {
             },
             reasoning_effort_selection: None,
             reasoning_effort: None,
-            system_prompt_mode: devo_core::SystemPromptMode::CodingAgent,
+            system_prompt_mode: infinitecode_core::SystemPromptMode::CodingAgent,
         };
         let turn_context = TurnContext {
             environment: EnvironmentContext {
@@ -2739,7 +2739,7 @@ mod tests {
             reasoning_effort_selection: Some("enabled".into()),
             reasoning_effort: None,
             observed_agents_snapshot: None,
-            collaboration_mode: devo_core::CollaborationMode::Build,
+            collaboration_mode: infinitecode_core::CollaborationMode::Build,
         };
         let mut replay = ReplayState::default();
 
@@ -2790,7 +2790,7 @@ mod tests {
                     started_at: now,
                     completed_at: Some(now),
                     status: TurnStatus::Completed,
-                    kind: devo_core::TurnKind::Regular,
+                    kind: infinitecode_core::TurnKind::Regular,
                     model: "model-b".into(),
                     model_binding_id: None,
                     reasoning_effort_selection: Some("enabled".into()),
@@ -2834,7 +2834,7 @@ mod tests {
             },
             reasoning_effort_selection: None,
             reasoning_effort: None,
-            system_prompt_mode: devo_core::SystemPromptMode::CodingAgent,
+            system_prompt_mode: infinitecode_core::SystemPromptMode::CodingAgent,
         }
     }
 
@@ -2859,7 +2859,7 @@ mod tests {
             reasoning_effort_selection: Some("enabled".into()),
             reasoning_effort: None,
             observed_agents_snapshot: None,
-            collaboration_mode: devo_core::CollaborationMode::Build,
+            collaboration_mode: infinitecode_core::CollaborationMode::Build,
         };
         let mut replay = ReplayState::default();
 
@@ -2902,7 +2902,7 @@ mod tests {
             .expect("apply session meta");
         replay
             .apply_line(RolloutLine::SessionContextUpdated(Box::new(
-                devo_core::SessionContextUpdatedLine {
+                infinitecode_core::SessionContextUpdatedLine {
                     timestamp: now,
                     session_id,
                     session_context: session_context.clone(),
@@ -2920,7 +2920,7 @@ mod tests {
                     started_at: now,
                     completed_at: Some(now),
                     status: TurnStatus::Completed,
-                    kind: devo_core::TurnKind::Regular,
+                    kind: infinitecode_core::TurnKind::Regular,
                     model: "model-b".into(),
                     model_binding_id: None,
                     reasoning_effort_selection: Some("enabled".into()),
@@ -2965,7 +2965,7 @@ mod tests {
             reasoning_effort_selection: Some("enabled".into()),
             reasoning_effort: None,
             observed_agents_snapshot: None,
-            collaboration_mode: devo_core::CollaborationMode::Build,
+            collaboration_mode: infinitecode_core::CollaborationMode::Build,
         };
         let mut replay = ReplayState::default();
 
@@ -3008,7 +3008,7 @@ mod tests {
             .expect("apply session meta");
         replay
             .apply_line(RolloutLine::SessionContextUpdated(Box::new(
-                devo_core::SessionContextUpdatedLine {
+                infinitecode_core::SessionContextUpdatedLine {
                     timestamp: now,
                     session_id,
                     session_context: session_context.clone(),

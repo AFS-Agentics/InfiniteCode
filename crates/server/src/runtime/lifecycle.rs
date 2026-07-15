@@ -148,7 +148,7 @@ impl ServerRuntime {
                     && goal.status == crate::goal::GoalStatus::Active
                 {
                     let previous_status = goal.status;
-                    match goal_store.set_status(devo_protocol::ThreadGoalStatus::Paused) {
+                    match goal_store.set_status(infinitecode_protocol::ThreadGoalStatus::Paused) {
                         Ok(paused_goal) => {
                             if let Err(error) = self
                                 .goal_durable_store
@@ -240,7 +240,7 @@ impl ServerRuntime {
 
             self.run_session_hook(
                 session_id,
-                devo_core::HookEvent::SessionEnd,
+                infinitecode_core::HookEvent::SessionEnd,
                 serde_json::Map::from_iter([("reason".to_string(), serde_json::json!("other"))]),
             )
             .await;

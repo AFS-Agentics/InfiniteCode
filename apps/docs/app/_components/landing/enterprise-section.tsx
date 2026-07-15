@@ -1,7 +1,7 @@
 import { type ReactNode } from "react";
 
 import { type LandingCopy } from "./data";
-import { renderWithDevoMark } from "./devo-word";
+import { renderWithInfiniteCodeMark } from "./infinitecode-word";
 
 type EnterpriseSectionProps = {
   copy: LandingCopy["enterprise"];
@@ -60,7 +60,7 @@ function DashboardFrame({
               {copy.label}
             </p>
             <h3 className="mt-2 text-xl font-semibold text-white">
-              {renderWithDevoMark(copy.title)}
+              {renderWithInfiniteCodeMark(copy.title)}
             </h3>
           </div>
           <div className="flex items-center gap-2 text-sm">
@@ -364,7 +364,7 @@ export function EnterpriseSection({ copy }: EnterpriseSectionProps) {
           </div>
           <div>
             <p className="max-w-3xl text-lg leading-8 text-white/62">
-              {renderWithDevoMark(copy.body)}
+              {renderWithInfiniteCodeMark(copy.body)}
             </p>
             <div className="mt-6 border-t border-white/12 pt-5 text-sm leading-6 text-white/50">
               {copy.footer}

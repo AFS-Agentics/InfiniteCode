@@ -2,11 +2,11 @@
 description = "Fuzzy matching helpers"
 edition.workspace = true
 license.workspace = true
-name = "devo-util-fuzzy"
+name = "infinitecode-util-fuzzy"
 version.workspace = true
 
 [lib]
-name = "devo_util_fuzzy"
+name = "infinitecode_util_fuzzy"
 path = "src/lib.rs"
 
 [dev-dependencies]

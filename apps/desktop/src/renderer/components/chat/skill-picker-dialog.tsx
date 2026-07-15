@@ -1,7 +1,7 @@
 /**
  * Skill picker dialog — opened via /skills slash command.
  *
- * Matches the Devo TUI pattern: a dedicated dialog for browsing
+ * Matches the InfiniteCode TUI pattern: a dedicated dialog for browsing
  * and selecting skills, separate from the main slash command popover.
  * Uses the SDK's app.skills() endpoint for the full skill list.
  */
@@ -12,10 +12,10 @@ import {
 	DialogDescription,
 	DialogHeader,
 	DialogTitle,
-} from "@devo/ui/components/dialog"
-import { Input } from "@devo/ui/components/input"
-import { ScrollArea } from "@devo/ui/components/scroll-area"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/dialog"
+import { Input } from "@infinitecode/ui/components/input"
+import { ScrollArea } from "@infinitecode/ui/components/scroll-area"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { useQuery } from "@tanstack/react-query"
 import fuzzysort from "fuzzysort"
 import { BookOpenIcon, SearchIcon } from "lucide-react"

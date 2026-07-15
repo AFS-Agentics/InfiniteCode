@@ -1,6 +1,6 @@
 "use client"
 
-import { cn } from "@devo/ui/lib/utils"
+import { cn } from "@infinitecode/ui/lib/utils"
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 

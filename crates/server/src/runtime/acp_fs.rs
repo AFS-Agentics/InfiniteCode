@@ -2,9 +2,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use devo_core::tools::ClientFilesystem;
-use devo_core::tools::ClientTextFileRead;
-use devo_core::tools::ClientTextFileWrite;
+use infinitecode_core::tools::ClientFilesystem;
+use infinitecode_core::tools::ClientTextFileRead;
+use infinitecode_core::tools::ClientTextFileWrite;
 use tokio_util::sync::CancellationToken;
 
 use super::*;

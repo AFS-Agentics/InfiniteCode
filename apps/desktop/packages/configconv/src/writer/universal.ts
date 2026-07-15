@@ -39,7 +39,7 @@ export interface UniversalWriteResult {
  */
 function getGlobalConfigPath(format: AgentFormat): string {
 	switch (format) {
-		case "devo":
+		case "infinitecode":
 			return paths.ocGlobalConfigPath()
 		case "claude-code":
 			return paths.ccSettingsPath()
@@ -53,7 +53,7 @@ function getGlobalConfigPath(format: AgentFormat): string {
  */
 function getProjectConfigPath(format: AgentFormat, projectPath: string): string {
 	switch (format) {
-		case "devo":
+		case "infinitecode":
 			return paths.ocProjectConfigPath(projectPath)
 		case "claude-code":
 			return paths.ccProjectMcpJsonPath(projectPath)
@@ -95,7 +95,7 @@ function collectTargetPaths(conversion: CanonicalConversionResult): string[] {
 /**
  * Write universal conversion results to disk.
  *
- * Works with any target format (Devo, Claude Code, Cursor).
+ * Works with any target format (InfiniteCode, Claude Code, Cursor).
  * The conversion result already contains absolute target paths for
  * agents, commands, rules, and extraFiles.
  *

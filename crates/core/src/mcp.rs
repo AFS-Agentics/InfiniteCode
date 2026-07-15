@@ -3,17 +3,17 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-pub use devo_config::McpAuthConfig;
-pub use devo_config::McpCapability;
-pub use devo_config::McpConfig;
-pub use devo_config::McpOutputLimits;
-pub use devo_config::McpRootsPolicy;
-pub use devo_config::McpServerEnvVar;
-pub use devo_config::McpServerId;
-pub use devo_config::McpServerRecord;
-pub use devo_config::McpStartupPolicy;
-pub use devo_config::McpTransportConfig;
-pub use devo_config::McpTrustPolicy;
+pub use infinitecode_config::McpAuthConfig;
+pub use infinitecode_config::McpCapability;
+pub use infinitecode_config::McpConfig;
+pub use infinitecode_config::McpOutputLimits;
+pub use infinitecode_config::McpRootsPolicy;
+pub use infinitecode_config::McpServerEnvVar;
+pub use infinitecode_config::McpServerId;
+pub use infinitecode_config::McpServerRecord;
+pub use infinitecode_config::McpStartupPolicy;
+pub use infinitecode_config::McpTransportConfig;
+pub use infinitecode_config::McpTrustPolicy;
 
 pub const DIRECT_MCP_TOOL_EXPOSURE_THRESHOLD: usize = 100;
 
@@ -22,7 +22,7 @@ const MCP_UI_META_KEY: &str = "ui";
 const MCP_UI_VISIBILITY_META_KEY: &str = "visibility";
 const MCP_UI_MODEL_VISIBILITY: &str = "model";
 
-/// Metadata for one MCP tool after Devo normalizes names for model use.
+/// Metadata for one MCP tool after InfiniteCode normalizes names for model use.
 #[derive(Debug, Clone, PartialEq)]
 pub struct McpToolInfo {
     /// Raw MCP server id used for routing calls.
@@ -35,7 +35,7 @@ pub struct McpToolInfo {
     pub callable_namespace: String,
     /// Sanitized tool-name component used for model-facing names.
     pub callable_name: String,
-    /// Flat Devo function name exposed to providers.
+    /// Flat InfiniteCode function name exposed to providers.
     pub flat_name: String,
     /// Whether calls can be executed in parallel by default.
     pub supports_parallel_tool_calls: bool,

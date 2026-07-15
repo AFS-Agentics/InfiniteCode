@@ -11,7 +11,7 @@ use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyEventKind;
 use crossterm::event::KeyModifiers;
-use devo_protocol::InputItem;
+use infinitecode_protocol::InputItem;
 use ratatui::style::Style;
 use ratatui::style::Stylize;
 use ratatui::text::Line;
@@ -27,7 +27,7 @@ use crate::history_cell::PlainHistoryCell;
 use crate::onboarding_widget::OnboardingResult;
 use crate::onboarding_widget::OnboardingTranscriptEvent;
 use crate::slash_command::SlashCommand;
-use devo_protocol::CollaborationMode;
+use infinitecode_protocol::CollaborationMode;
 
 use super::ChatWidget;
 use super::ExternalEditorState;

@@ -7,7 +7,7 @@ use chrono::Utc;
 use sha2::Digest;
 use sha2::Sha256;
 
-use devo_protocol::{ItemId, SessionId, TurnId};
+use infinitecode_protocol::{ItemId, SessionId, TurnId};
 
 use crate::durable_record::{
     ContentPart, DurableRecord, EditId, EditState, FileRestoreOutcome, Mention,

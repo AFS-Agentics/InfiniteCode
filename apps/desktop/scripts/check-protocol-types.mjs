@@ -4,8 +4,8 @@ import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 
-const generatedDir = resolve("packages/devo-ai-sdk/src/v2/generated");
-const tempDir = await mkdtemp(join(tmpdir(), "devo-protocol-types-"));
+const generatedDir = resolve("packages/infinitecode-ai-sdk/src/v2/generated");
+const tempDir = await mkdtemp(join(tmpdir(), "infinitecode-protocol-types-"));
 
 try {
 	const result = spawnSync(
@@ -15,7 +15,7 @@ try {
 			"--manifest-path",
 			"../../Cargo.toml",
 			"-p",
-			"devo-protocol",
+			"infinitecode-protocol",
 			"--bin",
 			"generate-acp-ts",
 			"--",

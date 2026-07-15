@@ -3,8 +3,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use devo_core::ChangeSetCoverage;
-use devo_protocol::{
+use infinitecode_core::ChangeSetCoverage;
+use infinitecode_protocol::{
     SessionId, TurnId, WorkspaceChangeAttribution, WorkspaceChangeBase, WorkspaceChangeCoverage,
     WorkspaceChangeScope, WorkspaceChangeSetStatus, WorkspaceChangeStats, WorkspaceChangeView,
     WorkspaceChangeViewStatus, WorkspaceChangedFile, WorkspaceChangedFileStatus,

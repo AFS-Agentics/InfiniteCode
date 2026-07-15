@@ -7,7 +7,7 @@ import {
 	CommandList,
 	CommandSeparator,
 	CommandShortcut,
-} from "@devo/ui/components/command"
+} from "@infinitecode/ui/components/command"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import {

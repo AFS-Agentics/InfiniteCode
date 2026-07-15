@@ -6,12 +6,12 @@ use crate::TurnQueueSteerParams;
 use crate::TurnQueueSteerResult;
 
 fn pending_turn_metadata(
-    collaboration_mode: devo_protocol::CollaborationMode,
+    collaboration_mode: infinitecode_protocol::CollaborationMode,
     model: Option<String>,
     model_binding_id: Option<String>,
 ) -> Option<serde_json::Value> {
     let mut metadata = serde_json::Map::new();
-    if collaboration_mode != devo_protocol::CollaborationMode::Build {
+    if collaboration_mode != infinitecode_protocol::CollaborationMode::Build {
         metadata.insert(
             "collaboration_mode".to_string(),
             serde_json::json!(collaboration_mode),
@@ -150,14 +150,14 @@ impl ServerRuntime {
             Ok(resolved_input) => resolved_input,
             Err(error) => {
                 let code = match error {
-                    devo_core::SkillError::SkillNotFound { .. }
-                    | devo_core::SkillError::AmbiguousSkillName { .. }
-                    | devo_core::SkillError::SkillDisabled { .. } => {
+                    infinitecode_core::SkillError::SkillNotFound { .. }
+                    | infinitecode_core::SkillError::AmbiguousSkillName { .. }
+                    | infinitecode_core::SkillError::SkillDisabled { .. } => {
                         ProtocolErrorCode::InvalidParams
                     }
-                    devo_core::SkillError::SkillParseFailed { .. }
-                    | devo_core::SkillError::SkillRootUnavailable { .. }
-                    | devo_core::SkillError::DuplicateSkillId { .. } => {
+                    infinitecode_core::SkillError::SkillParseFailed { .. }
+                    | infinitecode_core::SkillError::SkillRootUnavailable { .. }
+                    | infinitecode_core::SkillError::DuplicateSkillId { .. } => {
                         ProtocolErrorCode::InternalError
                     }
                 };
@@ -177,7 +177,7 @@ impl ServerRuntime {
         let prompt_hook_report = self
             .run_session_hook(
                 params.session_id,
-                devo_core::HookEvent::UserPromptSubmit,
+                infinitecode_core::HookEvent::UserPromptSubmit,
                 serde_json::Map::from_iter([(
                     "prompt".to_string(),
                     serde_json::Value::String(resolved_input.prompt_text.clone()),
@@ -210,8 +210,8 @@ impl ServerRuntime {
                 .model_binding_id
                 .clone()
                 .or_else(|| reservation.summary.model_binding_id.clone());
-            let item = devo_core::PendingInputItem::new(
-                devo_core::PendingInputKind::UserInput {
+            let item = infinitecode_core::PendingInputItem::new(
+                infinitecode_core::PendingInputKind::UserInput {
                     input: params.input.clone(),
                     display_text: display_input.clone(),
                     prompt_text: resolved_input.prompt_text.clone(),
@@ -297,7 +297,7 @@ impl ServerRuntime {
                 .as_ref()
                 .map_or(1, |turn| turn.sequence + 1),
             status: TurnStatus::Running,
-            kind: devo_core::TurnKind::Regular,
+            kind: infinitecode_core::TurnKind::Regular,
             model: turn_config.model.slug.clone(),
             model_binding_id: turn_config.model_binding_id.clone(),
             reasoning_effort_selection: turn_config.reasoning_effort_selection.clone(),
@@ -316,7 +316,7 @@ impl ServerRuntime {
         if let Some((old_cwd, new_cwd)) = cwd_change {
             self.run_session_hook(
                 params.session_id,
-                devo_core::HookEvent::CwdChanged,
+                infinitecode_core::HookEvent::CwdChanged,
                 serde_json::Map::from_iter([
                     (
                         "old_cwd".to_string(),
@@ -349,7 +349,7 @@ impl ServerRuntime {
         }
 
         self.broadcast_event(ServerEvent::InputQueueUpdated(
-            devo_core::InputQueueUpdatedPayload {
+            infinitecode_core::InputQueueUpdatedPayload {
                 session_id: params.session_id,
                 pending_count: 0,
                 pending_texts: vec![],
@@ -500,7 +500,7 @@ impl ServerRuntime {
                 .as_ref()
                 .map_or(1, |turn| turn.sequence + 1),
             status: TurnStatus::Running,
-            kind: devo_core::TurnKind::Other("shell_command".to_string()),
+            kind: infinitecode_core::TurnKind::Other("shell_command".to_string()),
             model: model.clone(),
             model_binding_id: reservation.summary.model_binding_id.clone(),
             reasoning_effort_selection: reservation.summary.reasoning_effort_selection.clone(),
@@ -525,7 +525,7 @@ impl ServerRuntime {
         if let Some((old_cwd, new_cwd)) = cwd_change {
             self.run_session_hook(
                 params.session_id,
-                devo_core::HookEvent::CwdChanged,
+                infinitecode_core::HookEvent::CwdChanged,
                 serde_json::Map::from_iter([
                     (
                         "old_cwd".to_string(),
@@ -651,7 +651,7 @@ impl ServerRuntime {
                 "active turn did not match expectedTurnId",
             );
         }
-        if active_turn.kind != devo_core::TurnKind::Regular {
+        if active_turn.kind != infinitecode_core::TurnKind::Regular {
             return self.error_response(
                 request_id,
                 ProtocolErrorCode::ActiveTurnNotSteerable,
@@ -673,14 +673,14 @@ impl ServerRuntime {
             }
             Err(error) => {
                 let code = match error {
-                    devo_core::SkillError::SkillNotFound { .. }
-                    | devo_core::SkillError::AmbiguousSkillName { .. }
-                    | devo_core::SkillError::SkillDisabled { .. } => {
+                    infinitecode_core::SkillError::SkillNotFound { .. }
+                    | infinitecode_core::SkillError::AmbiguousSkillName { .. }
+                    | infinitecode_core::SkillError::SkillDisabled { .. } => {
                         ProtocolErrorCode::InvalidParams
                     }
-                    devo_core::SkillError::SkillParseFailed { .. }
-                    | devo_core::SkillError::SkillRootUnavailable { .. }
-                    | devo_core::SkillError::DuplicateSkillId { .. } => {
+                    infinitecode_core::SkillError::SkillParseFailed { .. }
+                    | infinitecode_core::SkillError::SkillRootUnavailable { .. }
+                    | infinitecode_core::SkillError::DuplicateSkillId { .. } => {
                         ProtocolErrorCode::InternalError
                     }
                 };
@@ -702,8 +702,8 @@ impl ServerRuntime {
             serde_json::json!({ "title": "You", "text": display_input.clone() }),
         )
         .await;
-        let item = devo_core::PendingInputItem::new(
-            devo_core::PendingInputKind::UserInput {
+        let item = infinitecode_core::PendingInputItem::new(
+            infinitecode_core::PendingInputKind::UserInput {
                 input: params.input.clone(),
                 display_text: display_input,
                 prompt_text: resolved_input.prompt_text,
@@ -867,7 +867,7 @@ impl ServerRuntime {
                 "active turn did not match expectedTurnId",
             );
         }
-        if active_turn.kind != devo_core::TurnKind::Regular {
+        if active_turn.kind != infinitecode_core::TurnKind::Regular {
             return self.error_response(
                 request_id,
                 ProtocolErrorCode::ActiveTurnNotSteerable,
@@ -892,8 +892,8 @@ impl ServerRuntime {
                 );
             };
             let display_input = match &queue[index].kind {
-                devo_core::PendingInputKind::UserText { text } => text.clone(),
-                devo_core::PendingInputKind::UserInput { display_text, .. } => display_text.clone(),
+                infinitecode_core::PendingInputKind::UserText { text } => text.clone(),
+                infinitecode_core::PendingInputKind::UserInput { display_text, .. } => display_text.clone(),
                 _ => {
                     return self.error_response(
                         request_id,

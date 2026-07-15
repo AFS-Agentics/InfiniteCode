@@ -1,10 +1,10 @@
 /**
  * Onboarding Step 1: Welcome.
  *
- * Brief introduction to Devo and what the setup will cover.
+ * Brief introduction to InfiniteCode and what the setup will cover.
  */
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import { ArrowRightIcon } from "lucide-react"
 
 interface WelcomeStepProps {

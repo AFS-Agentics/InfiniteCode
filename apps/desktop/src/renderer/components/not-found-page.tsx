@@ -1,4 +1,4 @@
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import { useRouter } from "@tanstack/react-router"
 import { SearchXIcon } from "lucide-react"
 

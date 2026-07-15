@@ -4,7 +4,7 @@
  * Preserves the server-ranked Skill, MCP, and File result stream from the
  * connection-local `search/*` session.
  */
-import type { ReferenceSearchResult, ReferenceSearchSnapshot } from "@devo-ai/sdk/v2/client"
+import type { ReferenceSearchResult, ReferenceSearchSnapshot } from "@infinitecode-ai/sdk/v2/client"
 import { useEffect, useRef, useState } from "react"
 import { getProjectClient } from "../services/connection-manager"
 

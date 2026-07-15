@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
-use devo_protocol::ToolDefinition;
+use infinitecode_protocol::ToolDefinition;
 
 use crate::tool_spec::ToolSpec;
 

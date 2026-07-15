@@ -7,31 +7,31 @@ stdout stream.
 
 ## Enabling
 
-Set the `DEVO_PROTOCOL_TRACE` environment variable before launching Devo:
+Set the `INFINITECODE_PROTOCOL_TRACE` environment variable before launching InfiniteCode:
 
 ```bash
-DEVO_PROTOCOL_TRACE=1 devo
+INFINITECODE_PROTOCOL_TRACE=1 infinitecode
 ```
 
 On Windows (PowerShell):
 
 ```powershell
-$env:DEVO_PROTOCOL_TRACE = "1"; devo
+$env:INFINITECODE_PROTOCOL_TRACE = "1"; infinitecode
 ```
 
 ## Output location
 
-Trace files are written to `DEVO_HOME/traces/` (default `~/.devo/traces/`)
+Trace files are written to `INFINITECODE_HOME/traces/` (default `~/.infinitecode/traces/`)
 using the naming pattern `protocol-<pid>-<utc_timestamp>.ndjsonl`.
 
-To write to a specific path instead, set `DEVO_PROTOCOL_TRACE_FILE`:
+To write to a specific path instead, set `INFINITECODE_PROTOCOL_TRACE_FILE`:
 
 ```bash
-DEVO_PROTOCOL_TRACE=1 DEVO_PROTOCOL_TRACE_FILE=/tmp/my-trace.ndjsonl devo
+INFINITECODE_PROTOCOL_TRACE=1 INFINITECODE_PROTOCOL_TRACE_FILE=/tmp/my-trace.ndjsonl infinitecode
 ```
 
-If `DEVO_HOME` cannot be resolved, the trace falls back to
-`<temp_dir>/devo-traces/`.
+If `INFINITECODE_HOME` cannot be resolved, the trace falls back to
+`<temp_dir>/infinitecode-traces/`.
 
 ## Record format
 
@@ -73,13 +73,13 @@ Use `jq` to filter and inspect:
 
 ```bash
 # Show only outbound (client → server) messages
-jq 'select(.dir == "out")' ~/.devo/traces/protocol-*.ndjsonl
+jq 'select(.dir == "out")' ~/.infinitecode/traces/protocol-*.ndjsonl
 
 # Show methods of all outbound requests
-jq -r 'select(.dir == "out") | .line | fromjson | .method // empty' ~/.devo/traces/protocol-*.ndjsonl
+jq -r 'select(.dir == "out") | .line | fromjson | .method // empty' ~/.infinitecode/traces/protocol-*.ndjsonl
 
 # Show inbound messages larger than 1 KB
-jq 'select(.dir == "in" and .bytes > 1024)' ~/.devo/traces/protocol-*.ndjsonl
+jq 'select(.dir == "in" and .bytes > 1024)' ~/.infinitecode/traces/protocol-*.ndjsonl
 ```
 
 ## Security note

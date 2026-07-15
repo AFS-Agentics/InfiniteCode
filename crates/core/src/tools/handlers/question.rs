@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use devo_protocol::CollaborationMode;
-use devo_protocol::RequestUserInputArgs;
-use devo_protocol::RequestUserInputQuestion;
+use infinitecode_protocol::CollaborationMode;
+use infinitecode_protocol::RequestUserInputArgs;
+use infinitecode_protocol::RequestUserInputQuestion;
 
 use crate::contracts::{
     ToolCallError, ToolContext, ToolProgressSender, ToolResult, ToolResultContent,

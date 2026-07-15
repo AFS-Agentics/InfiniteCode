@@ -7,21 +7,21 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
-use devo_protocol::ApprovalDecisionPayload;
-use devo_protocol::ApprovalDecisionValue;
-use devo_protocol::ApprovalRequestPayload;
-use devo_protocol::ApprovalResponseParams;
-use devo_protocol::ApprovalScopeValue;
-use devo_protocol::EventContext;
-use devo_protocol::ItemEnvelope;
-use devo_protocol::ItemEventPayload;
-use devo_protocol::ItemId;
-use devo_protocol::ItemKind;
-use devo_protocol::PendingServerRequestContext;
-use devo_protocol::ServerEvent;
-use devo_protocol::ServerRequestKind;
-use devo_protocol::TurnId;
-use devo_protocol::acp_success_response;
+use infinitecode_protocol::ApprovalDecisionPayload;
+use infinitecode_protocol::ApprovalDecisionValue;
+use infinitecode_protocol::ApprovalRequestPayload;
+use infinitecode_protocol::ApprovalResponseParams;
+use infinitecode_protocol::ApprovalScopeValue;
+use infinitecode_protocol::EventContext;
+use infinitecode_protocol::ItemEnvelope;
+use infinitecode_protocol::ItemEventPayload;
+use infinitecode_protocol::ItemId;
+use infinitecode_protocol::ItemKind;
+use infinitecode_protocol::PendingServerRequestContext;
+use infinitecode_protocol::ServerEvent;
+use infinitecode_protocol::ServerRequestKind;
+use infinitecode_protocol::TurnId;
+use infinitecode_protocol::acp_success_response;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 
@@ -33,7 +33,7 @@ pub(crate) type AcpPendingPermissions = Arc<Mutex<HashMap<String, AcpPendingPerm
 
 pub(crate) struct AcpPendingPermission {
     request_id: serde_json::Value,
-    session_id: devo_protocol::SessionId,
+    session_id: infinitecode_protocol::SessionId,
     turn_id: TurnId,
     item_id: ItemId,
     options: Vec<AcpPermissionOption>,
@@ -55,7 +55,7 @@ pub(crate) async fn handle_acp_request_permission(
         .cloned()
         .ok_or_else(|| "session/request_permission params.sessionId is required".to_string())
         .and_then(|value| {
-            serde_json::from_value::<devo_protocol::SessionId>(value)
+            serde_json::from_value::<infinitecode_protocol::SessionId>(value)
                 .map_err(|error| format!("invalid session/request_permission sessionId: {error}"))
         })?;
     let options = acp_permission_options(&params)?;
@@ -317,7 +317,7 @@ mod tests {
     async fn permission_request_resolves_selected_approval_response() {
         let pending_permissions = Arc::new(Mutex::new(HashMap::new()));
         let (notifications_tx, mut notifications_rx) = mpsc::unbounded_channel();
-        let session_id = devo_protocol::SessionId::new();
+        let session_id = infinitecode_protocol::SessionId::new();
 
         handle_acp_request_permission(
             serde_json::json!(77),

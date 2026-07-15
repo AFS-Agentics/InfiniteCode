@@ -2,7 +2,7 @@
 description = "Message model, session state, and agent main loop"
 edition.workspace = true
 license.workspace = true
-name = "devo-core"
+name = "infinitecode-core"
 version.workspace = true
 
 [features]
@@ -11,19 +11,19 @@ default = ["code-search"]
 # dependencies (tokenizers, model2vec, hf-hub/hf-xet, hnsw_rs and the full
 # tree-sitter grammar set). Disable with `--no-default-features` for a slim
 # build that omits the entire code-search stack.
-code-search = ["dep:devo-code-search"]
+code-search = ["dep:infinitecode-code-search"]
 
 [dependencies]
-devo-config = { workspace = true }
-devo-code-search = { workspace = true, optional = true }
-devo-network-proxy = { workspace = true }
-devo-protocol = { workspace = true }
-devo-provider = { workspace = true }
-devo-safety = { workspace = true }
-devo-skills = { workspace = true }
-devo-tools = { workspace = true }
-devo-util-process = { workspace = true }
-devo-util-paths = { workspace = true }
+infinitecode-config = { workspace = true }
+infinitecode-code-search = { workspace = true, optional = true }
+infinitecode-network-proxy = { workspace = true }
+infinitecode-protocol = { workspace = true }
+infinitecode-provider = { workspace = true }
+infinitecode-safety = { workspace = true }
+infinitecode-skills = { workspace = true }
+infinitecode-tools = { workspace = true }
+infinitecode-util-process = { workspace = true }
+infinitecode-util-paths = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -55,8 +55,8 @@ uuid = { workspace = true }
 [dev-dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-devo-provider = { workspace = true }
-devo-safety = { workspace = true }
+infinitecode-provider = { workspace = true }
+infinitecode-safety = { workspace = true }
 futures = { workspace = true }
 pretty_assertions = { workspace = true }
 serde_json = { workspace = true }

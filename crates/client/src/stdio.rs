@@ -1,4 +1,4 @@
-//! Stdio transport for a spawned devo server process.
+//! Stdio transport for a spawned infinitecode server process.
 //!
 //! Writes newline-delimited JSON to the child stdin and runs a background stdout
 //! reader that delegates framing and JSON-RPC routing to [`ServerClientCore`].
@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
-use devo_protocol::*;
+use infinitecode_protocol::*;
 use tokio::io::AsyncBufReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::io::BufReader;
@@ -490,9 +490,9 @@ mod tests {
     use tokio::time::Duration;
     use tokio::time::timeout;
 
-    fn default_test_client_capabilities() -> devo_protocol::AcpClientCapabilities {
-        devo_protocol::AcpClientCapabilities {
-            fs: devo_protocol::AcpFileSystemCapabilities {
+    fn default_test_client_capabilities() -> infinitecode_protocol::AcpClientCapabilities {
+        infinitecode_protocol::AcpClientCapabilities {
+            fs: infinitecode_protocol::AcpFileSystemCapabilities {
                 read_text_file: true,
                 write_text_file: true,
                 meta: None,
@@ -504,8 +504,8 @@ mod tests {
 
     fn test_agent_capabilities_with_session_list() -> AcpAgentCapabilities {
         AcpAgentCapabilities {
-            session_capabilities: devo_protocol::AcpSessionCapabilities {
-                list: Some(devo_protocol::AcpSessionListCapabilities::default()),
+            session_capabilities: infinitecode_protocol::AcpSessionCapabilities {
+                list: Some(infinitecode_protocol::AcpSessionListCapabilities::default()),
                 ..Default::default()
             },
             ..Default::default()
@@ -515,7 +515,7 @@ mod tests {
     async fn spawn_test_stdio_client(
         child: Child,
         stdin: ChildStdin,
-        client_capabilities: devo_protocol::AcpClientCapabilities,
+        client_capabilities: infinitecode_protocol::AcpClientCapabilities,
     ) -> (StdioServerClient, PendingResponses) {
         let stdin = Arc::new(Mutex::new(stdin));
         let (client_writer, mut write_rx) = ClientWriter::channel();
@@ -548,8 +548,8 @@ mod tests {
     #[tokio::test]
     async fn initialize_uses_configured_client_capabilities() {
         let (child, stdin, stdout) = request_capture_child_for_turn_start_test().await;
-        let client_capabilities = devo_protocol::AcpClientCapabilities {
-            fs: devo_protocol::AcpFileSystemCapabilities {
+        let client_capabilities = infinitecode_protocol::AcpClientCapabilities {
+            fs: infinitecode_protocol::AcpFileSystemCapabilities {
                 read_text_file: true,
                 write_text_file: false,
                 meta: None,
@@ -596,13 +596,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn session_start_accepts_standard_acp_response_without_devo_metadata() {
+    async fn session_start_accepts_standard_acp_response_without_infinitecode_metadata() {
         let (child, stdin, stdout) = request_capture_child_for_turn_start_test().await;
         let (mut client, pending) =
             spawn_test_stdio_client(child, stdin, default_test_client_capabilities()).await;
         let cwd = std::env::current_dir().expect("current dir");
         let additional_directory = cwd.join("shared");
-        let session_id = devo_protocol::SessionId::new();
+        let session_id = infinitecode_protocol::SessionId::new();
         let params = SessionStartParams {
             cwd: cwd.clone(),
             additional_directories: vec![additional_directory.clone()],
@@ -673,7 +673,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn session_list_accepts_standard_acp_sessions_without_devo_metadata() {
+    async fn session_list_accepts_standard_acp_sessions_without_infinitecode_metadata() {
         let (child, stdin, stdout) = request_capture_child_for_turn_start_test().await;
         let (mut client, pending) =
             spawn_test_stdio_client(child, stdin, default_test_client_capabilities()).await;
@@ -682,7 +682,7 @@ mod tests {
             .set_agent_capabilities_for_test(test_agent_capabilities_with_session_list());
         let cwd = std::env::current_dir().expect("current dir");
         let additional_directory = cwd.join("shared");
-        let session_id = devo_protocol::SessionId::new();
+        let session_id = infinitecode_protocol::SessionId::new();
         let updated_at = "2026-06-20T00:00:00Z";
         let expected_timestamp = chrono::DateTime::parse_from_rfc3339(updated_at)
             .expect("parse updatedAt")
@@ -764,7 +764,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn session_resume_accepts_standard_acp_response_without_devo_metadata() {
+    async fn session_resume_accepts_standard_acp_response_without_infinitecode_metadata() {
         let (child, stdin, stdout) = request_capture_child_for_turn_start_test().await;
         let (mut client, pending) =
             spawn_test_stdio_client(child, stdin, default_test_client_capabilities()).await;
@@ -773,7 +773,7 @@ mod tests {
             .set_agent_capabilities_for_test(test_agent_capabilities_with_session_list());
         let cwd = std::env::current_dir().expect("current dir");
         let additional_directory = cwd.join("shared");
-        let session_id = devo_protocol::SessionId::new();
+        let session_id = infinitecode_protocol::SessionId::new();
         let updated_at = "2026-06-20T00:00:00Z";
         let expected_timestamp = chrono::DateTime::parse_from_rfc3339(updated_at)
             .expect("parse updatedAt")
@@ -883,13 +883,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn turn_start_sends_devo_extension_with_full_params() {
+    async fn turn_start_sends_infinitecode_extension_with_full_params() {
         let (child, stdin, stdout) = request_capture_child_for_turn_start_test().await;
         let (mut client, pending) =
             spawn_test_stdio_client(child, stdin, default_test_client_capabilities()).await;
         let params = TurnStartParams {
-            session_id: devo_protocol::SessionId::new(),
-            input: vec![devo_protocol::InputItem::Text {
+            session_id: infinitecode_protocol::SessionId::new(),
+            input: vec![infinitecode_protocol::InputItem::Text {
                 text: "research this".to_string(),
             }],
             model: Some("test-model".to_string()),
@@ -898,8 +898,8 @@ mod tests {
             sandbox: Some("workspace-write".to_string()),
             approval_policy: Some("on-request".to_string()),
             cwd: Some(PathBuf::from("workspace")),
-            collaboration_mode: devo_protocol::CollaborationMode::Plan,
-            execution_mode: devo_protocol::TurnExecutionMode::Regular,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Plan,
+            execution_mode: infinitecode_protocol::TurnExecutionMode::Regular,
         };
         let expected_params = serde_json::to_value(&params).expect("serialize turn params");
         let mut stdout_lines = BufReader::new(stdout).lines();
@@ -921,7 +921,7 @@ mod tests {
             serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 1,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": expected_params,
             })
         );
@@ -937,7 +937,7 @@ mod tests {
                 "id": 1,
                 "result": {
                     "disposition": "started",
-                    "turn_id": devo_protocol::TurnId::new(),
+                    "turn_id": infinitecode_protocol::TurnId::new(),
                     "status": "Running",
                     "accepted_at": "2026-06-20T00:00:00Z"
                 }
@@ -955,10 +955,10 @@ mod tests {
         let (child, stdin, stdout) = request_capture_child_for_turn_start_test().await;
         let (mut client, pending) =
             spawn_test_stdio_client(child, stdin, default_test_client_capabilities()).await;
-        let session_id = devo_protocol::SessionId::new();
+        let session_id = infinitecode_protocol::SessionId::new();
         let params = TurnStartParams {
             session_id,
-            input: vec![devo_protocol::InputItem::Text {
+            input: vec![infinitecode_protocol::InputItem::Text {
                 text: "native prompt".to_string(),
             }],
             model: Some("ignored-by-acp".to_string()),
@@ -967,8 +967,8 @@ mod tests {
             sandbox: None,
             approval_policy: None,
             cwd: None,
-            collaboration_mode: devo_protocol::CollaborationMode::Build,
-            execution_mode: devo_protocol::TurnExecutionMode::Regular,
+            collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
+            execution_mode: infinitecode_protocol::TurnExecutionMode::Regular,
         };
         let mut stdout_lines = BufReader::new(stdout).lines();
 
@@ -978,12 +978,12 @@ mod tests {
         });
 
         let first_request = read_request_line(&mut stdout_lines).await;
-        assert_eq!(first_request["method"], "_devo/turn/start");
+        assert_eq!(first_request["method"], "_infinitecode/turn/start");
         pending
             .lock()
             .await
             .remove(&1)
-            .expect("devo turn/start has pending response")
+            .expect("infinitecode turn/start has pending response")
             .send(serde_json::json!({
                 "jsonrpc": "2.0",
                 "id": 1,

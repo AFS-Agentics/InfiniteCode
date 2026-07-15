@@ -1,8 +1,8 @@
 use crossterm::event::KeyCode;
-use devo_protocol::ApprovalDecisionValue;
-use devo_protocol::ApprovalScopeValue;
-use devo_protocol::SessionId;
-use devo_protocol::TurnId;
+use infinitecode_protocol::ApprovalDecisionValue;
+use infinitecode_protocol::ApprovalScopeValue;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::TurnId;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;

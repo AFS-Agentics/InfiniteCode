@@ -67,7 +67,7 @@ Default composer:
 
 ```text
 
-┃ Ask Devo
+┃ Ask InfiniteCode
 
   BUILD · deepseek-v4-pro high  ↑0[cached 0 0%]  ↓0  ▱▱▱▱▱▱▱▱▱▱  0%  0/950k
 ```
@@ -107,7 +107,7 @@ Rules:
 - Composer content lines use a left `┃` marker in the active input mode color. Build uses the current blue/cyan color, Plan uses purple, and Shell uses orange.
 - The composer is rendered as a full-width input band: one padding line above the content, the content lines, and one padding line below the content share the same background span.
 - For multi-line input, each user-entered content line may repeat the `┃` marker. The top and bottom padding rows must keep the input-band background but must not render `┃`.
-- `Ask Devo` is the empty-input hint. It uses muted grey text and disappears as soon as the user types content.
+- `Ask InfiniteCode` is the empty-input hint. It uses muted grey text and disappears as soon as the user types content.
 - User-entered input replaces the hint and uses normal input foreground styling.
 - The status label is the first visible field in the bottom status line.
 - `BUILD`, `PLAN`, and `SHELL` must use distinct colors.
@@ -188,8 +188,8 @@ Rules:
 - Shell Mode command execution must use the program's terminal command capability, not an unmanaged client-local shell.
 - Each Shell Mode submission should start a fresh one-shot PTY command through the server `command/exec` API and render `command/exec/outputDelta` notifications.
 - `!cmd` from Build Mode should use the same one-shot `command/exec` path and then return to Build Mode.
-- If no Devo session exists yet, Shell Mode and `!cmd` should omit `session_id`, pass an explicit `cwd`, and must not call `session/start`, emit session activation, or apply session permissions only to execute a command.
-- After a Devo session exists, Shell Mode command execution may include that `session_id`, but it still must not create a new session for shell execution.
+- If no InfiniteCode session exists yet, Shell Mode and `!cmd` should omit `session_id`, pass an explicit `cwd`, and must not call `session/start`, emit session activation, or apply session permissions only to execute a command.
+- After a InfiniteCode session exists, Shell Mode command execution may include that `session_id`, but it still must not create a new session for shell execution.
 - Shell Mode must respect workspace, permission policy, safety, privacy, and sandbox constraints.
 - Shell Mode results should appear in the transcript as direct command execution output with `UserShell` source attribution and bounded display.
 - Shell Mode process completions should use `▣ Shell` for the summary instead of the active model display name.
@@ -210,7 +210,7 @@ TUI state:
 
 ⠋ Working · ⏱ 2s
 
-┃ Ask Devo
+┃ Ask InfiniteCode
 
   SHELL · deepseek-v4-pro high  ↑420[cached 300 71%]  ↓12  ▰▰▱▱▱▱▱▱▱▱  20%  190k/950k
 
@@ -270,7 +270,7 @@ Open slash-command list:
   /goal         set or view the goal for a long-running task
   /new          start a new chat
   /status       show current session configuration and token usage
-  /permissions  choose what Devo is allowed to do
+  /permissions  choose what InfiniteCode is allowed to do
 ```
 
 Full slash-command list:
@@ -283,10 +283,10 @@ Full slash-command list:
   /goal         set or view the goal for a long-running task
   /new          start a new chat
   /status       show current session configuration and token usage
-  /permissions  choose what Devo is allowed to do
+  /permissions  choose what InfiniteCode is allowed to do
   /clear        clear the current transcript
   /btw          start a side conversation in an ephemeral fork
-  /exit         exit Devo
+  /exit         exit InfiniteCode
 ```
 
 The eight-row visible list shows the first eight matching commands by default. When there are more than eight matches, the selection may scroll through the full list while preserving the two-character left padding and row color rules.
@@ -319,10 +319,10 @@ Command purposes:
 - `/goal`: set or view the goal for a long-running task.
 - `/new`: start a new chat.
 - `/status`: show current session configuration and token usage.
-- `/permissions`: choose what Devo is allowed to do.
+- `/permissions`: choose what InfiniteCode is allowed to do.
 - `/clear`: clear the current transcript.
 - `/btw`: start a side conversation in an ephemeral fork.
-- `/exit`: exit Devo.
+- `/exit`: exit InfiniteCode.
 
 Command-specific L2 designs:
 
@@ -374,7 +374,7 @@ Rules:
 | Revision | Date | Author | Change Type | Notes |
 |---:|---|---|---|---|
 | 1 | 2026-05-23 | Assistant | Initial | Initial composer, Shell Mode, Plan Mode, and command discovery design. |
-| 1 | 2026-05-23 | Human | Refinement | Added `Ask Devo` prompt band styling, `Build` default status label, distinct mode colors, and bottom token/cache/context status fields. |
+| 1 | 2026-05-23 | Human | Refinement | Added `Ask InfiniteCode` prompt band styling, `Build` default status label, distinct mode colors, and bottom token/cache/context status fields. |
 | 1 | 2026-05-23 | Human | Refinement | Added slash-command popup behavior, eight-row command list, selection styling, keyboard navigation, and initial command catalog. |
 | 1 | 2026-05-23 | Human | Refinement | Added inline slash-command coloring for matched command tokens and muted parameter hints. |
 | 1 | 2026-05-23 | Human | Refinement | Clarified that multi-line composer input repeats `┃` on content lines while top and bottom padding rows remain background-only. |

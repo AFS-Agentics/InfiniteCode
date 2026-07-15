@@ -8,14 +8,14 @@ import {
 	PromptInputTools,
 	usePromptInputAttachments,
 	usePromptInputController,
-} from "@devo/ui/components/ai-elements/prompt-input"
+} from "@infinitecode/ui/components/ai-elements/prompt-input"
 import { type MentionOption, MentionPopover, type MentionPopoverHandle } from "./chat/mention-popover"
 import {
 	createMentionFromOption,
 	insertMentionIntoText,
 } from "./chat/prompt-mentions"
 import { SlashCommandPopover, type SlashCommandPopoverHandle } from "./chat/slash-command-popover"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { useAtomValue } from "jotai"
 import {
@@ -36,17 +36,17 @@ import { appStore } from "../atoms/store"
 import { useDesktopProjectActions } from "./desktop-project-actions-context"
 import { useAgents, useProjectList } from "../hooks/use-agents"
 import { newChatDraftKey, useDraftActions, useDraftSnapshot } from "../hooks/use-draft"
-import type { ModelRef } from "../hooks/use-devo-data"
+import type { ModelRef } from "../hooks/use-infinitecode-data"
 import {
 	getModelInputCapabilities,
 	getModelVariants,
 	resolveEffectiveModel,
 	useConfig,
 	useModelState,
-	useDevoAgents,
+	useInfiniteCodeAgents,
 	useProviders,
 	useVcs,
-} from "../hooks/use-devo-data"
+} from "../hooks/use-infinitecode-data"
 import { useAgentActions } from "../hooks/use-server"
 import { persistRuntimeModelConfigOption, persistRuntimeModelSelection } from "../lib/model-config-options"
 import { resolveSelectedProjectDirectory } from "../lib/project-selection"
@@ -301,7 +301,7 @@ export function NewChat() {
 	const { data: providers } = useProviders(selectedDirectory || null)
 	const { data: config } = useConfig(selectedDirectory || null)
 	const { data: vcs, reload: reloadVcs } = useVcs(selectedDirectory || null)
-	const { agents: devoAgents } = useDevoAgents(selectedDirectory || null)
+	const { agents: infinitecodeAgents } = useInfiniteCodeAgents(selectedDirectory || null)
 	const { recentModels, addRecent: addRecentModel } = useModelState()
 
 	const handleModelSelect = useCallback(
@@ -415,10 +415,10 @@ export function NewChat() {
 	)
 
 	// Resolve active agent for model resolution
-	const activeDevoAgent = useMemo(() => {
+	const activeInfiniteCodeAgent = useMemo(() => {
 		const agentName = selectedAgent ?? config?.defaultAgent
-		return devoAgents?.find((a) => a.name === agentName) ?? null
-	}, [selectedAgent, config?.defaultAgent, devoAgents])
+		return infinitecodeAgents?.find((a) => a.name === agentName) ?? null
+	}, [selectedAgent, config?.defaultAgent, infinitecodeAgents])
 
 	// Resolve effective model — selectedModel is seeded from the persisted project model
 	// on mount/project switch (above), so it already wins at step 1 of the resolution chain.
@@ -426,13 +426,13 @@ export function NewChat() {
 		() =>
 			resolveEffectiveModel(
 				selectedModel,
-				activeDevoAgent,
+				activeInfiniteCodeAgent,
 				config?.model,
 				providers?.defaults ?? {},
 				providers?.providers ?? [],
 				recentModels,
 			),
-		[selectedModel, activeDevoAgent, config?.model, providers, recentModels],
+		[selectedModel, activeInfiniteCodeAgent, config?.model, providers, recentModels],
 	)
 
 	// Validate variant against the effective model's available variants.
@@ -685,7 +685,7 @@ export function NewChat() {
 				</div>
 
 				<div
-					className="devo-composer-shell bg-muted/30 shadow-[0_12px_48px_rgba(0,0,0,0.07)]"
+					className="infinitecode-composer-shell bg-muted/30 shadow-[0_12px_48px_rgba(0,0,0,0.07)]"
 					data-popover-open={slashOpen || mentionOpen ? "true" : undefined}
 				>
 					<PromptInputProvider key={draftKey} initialInput={draft}>
@@ -715,12 +715,12 @@ export function NewChat() {
 								query={mentionQuery}
 								open={mentionOpen}
 								directory={selectedDirectory || null}
-								agents={devoAgents ?? []}
+								agents={infinitecodeAgents ?? []}
 								onSelect={handleMentionSelect}
 								onClose={handleMentionClose}
 							/>
 							<PromptInput
-								className="devo-composer border-border/60 bg-background/95 shadow-none"
+								className="infinitecode-composer border-border/60 bg-background/95 shadow-none"
 								accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
 								multiple
 								maxFileSize={10 * 1024 * 1024}
@@ -750,7 +750,7 @@ export function NewChat() {
 										<AttachButton disabled={launching || !selectedDirectory} />
 										{hasToolbar && (
 											<PromptToolbar
-												agents={devoAgents ?? []}
+												agents={infinitecodeAgents ?? []}
 												selectedAgent={selectedAgent}
 												defaultAgent={config?.defaultAgent}
 												onSelectAgent={setSelectedAgent}

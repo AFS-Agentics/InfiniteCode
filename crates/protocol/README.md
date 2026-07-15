@@ -1,11 +1,11 @@
-# devo-protocol
+# infinitecode-protocol
 
-This crate defines the protocol types shared by Devo clients and the Devo
+This crate defines the protocol types shared by InfiniteCode clients and the InfiniteCode
 server.
 
-## ACP and Devo extension methods
+## ACP and InfiniteCode extension methods
 
-Devo uses ACP JSON-RPC methods for the portable protocol surface. The current
+InfiniteCode uses ACP JSON-RPC methods for the portable protocol surface. The current
 client-to-server ACP methods are:
 
 - `initialize`: negotiate protocol version, client capabilities, and server
@@ -19,7 +19,7 @@ client-to-server ACP methods are:
 - `session/cancel`: cancel the active session turn.
 
 Event-driven clients that need an immediate turn acknowledgement should use the
-Devo extension `_devo/turn/start`, which returns `TurnStartResult::Started`
+InfiniteCode extension `_infinitecode/turn/start`, which returns `TurnStartResult::Started`
 promptly and streams turn progress through server notifications.
 
 The current server-to-client ACP notification method is:
@@ -58,84 +58,84 @@ The current server-to-client ACP request methods are:
 - `terminal/release`: ask the client to release a terminal process and clean up
   associated state.
 
-Devo-specific client-to-server APIs are sent with the `_devo/` method prefix.
+InfiniteCode-specific client-to-server APIs are sent with the `_infinitecode/` method prefix.
 The prefix is applied by the client transport, then removed by the server before
 dispatching to `ClientMethod`. These methods remain non-standard ACP extension
-points because they expose Devo-specific TUI, runtime, or local workflow
+points because they expose InfiniteCode-specific TUI, runtime, or local workflow
 behavior that is not represented by the portable ACP method set.
 
 ### Session extensions
 
-- `_devo/session/title/update`: rename a session from the client.
-- `_devo/session/metadata/update`: update session metadata such as the active
+- `_infinitecode/session/title/update`: rename a session from the client.
+- `_infinitecode/session/metadata/update`: update session metadata such as the active
   model or reasoning-effort selection.
-- `_devo/session/permissions/update`: update the current permission preset.
-- `_devo/session/compact`: proactively compact a session context.
-- `_devo/session/fork`: fork a new session from an existing turn.
-- `_devo/session/rollback`: roll back a session to a selected user turn.
+- `_infinitecode/session/permissions/update`: update the current permission preset.
+- `_infinitecode/session/compact`: proactively compact a session context.
+- `_infinitecode/session/fork`: fork a new session from an existing turn.
+- `_infinitecode/session/rollback`: roll back a session to a selected user turn.
 
 ### Turn extensions
 
-- `_devo/turn/start`: start a Devo turn with the full Devo turn request shape.
+- `_infinitecode/turn/start`: start a InfiniteCode turn with the full InfiniteCode turn request shape.
   If an older server does not support it, the client falls back to ACP
   `session/prompt`.
-- `_devo/turn/shell_command`: run a user shell command through the server
+- `_infinitecode/turn/shell_command`: run a user shell command through the server
   runtime.
-- `_devo/turn/interrupt`: interrupt the active Devo turn.
-- `_devo/turn/steer`: send steering input into a running turn.
+- `_infinitecode/turn/interrupt`: interrupt the active InfiniteCode turn.
+- `_infinitecode/turn/steer`: send steering input into a running turn.
 
 ### Workspace extensions
 
-- `_devo/workspace/changes/read`: read branch, uncommitted, or turn-scoped
+- `_infinitecode/workspace/changes/read`: read branch, uncommitted, or turn-scoped
   workspace change views. Git workspaces support branch and uncommitted scopes;
   non-Git workspaces report those scopes as unsupported and only expose
   turn-scoped bounded filesystem snapshots.
 - `workspace/changes/updated`: notify subscribed clients that the turn-scoped
   workspace change summary was finalized or updated. The notification carries a
-  summary only; clients call `_devo/workspace/changes/read` for full diffs.
+  summary only; clients call `_infinitecode/workspace/changes/read` for full diffs.
 
 ### Provider and model extensions
 
-- `_devo/provider/list`: list configured provider vendors.
-- `_devo/provider/upsert`: add or update a provider vendor and optional model
+- `_infinitecode/provider/list`: list configured provider vendors.
+- `_infinitecode/provider/upsert`: add or update a provider vendor and optional model
   binding.
-- `_devo/provider/validate`: validate provider credentials and model settings.
-- `_devo/model/catalog`: read the effective model catalog.
-- `_devo/model/saved`: notify the server that model configuration was saved.
+- `_infinitecode/provider/validate`: validate provider credentials and model settings.
+- `_infinitecode/model/catalog`: read the effective model catalog.
+- `_infinitecode/model/saved`: notify the server that model configuration was saved.
 
 ### Skills extensions
 
-- `_devo/skills/list`: list available skills for a working directory.
-- `_devo/skills/changed`: notify the server that skill files changed.
-- `_devo/skills/set_enabled`: persistently enable or disable a skill.
+- `_infinitecode/skills/list`: list available skills for a working directory.
+- `_infinitecode/skills/changed`: notify the server that skill files changed.
+- `_infinitecode/skills/set_enabled`: persistently enable or disable a skill.
 
 ### Command execution extensions
 
-- `_devo/command/exec`: launch a command execution request.
-- `_devo/command/exec/write`: write input to a running command.
-- `_devo/command/exec/resize`: resize a running command terminal.
-- `_devo/command/exec/terminate`: terminate a running command.
+- `_infinitecode/command/exec`: launch a command execution request.
+- `_infinitecode/command/exec/write`: write input to a running command.
+- `_infinitecode/command/exec/resize`: resize a running command terminal.
+- `_infinitecode/command/exec/terminate`: terminate a running command.
 
 ### Goal extensions
 
-- `_devo/goal/create`: create a goal for the active thread.
-- `_devo/goal/set`: update the current goal objective.
-- `_devo/goal/status`: read the current goal state.
-- `_devo/goal/pause`: pause goal continuation.
-- `_devo/goal/resume`: resume goal continuation.
-- `_devo/goal/complete`: mark the goal complete.
-- `_devo/goal/clear`: clear the current goal.
+- `_infinitecode/goal/create`: create a goal for the active thread.
+- `_infinitecode/goal/set`: update the current goal objective.
+- `_infinitecode/goal/status`: read the current goal state.
+- `_infinitecode/goal/pause`: pause goal continuation.
+- `_infinitecode/goal/resume`: resume goal continuation.
+- `_infinitecode/goal/complete`: mark the goal complete.
+- `_infinitecode/goal/clear`: clear the current goal.
 
 ### Agent extensions
 
-- `_devo/agent/list`: list subagents associated with a session.
-- `_devo/agent/spawn`: spawn a subagent.
-- `_devo/agent/close`: close a subagent.
+- `_infinitecode/agent/list`: list subagents associated with a session.
+- `_infinitecode/agent/spawn`: spawn a subagent.
+- `_infinitecode/agent/close`: close a subagent.
 
 ### Reference search and user-input extensions
 
-- `_devo/search/start`: start a server-backed composer reference search.
-- `_devo/search/update`: update the active reference-search query.
-- `_devo/search/cancel`: cancel the active reference search.
-- `_devo/request_user_input/respond`: answer a pending structured user-input
+- `_infinitecode/search/start`: start a server-backed composer reference search.
+- `_infinitecode/search/update`: update the active reference-search query.
+- `_infinitecode/search/cancel`: cancel the active reference search.
+- `_infinitecode/request_user_input/respond`: answer a pending structured user-input
   request.

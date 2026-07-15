@@ -1,4 +1,4 @@
-pub use devo_protocol::{
+pub use infinitecode_protocol::{
     ApprovalDecisionValue, ApprovalResponseParams, ApprovalScopeValue, EventsSubscribeParams,
     EventsSubscribeResult,
 };

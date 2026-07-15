@@ -14,7 +14,7 @@ import { streamingVersionFamily } from "../atoms/streaming"
 import { queryClient } from "../lib/query-client"
 import type { Message, Part } from "../lib/types"
 import { getBaseClient, getProjectClient } from "../services/connection-manager"
-import { queryKeys } from "./use-devo-data"
+import { queryKeys } from "./use-infinitecode-data"
 
 // Re-export types for consumers
 export type { ChatMessageEntry, ChatTurn }
@@ -98,7 +98,7 @@ export function useSessionChat(
 				// Use a directory-scoped client when available, otherwise fall back to the base client
 				const client = (directory ? getProjectClient(directory) : null) ?? getBaseClient()
 				if (!client) {
-					setError("Not connected to Devo server")
+					setError("Not connected to InfiniteCode server")
 					return
 				}
 

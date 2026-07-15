@@ -1,16 +1,16 @@
 use anyhow::Context;
 use anyhow::Result;
-use devo_core::ModelBindingConfig;
-use devo_core::ProviderConfigSection;
-use devo_core::ProviderDefaultsConfig;
-use devo_core::ProviderVendorConfig;
-use devo_core::provider_id_for_endpoint;
-use devo_core::upsert_user_auth_api_key;
-use devo_protocol::PermissionPreset;
-use devo_protocol::ProviderModelBinding;
-use devo_protocol::ProviderVendor;
-use devo_protocol::ProviderWireApi;
-use devo_util_paths::find_devo_home;
+use infinitecode_core::ModelBindingConfig;
+use infinitecode_core::ProviderConfigSection;
+use infinitecode_core::ProviderDefaultsConfig;
+use infinitecode_core::ProviderVendorConfig;
+use infinitecode_core::provider_id_for_endpoint;
+use infinitecode_core::upsert_user_auth_api_key;
+use infinitecode_protocol::PermissionPreset;
+use infinitecode_protocol::ProviderModelBinding;
+use infinitecode_protocol::ProviderVendor;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_util_paths::find_infinitecode_home;
 use std::collections::BTreeMap;
 use toml::Value;
 
@@ -31,7 +31,7 @@ pub(crate) fn save_onboarding_config(
     base_url: Option<&str>,
     api_key: Option<&str>,
 ) -> Result<()> {
-    let config_home = find_devo_home().context("could not determine user config path")?;
+    let config_home = find_infinitecode_home().context("could not determine user config path")?;
     save_onboarding_config_to_dir(&config_home, binding, base_url, api_key)
 }
 
@@ -111,7 +111,7 @@ pub(crate) fn save_last_used_model(
     provider: ProviderWireApi,
     model: &str,
 ) -> Result<()> {
-    let path = find_devo_home()
+    let path = find_infinitecode_home()
         .context("could not determine user config path")?
         .join("config.toml");
     let mut root = if path.exists() {
@@ -138,7 +138,7 @@ pub(crate) fn save_last_used_model(
 
 #[allow(dead_code)]
 pub(crate) fn save_reasoning_effort_selection(selection: Option<&str>) -> Result<()> {
-    let path = find_devo_home()
+    let path = find_infinitecode_home()
         .context("could not determine user config path")?
         .join("config.toml");
     let mut root = if path.exists() {
@@ -163,7 +163,7 @@ pub(crate) fn save_reasoning_effort_selection(selection: Option<&str>) -> Result
 }
 
 pub(crate) fn save_theme_selection(name: &str) -> Result<()> {
-    let path = find_devo_home()
+    let path = find_infinitecode_home()
         .context("could not determine user config path")?
         .join("config.toml");
     let mut root = if path.exists() {
@@ -191,7 +191,7 @@ pub(crate) fn save_project_permission_preset(
     project_key: &str,
     preset: PermissionPreset,
 ) -> Result<()> {
-    let path = find_devo_home()
+    let path = find_infinitecode_home()
         .context("could not determine user config path")?
         .join("config.toml");
     let mut root = if path.exists() {
@@ -216,7 +216,7 @@ pub(crate) fn save_project_permission_preset(
 }
 
 pub(crate) fn load_theme_selection() -> Option<String> {
-    let path = find_devo_home().ok()?.join("config.toml");
+    let path = find_infinitecode_home().ok()?.join("config.toml");
     let data = std::fs::read_to_string(&path).ok()?;
     let root: Value = data.parse().ok()?;
     root.get("theme")
@@ -772,10 +772,10 @@ fn upsert_model_entry(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use devo_core::AuthCredentialConfig;
-    use devo_core::AuthCredentialKind;
-    use devo_core::UserAuthConfigFile;
-    use devo_core::read_user_auth_config;
+    use infinitecode_core::AuthCredentialConfig;
+    use infinitecode_core::AuthCredentialKind;
+    use infinitecode_core::UserAuthConfigFile;
+    use infinitecode_core::read_user_auth_config;
     use pretty_assertions::assert_eq;
 
     #[test]

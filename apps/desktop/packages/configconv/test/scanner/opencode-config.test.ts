@@ -29,7 +29,7 @@ const { scanFormat } = await import("../../src/scanner")
 beforeEach(async () => {
 	testDir = join(
 		tmpdir(),
-		`devo-configconv-opencode-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+		`infinitecode-configconv-opencode-${Date.now()}-${Math.random().toString(36).slice(2)}`,
 	)
 	await mkdir(testDir, { recursive: true })
 })

@@ -1,9 +1,9 @@
 ---
 title: Code Search
-description: Understand Devo's local semantic code search.
+description: Understand InfiniteCode's local semantic code search.
 ---
 
-`code_search` is Devo's built-in read-only retrieval tool for finding relevant
+`code_search` is InfiniteCode's built-in read-only retrieval tool for finding relevant
 code by meaning, identifiers, and related locations.
 
 It is different from shell search. Shell search is exact text search. Code
@@ -23,7 +23,7 @@ The code-search engine handles:
 - warm in-memory indexes;
 - disk cache refresh.
 
-It only reads the workspace. Its writes are cache files under Devo's cache
+It only reads the workspace. Its writes are cache files under InfiniteCode's cache
 directory.
 
 ## Operations
@@ -50,14 +50,14 @@ Production code search uses a local model2vec embedding provider with the
 `minishlab/potion-code-16M` model. The model is loaded lazily on first embedding
 call.
 
-If the model files are missing, Devo tries to fetch them on first use. In an
+If the model files are missing, InfiniteCode tries to fetch them on first use. In an
 offline environment, pre-populate the local model cache before relying on
 `code_search`; otherwise the tool reports a recoverable model-unavailable
 configuration error.
 
 ## Cache Behavior
 
-Devo keeps one in-memory index per workspace root, content filter, and embedding
+InfiniteCode keeps one in-memory index per workspace root, content filter, and embedding
 model identity. It also stores disk cache metadata and embedding rows so repeat
 queries do not always rebuild the whole index.
 
@@ -85,5 +85,5 @@ Use shell search when:
 - you want a full list of matches;
 - you need command-line flags or file-glob control.
 
-Devo may use both in the same task: shell search for exact confirmation and
+InfiniteCode may use both in the same task: shell search for exact confirmation and
 code search for broader navigation.

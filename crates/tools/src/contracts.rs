@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use devo_protocol::CollaborationMode;
+use infinitecode_protocol::CollaborationMode;
 use serde::Deserialize;
 use serde::Serialize;
 

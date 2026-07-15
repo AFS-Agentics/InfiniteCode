@@ -1,8 +1,8 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@devo/ui/components/hover-card"
-import { cn } from "@devo/ui/lib/utils"
+import { Button } from "@infinitecode/ui/components/button"
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@infinitecode/ui/components/hover-card"
+import { cn } from "@infinitecode/ui/lib/utils"
 import type { FileUIPart, SourceDocumentUIPart } from "ai"
 import {
 	FileTextIcon,

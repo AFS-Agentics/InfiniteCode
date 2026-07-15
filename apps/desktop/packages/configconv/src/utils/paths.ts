@@ -1,5 +1,5 @@
 /**
- * Path resolution utilities for Claude Code and Devo config locations.
+ * Path resolution utilities for Claude Code and InfiniteCode config locations.
  * Handles platform differences and XDG base directories.
  */
 import { homedir } from "node:os"
@@ -102,100 +102,100 @@ export function projectAgentsMdPath(projectPath: string): string {
 	return join(projectPath, "AGENTS.md")
 }
 
-// ─── Devo Paths ──────────────────────────────────────────────────
+// ─── InfiniteCode Paths ──────────────────────────────────────────────────
 
-/** ~/.config/devo/devo.json */
+/** ~/.config/infinitecode/infinitecode.json */
 export function ocGlobalConfigPath(): string {
 	const xdgConfig = process.env.XDG_CONFIG_HOME || join(home, ".config")
-	return join(xdgConfig, "devo", "devo.json")
+	return join(xdgConfig, "infinitecode", "infinitecode.json")
 }
 
-/** ~/.config/devo/ */
+/** ~/.config/infinitecode/ */
 export function ocGlobalConfigDir(): string {
 	const xdgConfig = process.env.XDG_CONFIG_HOME || join(home, ".config")
-	return join(xdgConfig, "devo")
+	return join(xdgConfig, "infinitecode")
 }
 
-/** ~/.config/devo/backups/ */
+/** ~/.config/infinitecode/backups/ */
 export function ocBackupsDir(): string {
 	return join(ocGlobalConfigDir(), "backups")
 }
 
-/** ~/.config/devo/AGENTS.md */
+/** ~/.config/infinitecode/AGENTS.md */
 export function ocGlobalAgentsMdPath(): string {
 	return join(ocGlobalConfigDir(), "AGENTS.md")
 }
 
-/** ~/.config/devo/skills/ */
+/** ~/.config/infinitecode/skills/ */
 export function ocGlobalSkillsDir(): string {
 	return join(ocGlobalConfigDir(), "skills")
 }
 
-/** ~/.config/devo/commands/ */
+/** ~/.config/infinitecode/commands/ */
 export function ocGlobalCommandsDir(): string {
 	return join(ocGlobalConfigDir(), "commands")
 }
 
-/** ~/.config/devo/agents/ */
+/** ~/.config/infinitecode/agents/ */
 export function ocGlobalAgentsDir(): string {
 	return join(ocGlobalConfigDir(), "agents")
 }
 
-/** ~/.config/devo/plugins/ */
+/** ~/.config/infinitecode/plugins/ */
 export function ocGlobalPluginsDir(): string {
 	return join(ocGlobalConfigDir(), "plugins")
 }
 
-/** ~/.local/share/devo/ */
+/** ~/.local/share/infinitecode/ */
 export function ocDataDir(): string {
 	const xdgData = process.env.XDG_DATA_HOME || join(home, ".local", "share")
-	return join(xdgData, "devo")
+	return join(xdgData, "infinitecode")
 }
 
-/** ~/.local/share/devo/storage/ (legacy flat-file storage, pre-v1.2.0) */
+/** ~/.local/share/infinitecode/storage/ (legacy flat-file storage, pre-v1.2.0) */
 export function ocStorageDir(): string {
 	return join(ocDataDir(), "storage")
 }
 
-/** ~/.local/share/devo/devo.db (SQLite database, v1.2.0+) */
+/** ~/.local/share/infinitecode/infinitecode.db (SQLite database, v1.2.0+) */
 export function ocDatabasePath(): string {
-	return join(ocDataDir(), "devo.db")
+	return join(ocDataDir(), "infinitecode.db")
 }
 
-/** ~/.local/state/devo/ */
+/** ~/.local/state/infinitecode/ */
 export function ocStateDir(): string {
 	const xdgState = process.env.XDG_STATE_HOME || join(home, ".local", "state")
-	return join(xdgState, "devo")
+	return join(xdgState, "infinitecode")
 }
 
-/** ~/.local/state/devo/prompt-history.jsonl */
+/** ~/.local/state/infinitecode/prompt-history.jsonl */
 export function ocPromptHistoryPath(): string {
 	return join(ocStateDir(), "prompt-history.jsonl")
 }
 
-/** Project-level devo.json */
+/** Project-level infinitecode.json */
 export function ocProjectConfigPath(projectPath: string): string {
-	return join(projectPath, "devo.json")
+	return join(projectPath, "infinitecode.json")
 }
 
-/** Project-level .devo/agents/ */
+/** Project-level .infinitecode/agents/ */
 export function ocProjectAgentsDir(projectPath: string): string {
-	return join(projectPath, ".devo", "agents")
+	return join(projectPath, ".infinitecode", "agents")
 }
 
-/** Project-level .devo/commands/ */
+/** Project-level .infinitecode/commands/ */
 export function ocProjectCommandsDir(projectPath: string): string {
-	return join(projectPath, ".devo", "commands")
+	return join(projectPath, ".infinitecode", "commands")
 }
 
-/** Project-level .devo/skills/ */
+/** Project-level .infinitecode/skills/ */
 export function ocProjectSkillsDir(projectPath: string): string {
-	return join(projectPath, ".devo", "skills")
+	return join(projectPath, ".infinitecode", "skills")
 }
 
-/** Project-level .devo/plugins/ */
+/** Project-level .infinitecode/plugins/ */
 export function ocProjectPluginsDir(projectPath: string): string {
-	return join(projectPath, ".devo", "plugins")
+	return join(projectPath, ".infinitecode", "plugins")
 }
 
 /** Project-level AGENTS.md */

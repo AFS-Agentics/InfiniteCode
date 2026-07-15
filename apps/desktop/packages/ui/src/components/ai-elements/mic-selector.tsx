@@ -1,16 +1,16 @@
 "use client"
 
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Command,
 	CommandEmpty,
 	CommandInput,
 	CommandItem,
 	CommandList,
-} from "@devo/ui/components/command"
-import { Popover, PopoverContent, PopoverTrigger } from "@devo/ui/components/popover"
-import { useControllableState } from "@devo/ui/hooks/use-controllable-state"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@infinitecode/ui/components/popover"
+import { useControllableState } from "@infinitecode/ui/hooks/use-controllable-state"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { ChevronsUpDownIcon } from "lucide-react"
 import type { ComponentProps, ReactNode } from "react"
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"

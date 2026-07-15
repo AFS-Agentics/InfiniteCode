@@ -6,7 +6,7 @@ import { defineConfig, externalizeDepsPlugin } from "electron-vite"
 import type { Plugin } from "vite"
 import { protocolTypesPlugin } from "./scripts/protocol-types"
 
-const sdkClientAlias = path.resolve(__dirname, "packages/devo-ai-sdk/src/v2/client.ts")
+const sdkClientAlias = path.resolve(__dirname, "packages/infinitecode-ai-sdk/src/v2/client.ts")
 
 /**
  * Copies the drizzle migrations directory into the main process output.
@@ -32,13 +32,13 @@ export default defineConfig({
 		plugins: [
 			protocolTypesPlugin({ desktopDir: __dirname }),
 			externalizeDepsPlugin({
-				exclude: ["@devo-ai/plugin", "@devo-ai/sdk", "@devo/configconv", "drizzle-orm"],
+				exclude: ["@infinitecode-ai/plugin", "@infinitecode-ai/sdk", "@infinitecode/configconv", "drizzle-orm"],
 			}),
 			copyDrizzleMigrations(),
 		],
 		resolve: {
 			alias: {
-				"@devo-ai/sdk/v2/client": sdkClientAlias,
+				"@infinitecode-ai/sdk/v2/client": sdkClientAlias,
 			},
 		},
 		build: {
@@ -52,7 +52,7 @@ export default defineConfig({
 		// Output CJS because Electron sandboxed preloads cannot use ESM.
 		resolve: {
 			alias: {
-				"@devo-ai/sdk/v2/client": sdkClientAlias,
+				"@infinitecode-ai/sdk/v2/client": sdkClientAlias,
 			},
 		},
 		build: {
@@ -70,8 +70,8 @@ export default defineConfig({
 		resolve: {
 			alias: {
 				"@": path.resolve(__dirname, "src/renderer"),
-				"@devo/ui": path.resolve(__dirname, "packages/ui/src"),
-				"@devo-ai/sdk/v2/client": sdkClientAlias,
+				"@infinitecode/ui": path.resolve(__dirname, "packages/ui/src"),
+				"@infinitecode-ai/sdk/v2/client": sdkClientAlias,
 			},
 		},
 		worker: {

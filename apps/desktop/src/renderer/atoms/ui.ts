@@ -68,11 +68,11 @@ export interface ReviewPanelSettings {
 }
 
 export const reviewPanelSettingsAtom = atomWithStorage<ReviewPanelSettings>(
-	"devo:review-panel-settings",
+	"infinitecode:review-panel-settings",
 	{ diffStyle: "unified", expanded: false },
 )
 
-/** Per-session diff data from the Devo API */
+/** Per-session diff data from the InfiniteCode API */
 export const sessionDiffFamily = atomFamily((_sessionId: string) => atom<FileDiff[]>([]))
 
 /** Write-only atom to update session diff data */

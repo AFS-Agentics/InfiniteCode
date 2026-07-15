@@ -1,8 +1,8 @@
-//! Devo TUI chat surface.
+//! InfiniteCode TUI chat surface.
 //!
 //! `ChatWidget` owns the v2 conversation surface: committed history cells, the
 //! active bottom input pane, and the Claw-local app events produced by user
-//! interaction. Protocol reasoning choices come from `devo_protocol`
+//! interaction. Protocol reasoning choices come from `infinitecode_protocol`
 //! through `Model` instead of a TUI-local reasoning enum.
 
 use std::cell::Cell;
@@ -12,18 +12,18 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use devo_core::ItemId;
-use devo_protocol::AcpAvailableCommand;
-use devo_protocol::AcpCost;
-use devo_protocol::AcpSessionConfigOption;
-use devo_protocol::Model;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::ReasoningEffort;
-use devo_protocol::user_input::TextElement;
+use infinitecode_core::ItemId;
+use infinitecode_protocol::AcpAvailableCommand;
+use infinitecode_protocol::AcpCost;
+use infinitecode_protocol::AcpSessionConfigOption;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::ReasoningEffort;
+use infinitecode_protocol::user_input::TextElement;
 use ratatui::style::Color;
 use ratatui::text::Line;
 
-use devo_protocol::TurnId;
+use infinitecode_protocol::TurnId;
 
 use crate::app_event_sender::AppEventSender;
 use crate::bottom_pane::BottomPane;
@@ -99,7 +99,7 @@ pub(crate) struct ChatWidgetInit {
     pub(crate) app_event_tx: AppEventSender,
     pub(crate) initial_session: TuiSessionState,
     pub(crate) initial_reasoning_effort_selection: Option<String>,
-    pub(crate) initial_permission_preset: devo_protocol::PermissionPreset,
+    pub(crate) initial_permission_preset: infinitecode_protocol::PermissionPreset,
     pub(crate) initial_user_message: Option<UserMessage>,
     pub(crate) enhanced_keys_supported: bool,
     pub(crate) is_first_run: bool,
@@ -226,7 +226,7 @@ struct PendingModelSelection {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PendingApprovalRequest {
-    session_id: devo_protocol::SessionId,
+    session_id: infinitecode_protocol::SessionId,
     turn_id: TurnId,
     approval_id: String,
     action_summary: String,
@@ -299,7 +299,7 @@ pub(crate) struct ChatWidget {
     pending_approval: Option<PendingApprovalRequest>,
     active_proposed_plan: Option<ActiveProposedPlan>,
     pending_proposed_plan_actions: bool,
-    permission_preset: devo_protocol::PermissionPreset,
+    permission_preset: infinitecode_protocol::PermissionPreset,
     busy: bool,
     selection_mode: bool,
     selected_user_cell_index: Option<usize>,
@@ -432,7 +432,7 @@ impl ChatWidget {
             frame_requester: frame_requester.clone(),
             has_input_focus: true,
             enhanced_keys_supported,
-            placeholder_text: "Ask Devo".to_string(),
+            placeholder_text: "Ask InfiniteCode".to_string(),
             disable_paste_burst: false,
             skills: None,
             animations_enabled: true,

@@ -2,7 +2,7 @@
  * Rules file converter.
  *
  * CLAUDE.md -> AGENTS.md conversion.
- * Devo reads CLAUDE.md as a fallback, but AGENTS.md is preferred.
+ * InfiniteCode reads CLAUDE.md as a fallback, but AGENTS.md is preferred.
  */
 import type { MigrationReport } from "../types/report"
 import { createEmptyReport } from "../types/report"
@@ -30,13 +30,13 @@ export interface RulesConversionResult {
 export function convertRules(input: RulesConversionInput): RulesConversionResult {
 	const report = createEmptyReport()
 
-	// If AGENTS.md already exists, skip (Devo prefers AGENTS.md over CLAUDE.md)
+	// If AGENTS.md already exists, skip (InfiniteCode prefers AGENTS.md over CLAUDE.md)
 	if (input.agentsMd) {
 		report.skipped.push({
 			category: "rules",
 			source: input.claudeMdPath ?? "CLAUDE.md",
 			target: input.agentsMdPath ?? "AGENTS.md",
-			details: "AGENTS.md already exists -- Devo will use it. CLAUDE.md kept as CC fallback.",
+			details: "AGENTS.md already exists -- InfiniteCode will use it. CLAUDE.md kept as CC fallback.",
 		})
 		return { report }
 	}
@@ -65,8 +65,8 @@ export function convertRules(input: RulesConversionInput): RulesConversionResult
 
 	report.manualActions.push(
 		`Consider renaming CLAUDE.md to AGENTS.md in your project. ` +
-			`Devo reads both, but AGENTS.md is the preferred convention. ` +
-			`If you use both Claude Code and Devo, keep CLAUDE.md and let Devo read it as fallback.`,
+			`InfiniteCode reads both, but AGENTS.md is the preferred convention. ` +
+			`If you use both Claude Code and InfiniteCode, keep CLAUDE.md and let InfiniteCode read it as fallback.`,
 	)
 
 	return { agentsMd, report }

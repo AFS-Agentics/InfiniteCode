@@ -264,8 +264,8 @@ mod tests {
     #[test]
     /// Verifies that logs default to a `logs` directory under the configured home directory.
     fn resolve_log_directory_defaults_under_home() {
-        let resolved = resolve_log_directory(Path::new("/tmp/.devo"), None);
-        assert_eq!(resolved, PathBuf::from("/tmp/.devo/logs"));
+        let resolved = resolve_log_directory(Path::new("/tmp/.infinitecode"), None);
+        assert_eq!(resolved, PathBuf::from("/tmp/.infinitecode/logs"));
     }
 
     #[cfg(windows)]
@@ -273,12 +273,12 @@ mod tests {
     /// Verifies that a relative Windows override is resolved under the home directory.
     fn resolve_log_directory_supports_relative_override_windows() {
         let resolved = resolve_log_directory(
-            Path::new("C:\\Users\\tester\\.devo"),
+            Path::new("C:\\Users\\tester\\.infinitecode"),
             Some(Path::new("diagnostics")),
         );
         assert_eq!(
             resolved,
-            PathBuf::from("C:\\Users\\tester\\.devo\\diagnostics")
+            PathBuf::from("C:\\Users\\tester\\.infinitecode\\diagnostics")
         );
     }
 
@@ -287,10 +287,10 @@ mod tests {
     /// Verifies that an absolute Windows override is preserved as-is.
     fn resolve_log_directory_preserves_absolute_override_windows() {
         let resolved = resolve_log_directory(
-            Path::new("C:\\Users\\tester\\.devo"),
-            Some(Path::new("D:\\devo-logs")),
+            Path::new("C:\\Users\\tester\\.infinitecode"),
+            Some(Path::new("D:\\infinitecode-logs")),
         );
-        assert_eq!(resolved, PathBuf::from("D:\\devo-logs"));
+        assert_eq!(resolved, PathBuf::from("D:\\infinitecode-logs"));
     }
 
     #[cfg(unix)]
@@ -298,10 +298,10 @@ mod tests {
     /// Verifies that a relative Unix override is resolved under the home directory.
     fn resolve_log_directory_supports_relative_override_unix() {
         let resolved = resolve_log_directory(
-            Path::new("/home/tester/.devo"),
+            Path::new("/home/tester/.infinitecode"),
             Some(Path::new("diagnostics")),
         );
-        assert_eq!(resolved, PathBuf::from("/home/tester/.devo/diagnostics"));
+        assert_eq!(resolved, PathBuf::from("/home/tester/.infinitecode/diagnostics"));
     }
 
     #[cfg(unix)]
@@ -309,9 +309,9 @@ mod tests {
     /// Verifies that an absolute Unix override is preserved as-is.
     fn resolve_log_directory_preserves_absolute_override_unix() {
         let resolved = resolve_log_directory(
-            Path::new("/home/tester/.devo"),
-            Some(Path::new("/var/log/devo")),
+            Path::new("/home/tester/.infinitecode"),
+            Some(Path::new("/var/log/infinitecode")),
         );
-        assert_eq!(resolved, PathBuf::from("/var/log/devo"));
+        assert_eq!(resolved, PathBuf::from("/var/log/infinitecode"));
     }
 }

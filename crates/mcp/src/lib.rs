@@ -2,4 +2,4 @@
 
 pub mod manager;
 
-pub use devo_core::mcp::*;
+pub use infinitecode_core::mcp::*;

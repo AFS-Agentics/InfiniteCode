@@ -13,7 +13,7 @@
 //!
 //! Boundary:
 //! - this module must not own bundled JSON loading or compatibility parsing for catalog files
-//! - raw preset/config concerns live in `devo-core`
+//! - raw preset/config concerns live in `infinitecode-core`
 //! - this module describes runtime state and runtime-facing interfaces only
 //!
 use schemars::JsonSchema;
@@ -93,7 +93,7 @@ pub struct ModelRequest {
 /// Identifies the model metadata a provider adapter should use when shaping a request.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum ModelProfileKey {
-    /// Resolve provider capabilities using this Devo catalog slug.
+    /// Resolve provider capabilities using this InfiniteCode catalog slug.
     CatalogSlug(String),
     /// Use the provider's generic capability profile.
     #[default]

@@ -2,11 +2,11 @@
  * Worktree service layer.
  *
  * Provides worktree lifecycle operations (create, list, remove, reset) via
- * the Devo experimental worktree API. Works for both local and remote
- * Devo servers without any upstream code changes.
+ * the InfiniteCode experimental worktree API. Works for both local and remote
+ * InfiniteCode servers without any upstream code changes.
  */
 
-import type { DevoClient, Worktree } from "@devo-ai/sdk/v2/client"
+import type { InfiniteCodeClient, Worktree } from "@infinitecode-ai/sdk/v2/client"
 import { createLogger } from "../lib/logger"
 import { isElectron } from "./backend"
 import { getProjectClient } from "./connection-manager"
@@ -17,7 +17,7 @@ const log = createLogger("worktree-service")
 // Types
 // ============================================================
 
-/** Result shaped for the existing Devo UI (compatible with new-chat.tsx flow) */
+/** Result shaped for the existing InfiniteCode UI (compatible with new-chat.tsx flow) */
 export interface WorktreeResult {
 	/** Absolute path to the worktree root (git worktree directory) */
 	worktreeRoot: string
@@ -26,7 +26,7 @@ export interface WorktreeResult {
 	 * If the source was /repo/packages/app, this points to /worktree/packages/app.
 	 */
 	worktreeWorkspace: string
-	/** The branch name created (e.g. "devo/fix-auth-bug") */
+	/** The branch name created (e.g. "infinitecode/fix-auth-bug") */
 	branchName: string
 }
 
@@ -168,7 +168,7 @@ function computeSubPath(repoRoot: string, sourceDir: string): string {
  * fully bootstrapped.
  */
 async function waitForWorktreeReady(
-	client: DevoClient,
+	client: InfiniteCodeClient,
 	directory: string,
 	timeoutMs = 60_000,
 ): Promise<void> {
@@ -197,7 +197,7 @@ async function waitForWorktreeReady(
 // ============================================================
 
 /**
- * Creates a worktree for a session via the Devo experimental API.
+ * Creates a worktree for a session via the InfiniteCode experimental API.
  *
  * @param projectDir  The project's main directory (for SDK client scoping)
  * @param sourceDir   The source directory (may differ from projectDir in monorepos)
@@ -253,7 +253,7 @@ export async function createWorktree(
 }
 
 /**
- * Lists worktree directories for a project via the Devo API.
+ * Lists worktree directories for a project via the InfiniteCode API.
  */
 export async function listWorktrees(projectDir: string): Promise<string[]> {
 	const client = getProjectClient(projectDir)
@@ -271,7 +271,7 @@ export async function listWorktrees(projectDir: string): Promise<string[]> {
 }
 
 /**
- * Removes a worktree via the Devo API.
+ * Removes a worktree via the InfiniteCode API.
  */
 export async function removeWorktree(projectDir: string, worktreeDir: string): Promise<void> {
 	const client = getProjectClient(projectDir)
@@ -293,7 +293,7 @@ export async function removeWorktree(projectDir: string, worktreeDir: string): P
 }
 
 /**
- * Resets a worktree back to the default branch via the Devo API.
+ * Resets a worktree back to the default branch via the InfiniteCode API.
  */
 export async function resetWorktree(projectDir: string, worktreeDir: string): Promise<void> {
 	const client = getProjectClient(projectDir)
@@ -319,14 +319,14 @@ export async function resetWorktree(projectDir: string, worktreeDir: string): Pr
 // ============================================================
 
 /**
- * Fetches the diff from a remote worktree session via the Devo `session.diff` API,
+ * Fetches the diff from a remote worktree session via the InfiniteCode `session.diff` API,
  * then applies it to the local checkout using Electron IPC (`git apply`).
  *
  * This enables "apply to local" for worktrees running on remote servers, where
- * Devo cannot directly access the worktree filesystem.
+ * InfiniteCode cannot directly access the worktree filesystem.
  *
  * @param projectDir  The project directory (for SDK client scoping)
- * @param sessionId   The Devo session ID running in the remote worktree
+ * @param sessionId   The InfiniteCode session ID running in the remote worktree
  * @param localDir    The local directory to apply changes to
  */
 export async function applyRemoteDiffToLocal(

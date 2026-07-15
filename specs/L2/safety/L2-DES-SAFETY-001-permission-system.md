@@ -54,9 +54,9 @@ A flat list of entries is the right primitive because it composes cleanly with p
 
 ### DD-4: Protected metadata directories are always read-only under writable roots
 
-Directories like `.git` and `.devo` inside writable roots must never be modified by the agent without an explicit, intentional configuration override. Implicit writable-root grants must not cascade into those directories.
+Directories like `.git` and `.infinitecode` inside writable roots must never be modified by the agent without an explicit, intentional configuration override. Implicit writable-root grants must not cascade into those directories.
 
-**Decision**: When resolving writable roots, protected metadata paths (`.git`, `.devo`, `.agents`) are automatically added as read-only carveouts unless the user has explicitly listed them as writable.
+**Decision**: When resolving writable roots, protected metadata paths (`.git`, `.infinitecode`, `.agents`) are automatically added as read-only carveouts unless the user has explicitly listed them as writable.
 
 ### DD-5: Network model is initially coarse
 
@@ -185,7 +185,7 @@ When a writable root is resolved, the following directories within it are automa
 | Directory | Reason |
 |-----------|--------|
 | `.git` | Version control integrity |
-| `.devo` | Project configuration and state |
+| `.infinitecode` | Project configuration and state |
 | `.agents` | Agent configuration integrity |
 
 ### Network Access Model

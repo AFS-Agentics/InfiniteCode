@@ -3,7 +3,7 @@
  * command palette, and onboarding.
  * Does NOT render any sidebar chrome -- that lives in SidebarLayout.
  */
-import { TooltipProvider } from "@devo/ui/components/tooltip"
+import { TooltipProvider } from "@infinitecode/ui/components/tooltip"
 import { Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { useAtomValue, useSetAtom } from "jotai"
 import { useCallback, useEffect, useMemo } from "react"
@@ -159,7 +159,7 @@ export function RootLayout() {
 			skippedSteps: string[]
 			migrationPerformed: boolean
 			migratedFrom: string[]
-			devoVersion: string | null
+			infinitecodeVersion: string | null
 			providersConnected: number
 		}) => {
 			setOnboardingState({
@@ -168,7 +168,7 @@ export function RootLayout() {
 				skippedSteps: state.skippedSteps,
 				migrationPerformed: state.migrationPerformed,
 				migratedFrom: state.migratedFrom,
-				devoVersion: state.devoVersion,
+				infinitecodeVersion: state.infinitecodeVersion,
 				providersConnected: state.providersConnected,
 			})
 		},

@@ -8,9 +8,9 @@ const newChatSource = readFileSync(new URL("./new-chat.tsx", import.meta.url), "
 
 const project: SidebarProject = {
 	id: "project-1",
-	slug: "devo-1",
-	name: "devo_desktop_0626",
-	directory: "/Users/tester/devo_desktop_0626",
+	slug: "infinitecode-1",
+	name: "infinitecode_desktop_0626",
+	directory: "/Users/tester/infinitecode_desktop_0626",
 	agentCount: 0,
 	lastActiveAt: 0,
 	hasActiveAgent: false,
@@ -32,7 +32,7 @@ describe("NewChatProjectPicker", () => {
 
 		expect({
 			chooseProject: markup.includes("Choose project"),
-			projectNameHiddenUntilOpen: markup.includes("devo_desktop_0626"),
+			projectNameHiddenUntilOpen: markup.includes("infinitecode_desktop_0626"),
 			compactTriggerHeight: markup.includes("h-8"),
 			tallTriggerHeightRemoved: !markup.includes("h-9"),
 		}).toEqual({
@@ -65,7 +65,7 @@ describe("NewChatProjectPicker", () => {
 		)
 
 		expect({
-			projectName: markup.includes("devo_desktop_0626"),
+			projectName: markup.includes("infinitecode_desktop_0626"),
 			clearProjectButton: markup.includes('aria-label="Clear project"'),
 		}).toEqual({
 			projectName: true,

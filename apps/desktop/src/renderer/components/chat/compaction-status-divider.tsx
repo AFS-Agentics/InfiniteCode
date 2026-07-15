@@ -1,4 +1,4 @@
-import { cn } from "@devo/ui/lib/utils";
+import { cn } from "@infinitecode/ui/lib/utils";
 import { BubblesIcon, PackageCheckIcon } from "lucide-react";
 import type { SessionCompactionStatus } from "../../atoms/compaction";
 

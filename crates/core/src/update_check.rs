@@ -10,9 +10,9 @@ use serde::Serialize;
 
 use crate::UpdatesConfig;
 
-const RELEASES_LATEST_URL: &str = "https://api.github.com/repos/7df-lab/devo/releases/latest";
+const RELEASES_LATEST_URL: &str = "https://api.github.com/repos/AFS-Agentics/InfiniteCode/releases/latest";
 const UPDATE_CACHE_FILE_NAME: &str = "update-check.json";
-const UPGRADE_COMMAND: &str = "devo upgrade";
+const UPGRADE_COMMAND: &str = "infinitecode upgrade";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateCheckOutcome {
@@ -64,7 +64,7 @@ impl UpdateChecker {
     pub fn new(home_dir: PathBuf, config: UpdatesConfig) -> Result<Self, reqwest::Error> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(2))
-            .user_agent(format!("devo/{}", env!("CARGO_PKG_VERSION")))
+            .user_agent(format!("infinitecode/{}", env!("CARGO_PKG_VERSION")))
             .build()?;
         Ok(Self {
             home_dir,
@@ -144,7 +144,7 @@ impl UpdateChecker {
 
 pub fn format_update_notification(notification: &UpdateNotification) -> String {
     format!(
-        "A new devo version is available: {} (current: {})\nRelease: {}\nUpdate: {}",
+        "A new infinitecode version is available: {} (current: {})\nRelease: {}\nUpdate: {}",
         notification.latest_version,
         notification.current_version,
         notification.release_url,
@@ -271,7 +271,7 @@ mod tests {
             UpdateCheckCache {
                 last_checked_at: chrono::Utc::now(),
                 latest_version: "v0.1.4".into(),
-                release_url: "https://github.com/7df-lab/devo/releases/tag/v0.1.4".into(),
+                release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.4".into(),
                 published_at: None,
                 last_error: None,
             },
@@ -283,9 +283,9 @@ mod tests {
             UpdateCheckOutcome::UpdateAvailable(super::UpdateNotification {
                 current_version: "0.1.3".into(),
                 latest_version: "v0.1.4".into(),
-                release_url: "https://github.com/7df-lab/devo/releases/tag/v0.1.4".into(),
+                release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.4".into(),
                 published_at: None,
-                upgrade_command: "devo upgrade",
+                upgrade_command: "infinitecode upgrade",
             })
         );
     }
@@ -297,7 +297,7 @@ mod tests {
             UpdateCheckCache {
                 last_checked_at: chrono::Utc::now(),
                 latest_version: "v0.1.3".into(),
-                release_url: "https://github.com/7df-lab/devo/releases/tag/v0.1.3".into(),
+                release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.3".into(),
                 published_at: None,
                 last_error: None,
             },
@@ -315,7 +315,7 @@ mod tests {
                 UpdateCheckCache {
                     last_checked_at: chrono::Utc::now(),
                     latest_version: "latest".into(),
-                    release_url: "https://github.com/7df-lab/devo/releases/latest".into(),
+                    release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/latest".into(),
                     published_at: None,
                     last_error: None,
                 },
@@ -329,7 +329,7 @@ mod tests {
         let fresh = UpdateCheckCache {
             last_checked_at: chrono::Utc::now() - Duration::hours(23),
             latest_version: "v0.1.4".into(),
-            release_url: "https://github.com/7df-lab/devo/releases/tag/v0.1.4".into(),
+            release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.4".into(),
             published_at: None,
             last_error: None,
         };
@@ -356,14 +356,14 @@ mod tests {
         let text = format_update_notification(&super::UpdateNotification {
             current_version: "0.1.3".into(),
             latest_version: "v0.1.4".into(),
-            release_url: "https://github.com/7df-lab/devo/releases/tag/v0.1.4".into(),
+            release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.4".into(),
             published_at: None,
             upgrade_command: "install-command",
         });
 
         assert_eq!(
             text,
-            "A new devo version is available: v0.1.4 (current: 0.1.3)\nRelease: https://github.com/7df-lab/devo/releases/tag/v0.1.4\nUpdate: install-command"
+            "A new infinitecode version is available: v0.1.4 (current: 0.1.3)\nRelease: https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.4\nUpdate: install-command"
         );
     }
 

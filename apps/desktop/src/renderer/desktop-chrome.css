@@ -1,26 +1,26 @@
 :root {
-	--devo-chrome-background: #f5f5f5;
-	--devo-transcript-background: var(--background);
+	--infinitecode-chrome-background: #f5f5f5;
+	--infinitecode-transcript-background: var(--background);
 }
 
 :root:not(.dark) {
-	--sidebar: var(--devo-chrome-background);
+	--sidebar: var(--infinitecode-chrome-background);
 }
 
 :root.dark {
-	--devo-chrome-background: color-mix(
+	--infinitecode-chrome-background: color-mix(
 		in srgb,
 		var(--background) 92%,
 		var(--foreground) 8%
 	);
-	--devo-transcript-background: var(--background);
-	--sidebar: var(--devo-chrome-background);
+	--infinitecode-transcript-background: var(--background);
+	--sidebar: var(--infinitecode-chrome-background);
 }
 
 :root[data-platform="win32"] {
-	--devo-titlebar-height: 40px;
-	--devo-windows-focus-chrome-bg: var(--devo-chrome-background);
-	--devo-windows-unfocused-chrome-bg: var(--devo-chrome-background);
+	--infinitecode-titlebar-height: 40px;
+	--infinitecode-windows-focus-chrome-bg: var(--infinitecode-chrome-background);
+	--infinitecode-windows-unfocused-chrome-bg: var(--infinitecode-chrome-background);
 }
 
 :root.electron-transparent,
@@ -43,7 +43,7 @@
 }
 
 [data-slot="content-area"] {
-	background: var(--devo-transcript-background);
+	background: var(--infinitecode-transcript-background);
 }
 
 :root:not(.electron-transparent):not(.electron-vibrancy)
@@ -63,7 +63,7 @@
 :root.electron-vibrancy [data-slot="content-area"] {
 	background: color-mix(
 		in srgb,
-		var(--devo-transcript-background) var(--glass-content),
+		var(--infinitecode-transcript-background) var(--glass-content),
 		transparent
 	);
 }
@@ -75,29 +75,29 @@
 	--glass-surface: 84%;
 	--glass-elevated: 88%;
 	--glass-card: 88%;
-	--devo-content-radius: 12px;
-	--devo-composer-radius: 16px;
+	--infinitecode-content-radius: 12px;
+	--infinitecode-composer-radius: 16px;
 }
 
 :root[data-platform="win32"][data-window-focused="true"] {
-	--devo-windows-chrome-bg: var(
-		--devo-titlebar-tint,
-		var(--devo-windows-focus-chrome-bg)
+	--infinitecode-windows-chrome-bg: var(
+		--infinitecode-titlebar-tint,
+		var(--infinitecode-windows-focus-chrome-bg)
 	);
-	--sidebar: var(--devo-windows-chrome-bg);
+	--sidebar: var(--infinitecode-windows-chrome-bg);
 }
 
 :root[data-platform="win32"][data-window-focused="false"] {
-	--devo-windows-chrome-bg: var(--devo-windows-unfocused-chrome-bg);
-	--sidebar: var(--devo-windows-unfocused-chrome-bg);
+	--infinitecode-windows-chrome-bg: var(--infinitecode-windows-unfocused-chrome-bg);
+	--sidebar: var(--infinitecode-windows-unfocused-chrome-bg);
 }
 
 :root[data-platform="win32"][data-window-focused="true"]
 	[data-slot="sidebar-inset"],
 :root[data-platform="win32"][data-window-focused="false"]
 	[data-slot="sidebar-inset"] {
-	background: var(--devo-windows-chrome-bg) !important;
-	background-color: var(--devo-windows-chrome-bg) !important;
+	background: var(--infinitecode-windows-chrome-bg) !important;
+	background-color: var(--infinitecode-windows-chrome-bg) !important;
 }
 
 :root[data-platform="win32"][data-window-focused="true"] body::before,
@@ -108,9 +108,9 @@
 	right: 0;
 	left: 0;
 	z-index: 20;
-	height: var(--devo-titlebar-height, 40px);
+	height: var(--infinitecode-titlebar-height, 40px);
 	pointer-events: none;
-	background-color: var(--devo-windows-chrome-bg);
+	background-color: var(--infinitecode-windows-chrome-bg);
 	/* Product requirement - after the splash enters the app, the Windows topbar
 	   should use the same chrome surface as the left side panel. */
 	transition: background-color var(--duration-fast, 150ms) ease;
@@ -142,8 +142,8 @@
 	[data-slot="sidebar-content"],
 :root[data-platform="win32"][data-window-focused="false"]
 	[data-slot="sidebar-footer"] {
-	background: var(--devo-windows-chrome-bg) !important;
-	background-color: var(--devo-windows-chrome-bg) !important;
+	background: var(--infinitecode-windows-chrome-bg) !important;
+	background-color: var(--infinitecode-windows-chrome-bg) !important;
 }
 
 :root[data-platform="win32"].electron-transparent [data-slot="sidebar-inset"] {
@@ -156,10 +156,10 @@
 }
 
 :root[data-platform="win32"].electron-transparent [data-slot="content-area"] {
-	border-top-left-radius: var(--devo-content-radius);
+	border-top-left-radius: var(--infinitecode-content-radius);
 	border-top-right-radius: 0;
 	border-bottom-right-radius: 0;
-	border-bottom-left-radius: var(--devo-content-radius);
+	border-bottom-left-radius: var(--infinitecode-content-radius);
 }
 
 :root[data-platform="darwin"].electron-transparent [data-slot="sidebar-inset"],
@@ -205,27 +205,27 @@
 	-webkit-app-region: no-drag;
 }
 
-.devo-composer,
-.devo-composer-shell {
-	border-radius: var(--devo-composer-radius, 16px);
+.infinitecode-composer,
+.infinitecode-composer-shell {
+	border-radius: var(--infinitecode-composer-radius, 16px);
 }
 
-.devo-composer {
+.infinitecode-composer {
 	background: var(--background) !important;
 	background-color: var(--background) !important;
 }
 
-.devo-composer-shell {
+.infinitecode-composer-shell {
 	overflow: hidden;
 }
 
-.devo-composer-shell[data-popover-open="true"] {
+.infinitecode-composer-shell[data-popover-open="true"] {
 	/* User requirement: new-session slash and mention popovers must remain visible
 	   above the rounded composer shell instead of being clipped by the shell. */
 	overflow: visible;
 }
 
-.devo-composer [data-slot="input-group"] {
+.infinitecode-composer [data-slot="input-group"] {
 	background: var(--background) !important;
 	background-color: var(--background) !important;
 	border-radius: inherit;

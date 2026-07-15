@@ -13,17 +13,17 @@ use serde_json::Value;
 use serde_json::json;
 use tracing::debug;
 mod stream;
-use devo_protocol::ModelProfileKey;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ProviderWireApi;
-use devo_protocol::RequestContent;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseExtra;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::Usage;
+use infinitecode_protocol::ModelProfileKey;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ProviderWireApi;
+use infinitecode_protocol::RequestContent;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseExtra;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::Usage;
 
 use super::capabilities::OpenAIReasoningMode;
 use super::capabilities::OpenAITransport;
@@ -1174,21 +1174,21 @@ impl ProviderAdapter for OpenAIProvider {
 #[cfg(test)]
 mod tests {
     use crate::dsml::DsmlToolCallHealer;
-    use devo_protocol::ModelProfileKey;
-    use devo_protocol::ModelRequest;
-    use devo_protocol::RequestContent;
-    use devo_protocol::RequestMessage;
-    use devo_protocol::SamplingControls;
-    use devo_protocol::ToolDefinition;
+    use infinitecode_protocol::ModelProfileKey;
+    use infinitecode_protocol::ModelRequest;
+    use infinitecode_protocol::RequestContent;
+    use infinitecode_protocol::RequestMessage;
+    use infinitecode_protocol::SamplingControls;
+    use infinitecode_protocol::ToolDefinition;
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
     use super::parse_finish_reason;
     use super::parse_response;
     use super::parse_usage;
-    use devo_protocol::ResponseContent;
-    use devo_protocol::ResponseExtra;
-    use devo_protocol::StopReason;
+    use infinitecode_protocol::ResponseContent;
+    use infinitecode_protocol::ResponseExtra;
+    use infinitecode_protocol::StopReason;
 
     use crate::openai::chat_completions::build_request;
 
@@ -1241,7 +1241,7 @@ mod tests {
                 ..SamplingControls::default()
             },
             request_thinking: Some("medium".to_string()),
-            reasoning_effort: Some(devo_protocol::ReasoningEffort::Medium),
+            reasoning_effort: Some(infinitecode_protocol::ReasoningEffort::Medium),
             extra_body: None,
         };
 
@@ -1705,7 +1705,7 @@ mod tests {
             hosted_tools: Vec::new(),
             sampling: SamplingControls::default(),
             request_thinking: Some("enabled".to_string()),
-            reasoning_effort: Some(devo_protocol::ReasoningEffort::Max),
+            reasoning_effort: Some(infinitecode_protocol::ReasoningEffort::Max),
             extra_body: None,
         };
 
@@ -1732,7 +1732,7 @@ mod tests {
             hosted_tools: Vec::new(),
             sampling: SamplingControls::default(),
             request_thinking: Some("enabled".to_string()),
-            reasoning_effort: Some(devo_protocol::ReasoningEffort::High),
+            reasoning_effort: Some(infinitecode_protocol::ReasoningEffort::High),
             extra_body: None,
         };
 

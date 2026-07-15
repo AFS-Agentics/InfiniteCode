@@ -7,27 +7,27 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Datelike;
 use chrono::SecondsFormat;
-use devo_core::AppConfigStore;
-use devo_core::BundledSkillsConfig;
-use devo_core::FileSystemSkillCatalog;
-use devo_core::PresetModelCatalog;
-use devo_core::ProviderVendorCatalog;
-use devo_core::SkillsConfig;
-use devo_core::tools::ToolRegistry;
-use devo_protocol::Model;
-use devo_protocol::ModelRequest;
-use devo_protocol::ModelResponse;
-use devo_protocol::ResponseContent;
-use devo_protocol::ResponseMetadata;
-use devo_protocol::SessionId;
-use devo_protocol::StopReason;
-use devo_protocol::StreamEvent;
-use devo_protocol::TurnId;
-use devo_protocol::Usage;
-use devo_provider::ModelProviderSDK;
-use devo_provider::ProviderRoute;
-use devo_provider::ProviderRouter;
-use devo_provider::error::ProviderError;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::BundledSkillsConfig;
+use infinitecode_core::FileSystemSkillCatalog;
+use infinitecode_core::PresetModelCatalog;
+use infinitecode_core::ProviderVendorCatalog;
+use infinitecode_core::SkillsConfig;
+use infinitecode_core::tools::ToolRegistry;
+use infinitecode_protocol::Model;
+use infinitecode_protocol::ModelRequest;
+use infinitecode_protocol::ModelResponse;
+use infinitecode_protocol::ResponseContent;
+use infinitecode_protocol::ResponseMetadata;
+use infinitecode_protocol::SessionId;
+use infinitecode_protocol::StopReason;
+use infinitecode_protocol::StreamEvent;
+use infinitecode_protocol::TurnId;
+use infinitecode_protocol::Usage;
+use infinitecode_provider::ModelProviderSDK;
+use infinitecode_provider::ProviderRoute;
+use infinitecode_provider::ProviderRouter;
+use infinitecode_provider::error::ProviderError;
 use futures::Stream;
 use futures::stream;
 use pretty_assertions::assert_eq;
@@ -36,9 +36,9 @@ use tokio::sync::mpsc;
 use tokio::time::Duration;
 use tokio::time::timeout;
 
-use devo_server::ClientTransportKind;
-use devo_server::ServerRuntime;
-use devo_server::ServerRuntimeDependencies;
+use infinitecode_server::ClientTransportKind;
+use infinitecode_server::ServerRuntime;
+use infinitecode_server::ServerRuntimeDependencies;
 
 struct BlockingRouter {
     stream_calls: mpsc::UnboundedSender<ModelRequest>,
@@ -106,7 +106,7 @@ async fn turn_start_append_failure_does_not_launch_model_turn_or_leave_session_a
             connection_id,
             serde_json::json!({
                 "id": 3,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": turn_start_params(session.session_id)
             }),
         )
@@ -135,15 +135,15 @@ async fn turn_start_append_failure_does_not_launch_model_turn_or_leave_session_a
             connection_id,
             serde_json::json!({
                 "id": 4,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": turn_start_params(session.session_id)
             }),
         )
         .await
         .context("successful turn/start response")?;
-    let response: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(successful_start)?;
-    assert_eq!(response.result.status(), devo_protocol::TurnStatus::Running);
+    assert_eq!(response.result.status(), infinitecode_protocol::TurnStatus::Running);
     stream_calls_rx
         .recv()
         .await
@@ -172,13 +172,13 @@ async fn message_edit_previous_accepts_skip_restore_and_replaces_prompt_branch()
             connection_id,
             serde_json::json!({
                 "id": 6,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": turn_start_params(session.session_id)
             }),
         )
         .await
         .context("original turn/start response")?;
-    let original_start: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let original_start: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(original_start)?;
     let original_request = stream_calls_rx
         .recv()
@@ -204,7 +204,7 @@ async fn message_edit_previous_accepts_skip_restore_and_replaces_prompt_branch()
             connection_id,
             serde_json::json!({
                 "id": 7,
-                "method": "_devo/message/editPrevious",
+                "method": "_infinitecode/message/editPrevious",
                 "params": {
                     "session_id": session.session_id,
                     "expected_target_message_id": null,
@@ -216,7 +216,7 @@ async fn message_edit_previous_accepts_skip_restore_and_replaces_prompt_branch()
         )
         .await
         .context("message/editPrevious response")?;
-    let edit_response: devo_server::SuccessResponse<devo_server::MessageEditPreviousResult> =
+    let edit_response: infinitecode_server::SuccessResponse<infinitecode_server::MessageEditPreviousResult> =
         serde_json::from_value(edit_response)?;
     let replacement_turn_id = edit_response
         .result
@@ -268,13 +268,13 @@ async fn message_edit_previous_default_safe_restore_records_and_broadcasts() -> 
             connection_id,
             serde_json::json!({
                 "id": 6,
-                "method": "_devo/turn/start",
+                "method": "_infinitecode/turn/start",
                 "params": turn_start_params(session.session_id)
             }),
         )
         .await
         .context("original turn/start response")?;
-    let original_start: devo_server::SuccessResponse<devo_server::TurnStartResult> =
+    let original_start: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(original_start)?;
     stream_calls_rx
         .recv()
@@ -297,7 +297,7 @@ async fn message_edit_previous_default_safe_restore_records_and_broadcasts() -> 
             connection_id,
             serde_json::json!({
                 "id": 7,
-                "method": "_devo/message/editPrevious",
+                "method": "_infinitecode/message/editPrevious",
                 "params": {
                     "session_id": session.session_id,
                     "expected_target_message_id": null,
@@ -308,7 +308,7 @@ async fn message_edit_previous_default_safe_restore_records_and_broadcasts() -> 
         )
         .await
         .context("message/editPrevious response")?;
-    let edit_response: devo_server::SuccessResponse<devo_server::MessageEditPreviousResult> =
+    let edit_response: infinitecode_server::SuccessResponse<infinitecode_server::MessageEditPreviousResult> =
         serde_json::from_value(edit_response)?;
     let replacement_turn_id = edit_response
         .result
@@ -371,7 +371,7 @@ async fn message_edit_previous_dispatches_to_edit_handler() -> Result<()> {
             connection_id,
             serde_json::json!({
                 "id": 6,
-                "method": "_devo/message/editPrevious",
+                "method": "_infinitecode/message/editPrevious",
                 "params": {
                     "session_id": session.session_id,
                     "expected_target_message_id": null,
@@ -410,7 +410,7 @@ async fn message_edit_previous_rejects_malformed_edited_content_parts() -> Resul
             connection_id,
             serde_json::json!({
                 "id": 6,
-                "method": "_devo/message/editPrevious",
+                "method": "_infinitecode/message/editPrevious",
                 "params": {
                     "session_id": session.session_id,
                     "expected_target_message_id": null,
@@ -450,7 +450,7 @@ async fn collect_notification_methods(
     while let Ok(Some(notification)) =
         timeout(Duration::from_millis(10), notifications_rx.recv()).await
     {
-        if let Some(method) = notification["params"]["_meta"]["devo/originalMethod"]
+        if let Some(method) = notification["params"]["_meta"]["infinitecode/originalMethod"]
             .as_str()
             .or_else(|| {
                 notification
@@ -480,7 +480,7 @@ fn build_runtime(
 ) -> Result<Arc<ServerRuntime>> {
     let provider: Arc<dyn ModelProviderSDK> = Arc::new(UnusedProvider);
     let router: Arc<dyn ProviderRouter> = Arc::new(BlockingRouter { stream_calls });
-    let db = Arc::new(devo_server::db::Database::open(
+    let db = Arc::new(infinitecode_server::db::Database::open(
         data_root.join("turn_start_persistence.db"),
     )?);
     Ok(ServerRuntime::new(
@@ -500,7 +500,7 @@ fn build_runtime(
                 bundled: Some(BundledSkillsConfig { enabled: false }),
                 ..SkillsConfig::default()
             })),
-            devo_core::AgentsMdConfig::default(),
+            infinitecode_core::AgentsMdConfig::default(),
             db,
             Arc::new(std::sync::Mutex::new(AppConfigStore::load(
                 data_root.to_path_buf(),
@@ -517,7 +517,7 @@ fn request_messages_json(request: &ModelRequest) -> Result<String> {
 async fn initialize_connection(
     runtime: &Arc<ServerRuntime>,
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
-    let (notifications_tx, notifications_rx) = devo_server::test_outbound_channel(128);
+    let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(128);
     let connection_id = runtime
         .register_connection(ClientTransportKind::Stdio, notifications_tx)
         .await;
@@ -543,7 +543,7 @@ async fn initialize_connection(
     let response: serde_json::Value = initialize_response;
     assert_eq!(
         response["result"]["agentInfo"]["name"],
-        serde_json::json!("devo-server")
+        serde_json::json!("infinitecode-server")
     );
     Ok((connection_id, notifications_rx))
 }
@@ -552,7 +552,7 @@ async fn start_session(
     runtime: &Arc<ServerRuntime>,
     connection_id: u64,
     cwd: &Path,
-) -> Result<devo_server::SessionMetadata> {
+) -> Result<infinitecode_server::SessionMetadata> {
     let response = runtime
         .handle_incoming(
             connection_id,
@@ -570,7 +570,7 @@ async fn start_session(
         )
         .await
         .context("session/start response")?;
-    let response: devo_server::SuccessResponse<devo_server::SessionStartResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult> =
         serde_json::from_value(response)?;
     Ok(response.result.session)
 }
@@ -586,7 +586,7 @@ async fn interrupt_turn(
             connection_id,
             serde_json::json!({
                 "id": 5,
-                "method": "_devo/turn/interrupt",
+                "method": "_infinitecode/turn/interrupt",
                 "params": {
                     "session_id": session_id,
                     "turn_id": turn_id,
@@ -596,11 +596,11 @@ async fn interrupt_turn(
         )
         .await
         .context("turn/interrupt response")?;
-    let response: devo_server::SuccessResponse<devo_server::TurnInterruptResult> =
+    let response: infinitecode_server::SuccessResponse<infinitecode_server::TurnInterruptResult> =
         serde_json::from_value(response)?;
     assert_eq!(
         response.result.status,
-        devo_protocol::TurnStatus::Interrupted
+        infinitecode_protocol::TurnStatus::Interrupted
     );
     Ok(())
 }
@@ -620,7 +620,7 @@ fn turn_start_params(session_id: SessionId) -> serde_json::Value {
 
 fn rollout_path_for_session(
     data_root: &Path,
-    session: &devo_server::SessionMetadata,
+    session: &infinitecode_server::SessionMetadata,
 ) -> std::path::PathBuf {
     let timestamp = session
         .created_at

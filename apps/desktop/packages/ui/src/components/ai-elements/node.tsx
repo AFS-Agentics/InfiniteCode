@@ -6,8 +6,8 @@ import {
 	CardFooter,
 	CardHeader,
 	CardTitle,
-} from "@devo/ui/components/card"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/card"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { Handle, Position } from "@xyflow/react"
 import type { ComponentProps } from "react"
 

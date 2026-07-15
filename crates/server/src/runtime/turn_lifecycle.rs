@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use devo_core::SessionId;
+use infinitecode_core::SessionId;
 use tokio_util::sync::CancellationToken;
 
 use crate::turn::TurnMetadata;

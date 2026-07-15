@@ -2,14 +2,14 @@
  * Onboarding: Complete / Ready.
  *
  * Shows a success state, quick tips, and optional prompts to migrate
- * from detected providers (Claude Code, Cursor, Devo, OpenCode). Migration
+ * from detected providers (Claude Code, Cursor, InfiniteCode, OpenCode). Migration
  * cards only appear for providers that have config on disk and haven't
  * already been migrated.
  */
 
-import { Badge } from "@devo/ui/components/badge"
-import { Button } from "@devo/ui/components/button"
-import { Spinner } from "@devo/ui/components/spinner"
+import { Badge } from "@infinitecode/ui/components/badge"
+import { Button } from "@infinitecode/ui/components/button"
+import { Spinner } from "@infinitecode/ui/components/spinner"
 import { ArrowRightIcon, CheckCircle2Icon, CommandIcon, FlaskConicalIcon } from "lucide-react"
 import { motion } from "motion/react"
 import { useEffect, useRef, useState } from "react"
@@ -20,7 +20,7 @@ import type { MigrationProvider, MigrationResult, ProviderDetection } from "../.
 // ============================================================
 
 interface CompleteStepProps {
-	devoVersion: string | null
+	infinitecodeVersion: string | null
 	migratedProviders: string[]
 	migrationResult: MigrationResult | null
 	onStartMigration: (provider: MigrationProvider) => void
@@ -35,7 +35,7 @@ const isElectron = typeof window !== "undefined" && "infinitecode" in window
 const isMac = isElectron && window.infinitecode.platform === "darwin"
 
 export function CompleteStep({
-	devoVersion,
+	infinitecodeVersion,
 	migratedProviders,
 	migrationResult,
 	onStartMigration,
@@ -56,9 +56,9 @@ export function CompleteStep({
 		window.infinitecode.onboarding
 			.detectProviders()
 			.then((detections) => {
-				// Only show providers that were found and aren't Devo itself
-				// (no point migrating Devo -> Devo)
-				setProviders(detections.filter((d) => d.found && d.provider !== "devo"))
+				// Only show providers that were found and aren't InfiniteCode itself
+				// (no point migrating InfiniteCode -> InfiniteCode)
+				setProviders(detections.filter((d) => d.found && d.provider !== "infinitecode"))
 				setDetecting(false)
 			})
 			.catch(() => {
@@ -99,8 +99,8 @@ export function CompleteStep({
 				>
 					<h2 className="text-2xl font-semibold text-foreground">You're all set.</h2>
 					<p className="text-sm text-muted-foreground">
-						{devoVersion
-							? `InfiniteCode is connected to CLI ${formatVersion(devoVersion)}`
+						{infinitecodeVersion
+							? `InfiniteCode is connected to CLI ${formatVersion(infinitecodeVersion)}`
 							: "InfiniteCode is ready to go"}
 						{hasMigrated ? " and your configuration has been migrated." : "."}
 					</p>

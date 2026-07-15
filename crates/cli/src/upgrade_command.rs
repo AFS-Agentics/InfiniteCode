@@ -1,15 +1,15 @@
 //! Platform-specific self-upgrade launcher.
 //!
-//! On Unix, `devo upgrade` runs a short shell script in the current process
+//! On Unix, `infinitecode upgrade` runs a short shell script in the current process
 //! tree: it downloads `install.sh` into a temporary directory and executes it,
 //! then reports the installer's exit status back to the caller. Unix systems can
 //! generally replace an executable file while the old process is still running,
 //! so no detached helper is needed.
 //!
-//! On Windows, the running `devo.exe` file is locked by the current process, so
+//! On Windows, the running `infinitecode.exe` file is locked by the current process, so
 //! it cannot be replaced in-place. The Windows path starts a detached PowerShell
 //! process, passes it the current process id, and returns immediately. The
-//! PowerShell script waits for this `devo.exe` process to exit, then downloads
+//! PowerShell script waits for this `infinitecode.exe` process to exit, then downloads
 //! and runs `install.ps1`, which can safely copy the new binary over the old one
 //! after the lock has been released.
 
@@ -21,9 +21,9 @@ use anyhow::Result;
 use anyhow::bail;
 
 #[cfg(unix)]
-const INSTALL_SH_URL: &str = "https://raw.githubusercontent.com/7df-lab/devo/main/install.sh";
+const INSTALL_SH_URL: &str = "https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh";
 #[cfg(windows)]
-const INSTALL_PS1_URL: &str = "https://raw.githubusercontent.com/7df-lab/devo/main/install.ps1";
+const INSTALL_PS1_URL: &str = "https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1";
 
 pub fn run_upgrade() -> Result<()> {
     run_platform_upgrade()
@@ -37,10 +37,10 @@ fn run_platform_upgrade() -> Result<()> {
         .arg("-c")
         .arg(unix_upgrade_script())
         .status()
-        .context("run install.sh for devo upgrade")?;
+        .context("run install.sh for infinitecode upgrade")?;
 
     if !status.success() {
-        bail!("devo upgrade failed with status {status}");
+        bail!("infinitecode upgrade failed with status {status}");
     }
 
     Ok(())
@@ -54,7 +54,7 @@ command -v curl >/dev/null 2>&1 || {{
     printf '%s\n' "Error: 'curl' is required but not installed." >&2
     exit 1
 }}
-tmp_dir="$(mktemp -d "${{TMPDIR:-/tmp}}/devo-upgrade.XXXXXX")"
+tmp_dir="$(mktemp -d "${{TMPDIR:-/tmp}}/infinitecode-upgrade.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT INT TERM
 curl -fsSL '{INSTALL_SH_URL}' -o "$tmp_dir/install.sh"
 sh "$tmp_dir/install.sh"
@@ -78,10 +78,10 @@ fn run_platform_upgrade() -> Result<()> {
         ])
         .stdin(Stdio::null())
         .spawn()
-        .context("start install.ps1 for devo upgrade")?;
+        .context("start install.ps1 for infinitecode upgrade")?;
 
-    println!("Started devo upgrade with install.ps1.");
-    println!("The installer will continue after this devo.exe process exits.");
+    println!("Started infinitecode upgrade with install.ps1.");
+    println!("The installer will continue after this infinitecode.exe process exits.");
     Ok(())
 }
 

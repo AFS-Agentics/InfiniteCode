@@ -1,4 +1,4 @@
-pub use devo_protocol::{
+pub use infinitecode_protocol::{
     SessionCompactParams, SessionCompactResult, SessionForkParams, SessionForkResult,
     SessionHistoryItem, SessionHistoryItemKind, SessionHistoryToolIo, SessionMetadata,
     SessionMetadataUpdateParams, SessionMetadataUpdateResult, SessionPermissionsUpdateParams,

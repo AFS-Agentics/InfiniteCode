@@ -3,7 +3,7 @@ import {
 	ConversationContent,
 	ConversationScrollButton,
 	useStickToBottomContext,
-} from "@devo/ui/components/ai-elements/conversation"
+} from "@infinitecode/ui/components/ai-elements/conversation"
 import {
 	PromptInput,
 	PromptInputButton,
@@ -14,9 +14,9 @@ import {
 	PromptInputTools,
 	usePromptInputAttachments,
 	usePromptInputController,
-} from "@devo/ui/components/ai-elements/prompt-input"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/ai-elements/prompt-input"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useAtomValue, useSetAtom } from "jotai"
 import {
@@ -70,13 +70,13 @@ import type {
 	ProvidersData,
 	SdkAgent,
 	VcsData,
-} from "../../hooks/use-devo-data"
+} from "../../hooks/use-infinitecode-data"
 import {
 	getModelInputCapabilities,
 	getModelVariants,
 	resolveEffectiveModel,
 	useModelState,
-} from "../../hooks/use-devo-data"
+} from "../../hooks/use-infinitecode-data"
 import type { ChatTurn } from "../../hooks/use-session-chat"
 import { createLogger } from "../../lib/logger"
 import { computeTurnWorkTimeSplit, formatWorkDuration } from "../../lib/session-metrics"
@@ -746,8 +746,8 @@ interface ChatViewProps {
 	config?: ConfigData | null
 	/** VCS data, currently consumed by non-composer surfaces only. */
 	vcs?: VcsData | null
-	/** Available Devo agents */
-	devoAgents?: SdkAgent[]
+	/** Available InfiniteCode agents */
+	infinitecodeAgents?: SdkAgent[]
 	/** Permission handlers */
 	onApprove?: (
 		agent: Agent,
@@ -796,7 +796,7 @@ export function ChatView({
 	onStop,
 	providers,
 	config,
-	devoAgents,
+	infinitecodeAgents,
 	onApprove,
 	onDeny,
 	onReplyQuestion,
@@ -1130,7 +1130,7 @@ export function ChatView({
 						onStop={onStop}
 						providers={providers}
 						config={config}
-						devoAgents={devoAgents}
+						infinitecodeAgents={infinitecodeAgents}
 						onApprove={handleApprovePermission}
 						onDeny={handleDenyPermission}
 						onReplyQuestion={onReplyQuestion}
@@ -1160,7 +1160,7 @@ interface ChatInputSectionProps {
 	onStop?: ChatViewProps["onStop"]
 	providers?: ProvidersData | null
 	config?: ConfigData | null
-	devoAgents?: SdkAgent[]
+	infinitecodeAgents?: SdkAgent[]
 	onApprove?: (
 		agent: Agent,
 		permissionSessionId: string,
@@ -1186,7 +1186,7 @@ function ChatInputSection({
 	onStop,
 	providers,
 	config,
-	devoAgents,
+	infinitecodeAgents,
 	onApprove,
 	onDeny,
 	onReplyQuestion,
@@ -1407,21 +1407,21 @@ function ChatInputSection({
 
 	const { addRecent: addRecentModel } = useModelState()
 
-	const activeDevoAgent = useMemo(() => {
+	const activeInfiniteCodeAgent = useMemo(() => {
 		const agentName = selectedAgent ?? config?.defaultAgent
-		return devoAgents?.find((a) => a.name === agentName) ?? null
-	}, [selectedAgent, config?.defaultAgent, devoAgents])
+		return infinitecodeAgents?.find((a) => a.name === agentName) ?? null
+	}, [selectedAgent, config?.defaultAgent, infinitecodeAgents])
 
 	const effectiveModel = useMemo(
 		() =>
 			resolveEffectiveModel(
 				selectedModel,
-				activeDevoAgent,
+				activeInfiniteCodeAgent,
 				config?.model,
 				providers?.defaults ?? {},
 				providers?.providers ?? [],
 			),
-		[selectedModel, activeDevoAgent, config?.model, providers],
+		[selectedModel, activeInfiniteCodeAgent, config?.model, providers],
 	)
 
 	useEffect(() => {
@@ -1577,7 +1577,7 @@ function ChatInputSection({
 		async (trigger: ComposerTrigger, text: string, files?: FileAttachment[]) => {
 			if (!agent.directory) throw new Error("No project directory for slash trigger")
 			const client = getProjectClient(agent.directory)
-			if (!client) throw new Error("Not connected to Devo server")
+			if (!client) throw new Error("Not connected to InfiniteCode server")
 			const parts: Array<
 				{ type: "text"; text: string } | {
 					type: "file"
@@ -1954,7 +1954,7 @@ function ChatInputSection({
 									query={mentionQuery}
 									open={mentionOpen}
 									directory={agent.directory}
-									agents={devoAgents ?? []}
+									agents={infinitecodeAgents ?? []}
 									onSelect={handleMentionSelect}
 									onClose={handleMentionClose}
 								/>
@@ -1968,7 +1968,7 @@ function ChatInputSection({
 								/>
 								<PromptInput
 									className={cn(
-										"devo-composer bg-background/95 shadow-[0_18px_52px_rgba(0,0,0,0.10)] dark:shadow-[0_18px_58px_rgba(0,0,0,0.34)]",
+										"infinitecode-composer bg-background/95 shadow-[0_18px_52px_rgba(0,0,0,0.10)] dark:shadow-[0_18px_58px_rgba(0,0,0,0.34)]",
 										activeGoal && "rounded-t-none border-t-border/70",
 									)}
 									accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
@@ -2006,7 +2006,7 @@ function ChatInputSection({
 										<PromptInputTools>
 											<AttachButton disabled={!isConnected} />
 											<PromptToolbar
-												agents={devoAgents ?? []}
+												agents={infinitecodeAgents ?? []}
 												selectedAgent={selectedAgent}
 												defaultAgent={config?.defaultAgent}
 												onSelectAgent={setSelectedAgent}

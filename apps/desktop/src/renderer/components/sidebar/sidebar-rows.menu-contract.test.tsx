@@ -35,7 +35,7 @@ mock.module("@tanstack/react-router", () => ({
 	useNavigate: () => () => undefined,
 }))
 
-mock.module("@devo/ui/components/dropdown-menu", () => ({
+mock.module("@infinitecode/ui/components/dropdown-menu", () => ({
 	DropdownMenu: MockPassthrough,
 	DropdownMenuContent: MockPassthrough,
 	DropdownMenuGroup: MockPassthrough,
@@ -44,7 +44,7 @@ mock.module("@devo/ui/components/dropdown-menu", () => ({
 	DropdownMenuTrigger: MockPassthrough,
 }))
 
-mock.module("@devo/ui/components/context-menu", () => ({
+mock.module("@infinitecode/ui/components/context-menu", () => ({
 	ContextMenu: MockPassthrough,
 	ContextMenuContent: MockPassthrough,
 	ContextMenuItem: MockMenuItem,
@@ -61,10 +61,10 @@ function agent(): Agent {
 		name: "Greeting and Introduction",
 		status: "idle",
 		environment: "local",
-		project: "devo",
-		projectSlug: "devo-123",
-		directory: "/Users/tsiao/Desktop/devo",
-		projectDirectory: "/Users/tsiao/Desktop/devo",
+		project: "infinitecode",
+		projectSlug: "infinitecode-123",
+		directory: "/Users/tsiao/Desktop/infinitecode",
+		projectDirectory: "/Users/tsiao/Desktop/infinitecode",
 		branch: "main",
 		duration: "42m",
 		activities: [],

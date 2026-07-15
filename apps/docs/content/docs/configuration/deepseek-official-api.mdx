@@ -3,8 +3,8 @@ title: DeepSeek Official API
 description: Configure DeepSeek official API with the recommended provider path.
 ---
 
-DeepSeek official API is the recommended first provider for many Devo users.
-The recommended Devo setup uses DeepSeek's Anthropic-compatible API path.
+DeepSeek official API is the recommended first provider for many InfiniteCode users.
+The recommended InfiniteCode setup uses DeepSeek's Anthropic-compatible API path.
 
 Last checked against DeepSeek official docs: 2026-06-14.
 
@@ -57,7 +57,7 @@ invocation_method = "anthropic_messages"
 default_reasoning_effort = "high"
 ```
 
-Store the API key in `<DEVO_HOME>/auth.json`:
+Store the API key in `<INFINITECODE_HOME>/auth.json`:
 
 ```json
 {
@@ -93,7 +93,7 @@ default.
 ## Why Anthropic-Compatible First
 
 Use the Anthropic-compatible provider method for DeepSeek official API because
-that path lets Devo use provider-hosted `web_search` and `web_fetch`.
+that path lets InfiniteCode use provider-hosted `web_search` and `web_fetch`.
 
 The OpenAI-compatible path can run model requests, but web search commonly
 needs separate local or third-party configuration.
@@ -144,10 +144,10 @@ Then add `exa_api_key` to `auth.json`.
 Run:
 
 ```bash
-devo doctor
+infinitecode doctor
 ```
 
-Then start Devo and ask a read-only first prompt:
+Then start InfiniteCode and ask a read-only first prompt:
 
 ```text
 Explain the project structure. Do not edit files yet.

@@ -14,7 +14,7 @@ describe("ServerSettings", () => {
 			hasTransportRow: markup.includes("Transport"),
 			hasTransportDescription: markup.includes("ACP over child-process stdin/stdout"),
 			hasStopRuntime: markup.includes("Stop runtime"),
-			hasStopDescription: markup.includes("Stop the managed Devo child process"),
+			hasStopDescription: markup.includes("Stop the managed InfiniteCode child process"),
 				hasDeveloperMode: markup.includes("Developer mode"),
 				hasDeveloperOptions: markup.includes("Developer options"),
 				hasAcpTrafficLog: markup.includes("ACP traffic log"),
@@ -40,7 +40,7 @@ describe("ServerSettings", () => {
 		})
 
 	test("shows a collapsed developer trigger without the log path when enabled", () => {
-		const logPath = "/Users/tester/.devo/traces/protocol-12345-20260703T153000Z.ndjsonl"
+		const logPath = "/Users/tester/.infinitecode/traces/protocol-12345-20260703T153000Z.ndjsonl"
 		const markup = renderToStaticMarkup(
 			<AcpTrafficLogStatus
 				state={{
@@ -53,7 +53,7 @@ describe("ServerSettings", () => {
 		expect({
 			hasDeveloperOptions: markup.includes("Developer options"),
 			hasTrigger: markup.includes("ACP traffic log"),
-			hasDescription: markup.includes("Protocol trace enabled via DEVO_PROTOCOL_TRACE"),
+			hasDescription: markup.includes("Protocol trace enabled via INFINITECODE_PROTOCOL_TRACE"),
 			hasCollapsedState: markup.includes('aria-expanded="false"'),
 			hasPath: markup.includes(logPath),
 			hasSensitiveHint: markup.includes("prompts, paths, tool arguments, and provider details"),
@@ -70,7 +70,7 @@ describe("ServerSettings", () => {
 	})
 
 	test("shows log location details when the developer trigger is expanded", () => {
-		const logPath = "/Users/tester/.devo/traces/protocol-12345-20260703T153000Z.ndjsonl"
+		const logPath = "/Users/tester/.infinitecode/traces/protocol-12345-20260703T153000Z.ndjsonl"
 		const markup = renderToStaticMarkup(
 			<AcpTrafficLogStatus
 				initialExpanded

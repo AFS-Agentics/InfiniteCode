@@ -3,14 +3,14 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import type { Plugin } from "vite"
 
-const GENERATED_DIR = "packages/devo-ai-sdk/src/v2/generated"
+const GENERATED_DIR = "packages/infinitecode-ai-sdk/src/v2/generated"
 const GENERATED_SCHEMA = join(GENERATED_DIR, "schema.json")
 const GENERATE_PROTOCOL_TYPES_ARGS = [
 	"run",
 	"--manifest-path",
 	"../../Cargo.toml",
 	"-p",
-	"devo-protocol",
+	"infinitecode-protocol",
 	"--bin",
 	"generate-acp-ts",
 	"--",
@@ -54,7 +54,7 @@ export function ensureProtocolTypes({
 
 export function protocolTypesPlugin({ desktopDir }: EnsureProtocolTypesOptions = {}): Plugin {
 	return {
-		name: "devo-protocol-types",
+		name: "infinitecode-protocol-types",
 		enforce: "pre",
 		config() {
 			ensureProtocolTypes({ desktopDir })

@@ -3,7 +3,7 @@
  *
  * Detects whether we're running inside Electron (preload bridge available)
  * or in a plain browser (Bun + Hono server on port 3100). All hooks import
- * from here instead of `devo-server.ts` directly.
+ * from here instead of `infinitecode-server.ts` directly.
  *
  * In Electron mode, calls go through IPC to the main process.
  * In browser mode, calls go through HTTP to the InfiniteCode server.
@@ -38,7 +38,7 @@ const log = createLogger("backend")
 
 /**
  * Returns true when running inside Electron (preload bridge is available).
- * The `devo` object is exposed via `contextBridge.exposeInMainWorld`.
+ * The `infinitecode` object is exposed via `contextBridge.exposeInMainWorld`.
  */
 export const isElectron = typeof window !== "undefined" && "infinitecode" in window
 
@@ -47,23 +47,23 @@ export const isElectron = typeof window !== "undefined" && "infinitecode" in win
 // ============================================================
 
 /**
- * Ensures the single local Devo stdio runtime is running and returns its
+ * Ensures the single local InfiniteCode stdio runtime is running and returns its
  * compatibility URL.
  */
-export async function fetchDevoUrl(): Promise<{ url: string }> {
-	log.debug("fetchDevoUrl", { via: isElectron ? "ipc" : "http" })
+export async function fetchInfiniteCodeUrl(): Promise<{ url: string }> {
+	log.debug("fetchInfiniteCodeUrl", { via: isElectron ? "ipc" : "http" })
 	try {
 		if (isElectron) {
 			const info = await window.infinitecode.ensureInfiniteCode()
-			log.info("Devo server URL resolved", { url: info.url })
+			log.info("InfiniteCode server URL resolved", { url: info.url })
 			return { url: info.url }
 		}
-		const { fetchDevoUrl: httpFetch } = await import("./devo-server")
+		const { fetchInfiniteCodeUrl: httpFetch } = await import("./infinitecode-server")
 		const result = await httpFetch()
-		log.info("Devo server URL resolved", { url: result.url })
+		log.info("InfiniteCode server URL resolved", { url: result.url })
 		return result
 	} catch (err) {
-		log.error("fetchDevoUrl failed", err)
+		log.error("fetchInfiniteCodeUrl failed", err)
 		throw err
 	}
 }
@@ -74,8 +74,8 @@ export async function fetchDevoUrl(): Promise<{ url: string }> {
 export async function resolveServerUrl(
 	server: import("../../preload/api").ServerConfig,
 ): Promise<string> {
-	if (server.type !== "local") throw new Error("Remote Devo servers are disabled in this build")
-	const { url } = await fetchDevoUrl()
+	if (server.type !== "local") throw new Error("Remote InfiniteCode servers are disabled in this build")
+	const { url } = await fetchInfiniteCodeUrl()
 	return url
 }
 
@@ -89,14 +89,14 @@ export async function resolveAuthHeader(
 }
 
 /**
- * Fetches the Devo model state (recent models, favorites, variants)
- * from ~/.local/state/devo/model.json.
+ * Fetches the InfiniteCode model state (recent models, favorites, variants)
+ * from ~/.local/state/infinitecode/model.json.
  */
 export async function fetchModelState(): Promise<ModelState> {
 	if (isElectron) {
 		return window.infinitecode.getModelState()
 	}
-	const { fetchModelState: httpFetch } = await import("./devo-server")
+	const { fetchModelState: httpFetch } = await import("./infinitecode-server")
 	return httpFetch() as unknown as Promise<ModelState>
 }
 
@@ -112,20 +112,20 @@ export async function updateModelRecent(model: {
 	if (isElectron) {
 		return window.infinitecode.updateModelRecent(model)
 	}
-	const { updateModelRecent: httpUpdate } = await import("./devo-server")
+	const { updateModelRecent: httpUpdate } = await import("./infinitecode-server")
 	return httpUpdate(model) as unknown as Promise<ModelState>
 }
 
 /**
  * Checks if the backend is available.
  * In Electron, always returns true (main process is always there).
- * In browser, pings the Devo HTTP server.
+ * In browser, pings the InfiniteCode HTTP server.
  */
 export async function checkBackendHealth(): Promise<boolean> {
 	if (isElectron) {
 		return true
 	}
-	const { checkServerHealth } = await import("./devo-server")
+	const { checkServerHealth } = await import("./infinitecode-server")
 	return checkServerHealth()
 }
 
@@ -157,12 +157,12 @@ export async function createDesktopFolder(
 	if (isElectron && window.infinitecode.desktopFolders?.create) {
 		return window.infinitecode.desktopFolders.create(input)
 	}
-	throw new Error("Folder creation requires the updated desktop bridge. Restart Devo Desktop and try again.")
+	throw new Error("Folder creation requires the updated desktop bridge. Restart InfiniteCode Desktop and try again.")
 }
 
 // ============================================================
 // Git operations — Electron-only (main process via IPC)
-// In browser mode, these are not available (Devo server
+// In browser mode, these are not available (InfiniteCode server
 // doesn't expose git checkout/stash APIs).
 // ============================================================
 
@@ -221,7 +221,7 @@ export async function gitStashPop(directory: string): Promise<GitStashResult> {
 }
 
 // ============================================================
-// Worktree operations — Devo API only
+// Worktree operations — InfiniteCode API only
 // ============================================================
 
 export type { WorktreeResult } from "./worktree-service"
@@ -311,7 +311,7 @@ export async function gitApplyToLocal(
 /**
  * Applies a raw diff string to a local directory using `git apply`.
  * Used for remote worktree apply-to-local, where the diff is fetched
- * from the Devo session.diff API rather than from a local worktree.
+ * from the InfiniteCode session.diff API rather than from a local worktree.
  */
 export async function gitApplyDiffText(
 	localDir: string,

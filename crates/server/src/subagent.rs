@@ -11,11 +11,11 @@ use std::time::Duration;
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
-use devo_protocol::AgentInfo;
-use devo_protocol::AgentMailboxMessage;
-use devo_protocol::AgentOutputEvent;
-use devo_protocol::AgentOutputEventKind;
-use devo_protocol::SessionId;
+use infinitecode_protocol::AgentInfo;
+use infinitecode_protocol::AgentMailboxMessage;
+use infinitecode_protocol::AgentOutputEvent;
+use infinitecode_protocol::AgentOutputEventKind;
+use infinitecode_protocol::SessionId;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tokio::sync::Notify;
@@ -474,7 +474,7 @@ mod tests {
     async fn output_buffer_accumulates_assistant_deltas_per_turn() {
         let buffer = SubagentOutputBuffer::new();
         let child = SessionId::new();
-        let turn_id = devo_protocol::TurnId::new();
+        let turn_id = infinitecode_protocol::TurnId::new();
         let base = || AgentOutputEvent {
             sequence: 0,
             child_session_id: child,
@@ -530,7 +530,7 @@ mod tests {
     async fn wait_after_ignores_streaming_text_until_deadline() {
         let buffer = SubagentOutputBuffer::new();
         let child = SessionId::new();
-        let turn_id = devo_protocol::TurnId::new();
+        let turn_id = infinitecode_protocol::TurnId::new();
         let producer = buffer.clone();
         let streaming = tokio::spawn(async move {
             for text in ["alpha", " beta", " gamma"] {

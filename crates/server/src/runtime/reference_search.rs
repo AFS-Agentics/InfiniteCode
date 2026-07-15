@@ -9,22 +9,22 @@ use std::num::NonZero;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use devo_file_search::FileMatch;
-use devo_file_search::FileSearchOptions;
-use devo_file_search::FileSearchSession;
-use devo_file_search::FileSearchSnapshot;
-use devo_file_search::SessionReporter;
-use devo_protocol::ReferenceSearchCancelParams;
-use devo_protocol::ReferenceSearchCancelResult;
-use devo_protocol::ReferenceSearchId;
-use devo_protocol::ReferenceSearchResult;
-use devo_protocol::ReferenceSearchResultKind;
-use devo_protocol::ReferenceSearchSnapshot;
-use devo_protocol::ReferenceSearchStartParams;
-use devo_protocol::ReferenceSearchStartResult;
-use devo_protocol::ReferenceSearchUpdateParams;
-use devo_protocol::ReferenceSearchUpdateResult;
-use devo_util_fuzzy::fuzzy_match;
+use infinitecode_file_search::FileMatch;
+use infinitecode_file_search::FileSearchOptions;
+use infinitecode_file_search::FileSearchSession;
+use infinitecode_file_search::FileSearchSnapshot;
+use infinitecode_file_search::SessionReporter;
+use infinitecode_protocol::ReferenceSearchCancelParams;
+use infinitecode_protocol::ReferenceSearchCancelResult;
+use infinitecode_protocol::ReferenceSearchId;
+use infinitecode_protocol::ReferenceSearchResult;
+use infinitecode_protocol::ReferenceSearchResultKind;
+use infinitecode_protocol::ReferenceSearchSnapshot;
+use infinitecode_protocol::ReferenceSearchStartParams;
+use infinitecode_protocol::ReferenceSearchStartResult;
+use infinitecode_protocol::ReferenceSearchUpdateParams;
+use infinitecode_protocol::ReferenceSearchUpdateResult;
+use infinitecode_util_fuzzy::fuzzy_match;
 use tokio::sync::mpsc;
 
 use super::ServerRuntime;
@@ -33,7 +33,7 @@ use crate::ServerEvent;
 use crate::SkillRecord;
 use crate::SuccessResponse;
 use crate::session_context::SessionRuntimeContext;
-use devo_core::McpServerRecord;
+use infinitecode_core::McpServerRecord;
 
 const REFERENCE_FILE_LIMIT: usize = 20;
 
@@ -191,7 +191,7 @@ impl ServerRuntime {
             search_id: search_id.clone(),
             update_tx,
         });
-        let file_session = devo_file_search::create_session(
+        let file_session = infinitecode_file_search::create_session(
             vec![cwd.clone()],
             FileSearchOptions {
                 limit: NonZero::new(REFERENCE_FILE_LIMIT).expect("positive file limit"),
@@ -540,7 +540,7 @@ fn reference_match_indices(
 
 #[cfg(test)]
 mod tests {
-    use devo_file_search::MatchType;
+    use infinitecode_file_search::MatchType;
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -660,7 +660,7 @@ mod tests {
             total_file_match_count: 0,
             scanned_file_count: 0,
             file_search_complete: false,
-            file_session: devo_file_search::create_session(
+            file_session: infinitecode_file_search::create_session(
                 vec![PathBuf::from(".")],
                 FileSearchOptions::default(),
                 Arc::new(ReferenceSearchReporter {

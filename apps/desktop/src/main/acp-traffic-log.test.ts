@@ -99,8 +99,8 @@ describe("protocol trace env trigger", () => {
 			const logger = createAcpTrafficLoggerFromEnv({
 				env: {
 					[INFINITECODE_HOME_ENV]: dir,
-					DEVO_DESKTOP_ACP_TRAFFIC_LOG: "1",
-					DEVO_DESKTOP_ACP_TRAFFIC_LOG_PATH: path.join(dir, "old", "traffic.jsonl"),
+					INFINITECODE_DESKTOP_ACP_TRAFFIC_LOG: "1",
+					INFINITECODE_DESKTOP_ACP_TRAFFIC_LOG_PATH: path.join(dir, "old", "traffic.jsonl"),
 					TRAFFIC_LOG_PATH: path.join(dir, "old", "traffic.jsonl"),
 				},
 				clock: fixedClock,

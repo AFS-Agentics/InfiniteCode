@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use devo_protocol::Model;
+use infinitecode_protocol::Model;
 use pretty_assertions::assert_eq;
 use tokio::sync::mpsc;
 
@@ -22,7 +22,7 @@ fn widget_with_model(
         app_event_tx: AppEventSender::new(app_event_tx),
         initial_session: TuiSessionState::new(cwd, Some(model)),
         initial_reasoning_effort_selection: None,
-        initial_permission_preset: devo_protocol::PermissionPreset::Default,
+        initial_permission_preset: infinitecode_protocol::PermissionPreset::Default,
         initial_user_message: None,
         enhanced_keys_supported: true,
         is_first_run: false,
@@ -63,7 +63,7 @@ fn streaming_read_and_glob_updates_render_in_one_explored_cell() {
         tool_use_id: "read-1".to_string(),
         summary: "read {}".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![devo_protocol::parse_command::ParsedCommand::Read {
+        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
             cmd: String::new(),
             name: String::new(),
             path: PathBuf::new(),
@@ -78,7 +78,7 @@ fn streaming_read_and_glob_updates_render_in_one_explored_cell() {
     widget.handle_worker_event(WorkerEvent::ToolCallUpdated {
         tool_use_id: "read-1".to_string(),
         summary: "read README.md".to_string(),
-        parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::Read {
+        parsed_commands: vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
             cmd: "read README.md".to_string(),
             name: "README.md".to_string(),
             path: PathBuf::from("README.md"),
@@ -87,7 +87,7 @@ fn streaming_read_and_glob_updates_render_in_one_explored_cell() {
     widget.handle_worker_event(WorkerEvent::ToolResult {
         tool_use_id: "read-1".to_string(),
         title: "read README.md".to_string(),
-        preview: "# Devo".to_string(),
+        preview: "# InfiniteCode".to_string(),
         is_error: false,
         truncated: false,
     });
@@ -97,7 +97,7 @@ fn streaming_read_and_glob_updates_render_in_one_explored_cell() {
         summary: "glob {}".to_string(),
         preparing: false,
         parsed_commands: Some(vec![
-            devo_protocol::parse_command::ParsedCommand::ListFiles {
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
                 cmd: "glob".to_string(),
                 path: Some("glob".to_string()),
             },
@@ -106,7 +106,7 @@ fn streaming_read_and_glob_updates_render_in_one_explored_cell() {
     widget.handle_worker_event(WorkerEvent::ToolCallUpdated {
         tool_use_id: "glob-1".to_string(),
         summary: "glob **/Cargo.toml in crates".to_string(),
-        parsed_commands: vec![devo_protocol::parse_command::ParsedCommand::ListFiles {
+        parsed_commands: vec![infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
             cmd: "glob **/Cargo.toml in crates".to_string(),
             path: Some("**/Cargo.toml in crates".to_string()),
         }],

@@ -9,10 +9,10 @@ use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
-use devo_rmcp_client::ElicitationAction;
-use devo_rmcp_client::ElicitationResponse;
-use devo_rmcp_client::LocalStdioServerLauncher;
-use devo_rmcp_client::RmcpClient;
+use infinitecode_rmcp_client::ElicitationAction;
+use infinitecode_rmcp_client::ElicitationResponse;
+use infinitecode_rmcp_client::LocalStdioServerLauncher;
+use infinitecode_rmcp_client::RmcpClient;
 use futures::FutureExt as _;
 use rmcp::model::ClientCapabilities;
 use rmcp::model::Implementation;

@@ -1,9 +1,9 @@
-//! Semantic code retrieval for Devo.
+//! Semantic code retrieval for InfiniteCode.
 //!
 //! This crate implements the built-in read-only `code_search` tool's retrieval
 //! engine: workspace discovery, code chunking, dense embeddings, sparse BM25,
 //! hybrid ranking, related-code lookup, and warm/disk cache refresh. The public
-//! surface is intentionally small so Devo's tool runtime owns schema validation
+//! surface is intentionally small so InfiniteCode's tool runtime owns schema validation
 //! and execution policy while this crate owns retrieval mechanics.
 
 mod cache;

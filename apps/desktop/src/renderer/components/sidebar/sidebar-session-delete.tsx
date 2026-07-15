@@ -1,8 +1,8 @@
-import { Button } from "@devo/ui/components/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	Dialog,
 	DialogContent,
-} from "@devo/ui/components/dialog"
+} from "@infinitecode/ui/components/dialog"
 import { AlertTriangleIcon, Loader2Icon, TrashIcon } from "lucide-react"
 import type { Agent } from "../../lib/types"
 

@@ -17,9 +17,9 @@ use crate::tool_io_cell::FileChangeToolIoCell;
 use crate::tool_io_cell::ToolIoCell;
 use crate::tool_io_cell::ToolIoCellOptions;
 use crate::tool_result_cell::ToolResultCell;
-use devo_protocol::SessionHistoryItem;
-use devo_protocol::SessionHistoryMetadata;
-use devo_protocol::SessionPlanStepStatus;
+use infinitecode_protocol::SessionHistoryItem;
+use infinitecode_protocol::SessionHistoryMetadata;
+use infinitecode_protocol::SessionPlanStepStatus;
 use ratatui::text::Line;
 use serde_json::Value;
 
@@ -93,8 +93,8 @@ impl ChatWidget {
         for (index, item) in history_items.iter().enumerate() {
             if matches!(
                 item.kind,
-                devo_protocol::SessionHistoryItemKind::ToolResult
-                    | devo_protocol::SessionHistoryItemKind::Error
+                infinitecode_protocol::SessionHistoryItemKind::ToolResult
+                    | infinitecode_protocol::SessionHistoryItemKind::Error
             ) && let Some(tool_call_id) = item.tool_call_id.as_deref()
             {
                 paired_result_by_call_id
@@ -163,7 +163,7 @@ impl ChatWidget {
                         let result_item = paired_result_index
                             .map(|result_index| &history_items[result_index])
                             .or_else(|| {
-                                (item.kind != devo_protocol::SessionHistoryItemKind::ToolCall)
+                                (item.kind != infinitecode_protocol::SessionHistoryItemKind::ToolCall)
                                     .then_some(item)
                             });
                         self.apply_restored_exec_tool_io(item, result_item);
@@ -180,7 +180,7 @@ impl ChatWidget {
                 continue;
             }
 
-            if item.kind == devo_protocol::SessionHistoryItemKind::ToolCall
+            if item.kind == infinitecode_protocol::SessionHistoryItemKind::ToolCall
                 && let Some(tool_call_id) = item.tool_call_id.as_deref()
             {
                 if metadata_owned_ids.contains(tool_call_id) {
@@ -207,16 +207,16 @@ impl ChatWidget {
             }
 
             match item.kind {
-                devo_protocol::SessionHistoryItemKind::User => {
+                infinitecode_protocol::SessionHistoryItemKind::User => {
                     self.add_restored_user_prompt(item.body.clone());
                 }
-                devo_protocol::SessionHistoryItemKind::Assistant => {
+                infinitecode_protocol::SessionHistoryItemKind::Assistant => {
                     self.add_markdown_history_without_redraw("Assistant", &item.body);
                 }
-                devo_protocol::SessionHistoryItemKind::Reasoning => {
+                infinitecode_protocol::SessionHistoryItemKind::Reasoning => {
                     self.add_markdown_history_without_redraw("Reasoning", &item.body);
                 }
-                devo_protocol::SessionHistoryItemKind::ToolCall => {
+                infinitecode_protocol::SessionHistoryItemKind::ToolCall => {
                     self.add_history_entry_without_redraw(Box::new(
                         history_cell::AgentMessageCell::new_with_prefix(
                             vec![Self::running_tool_line(&item.title)],
@@ -226,8 +226,8 @@ impl ChatWidget {
                         ),
                     ));
                 }
-                devo_protocol::SessionHistoryItemKind::ToolResult
-                | devo_protocol::SessionHistoryItemKind::CommandExecution => {
+                infinitecode_protocol::SessionHistoryItemKind::ToolResult
+                | infinitecode_protocol::SessionHistoryItemKind::CommandExecution => {
                     if self.add_restored_tool_io_result_item(item, item) {
                         continue;
                     }
@@ -240,7 +240,7 @@ impl ChatWidget {
                         false,
                     )));
                 }
-                devo_protocol::SessionHistoryItemKind::Error => {
+                infinitecode_protocol::SessionHistoryItemKind::Error => {
                     if item.tool_call_id.is_none() {
                         self.add_history_entry_without_redraw(Box::new(
                             history_cell::new_error_event(item.body.clone()),
@@ -256,7 +256,7 @@ impl ChatWidget {
                         )));
                     }
                 }
-                devo_protocol::SessionHistoryItemKind::TurnSummary => {
+                infinitecode_protocol::SessionHistoryItemKind::TurnSummary => {
                     let summary = match item.body.as_str() {
                         "failed" => history_cell::TurnSummaryCell::new_failed(
                             InputMode::Build,
@@ -304,7 +304,7 @@ impl ChatWidget {
     fn add_restored_file_change_item(
         &mut self,
         item: &SessionHistoryItem,
-        changes: HashMap<PathBuf, devo_protocol::protocol::FileChange>,
+        changes: HashMap<PathBuf, infinitecode_protocol::protocol::FileChange>,
     ) {
         if let (Some(tool_name), Some(input)) = (
             Self::restored_tool_io_name(item, None),
@@ -336,7 +336,7 @@ impl ChatWidget {
         ) else {
             return false;
         };
-        if result_item.kind == devo_protocol::SessionHistoryItemKind::ToolResult
+        if result_item.kind == infinitecode_protocol::SessionHistoryItemKind::ToolResult
             && let Some(changes) = Self::edited_changes_from_history_item(result_item)
         {
             self.add_history_entry_without_redraw(Box::new(FileChangeToolIoCell::new(
@@ -352,7 +352,7 @@ impl ChatWidget {
             ToolIoCellOptions {
                 title_line: (!call_item.title.is_empty())
                     .then(|| Self::ran_tool_line(&call_item.title)),
-                dot_prefix: if result_item.kind == devo_protocol::SessionHistoryItemKind::Error {
+                dot_prefix: if result_item.kind == infinitecode_protocol::SessionHistoryItemKind::Error {
                     Self::failed_dot_prefix()
                 } else {
                     Self::tool_dot_prefix()
@@ -401,7 +401,7 @@ impl ChatWidget {
                     tool_call_id,
                     CommandOutput {
                         exit_code: if result_item.is_some_and(|item| {
-                            item.kind == devo_protocol::SessionHistoryItemKind::Error
+                            item.kind == infinitecode_protocol::SessionHistoryItemKind::Error
                         }) {
                             1
                         } else {
@@ -470,8 +470,8 @@ impl ChatWidget {
 
     pub(super) fn edited_changes_from_history_item(
         item: &SessionHistoryItem,
-    ) -> Option<HashMap<PathBuf, devo_protocol::protocol::FileChange>> {
-        if item.kind != devo_protocol::SessionHistoryItemKind::ToolResult {
+    ) -> Option<HashMap<PathBuf, infinitecode_protocol::protocol::FileChange>> {
+        if item.kind != infinitecode_protocol::SessionHistoryItemKind::ToolResult {
             return None;
         }
         let lower_title = item.title.to_ascii_lowercase();
@@ -501,21 +501,21 @@ impl ChatWidget {
                 .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             let change = match kind {
-                "add" => devo_protocol::protocol::FileChange::Add {
+                "add" => infinitecode_protocol::protocol::FileChange::Add {
                     content: file
                         .get("content")
                         .and_then(serde_json::Value::as_str)
                         .map(ToOwned::to_owned)
                         .unwrap_or_else(|| "\n".repeat(additions as usize)),
                 },
-                "delete" => devo_protocol::protocol::FileChange::Delete {
+                "delete" => infinitecode_protocol::protocol::FileChange::Delete {
                     content: file
                         .get("content")
                         .and_then(serde_json::Value::as_str)
                         .map(ToOwned::to_owned)
                         .unwrap_or_else(|| "\n".repeat(deletions as usize)),
                 },
-                "update" | "move" => devo_protocol::protocol::FileChange::Update {
+                "update" | "move" => infinitecode_protocol::protocol::FileChange::Update {
                     unified_diff: diff.clone(),
                     old_text: file
                         .get("oldContent")
@@ -545,7 +545,7 @@ impl ChatWidget {
     pub(super) fn restore_explored_history_item(
         &mut self,
         item: &SessionHistoryItem,
-        actions: Vec<devo_protocol::parse_command::ParsedCommand>,
+        actions: Vec<infinitecode_protocol::parse_command::ParsedCommand>,
     ) {
         let mut actions = actions;
         crate::read_display::normalize_read_actions(&mut actions, &self.session.cwd);
@@ -561,7 +561,7 @@ impl ChatWidget {
                     .unwrap_or_else(|| "restored".to_string()),
                 command_tokens.clone(),
                 actions.clone(),
-                devo_protocol::protocol::ExecCommandSource::Agent,
+                infinitecode_protocol::protocol::ExecCommandSource::Agent,
                 None,
             )
         {
@@ -575,7 +575,7 @@ impl ChatWidget {
                 .unwrap_or_else(|| "restored".to_string()),
             command_tokens,
             actions,
-            devo_protocol::protocol::ExecCommandSource::Agent,
+            infinitecode_protocol::protocol::ExecCommandSource::Agent,
             None,
             false,
         );

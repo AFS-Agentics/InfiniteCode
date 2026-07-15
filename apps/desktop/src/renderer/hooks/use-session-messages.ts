@@ -18,7 +18,7 @@ interface MessageEntry {
 }
 
 /**
- * Part types from Devo messages.
+ * Part types from InfiniteCode messages.
  */
 interface MessagePart {
 	type: string // "text" | "tool" | "step-start" | "step-finish"
@@ -36,7 +36,7 @@ interface MessagePart {
 }
 
 /**
- * Maps an Devo tool name to our Activity type.
+ * Maps an InfiniteCode tool name to our Activity type.
  */
 function toolToActivityType(
 	tool: string,
@@ -78,7 +78,7 @@ function formatTime(ms: number): string {
 }
 
 /**
- * Convert Devo messages to Activity entries for the detail panel.
+ * Convert InfiniteCode messages to Activity entries for the detail panel.
  */
 function messagesToActivities(entries: MessageEntry[]): Activity[] {
 	const activities: Activity[] = []
@@ -155,7 +155,7 @@ export function useSessionMessages(directory: string | null, sessionId: string |
 			// Use a directory-scoped client when available, otherwise fall back to the base client
 			const client = (directory ? getProjectClient(directory) : null) ?? getBaseClient()
 			if (!client) {
-				setError("Not connected to Devo server")
+				setError("Not connected to InfiniteCode server")
 				setActivities([])
 				return
 			}

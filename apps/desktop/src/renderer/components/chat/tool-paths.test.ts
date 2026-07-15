@@ -4,16 +4,16 @@ import { formatToolPathForDisplay, getFirstApplyPatchPath } from "./tool-paths"
 describe("formatToolPathForDisplay", () => {
 	test("shows project-relative Windows paths", () => {
 		expect(
-			formatToolPathForDisplay("C:\\Users\\lenovo\\Desktop\\devo\\src\\main.ts", {
-				projectRoot: "c:\\users\\lenovo\\desktop\\devo",
+			formatToolPathForDisplay("C:\\Users\\lenovo\\Desktop\\infinitecode\\src\\main.ts", {
+				projectRoot: "c:\\users\\lenovo\\desktop\\infinitecode",
 			}),
 		).toBe("src/main.ts")
 	})
 
 	test("shows project-relative POSIX paths", () => {
 		expect(
-			formatToolPathForDisplay("/home/lenovo/devo/src/main.ts", {
-				projectRoot: "/home/lenovo/devo",
+			formatToolPathForDisplay("/home/lenovo/infinitecode/src/main.ts", {
+				projectRoot: "/home/lenovo/infinitecode",
 			}),
 		).toBe("src/main.ts")
 	})
@@ -27,7 +27,7 @@ describe("formatToolPathForDisplay", () => {
 	test("does not leak absolute paths outside the project root", () => {
 		expect(
 			formatToolPathForDisplay("C:\\Users\\lenovo\\Other\\secrets.ts", {
-				projectRoot: "C:\\Users\\lenovo\\Desktop\\devo",
+				projectRoot: "C:\\Users\\lenovo\\Desktop\\infinitecode",
 			}),
 		).toBe("Other/secrets.ts")
 	})

@@ -8,13 +8,13 @@ import {
 	DropdownMenuSubContent,
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
-} from "@devo/ui/components/dropdown-menu"
+} from "@infinitecode/ui/components/dropdown-menu"
 import {
 	optionMenuIconClass,
 	optionMenuSeparatorClass,
-} from "@devo/ui/components/option-menu-styles"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@devo/ui/components/tooltip"
-import { cn } from "@devo/ui/lib/utils"
+} from "@infinitecode/ui/components/option-menu-styles"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
+import { cn } from "@infinitecode/ui/lib/utils"
 import {
 	ArchiveIcon,
 	CheckIcon,
