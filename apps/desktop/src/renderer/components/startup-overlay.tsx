@@ -16,7 +16,6 @@
 import { useAtomValue } from "jotai"
 import { useEffect, useRef, useState } from "react"
 import { discoveryPhaseAtom } from "../atoms/discovery"
-import { DevoSplashBrand } from "./devo-splash-brand"
 
 // ============================================================
 // Constants
@@ -93,9 +92,8 @@ export function StartupOverlay() {
 			<img
 				src="/logo.png"
 				alt="InfiniteCode"
-				className="mb-6 h-16 w-auto object-contain"
+				className="mb-6 h-24 w-auto object-contain"
 			/>
-			<DevoSplashBrand />
 			<div className="devo-loading-dots mt-8" aria-hidden="true">
 				<span />
 				<span />
