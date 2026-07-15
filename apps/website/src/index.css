@@ -5,6 +5,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
+	--animate-accordion-down: accordion-down 0.2s ease-out;
+	--animate-accordion-up: accordion-up 0.2s ease-out;
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
@@ -88,6 +90,16 @@
 	--chart-3: oklch(0.769 0.188 70.08);
 	--chart-4: oklch(0.627 0.265 303.9);
 	--chart-5: oklch(0.645 0.246 16.439);
+}
+
+@keyframes accordion-down {
+	from { height: 0; }
+	to { height: var(--radix-accordion-content-height); }
+}
+
+@keyframes accordion-up {
+	from { height: var(--radix-accordion-content-height); }
+	to { height: 0; }
 }
 
 * {
