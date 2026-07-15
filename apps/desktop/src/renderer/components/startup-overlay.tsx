@@ -90,6 +90,11 @@ export function StartupOverlay() {
 				WebkitAppRegion: "drag",
 			}}
 		>
+			<img
+				src="/logo.png"
+				alt="InfiniteCode"
+				className="mb-6 h-16 w-auto object-contain"
+			/>
 			<DevoSplashBrand />
 			<div className="devo-loading-dots mt-8" aria-hidden="true">
 				<span />

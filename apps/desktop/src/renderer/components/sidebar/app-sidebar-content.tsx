@@ -384,7 +384,7 @@ export function AppSidebarContent({
 					<img
 						src="/logo.png"
 						alt="InfiniteCode"
-						className="mb-2 mt-2 h-8 w-auto object-contain"
+						className="mb-2 mt-2 h-12 w-auto object-contain"
 					/>
 					<TopActionRow
 						icon={<PenLineIcon className={sidebarPrimaryIconClass} />}

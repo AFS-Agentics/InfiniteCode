@@ -35,6 +35,12 @@
         opacity: 0;
         pointer-events: none;
       }
+      .splash-logo {
+        height: 80px;
+        width: auto;
+        object-fit: contain;
+        margin-bottom: 16px;
+      }
       .devo-splash-brand {
         display: inline-flex;
         align-items: center;
@@ -201,6 +207,7 @@
     <!-- Splash screen: renders immediately before React/JS loads.
          The React StartupOverlay component removes this element once it mounts. -->
     <div id="splash">
+      <img src="/logo.png" alt="InfiniteCode" class="splash-logo" />
       <span class="devo-splash-brand" role="img" aria-label="InfiniteCode">
         <span class="devo-splash-brand-mark-frame" aria-hidden="true">
           <svg viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" class="devo-splash-brand-mark devo-brand-mark-attention">
