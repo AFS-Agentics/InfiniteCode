@@ -99,6 +99,7 @@ export function StartupOverlay() {
 				<span />
 				<span />
 			</div>
+			<p className="mt-12 text-xs text-muted-foreground">By AFS Agentics</p>
 		</div>
 	)
 }

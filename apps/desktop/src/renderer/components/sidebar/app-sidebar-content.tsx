@@ -489,6 +489,7 @@ export function AppSidebarContent({
 					<SettingsIcon className={sidebarPrimaryIconClass} />
 					<span className="truncate">Settings</span>
 				</button>
+				<p className="px-1 pt-1 text-[10px] text-muted-foreground/40">© 2026 AFS Agentics</p>
 			</SidebarFooter>
 			<FolderRemoveDialog
 				project={removeTarget}

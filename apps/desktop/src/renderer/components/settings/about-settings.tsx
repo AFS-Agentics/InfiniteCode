@@ -31,6 +31,9 @@ export function AboutSettings() {
 				<SettingsRow label="Version" description={isDev ? "Development build" : undefined}>
 					<span className="text-sm text-muted-foreground">{appVersion || "..."}</span>
 				</SettingsRow>
+				<SettingsRow label="Copyright">
+					<span className="text-sm text-muted-foreground">© 2026 AFS Agentics</span>
+				</SettingsRow>
 				<SettingsRow
 					label="Updates"
 					description={
