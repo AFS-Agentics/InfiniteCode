@@ -381,6 +381,11 @@ export function AppSidebarContent({
 		<>
 			<SidebarContent className="gap-0 bg-transparent px-0 pb-3">
 				<div className="flex shrink-0 flex-col gap-1 px-3 pb-7">
+					<img
+						src="/logo.png"
+						alt="InfiniteCode"
+						className="mb-2 mt-2 h-8 w-auto object-contain"
+					/>
 					<TopActionRow
 						icon={<PenLineIcon className={sidebarPrimaryIconClass} />}
 						onClick={handleNewChat}
