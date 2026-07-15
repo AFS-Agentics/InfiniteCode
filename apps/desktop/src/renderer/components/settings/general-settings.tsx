@@ -31,7 +31,6 @@ export function GeneralSettings() {
 			</SettingsSection>
 
 			<SettingsSection title="Appearance">
-				<ThemeRow />
 				<OpaqueWindowsRow />
 				<DisplayModeRow />
 			</SettingsSection>

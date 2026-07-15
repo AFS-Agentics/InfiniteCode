@@ -1,0 +1,14 @@
+{
+	"name": "infinitecode",
+	"private": true,
+	"version": "0.1.0",
+	"description": "InfiniteCode monorepo — AI coding assistant, desktop app, website, and docs",
+	"scripts": {
+		"dev:website": "npm --prefix apps/website run dev",
+		"dev:web": "npm --prefix apps/web run dev",
+		"build:website": "npm --prefix apps/website run build",
+		"build:web": "npm --prefix apps/web run build",
+		"dev:desktop": "bun --cwd apps/desktop run dev",
+		"test:desktop": "bun --cwd apps/desktop run test"
+	}
+}
