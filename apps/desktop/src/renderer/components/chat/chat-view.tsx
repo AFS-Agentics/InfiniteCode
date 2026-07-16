@@ -103,6 +103,7 @@ import {
 	type ComposerGoalStatus,
 } from "./composer-status-stack"
 import { ContextItems } from "./context-items"
+import { BannerAd } from "./banner-ad"
 import { NativeAd } from "./native-ad"
 import type { MentionOption } from "./mention-popover"
 import { MentionPopover, type MentionPopoverHandle } from "./mention-popover"
@@ -1080,8 +1081,8 @@ export function ChatView({
 									turns.map((turn, index) => (
 										<React.Fragment key={turn.id}>
 											{renderTurn(turn, index)}
-											{/* Native ad after each turn — scrolls naturally with messages */}
-											<NativeAd />
+											{/* Banner ad after each turn — multiple instances work independently */}
+											<BannerAd />
 										</React.Fragment>
 									))
 								)
@@ -1128,6 +1129,8 @@ export function ChatView({
 					ref={composerRef}
 					className="pointer-events-none absolute bottom-0 left-0 right-3.5 z-30 overflow-visible pt-3"
 				>
+					{/* Native ad above the composer — single container, blends into content */}
+					<NativeAd />
 					<ChatInputSection
 						agent={agent}
 						turns={turns}
