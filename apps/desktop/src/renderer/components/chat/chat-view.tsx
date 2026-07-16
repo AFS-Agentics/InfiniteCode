@@ -103,6 +103,7 @@ import {
 	type ComposerGoalStatus,
 } from "./composer-status-stack"
 import { ContextItems } from "./context-items"
+import { NativeAd } from "./native-ad"
 import type { MentionOption } from "./mention-popover"
 import { MentionPopover, type MentionPopoverHandle } from "./mention-popover"
 import { PromptAttachmentPreview } from "./prompt-attachments"
@@ -1084,6 +1085,11 @@ export function ChatView({
 								<div className="flex items-center justify-center py-8">
 									<p className="text-sm text-muted-foreground">No messages yet</p>
 								</div>
+							)}
+
+							{/* Native ad in-feed — shows while AI is responding */}
+							{isWorking && turns.length > 0 && (
+								<NativeAd />
 							)}
 
 							{/* Session-level error from session.error events */}
