@@ -1081,10 +1081,10 @@ export function ChatView({
 									turns.map((turn, index) => (
 										<React.Fragment key={turn.id}>
 											{renderTurn(turn, index)}
-											{/* Native ad after each turn — container-based */}
-											<NativeAd />
 										</React.Fragment>
 									))
+									{/* Single native ad at bottom — moves down as new turns stream in */}
+									<NativeAd />
 								)
 							) : setupPhase ? (
 								<WorktreeSetupProgress phase={setupPhase} />
