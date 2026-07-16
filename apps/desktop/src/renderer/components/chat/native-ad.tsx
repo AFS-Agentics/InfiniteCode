@@ -26,15 +26,14 @@ async function fetchBlockedWords(): Promise<string[]> {
 /**
  * Adsterra Native Ad with client-side content filtering.
  *
- * Loads invoke.js dynamically after the container is mounted, then watches
- * for ad content via MutationObserver. If the ad text contains any blocked
- * words (fetched from the LDNOOBW list on GitHub), the container is hidden.
+ * The invoke.js script is loaded in the document body (before the container)
+ * so it can find the container by ID and inject content properly.
  */
 export function NativeAd({ className }: { className?: string }): JSX.Element {
 	const containerRef = useRef<HTMLDivElement>(null)
 	const wordsRef = useRef<string[]>(cachedWords ?? [])
 
-	// Fetch word list once per session, store in ref
+	// Fetch word list once per session
 	useEffect(() => {
 		if (wordsRef.current.length === 0) {
 			fetchBlockedWords().then((words) => {
@@ -47,7 +46,14 @@ export function NativeAd({ className }: { className?: string }): JSX.Element {
 		const container = containerRef.current
 		if (!container) return
 
-		// Watch for ad content injected by invoke.js
+		// Load invoke.js into document body before the container
+		const script = document.createElement("script")
+		script.src = INVOKE_URL
+		script.async = true
+		script.setAttribute("data-cfasync", "false")
+		document.body.insertBefore(script, container)
+
+		// Watch for ad content injected into the container
 		const observer = new MutationObserver(() => {
 			const blockedWords = wordsRef.current
 			if (blockedWords.length === 0) return
@@ -60,13 +66,6 @@ export function NativeAd({ className }: { className?: string }): JSX.Element {
 		})
 
 		observer.observe(container, { childList: true, subtree: true, characterData: true })
-
-		// Load invoke.js after container is mounted
-		const script = document.createElement("script")
-		script.src = INVOKE_URL
-		script.async = true
-		script.setAttribute("data-cfasync", "false")
-		container.appendChild(script)
 
 		return () => {
 			observer.disconnect()
