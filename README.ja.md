@@ -246,7 +246,7 @@ TUI/CLI を使ってください。どちらの surface も同じローカル In
 
 ## Star 履歴
 
-<a href="https://www.star-history.com/?repos=7df-lab%2Finfinitecode&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=AFS-Agentics%2FInfiniteCode&type=date&legend=top-left">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=AFS-Agentics/InfiniteCode&type=date&theme=dark&legend=top-left" />
    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=AFS-Agentics/InfiniteCode&type=date&legend=top-left" />

@@ -18,21 +18,11 @@
 
 [English](./README.md) | [简体中文](./README.zh-Hans.md) | [繁體中文](./README.zh-Hant.md) | [日本語](./README.ja.md) | [Русский](./README.ru.md)
 
-[Why InfiniteCode](#why-infinitecode) · [Screenshots](#screenshots) · [Features](#features) · [Tested Models](#tested-models) · [Tested Platforms](#tested-platforms) · [Install](#installation) · [Quick Start](#quick-start) · [Docs](#docs)
+[Why InfiniteCode](#why-infinitecode) · [Features](#features) · [Tested Models](#tested-models) · [Tested Platforms](#tested-platforms) · [Install](#installation) · [Quick Start](#quick-start) · [Docs](#docs)
 
 </div>
 
 ---
-
-## Screenshots
-
-<p align="center">
-  <img width="100%" alt="InfiniteCode desktop coding agent app showing a repository conversation, project sidebar, and model controls" src="./.github/assets/infinitecode-desktop-coding-agent-screenshot.png" />
-</p>
-
-<p align="center">
-  <img width="100%" alt="InfiniteCode terminal TUI coding agent running in a local repository with model, context, and token status" src="./.github/assets/infinitecode-terminal-tui-coding-agent-screenshot.png" />
-</p>
 
 ## Why InfiniteCode
 
@@ -258,7 +248,7 @@ Open an issue or pull request to discuss changes.
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=7df-lab%2Finfinitecode&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=AFS-Agentics%2FInfiniteCode&type=date&legend=top-left">
  <picture>
    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=AFS-Agentics/InfiniteCode&type=date&theme=dark&legend=top-left&sealed_token=MnUnrvz2y0jVX7ra8V0X5Z6AvrYDpTndpzZkHP-0ilm9g4EpwuNEvvmJfE8I2qMI8tDhAkn5a2T5dks7vIrGvP1eVw3ov01-m4_l7zJyWuuAFP-f4MSHSvyRJVhkhWmoioiwBNutxCcNuvDtZkufcwHISOkZglpGH7tZhIZDj-ITupTBDzZmBVfI-_DU" />
    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=AFS-Agentics/InfiniteCode&type=date&legend=top-left&sealed_token=MnUnrvz2y0jVX7ra8V0X5Z6AvrYDpTndpzZkHP-0ilm9g4EpwuNEvvmJfE8I2qMI8tDhAkn5a2T5dks7vIrGvP1eVw3ov01-m4_l7zJyWuuAFP-f4MSHSvyRJVhkhWmoioiwBNutxCcNuvDtZkufcwHISOkZglpGH7tZhIZDj-ITupTBDzZmBVfI-_DU" />
