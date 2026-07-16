@@ -103,6 +103,7 @@ import {
 	type ComposerGoalStatus,
 } from "./composer-status-stack"
 import { ContextItems } from "./context-items"
+import { BannerAd } from "./banner-ad"
 import { NativeAd } from "./native-ad"
 import type { MentionOption } from "./mention-popover"
 import { MentionPopover, type MentionPopoverHandle } from "./mention-popover"
@@ -1045,6 +1046,8 @@ export function ChatView({
 				} as CSSProperties
 			}
 		>
+			{/* 468×60 banner — always visible at top, outside scroll area */}
+			<BannerAd />
 			{/* Chat messages -- constrained width for readability */}
 			<div className="relative min-h-0 min-w-0 flex-1">
 				<Conversation
