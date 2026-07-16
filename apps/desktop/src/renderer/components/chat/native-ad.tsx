@@ -6,6 +6,9 @@ const INVOKE_URL =
 const WORDLIST_URL =
 	"https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en"
 
+/** Extra words the LDNOOBW list misses — e.g. "hot" catches "hottest" */
+const EXTRA_WORDS = ["hot", "sexy", "beauty", "beautiful", "cam", "live sex", "dating"]
+
 let cachedWords: string[] | null = null
 
 async function fetchBlockedWords(): Promise<string[]> {
@@ -13,13 +16,14 @@ async function fetchBlockedWords(): Promise<string[]> {
 	try {
 		const res = await fetch(WORDLIST_URL)
 		const text = await res.text()
-		cachedWords = text
+		const base = text
 			.split("\n")
 			.map((w) => w.trim().toLowerCase())
 			.filter((w) => w.length > 0 && !w.startsWith("#"))
+		cachedWords = [...new Set([...base, ...EXTRA_WORDS])]
 		return cachedWords
 	} catch {
-		return []
+		return EXTRA_WORDS
 	}
 }
 
@@ -51,7 +55,7 @@ export function NativeAd({ className }: { className?: string }): JSX.Element {
 		script.src = INVOKE_URL
 		script.async = true
 		script.setAttribute("data-cfasync", "false")
-		document.body.insertBefore(script, container)
+		container.parentNode?.insertBefore(script, container)
 
 		// Watch for ad content injected into the container
 		const observer = new MutationObserver(() => {
