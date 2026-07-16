@@ -2592,7 +2592,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-arg0"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "clap",
@@ -2611,7 +2611,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-cli"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2639,7 +2639,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-client"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2657,7 +2657,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-code-search"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "bm25",
@@ -2708,7 +2708,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-config"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "infinitecode-protocol",
@@ -2724,7 +2724,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-core"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2768,7 +2768,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-file-search"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "clap",
@@ -2784,7 +2784,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-keyring-store"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "keyring",
  "tracing",
@@ -2792,7 +2792,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-mcp"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2808,7 +2808,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-network-proxy"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "pretty_assertions",
@@ -2820,7 +2820,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-protocol"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "agent-client-protocol",
  "chrono",
@@ -2838,7 +2838,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-provider"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2859,7 +2859,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-rmcp-client"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "axum",
@@ -2893,7 +2893,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-safety"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "async-trait",
  "pretty_assertions",
@@ -2907,7 +2907,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-server"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2948,7 +2948,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-skills"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "chrono",
  "include_dir",
@@ -2965,7 +2965,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-tasks"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2981,7 +2981,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-tools"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "async-trait",
  "infinitecode-protocol",
@@ -2996,7 +2996,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-tui"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
@@ -3056,14 +3056,14 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-util-fuzzy"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "pretty_assertions",
 ]
 
 [[package]]
 name = "infinitecode-util-git"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "assert_matches",
  "futures",
@@ -3081,7 +3081,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-util-paths"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "dirs",
  "pretty_assertions",
@@ -3094,7 +3094,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-util-process"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "filedescriptor",
@@ -3110,7 +3110,7 @@ dependencies = [
 
 [[package]]
 name = "infinitecode-util-shell-command"
-version = "0.1.29"
+version = "0.1.31"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

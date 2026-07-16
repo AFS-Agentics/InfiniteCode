@@ -1,7 +1,7 @@
 {
 	"name": "@infinitecode/desktop",
 	"productName": "InfiniteCode",
-	"version": "0.1.29",
+	"version": "0.1.31",
 	"description": "AI-powered coding assistant desktop app",
 	"author": "InfiniteCode",
 	"license": "MIT",
