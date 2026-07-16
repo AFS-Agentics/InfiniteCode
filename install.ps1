@@ -140,8 +140,19 @@ function Resolve-GitHubLatestVersion {
         [string]$RepoName
     )
 
-    $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoName/releases/latest"
-    return $latest.tag_name
+    # First try the releases API (requires a published release).
+    try {
+        $latest = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoName/releases/latest" -ErrorAction Stop
+        return $latest.tag_name
+    }
+    catch {
+        # Fall back to the tags API when there are no published releases.
+        $tags = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoName/tags" -ErrorAction Stop
+        if ($tags -and $tags.Count -gt 0) {
+            return $tags[0].name
+        }
+        throw "Failed to resolve the latest version from releases or tags"
+    }
 }
 
 function Resolve-Version {
@@ -289,12 +300,11 @@ function Test-InfiniteCodeVersionInstalled {
 # ── Banner ───────────────────────────────────────────────────────────────
 function Print-Banner {
     Write-Host ""
-    Write-Host "██████╗  ███████╗██╗   ██╗ ██████╗" -ForegroundColor DarkGray
-    Write-Host "██╔══██╗ ██╔════╝██║   ██║██╔═══██╗" -ForegroundColor DarkGray
-    Write-Host "██║  ██║ █████╗  ██║   ██║██║   ██║" -ForegroundColor DarkGray
-    Write-Host "██║  ██║ ██╔══╝  ╚██╗ ██╔╝██║   ██║" -ForegroundColor DarkGray
-    Write-Host "██████╔╝ ███████╗ ╚████╔╝ ╚██████╔╝" -ForegroundColor DarkGray
-    Write-Host "╚═════╝  ╚══════╝  ╚═══╝   ╚═════╝" -ForegroundColor DarkGray
+    Write-Host " ___ _   _ _____ ___ _   _ ___ _____ _____" -ForegroundColor DarkGray
+    Write-Host "|_ _| \ | |  ___|_ _| \ | |_ _|_   _| ____|" -ForegroundColor DarkGray
+    Write-Host " | ||  \| | |_   | ||  \| || |  | | |  _|" -ForegroundColor DarkGray
+    Write-Host " | || |\  |  _|  | || |\  || |  | | | |___" -ForegroundColor DarkGray
+    Write-Host "|___|_| \_|_|   |___|_| \_|___| |_| |_____|" -ForegroundColor DarkGray
     Write-Host ""
 }
 

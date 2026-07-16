@@ -14,6 +14,7 @@ import { ArrowRightIcon, CheckCircle2Icon, CommandIcon, FlaskConicalIcon } from 
 import { motion } from "motion/react"
 import { useEffect, useRef, useState } from "react"
 import type { MigrationProvider, MigrationResult, ProviderDetection } from "../../../../preload/api"
+import { ENABLE_MIGRATION_OFFERS } from "../onboarding-flags"
 
 // ============================================================
 // Types
@@ -23,7 +24,8 @@ interface CompleteStepProps {
 	infinitecodeVersion: string | null
 	migratedProviders: string[]
 	migrationResult: MigrationResult | null
-	onStartMigration: (provider: MigrationProvider) => void
+	/** Omitted / undefined when migration offers are disabled. */
+	onStartMigration?: (provider: MigrationProvider) => void
 	onFinish: () => void
 }
 
@@ -43,12 +45,13 @@ export function CompleteStep({
 }: CompleteStepProps) {
 	const modKey = isMac ? "Cmd" : "Ctrl"
 
-	// Detect available providers on mount
+	// Detect available providers on mount (skipped when migration offers are disabled)
 	const [providers, setProviders] = useState<ProviderDetection[]>([])
 	const [detecting, setDetecting] = useState(false)
 	const hasDetected = useRef(false)
 
 	useEffect(() => {
+		if (!ENABLE_MIGRATION_OFFERS || !onStartMigration) return
 		if (!isElectron || hasDetected.current) return
 		hasDetected.current = true
 		setDetecting(true)
@@ -64,10 +67,13 @@ export function CompleteStep({
 			.catch(() => {
 				setDetecting(false)
 			})
-	}, [])
+	}, [onStartMigration])
 
 	// Filter out already-migrated providers
-	const availableProviders = providers.filter((p) => !migratedProviders.includes(p.provider))
+	const availableProviders =
+		ENABLE_MIGRATION_OFFERS && onStartMigration
+			? providers.filter((p) => !migratedProviders.includes(p.provider))
+			: []
 	const hasMigrated = migratedProviders.length > 0
 
 	return (
@@ -137,8 +143,8 @@ export function CompleteStep({
 					</motion.div>
 				)}
 
-				{/* Provider migration cards */}
-				{detecting && (
+				{/* Provider migration cards (Claude Code / Cursor / OpenCode) — gated by flag */}
+				{ENABLE_MIGRATION_OFFERS && onStartMigration && detecting && (
 					<motion.div
 						initial={{ opacity: 0, y: 8 }}
 						animate={{ opacity: 1, y: 0 }}
@@ -150,44 +156,47 @@ export function CompleteStep({
 					</motion.div>
 				)}
 
-				{!detecting && availableProviders.length > 0 && (
-					<motion.div
-						initial={{ opacity: 0, y: 8 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ delay: 0.45, duration: 0.3 }}
-						className="space-y-2"
-					>
-						{availableProviders.map((provider) => (
-							<button
-								key={provider.provider}
-								type="button"
-								onClick={() => onStartMigration(provider.provider)}
-								data-slot="onboarding-card"
-								className="group w-full cursor-pointer rounded-lg border border-border bg-muted/20 p-4 text-left transition-colors hover:bg-muted/40"
-							>
-								<div className="flex items-center justify-between">
-									<div className="space-y-1">
-										<p className="flex items-center gap-2 text-sm font-medium text-foreground">
-											Migrate from {provider.label}?
-											<Badge
-												variant="outline"
-												className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
-											>
-												<FlaskConicalIcon aria-hidden="true" className="size-2.5" />
-												Experimental
-											</Badge>
-										</p>
-										<p className="text-xs text-muted-foreground">{provider.summary}</p>
+				{ENABLE_MIGRATION_OFFERS &&
+					onStartMigration &&
+					!detecting &&
+					availableProviders.length > 0 && (
+						<motion.div
+							initial={{ opacity: 0, y: 8 }}
+							animate={{ opacity: 1, y: 0 }}
+							transition={{ delay: 0.45, duration: 0.3 }}
+							className="space-y-2"
+						>
+							{availableProviders.map((provider) => (
+								<button
+									key={provider.provider}
+									type="button"
+									onClick={() => onStartMigration(provider.provider)}
+									data-slot="onboarding-card"
+									className="group w-full cursor-pointer rounded-lg border border-border bg-muted/20 p-4 text-left transition-colors hover:bg-muted/40"
+								>
+									<div className="flex items-center justify-between">
+										<div className="space-y-1">
+											<p className="flex items-center gap-2 text-sm font-medium text-foreground">
+												Migrate from {provider.label}?
+												<Badge
+													variant="outline"
+													className="gap-1 px-1.5 py-0 text-[10px] text-muted-foreground"
+												>
+													<FlaskConicalIcon aria-hidden="true" className="size-2.5" />
+													Experimental
+												</Badge>
+											</p>
+											<p className="text-xs text-muted-foreground">{provider.summary}</p>
+										</div>
+										<ArrowRightIcon
+											aria-hidden="true"
+											className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+										/>
 									</div>
-									<ArrowRightIcon
-										aria-hidden="true"
-										className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-									/>
-								</div>
-							</button>
-						))}
-					</motion.div>
-				)}
+								</button>
+							))}
+						</motion.div>
+					)}
 
 				{/* Quick tips */}
 				<motion.div

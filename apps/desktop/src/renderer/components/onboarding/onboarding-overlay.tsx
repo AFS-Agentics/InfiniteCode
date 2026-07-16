@@ -13,6 +13,10 @@ import { AnimatePresence, motion } from "motion/react"
 import { useCallback, useState } from "react"
 import type { MigrationPreview, MigrationProvider, MigrationResult } from "../../../preload/api"
 import { APP_BAR_HEIGHT } from "../app-bar"
+import {
+	ENABLE_MIGRATION_OFFERS,
+	ENABLE_PROVIDER_SETUP_STEP,
+} from "./onboarding-flags"
 import { OnboardingProgress } from "./onboarding-progress"
 import { CompleteStep } from "./steps/complete-step"
 import { EnvironmentCheckStep } from "./steps/environment-check-step"
@@ -48,7 +52,9 @@ interface OnboardingOverlayProps {
 // ============================================================
 
 /** Core steps shown in the progress indicator. Migration steps are a detour. */
-const CORE_STEPS: OnboardingStep[] = ["welcome", "environment", "providers", "complete"]
+const CORE_STEPS: OnboardingStep[] = ENABLE_PROVIDER_SETUP_STEP
+	? ["welcome", "environment", "providers", "complete"]
+	: ["welcome", "environment", "complete"]
 
 const STEP_TRANSITION = {
 	initial: { opacity: 0, y: 16 },
@@ -97,9 +103,15 @@ export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
 	const handleEnvironmentComplete = useCallback(
 		(version: string | null) => {
 			setInfiniteCodeVersion(version)
-			goToStep("providers")
+			if (ENABLE_PROVIDER_SETUP_STEP) {
+				goToStep("providers")
+			} else {
+				// Provider setup is disabled for now — skip straight to complete.
+				skipStep("providers")
+				goToStep("complete")
+			}
 		},
-		[goToStep],
+		[goToStep, skipStep],
 	)
 
 	const handleProvidersComplete = useCallback(
@@ -224,7 +236,7 @@ export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
 						</motion.div>
 					)}
 
-					{currentStep === "providers" && (
+					{ENABLE_PROVIDER_SETUP_STEP && currentStep === "providers" && (
 						<motion.div
 							key="providers"
 							className="absolute inset-0 overflow-y-auto"
@@ -247,13 +259,15 @@ export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
 								infinitecodeVersion={infinitecodeVersion}
 								migratedProviders={migratedProviders}
 								migrationResult={migrationResult}
-								onStartMigration={handleStartMigration}
+								onStartMigration={
+									ENABLE_MIGRATION_OFFERS ? handleStartMigration : undefined
+								}
 								onFinish={handleFinish}
 							/>
 						</motion.div>
 					)}
 
-					{currentStep === "migration-offer" && activeProvider && (
+					{ENABLE_MIGRATION_OFFERS && currentStep === "migration-offer" && activeProvider && (
 						<motion.div
 							key={`migration-offer-${activeProvider}`}
 							className="absolute inset-0 overflow-y-auto"
@@ -267,7 +281,7 @@ export function OnboardingOverlay({ onComplete }: OnboardingOverlayProps) {
 						</motion.div>
 					)}
 
-					{currentStep === "migration-preview" && activeProvider && (
+					{ENABLE_MIGRATION_OFFERS && currentStep === "migration-preview" && activeProvider && (
 						<motion.div
 							key={`migration-preview-${activeProvider}`}
 							className="absolute inset-0 overflow-y-auto"

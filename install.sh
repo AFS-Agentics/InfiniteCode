@@ -208,14 +208,24 @@ resolve_latest_version() {
     require_command curl "Error: 'curl' is required but not installed."
     require_command sed "Error: 'sed' is required but not installed."
 
+    # First try the releases API (requires a published release).
     latest="$(
         curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
             | sed -n 's/.*"tag_name":[[:space:]]*"\([^"]*\)".*/\1/p' \
             | sed -n '1p'
     )"
 
+    # Fall back to the tags API when there are no published releases.
     if [ -z "$latest" ]; then
-        die "Failed to resolve the latest release version"
+        latest="$(
+            curl -fsSL "https://api.github.com/repos/${REPO}/tags" \
+                | sed -n 's/.*"name":[[:space:]]*"\(v[^"]*\)".*/\1/p' \
+                | sed -n '1p'
+        )"
+    fi
+
+    if [ -z "$latest" ]; then
+        die "Failed to resolve the latest version from releases or tags"
     fi
 
     printf '%s\n' "$latest"
@@ -758,12 +768,11 @@ install_offline_code_search_model_files() {
 
 print_banner() {
     printf '\n'
-    printf '%b%s%b\n' "$MUTED" "██████╗  ███████╗██╗   ██╗ ██████╗" "$NC"
-    printf '%b%s%b\n' "$MUTED" "██╔══██╗ ██╔════╝██║   ██║██╔═══██╗" "$NC"
-    printf '%b%s%b\n' "$MUTED" "██║  ██║ █████╗  ██║   ██║██║   ██║" "$NC"
-    printf '%b%s%b\n' "$MUTED" "██║  ██║ ██╔══╝  ╚██╗ ██╔╝██║   ██║" "$NC"
-    printf '%b%s%b\n' "$MUTED" "██████╔╝ ███████╗ ╚████╔╝ ╚██████╔╝" "$NC"
-    printf '%b%s%b\n' "$MUTED" "╚═════╝  ╚══════╝  ╚═══╝   ╚═════╝" "$NC"
+    printf '%b%s%b\n' "$MUTED" " ___ _   _ _____ ___ _   _ ___ _____ _____" "$NC"
+    printf '%b%s%b\n' "$MUTED" "|_ _| \\ | |  ___|_ _| \\ | |_ _|_   _| ____|" "$NC"
+    printf '%b%s%b\n' "$MUTED" " | ||  \\| | |_   | ||  \\| || |  | | |  _|" "$NC"
+    printf '%b%s%b\n' "$MUTED" " | || |\\  |  _|  | || |\\  || |  | | | |___" "$NC"
+    printf '%b%s%b\n' "$MUTED" "|___|_| \\_|_|   |___|_| \\_|___| |_| |_____|" "$NC"
     printf '\n'
 }
 

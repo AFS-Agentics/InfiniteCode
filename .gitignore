@@ -9,3 +9,4 @@ node_modules
 .opencode/
 /apps/website/dist/
 .vercel
+devlog.txt

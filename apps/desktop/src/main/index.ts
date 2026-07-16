@@ -27,8 +27,16 @@ const log = createLogger("app")
 const appName = "InfiniteCode"
 let isQuitting = false
 
+// Must run before app.ready — macOS Notification Center / dock use this name.
+// Dev branding is also applied to Electron.app Info.plist via brand-electron-dev.mjs
+// (CFBundleName / CFBundleDisplayName). Without both, OS can keep showing a previous
+// brand (e.g. "Devo") in "… Notifications" permission banners.
 app.setName(appName)
 process.title = appName
+// Windows taskbar / toast identity.
+if (process.platform === "win32") {
+	app.setAppUserModelId("com.infinitecode.desktop")
+}
 
 // ESM equivalent for __dirname
 const __filename = fileURLToPath(import.meta.url)

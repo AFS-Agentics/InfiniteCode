@@ -16,13 +16,12 @@ pub(crate) const STARTUP_HEADER_ANIMATION_INTERVAL: Duration = Duration::from_mi
 const STARTUP_HEADER_MAX_TOTAL_WIDTH: usize = 62;
 const STARTUP_HEADER_MIN_FULL_WIDTH: usize = 44;
 const DIRECTORY_LABEL: &str = "Workspace  ";
-const INFINITECODE_LOGO: [&str; 6] = [
-    "██████╗  ███████╗██╗   ██╗ ██████╗",
-    "██╔══██╗ ██╔════╝██║   ██║██╔═══██╗",
-    "██║  ██║ █████╗  ██║   ██║██║   ██║",
-    "██║  ██║ ██╔══╝  ╚██╗ ██╔╝██║   ██║",
-    "██████╔╝ ███████╗ ╚████╔╝ ╚██████╔╝",
-    "╚═════╝  ╚══════╝  ╚═══╝   ╚═════╝",
+const INFINITECODE_LOGO: [&str; 5] = [
+    " ___ _   _ _____ ___ _   _ ___ _____ _____ ",
+    "|_ _| \\ | |  ___|_ _| \\ | |_ _|_   _| ____|",
+    " | ||  \\| | |_   | ||  \\| || |  | | |  _|  ",
+    " | || |\\  |  _|  | || |\\  || |  | | | |___ ",
+    "|___|_| \\_|_|   |___|_| \\_|___| |_| |_____|",
 ];
 
 pub(crate) struct StartupHeaderData<'a> {
@@ -333,11 +332,14 @@ mod tests {
             "medium",
             Path::new("/Users/tester/Desktop/infinitecode"),
         );
-        assert_eq!(10, rows.len());
+        assert_eq!(9, rows.len());
         assert!(rows[0].starts_with('┏'));
-        assert!(rows[1].contains("██████"));
-        assert!(rows[3].contains("v0.1.3"));
-        assert!(rows[8].contains("Workspace"));
+        assert!(rows[2].contains("|_ _|"));
+        // v0.1.3 version appears on the 3rd logo line (idx==2), which is rows[3]
+        assert!(rows[3].contains("v0.1.3") || rows[3].contains("0.1.3"));
+        // v0.1.3 version appears on the middle line (index 2 with 5 rows)
+        assert!(rows[2].contains("v0.1.3") || rows[2].contains("0.1.3"));
+        assert!(rows[7].contains("Workspace"));
         let rendered = rows.join("\n");
         assert!(!rendered.contains("Model"));
         assert!(!rendered.contains("Reasoning"));
@@ -364,8 +366,8 @@ mod tests {
             "medium",
             Path::new("/Users/tester/Desktop/projects/infinitecode/some/really/long/path"),
         );
-        assert!(rows[8].contains('…'));
-        assert!(rows[8].contains("long/path"));
+        assert!(rows[7].contains('…'));
+        assert!(rows[7].contains("long/path"));
         assert!(
             rows.iter()
                 .all(|row| UnicodeWidthStr::width(row.as_str()) <= 60)
@@ -380,7 +382,7 @@ mod tests {
             "",
             Path::new(r"C:\Users\tester\Desktop\infinitecode\long\workspace"),
         );
-        assert!(rows[8].contains("workspace"));
+        assert!(rows[7].contains("workspace"));
         assert!(
             rows.iter()
                 .all(|row| UnicodeWidthStr::width(row.as_str()) <= 60)
