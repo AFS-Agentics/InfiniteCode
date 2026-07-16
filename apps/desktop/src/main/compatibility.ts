@@ -132,7 +132,7 @@ export async function checkInfiniteCode(): Promise<InfiniteCodeCheckResult> {
 			path: null,
 			compatible: false,
 			compatibility: "unknown",
-			message: "InfiniteCode CLI not found. Install it from https://github.com/7df-lab/infinitecode",
+			message: "InfiniteCode CLI not found. Install it from https://github.com/AFS-Agentics/InfiniteCode",
 		}
 	}
 

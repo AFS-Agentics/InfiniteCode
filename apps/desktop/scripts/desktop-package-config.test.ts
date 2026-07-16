@@ -29,7 +29,7 @@ describe("desktop package runtime resources", () => {
 		expect({
 			homepage: packageJson.homepage,
 			repositoryUrl: packageJson.repository.url,
-			usesCanonicalOwner: config.includes("owner: 7df-lab"),
+			usesCanonicalOwner: config.includes("owner: AFS-Agentics"),
 			usesCanonicalRepo: config.includes("repo: infinitecode"),
 			usesCanonicalReleasePage: updaterSource.includes("https://github.com/AFS-Agentics/InfiniteCode"),
 			publishesBlockmaps: releaseWorkflow.includes("-o -name '*.blockmap'"),
