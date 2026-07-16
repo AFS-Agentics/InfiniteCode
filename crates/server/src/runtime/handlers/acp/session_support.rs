@@ -63,9 +63,11 @@ impl ServerRuntime {
             )
         };
         let mcp_manager = Arc::new(RmcpMcpManager::new(mcp_config, oauth_store_mode));
-        let registry =
-            infinitecode_core::tools::handlers::build_registry_from_plan_with_mcp(&tool_plan, mcp_manager)
-                .await;
+        let registry = infinitecode_core::tools::handlers::build_registry_from_plan_with_mcp(
+            &tool_plan,
+            mcp_manager,
+        )
+        .await;
 
         Ok(Some(Arc::new(registry)))
     }
@@ -232,7 +234,10 @@ mod tests {
     #[test]
     fn history_limit_meta_accepts_positive_integer() {
         let mut meta = AcpMeta::new();
-        meta.insert("infinitecode/historyLimit".to_string(), serde_json::json!(30));
+        meta.insert(
+            "infinitecode/historyLimit".to_string(),
+            serde_json::json!(30),
+        );
 
         assert_eq!(history_limit_from_meta(&Some(meta)), Some(30));
     }

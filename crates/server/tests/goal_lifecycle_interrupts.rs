@@ -141,8 +141,9 @@ async fn goal_cancel_interrupts_active_hidden_continuation_turn() -> Result<()> 
         )
         .await
         .context("goal/cancel response")?;
-    let _response: infinitecode_server::SuccessResponse<infinitecode_protocol::GoalSetStatusResult> =
-        serde_json::from_value(cancel_response)?;
+    let _response: infinitecode_server::SuccessResponse<
+        infinitecode_protocol::GoalSetStatusResult,
+    > = serde_json::from_value(cancel_response)?;
 
     let notifications = collect_until_turn_completed(&mut notifications_rx).await?;
     assert_turn_interrupted(&notifications, &turn_id);

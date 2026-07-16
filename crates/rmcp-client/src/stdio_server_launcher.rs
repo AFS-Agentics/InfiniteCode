@@ -20,13 +20,13 @@ use std::thread::spawn;
 #[cfg(unix)]
 use std::time::Duration;
 
+use futures::FutureExt;
+use futures::future::BoxFuture;
 use infinitecode_config::McpServerEnvVar;
 #[cfg(unix)]
 use infinitecode_util_process::process_group::kill_process_group;
 #[cfg(unix)]
 use infinitecode_util_process::process_group::terminate_process_group;
-use futures::FutureExt;
-use futures::future::BoxFuture;
 use rmcp::service::RoleClient;
 use rmcp::service::RxJsonRpcMessage;
 use rmcp::service::TxJsonRpcMessage;

@@ -430,7 +430,10 @@ impl ChatWidget {
         self.set_status_message("Select permissions");
     }
 
-    pub(crate) fn note_permissions_updated(&mut self, preset: infinitecode_protocol::PermissionPreset) {
+    pub(crate) fn note_permissions_updated(
+        &mut self,
+        preset: infinitecode_protocol::PermissionPreset,
+    ) {
         self.permission_preset = preset;
         let label = permission_preset_label(preset);
         self.add_to_history(history_cell::new_info_event(

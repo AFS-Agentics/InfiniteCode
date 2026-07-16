@@ -1,5 +1,6 @@
 use std::io;
 
+use futures::StreamExt;
 use infinitecode_protocol::HostedToolDefinition;
 use infinitecode_protocol::HostedWebSearchTool;
 use infinitecode_protocol::ModelRequest;
@@ -17,7 +18,6 @@ use infinitecode_provider::ProviderHttpOptions;
 use infinitecode_provider::anthropic::AnthropicProvider;
 use infinitecode_provider::openai::OpenAIProvider;
 use infinitecode_provider::openai::OpenAIResponsesProvider;
-use futures::StreamExt;
 use pretty_assertions::assert_eq;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;

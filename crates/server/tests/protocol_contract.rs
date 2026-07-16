@@ -402,9 +402,10 @@ fn session_compaction_events_serialize_expected_kinds() {
     let started = ServerEvent::SessionCompactionStarted(infinitecode_server::SessionEventPayload {
         session: metadata.clone(),
     });
-    let completed = ServerEvent::SessionCompactionCompleted(infinitecode_server::SessionEventPayload {
-        session: metadata,
-    });
+    let completed =
+        ServerEvent::SessionCompactionCompleted(infinitecode_server::SessionEventPayload {
+            session: metadata,
+        });
     let failed =
         ServerEvent::SessionCompactionFailed(infinitecode_server::SessionCompactionFailedPayload {
             session_id: SessionId::new(),

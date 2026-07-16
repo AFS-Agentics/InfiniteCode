@@ -104,7 +104,10 @@ pub fn original_event_from_acp_notification(
     notification: &AcpSessionNotification,
 ) -> Option<(String, ServerEvent)> {
     let meta = notification.meta.as_ref()?;
-    let method = meta.get(INFINITECODE_ORIGINAL_METHOD_META)?.as_str()?.to_string();
+    let method = meta
+        .get(INFINITECODE_ORIGINAL_METHOD_META)?
+        .as_str()?
+        .to_string();
     let event = serde_json::from_value(meta.get(INFINITECODE_ORIGINAL_EVENT_META)?.clone()).ok()?;
     Some((method, event))
 }

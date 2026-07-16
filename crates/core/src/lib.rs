@@ -56,11 +56,6 @@ pub use context::*;
 #[allow(ambiguous_glob_reexports)]
 pub use context_pipeline::*;
 pub use conversation::*;
-#[allow(ambiguous_glob_reexports)]
-pub use infinitecode_config::*;
-#[allow(ambiguous_glob_reexports)]
-pub use infinitecode_protocol::*;
-pub use infinitecode_protocol::{ContentBlock, Message, Role};
 pub use durable_record::*;
 pub use error::*;
 #[allow(ambiguous_glob_reexports)]
@@ -70,6 +65,11 @@ pub use fuzzy_search::*;
 pub use goal_prompts::*;
 pub use history::*;
 pub use hooks::*;
+#[allow(ambiguous_glob_reexports)]
+pub use infinitecode_config::*;
+#[allow(ambiguous_glob_reexports)]
+pub use infinitecode_protocol::*;
+pub use infinitecode_protocol::{ContentBlock, Message, Role};
 pub use instruction_discovery::*;
 pub use jsonl_store::*;
 pub use logging::*;

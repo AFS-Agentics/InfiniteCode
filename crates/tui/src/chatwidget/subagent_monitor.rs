@@ -1216,7 +1216,9 @@ fn normalize_terminal_subagent_status(status: &str) -> String {
     normalize_subagent_display_status(status)
 }
 
-fn normalize_runtime_status_for_subagent(status: infinitecode_protocol::SessionRuntimeStatus) -> String {
+fn normalize_runtime_status_for_subagent(
+    status: infinitecode_protocol::SessionRuntimeStatus,
+) -> String {
     match status {
         infinitecode_protocol::SessionRuntimeStatus::ActiveTurn => "working".to_string(),
         infinitecode_protocol::SessionRuntimeStatus::Idle => "idle".to_string(),

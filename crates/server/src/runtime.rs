@@ -208,8 +208,9 @@ pub struct ServerRuntime {
     /// Latest subagent turn usage grouped under the parent turn that requested the work.
     subagent_usage: Mutex<subagent_usage::SubagentUsageState>,
     /// Live client-owned reference search sessions.
-    reference_searches:
-        Mutex<HashMap<infinitecode_protocol::ReferenceSearchId, reference_search::ReferenceSearchState>>,
+    reference_searches: Mutex<
+        HashMap<infinitecode_protocol::ReferenceSearchId, reference_search::ReferenceSearchState>,
+    >,
     /// Live client-owned shell/process sessions.
     command_exec_manager: command_exec::CommandExecManager,
     code_index_warmup: code_index_warmup::CodeIndexWarmup,
@@ -228,7 +229,9 @@ pub struct ServerRuntime {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum TurnInputMode {
     VisibleUserMessage,
-    HiddenGoalContinuation { goal: infinitecode_protocol::ThreadGoal },
+    HiddenGoalContinuation {
+        goal: infinitecode_protocol::ThreadGoal,
+    },
 }
 
 const TERMINAL_TURN_STATUS_LIMIT: usize = 1024;
@@ -279,7 +282,8 @@ fn requested_model_selection<'a>(
         .or_else(|| session_model_selection(session))
 }
 
-const SUBAGENT_USAGE_PARENT_SESSION_ID_METADATA: &str = "infinitecode_subagent_usage_parent_session_id";
+const SUBAGENT_USAGE_PARENT_SESSION_ID_METADATA: &str =
+    "infinitecode_subagent_usage_parent_session_id";
 const SUBAGENT_USAGE_PARENT_TURN_ID_METADATA: &str = "infinitecode_subagent_usage_parent_turn_id";
 
 pub(super) fn subagent_usage_owner_pending_metadata(
@@ -351,10 +355,18 @@ fn safety_profile_from_protocol(
     additional_directories: Vec<std::path::PathBuf>,
 ) -> infinitecode_safety::RuntimePermissionProfile {
     let preset = match preset {
-        infinitecode_protocol::PermissionPreset::ReadOnly => infinitecode_safety::PermissionPreset::ReadOnly,
-        infinitecode_protocol::PermissionPreset::Default => infinitecode_safety::PermissionPreset::Default,
-        infinitecode_protocol::PermissionPreset::AutoReview => infinitecode_safety::PermissionPreset::AutoReview,
-        infinitecode_protocol::PermissionPreset::FullAccess => infinitecode_safety::PermissionPreset::FullAccess,
+        infinitecode_protocol::PermissionPreset::ReadOnly => {
+            infinitecode_safety::PermissionPreset::ReadOnly
+        }
+        infinitecode_protocol::PermissionPreset::Default => {
+            infinitecode_safety::PermissionPreset::Default
+        }
+        infinitecode_protocol::PermissionPreset::AutoReview => {
+            infinitecode_safety::PermissionPreset::AutoReview
+        }
+        infinitecode_protocol::PermissionPreset::FullAccess => {
+            infinitecode_safety::PermissionPreset::FullAccess
+        }
     };
     infinitecode_safety::RuntimePermissionProfile::from_preset(preset, cwd)
         .with_additional_roots(additional_directories)
@@ -364,7 +376,11 @@ fn protocol_reviewer_from_safety(
     reviewer: infinitecode_safety::ApprovalsReviewer,
 ) -> infinitecode_protocol::ApprovalsReviewer {
     match reviewer {
-        infinitecode_safety::ApprovalsReviewer::User => infinitecode_protocol::ApprovalsReviewer::User,
-        infinitecode_safety::ApprovalsReviewer::AutoReview => infinitecode_protocol::ApprovalsReviewer::AutoReview,
+        infinitecode_safety::ApprovalsReviewer::User => {
+            infinitecode_protocol::ApprovalsReviewer::User
+        }
+        infinitecode_safety::ApprovalsReviewer::AutoReview => {
+            infinitecode_protocol::ApprovalsReviewer::AutoReview
+        }
     }
 }

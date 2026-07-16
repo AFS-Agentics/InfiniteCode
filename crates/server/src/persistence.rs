@@ -2396,7 +2396,9 @@ mod tests {
             .append_title_update(
                 &record,
                 "Canonical rollout title".into(),
-                SessionTitleState::Final(infinitecode_core::SessionTitleFinalSource::ModelGenerated),
+                SessionTitleState::Final(
+                    infinitecode_core::SessionTitleFinalSource::ModelGenerated,
+                ),
                 None,
             )
             .expect("append title update");

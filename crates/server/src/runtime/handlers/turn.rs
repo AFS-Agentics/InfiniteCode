@@ -893,7 +893,9 @@ impl ServerRuntime {
             };
             let display_input = match &queue[index].kind {
                 infinitecode_core::PendingInputKind::UserText { text } => text.clone(),
-                infinitecode_core::PendingInputKind::UserInput { display_text, .. } => display_text.clone(),
+                infinitecode_core::PendingInputKind::UserInput { display_text, .. } => {
+                    display_text.clone()
+                }
                 _ => {
                     return self.error_response(
                         request_id,

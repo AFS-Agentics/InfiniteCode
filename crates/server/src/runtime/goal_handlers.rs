@@ -186,16 +186,17 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: infinitecode_protocol::GoalSetStatusParams = match serde_json::from_value(params) {
-            Ok(p) => p,
-            Err(e) => {
-                return self.error_response(
-                    request_id,
-                    ProtocolErrorCode::InvalidParams,
-                    format!("invalid goal/pause params: {e}"),
-                );
-            }
-        };
+        let params: infinitecode_protocol::GoalSetStatusParams =
+            match serde_json::from_value(params) {
+                Ok(p) => p,
+                Err(e) => {
+                    return self.error_response(
+                        request_id,
+                        ProtocolErrorCode::InvalidParams,
+                        format!("invalid goal/pause params: {e}"),
+                    );
+                }
+            };
 
         let mut stores = self.goal_stores.lock().await;
         let Some(store) = stores.get_mut(&params.session_id) else {
@@ -270,16 +271,17 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: infinitecode_protocol::GoalSetStatusParams = match serde_json::from_value(params) {
-            Ok(p) => p,
-            Err(e) => {
-                return self.error_response(
-                    request_id,
-                    ProtocolErrorCode::InvalidParams,
-                    format!("invalid goal/resume params: {e}"),
-                );
-            }
-        };
+        let params: infinitecode_protocol::GoalSetStatusParams =
+            match serde_json::from_value(params) {
+                Ok(p) => p,
+                Err(e) => {
+                    return self.error_response(
+                        request_id,
+                        ProtocolErrorCode::InvalidParams,
+                        format!("invalid goal/resume params: {e}"),
+                    );
+                }
+            };
         let session_id = params.session_id;
 
         let mut stores = self.goal_stores.lock().await;
@@ -334,16 +336,17 @@ impl ServerRuntime {
         request_id: serde_json::Value,
         params: serde_json::Value,
     ) -> serde_json::Value {
-        let params: infinitecode_protocol::GoalSetStatusParams = match serde_json::from_value(params) {
-            Ok(p) => p,
-            Err(e) => {
-                return self.error_response(
-                    request_id,
-                    ProtocolErrorCode::InvalidParams,
-                    format!("invalid goal/complete params: {e}"),
-                );
-            }
-        };
+        let params: infinitecode_protocol::GoalSetStatusParams =
+            match serde_json::from_value(params) {
+                Ok(p) => p,
+                Err(e) => {
+                    return self.error_response(
+                        request_id,
+                        ProtocolErrorCode::InvalidParams,
+                        format!("invalid goal/complete params: {e}"),
+                    );
+                }
+            };
 
         let mut stores = self.goal_stores.lock().await;
         let Some(store) = stores.get_mut(&params.session_id) else {

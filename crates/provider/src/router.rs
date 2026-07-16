@@ -3,8 +3,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use infinitecode_protocol::{ModelRequest, ProviderWireApi, StreamEvent};
 use futures::Stream;
+use infinitecode_protocol::{ModelRequest, ProviderWireApi, StreamEvent};
 
 use crate::error::ProviderError;
 use crate::provider::ModelProviderSDK;
@@ -188,11 +188,11 @@ mod tests {
     use std::sync::Mutex;
 
     use async_trait::async_trait;
+    use futures::stream;
     use infinitecode_protocol::{
         ModelResponse, RequestContent, RequestMessage, ResponseContent, ResponseMetadata,
         StopReason, Usage,
     };
-    use futures::stream;
     use pretty_assertions::assert_eq;
 
     use super::*;

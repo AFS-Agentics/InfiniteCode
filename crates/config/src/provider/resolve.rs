@@ -147,7 +147,8 @@ pub fn resolve_provider_settings_from_config_and_auth(
     }
 
     Err(ProviderConfigError::Validation {
-        message: "No provider configured. Run `infinitecode onboard` to complete setup.".to_string(),
+        message: "No provider configured. Run `infinitecode onboard` to complete setup."
+            .to_string(),
     })
 }
 

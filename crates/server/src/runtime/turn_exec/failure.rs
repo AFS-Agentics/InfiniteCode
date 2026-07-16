@@ -5,14 +5,18 @@ pub(super) fn turn_failure_reason_from_error(
     error: &infinitecode_core::AgentError,
 ) -> Option<TurnFailureReason> {
     match error {
-        infinitecode_core::AgentError::MaxTurnsExceeded(_) => Some(TurnFailureReason::MaxTurnRequests),
+        infinitecode_core::AgentError::MaxTurnsExceeded(_) => {
+            Some(TurnFailureReason::MaxTurnRequests)
+        }
         infinitecode_core::AgentError::Provider(_)
         | infinitecode_core::AgentError::ContextTooLong
         | infinitecode_core::AgentError::Aborted => None,
     }
 }
 
-pub(super) fn turn_error_payload_from_error(error: &infinitecode_core::AgentError) -> TurnErrorPayload {
+pub(super) fn turn_error_payload_from_error(
+    error: &infinitecode_core::AgentError,
+) -> TurnErrorPayload {
     let code = match error {
         infinitecode_core::AgentError::Provider(source) => source
             .chain()

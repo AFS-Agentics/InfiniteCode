@@ -5,6 +5,8 @@ use std::sync::Arc;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::Stream;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
 use infinitecode_core::FileSystemSkillCatalog;
@@ -23,8 +25,6 @@ use infinitecode_protocol::StreamEvent;
 use infinitecode_protocol::Usage;
 use infinitecode_provider::ModelProviderSDK;
 use infinitecode_provider::SingleProviderRouter;
-use futures::Stream;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -341,8 +341,9 @@ async fn list_sessions(
         )
         .await
         .context("session/list response")?;
-    let response: infinitecode_server::AcpSuccessResponse<infinitecode_server::AcpListSessionsResult> =
-        serde_json::from_value(response)?;
+    let response: infinitecode_server::AcpSuccessResponse<
+        infinitecode_server::AcpListSessionsResult,
+    > = serde_json::from_value(response)?;
     response
         .result
         .sessions

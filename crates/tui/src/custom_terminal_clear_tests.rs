@@ -16,7 +16,8 @@ fn clear_managed_inline_area_preserves_rows_above_infinitecode() {
     let mut term = Terminal::with_options(backend).expect("terminal");
     term.set_viewport_area(Rect::new(0, 2, width, 2));
 
-    insert_history_lines(&mut term, vec![Line::from("infinitecode line").into()]).expect("insert history");
+    insert_history_lines(&mut term, vec![Line::from("infinitecode line").into()])
+        .expect("insert history");
     let rows_before: Vec<String> = term.backend().vt100().screen().rows(0, width).collect();
     let infinitecode_row = rows_before
         .iter()
@@ -33,7 +34,9 @@ fn clear_managed_inline_area_preserves_rows_above_infinitecode() {
     assert_eq!(2, term.viewport_area.y);
     assert_eq!("", rows_after[2].trim_end());
     assert!(
-        rows_after.iter().all(|row| !row.contains("infinitecode line")),
+        rows_after
+            .iter()
+            .all(|row| !row.contains("infinitecode line")),
         "expected infinitecode-managed rows to be cleared, rows: {rows_after:?}"
     );
 }

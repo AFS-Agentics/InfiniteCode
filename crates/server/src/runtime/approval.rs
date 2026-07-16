@@ -130,8 +130,12 @@ impl ServerRuntime {
             serde_json::json!(request.tool_call_id),
         );
         extra.insert("reason".to_string(), serde_json::json!(reason));
-        self.run_session_hook(session_id, infinitecode_core::HookEvent::PermissionDenied, extra)
-            .await;
+        self.run_session_hook(
+            session_id,
+            infinitecode_core::HookEvent::PermissionDenied,
+            extra,
+        )
+        .await;
     }
 
     async fn auto_review_tool_request(
@@ -549,7 +553,9 @@ fn acp_request_permission_params(
     }
 }
 
-fn acp_permission_options_for_scopes(scopes: &[String]) -> Vec<infinitecode_protocol::AcpPermissionOption> {
+fn acp_permission_options_for_scopes(
+    scopes: &[String],
+) -> Vec<infinitecode_protocol::AcpPermissionOption> {
     let mut options = vec![infinitecode_protocol::AcpPermissionOption {
         option_id: "allow_once".to_string(),
         name: "Allow once".to_string(),
@@ -589,7 +595,9 @@ fn approval_decision_from_acp_outcome(
     outcome: infinitecode_protocol::AcpPermissionOutcome,
 ) -> Result<(ApprovalDecisionValue, ApprovalScopeValue), String> {
     match outcome {
-        infinitecode_protocol::AcpPermissionOutcome::Selected { option_id } => match option_id.as_str() {
+        infinitecode_protocol::AcpPermissionOutcome::Selected { option_id } => match option_id
+            .as_str()
+        {
             "allow_once" => Ok((ApprovalDecisionValue::Approve, ApprovalScopeValue::Once)),
             "allow_session" => Ok((ApprovalDecisionValue::Approve, ApprovalScopeValue::Session)),
             "reject_once" => Ok((ApprovalDecisionValue::Deny, ApprovalScopeValue::Once)),

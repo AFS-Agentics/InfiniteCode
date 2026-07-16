@@ -5,6 +5,7 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::FileSystemSkillCatalog;
 use infinitecode_core::PresetModelCatalog;
@@ -25,7 +26,6 @@ use infinitecode_server::ServerRuntime;
 use infinitecode_server::ServerRuntimeDependencies;
 use infinitecode_server::WebSocketServerClient;
 use infinitecode_server::WebSocketServerClientConfig;
-use futures::stream;
 use tempfile::TempDir;
 use tokio::time::timeout;
 
@@ -77,10 +77,9 @@ async fn websocket_server_client_drives_listener_session_and_notifications() -> 
         ),
     );
     let listen = vec![format!("ws://{bind_address}")];
-    let listener_task =
-        tokio::spawn(
-            async move { infinitecode_server::run_listeners(Arc::clone(&runtime), &listen).await },
-        );
+    let listener_task = tokio::spawn(async move {
+        infinitecode_server::run_listeners(Arc::clone(&runtime), &listen).await
+    });
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     let mut client = WebSocketServerClient::connect(WebSocketServerClientConfig {

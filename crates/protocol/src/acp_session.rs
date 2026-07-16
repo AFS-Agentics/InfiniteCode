@@ -214,8 +214,10 @@ mod tests {
             serde_json::json!(["/workspace/shared"])
         );
         assert_eq!(
-            serde_json::from_value::<SessionMetadata>(json["_meta"][INFINITECODE_SESSION_META].clone())
-                .expect("decode InfiniteCode session metadata"),
+            serde_json::from_value::<SessionMetadata>(
+                json["_meta"][INFINITECODE_SESSION_META].clone()
+            )
+            .expect("decode InfiniteCode session metadata"),
             session
         );
     }

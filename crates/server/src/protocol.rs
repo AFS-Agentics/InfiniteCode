@@ -28,7 +28,7 @@ pub use infinitecode_protocol::{
     AcpToolCallStatus, AcpToolKind, AcpUnsupportedMcpServer, AgentInfo, AgentListParams,
     AgentListResult, AgentMailboxMessage, AgentMessageParams, AgentMessageResult, AgentOutputEvent,
     AgentStatusParams, ClientMethod, ClientNotification, ClientRequest, CloseAgentParams,
-    CloseAgentResult, INFINITECODE_SESSION_META, INFINITECODE_SESSION_RESUME_META, ErrorResponse,
+    CloseAgentResult, ErrorResponse, INFINITECODE_SESSION_META, INFINITECODE_SESSION_RESUME_META,
     MessageEditPreviousParams, MessageEditPreviousResult, MessageEditWorkspaceRestorePolicy,
     ModelCatalogEntry, ModelCatalogParams, ModelCatalogResult, ModelConfigParams,
     ModelConfigResult, ModelSavedEntry, ModelSavedParams, ModelSavedResult, NotificationEnvelope,

@@ -10,7 +10,8 @@ use serde::Serialize;
 
 use crate::UpdatesConfig;
 
-const RELEASES_LATEST_URL: &str = "https://api.github.com/repos/AFS-Agentics/InfiniteCode/releases/latest";
+const RELEASES_LATEST_URL: &str =
+    "https://api.github.com/repos/AFS-Agentics/InfiniteCode/releases/latest";
 const UPDATE_CACHE_FILE_NAME: &str = "update-check.json";
 const UPGRADE_COMMAND: &str = "infinitecode upgrade";
 
@@ -271,7 +272,8 @@ mod tests {
             UpdateCheckCache {
                 last_checked_at: chrono::Utc::now(),
                 latest_version: "v0.1.4".into(),
-                release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.4".into(),
+                release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.4"
+                    .into(),
                 published_at: None,
                 last_error: None,
             },
@@ -283,7 +285,8 @@ mod tests {
             UpdateCheckOutcome::UpdateAvailable(super::UpdateNotification {
                 current_version: "0.1.3".into(),
                 latest_version: "v0.1.4".into(),
-                release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.4".into(),
+                release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.4"
+                    .into(),
                 published_at: None,
                 upgrade_command: "infinitecode upgrade",
             })
@@ -297,7 +300,8 @@ mod tests {
             UpdateCheckCache {
                 last_checked_at: chrono::Utc::now(),
                 latest_version: "v0.1.3".into(),
-                release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.3".into(),
+                release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/tag/v0.1.3"
+                    .into(),
                 published_at: None,
                 last_error: None,
             },
@@ -315,7 +319,8 @@ mod tests {
                 UpdateCheckCache {
                     last_checked_at: chrono::Utc::now(),
                     latest_version: "latest".into(),
-                    release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/latest".into(),
+                    release_url: "https://github.com/AFS-Agentics/InfiniteCode/releases/latest"
+                        .into(),
                     published_at: None,
                     last_error: None,
                 },

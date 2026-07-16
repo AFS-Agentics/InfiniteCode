@@ -4,6 +4,8 @@ use std::sync::Mutex;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::Stream;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
 use infinitecode_core::FileSystemSkillCatalog;
@@ -27,8 +29,6 @@ use infinitecode_provider::ModelProviderSDK;
 use infinitecode_provider::ProviderRoute;
 use infinitecode_provider::ProviderRouter;
 use infinitecode_provider::error::ProviderError;
-use futures::Stream;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -689,9 +689,8 @@ async fn update_session_model(
         .context("session/metadata/update response")?;
     let response_value = response.clone();
     let _: infinitecode_server::SuccessResponse<infinitecode_server::SessionMetadataUpdateResult> =
-        serde_json::from_value(response).with_context(|| {
-            format!("decode session/metadata/update response: {response_value}")
-        })?;
+        serde_json::from_value(response)
+            .with_context(|| format!("decode session/metadata/update response: {response_value}"))?;
     Ok(())
 }
 

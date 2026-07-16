@@ -5,6 +5,8 @@ use std::sync::Mutex;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::Stream;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
 use infinitecode_core::FileSystemSkillCatalog;
@@ -23,8 +25,6 @@ use infinitecode_provider::ModelProviderSDK;
 use infinitecode_provider::ProviderRouter;
 use infinitecode_provider::SingleProviderRouter;
 use infinitecode_provider::error::ProviderError;
-use futures::Stream;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -268,7 +268,9 @@ fn build_runtime(
     Arc<infinitecode_server::ServerRuntime>,
     Arc<infinitecode_server::db::Database>,
 )> {
-    let db = Arc::new(infinitecode_server::db::Database::open(data_root.join(db_name))?);
+    let db = Arc::new(infinitecode_server::db::Database::open(
+        data_root.join(db_name),
+    )?);
     let runtime = infinitecode_server::ServerRuntime::new(
         data_root.to_path_buf(),
         infinitecode_server::ServerRuntimeDependencies::new(
@@ -298,7 +300,10 @@ async fn initialize_connection(
 ) -> Result<(u64, mpsc::Receiver<serde_json::Value>)> {
     let (notifications_tx, notifications_rx) = infinitecode_server::test_outbound_channel(4096);
     let connection_id = runtime
-        .register_connection(infinitecode_server::ClientTransportKind::Stdio, notifications_tx)
+        .register_connection(
+            infinitecode_server::ClientTransportKind::Stdio,
+            notifications_tx,
+        )
         .await;
     let initialize_response = runtime
         .handle_incoming(

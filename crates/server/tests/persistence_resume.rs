@@ -7,11 +7,11 @@ use std::task;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::stream::Stream;
+use futures::stream::{self};
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
 use infinitecode_core::ProviderVendorCatalog;
-use futures::stream::Stream;
-use futures::stream::{self};
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -488,7 +488,9 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
     );
     assert_eq!(
         completed_result.session.title_state,
-        infinitecode_core::SessionTitleState::Final(infinitecode_core::SessionTitleFinalSource::ModelGenerated)
+        infinitecode_core::SessionTitleState::Final(
+            infinitecode_core::SessionTitleFinalSource::ModelGenerated
+        )
     );
 
     let rename_response = runtime
@@ -515,7 +517,9 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
     );
     assert_eq!(
         rename_result.session.title_state,
-        infinitecode_core::SessionTitleState::Final(infinitecode_core::SessionTitleFinalSource::UserRename)
+        infinitecode_core::SessionTitleState::Final(
+            infinitecode_core::SessionTitleFinalSource::UserRename
+        )
     );
 
     let rebuilt_runtime = build_runtime(data_root.path())?;
@@ -545,7 +549,9 @@ async fn runtime_generates_final_title_and_persists_explicit_rename() -> Result<
     );
     assert_eq!(
         rebuilt_result.session.title_state,
-        infinitecode_core::SessionTitleState::Final(infinitecode_core::SessionTitleFinalSource::UserRename)
+        infinitecode_core::SessionTitleState::Final(
+            infinitecode_core::SessionTitleFinalSource::UserRename
+        )
     );
     Ok(())
 }
@@ -1642,7 +1648,8 @@ fn build_runtime_with_provider(
     provider: Arc<dyn ModelProviderSDK>,
 ) -> Result<Arc<ServerRuntime>> {
     let db_path = data_root.join("test_persistence.db");
-    let db = Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
+    let db =
+        Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
     Ok(ServerRuntime::new(
         data_root.to_path_buf(),
         ServerRuntimeDependencies::new(
@@ -1718,8 +1725,9 @@ async fn initialize_connection(
 fn decode_acp_session_list_response(
     response: serde_json::Value,
 ) -> Result<Vec<infinitecode_server::SessionMetadata>> {
-    let response: infinitecode_server::AcpSuccessResponse<infinitecode_server::AcpListSessionsResult> =
-        serde_json::from_value(response)?;
+    let response: infinitecode_server::AcpSuccessResponse<
+        infinitecode_server::AcpListSessionsResult,
+    > = serde_json::from_value(response)?;
     response
         .result
         .sessions
@@ -1747,12 +1755,13 @@ fn legacy_event_from_acp_notification(value: serde_json::Value) -> serde_json::V
     if value.get("method") != Some(&serde_json::json!("session/update")) {
         return value;
     }
-    let Ok(notification) =
-        serde_json::from_value::<infinitecode_protocol::AcpSessionNotification>(value["params"].clone())
-    else {
+    let Ok(notification) = serde_json::from_value::<infinitecode_protocol::AcpSessionNotification>(
+        value["params"].clone(),
+    ) else {
         return value;
     };
-    let Some((method, event)) = infinitecode_protocol::original_event_from_acp_notification(&notification)
+    let Some((method, event)) =
+        infinitecode_protocol::original_event_from_acp_notification(&notification)
     else {
         return value;
     };
@@ -1984,8 +1993,9 @@ async fn interrupt_mid_stream_does_not_duplicate_last_item_on_resume() -> Result
         )
         .await
         .context("turn/interrupt")?;
-    let interrupt_result: infinitecode_server::SuccessResponse<infinitecode_server::TurnInterruptResult> =
-        serde_json::from_value(interrupt_response)?;
+    let interrupt_result: infinitecode_server::SuccessResponse<
+        infinitecode_server::TurnInterruptResult,
+    > = serde_json::from_value(interrupt_response)?;
     assert_eq!(interrupt_result.result.status, TurnStatus::Interrupted);
 
     // The server broadcasts both turn/interrupted and turn/completed.

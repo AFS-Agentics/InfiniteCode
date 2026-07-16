@@ -94,7 +94,10 @@ fn format_with_separators(value: usize) -> String {
     out
 }
 
-fn format_token_usage_line(exit: &infinitecode_tui::AppExit, color_enabled: bool) -> Option<String> {
+fn format_token_usage_line(
+    exit: &infinitecode_tui::AppExit,
+    color_enabled: bool,
+) -> Option<String> {
     let total = exit.total_tokens;
     let non_cached_input = exit
         .total_input_tokens
@@ -424,7 +427,8 @@ mod tests {
             ("warn", LevelFilter::WARN),
             ("error", LevelFilter::ERROR),
         ] {
-            let cli = Cli::try_parse_from(["infinitecode", "--log-level", level]).expect("parse log level");
+            let cli = Cli::try_parse_from(["infinitecode", "--log-level", level])
+                .expect("parse log level");
 
             assert!(cli.command.is_none());
             assert_eq!(cli.log_level, Some(expected));
@@ -451,8 +455,9 @@ mod tests {
     #[test]
     fn cli_parses_yolo_alias_on_resume_subcommand() {
         let session_id = SessionId::new();
-        let cli = Cli::try_parse_from(["infinitecode", "resume", &session_id.to_string(), "--yolo"])
-            .expect("parse resume with yolo");
+        let cli =
+            Cli::try_parse_from(["infinitecode", "resume", &session_id.to_string(), "--yolo"])
+                .expect("parse resume with yolo");
 
         assert!(matches!(cli.command, Some(Command::Resume { .. })));
         assert!(cli.dangerously_skip_permissions);
@@ -460,7 +465,8 @@ mod tests {
 
     #[test]
     fn cli_rejects_unsupported_log_levels() {
-        let err = Cli::try_parse_from(["infinitecode", "--log-level", "off"]).expect_err("reject off");
+        let err =
+            Cli::try_parse_from(["infinitecode", "--log-level", "off"]).expect_err("reject off");
 
         assert_eq!(err.kind(), clap::error::ErrorKind::InvalidValue);
     }
@@ -567,8 +573,8 @@ mod tests {
     #[test]
     fn cli_parses_resume_subcommand() {
         let session_id = SessionId::new();
-        let cli =
-            Cli::try_parse_from(["infinitecode", "resume", &session_id.to_string()]).expect("parse resume");
+        let cli = Cli::try_parse_from(["infinitecode", "resume", &session_id.to_string()])
+            .expect("parse resume");
 
         match cli.command {
             Some(Command::Resume { session_id: actual }) => assert_eq!(actual, session_id),
@@ -578,8 +584,8 @@ mod tests {
 
     #[test]
     fn cli_parses_prompt_jsonl_output_format() {
-        let cli =
-            Cli::try_parse_from(["infinitecode", "prompt", "--format", "jsonl", "hello"]).expect("parse");
+        let cli = Cli::try_parse_from(["infinitecode", "prompt", "--format", "jsonl", "hello"])
+            .expect("parse");
 
         match cli.command {
             Some(Command::Prompt { input, format }) => {
@@ -602,7 +608,8 @@ mod tests {
 
     #[test]
     fn cli_parses_server_status_and_shutdown_flags() {
-        let status = Cli::try_parse_from(["infinitecode", "server", "--status"]).expect("parse status");
+        let status =
+            Cli::try_parse_from(["infinitecode", "server", "--status"]).expect("parse status");
         let shutdown =
             Cli::try_parse_from(["infinitecode", "server", "--shutdown"]).expect("parse shutdown");
 
@@ -637,7 +644,10 @@ mod tests {
 
         match cli.command {
             Some(Command::Server { transport, .. }) => {
-                assert_eq!(transport, infinitecode_server::ServerTransportMode::WebSocket);
+                assert_eq!(
+                    transport,
+                    infinitecode_server::ServerTransportMode::WebSocket
+                );
             }
             other => panic!("expected server command, got {other:?}"),
         }
@@ -645,8 +655,8 @@ mod tests {
 
     #[test]
     fn server_process_args_from_cli_extracts_stdio_server_command() {
-        let cli =
-            Cli::try_parse_from(["infinitecode", "server", "--transport", "stdio"]).expect("parse server");
+        let cli = Cli::try_parse_from(["infinitecode", "server", "--transport", "stdio"])
+            .expect("parse server");
 
         assert_eq!(
             super::server_process_args_from_cli(&cli),
@@ -660,8 +670,9 @@ mod tests {
 
     #[test]
     fn server_process_args_from_cli_preserves_global_log_level_parse() {
-        let cli = Cli::try_parse_from(["infinitecode", "--log-level", "debug", "server", "--status"])
-            .expect("parse server");
+        let cli =
+            Cli::try_parse_from(["infinitecode", "--log-level", "debug", "server", "--status"])
+                .expect("parse server");
 
         assert_eq!(cli.log_level, Some(LevelFilter::DEBUG));
         assert_eq!(
@@ -767,7 +778,12 @@ mod tests {
                 "  infinitecode".to_string(),
             ]
         );
-        assert_eq!(lines.iter().any(|line| line.contains("infinitecode resume")), false);
+        assert_eq!(
+            lines
+                .iter()
+                .any(|line| line.contains("infinitecode resume")),
+            false
+        );
     }
 
     #[test]

@@ -221,17 +221,17 @@ impl ServerRuntime {
             edited_mentions,
             workspace_restore_policy,
         );
-        let [first_record, second_record]: [infinitecode_core::DurableRecord; 2] = match records.try_into()
-        {
-            Ok(records) => records,
-            Err(_) => {
-                return self.error_response(
-                    request_id,
-                    ProtocolErrorCode::InternalError,
-                    "message/editPrevious did not create the expected durable records",
-                );
-            }
-        };
+        let [first_record, second_record]: [infinitecode_core::DurableRecord; 2] =
+            match records.try_into() {
+                Ok(records) => records,
+                Err(_) => {
+                    return self.error_response(
+                        request_id,
+                        ProtocolErrorCode::InternalError,
+                        "message/editPrevious did not create the expected durable records",
+                    );
+                }
+            };
         let (
             infinitecode_core::DurableRecord::MessageEditRecorded(mut edit_record),
             infinitecode_core::DurableRecord::TurnSuperseded(mut superseded_record),
@@ -244,30 +244,32 @@ impl ServerRuntime {
             );
         };
         edit_record.requested_by_client_id = params.client_edit_id.clone();
-        let restore_plan = if workspace_restore_policy == infinitecode_core::WorkspaceRestorePolicy::Skip {
-            None
-        } else {
-            let restore_candidates =
-                discover_restore_candidates(&target_turn_items, target_turn_id);
-            let restore_candidate_files = candidate_files(&restore_candidates);
-            let (restore_record, restore_id) = infinitecode_core::plan_workspace_restore(
-                params.session_id,
-                target_turn_id,
-                restore_candidate_files,
-                workspace_restore_policy,
-            );
-            let infinitecode_core::DurableRecord::TurnWorkspaceRestoreStarted(restore_started_record) =
-                restore_record
-            else {
-                return self.error_response(
-                    request_id,
-                    ProtocolErrorCode::InternalError,
-                    "message/editPrevious created unexpected workspace restore record",
+        let restore_plan =
+            if workspace_restore_policy == infinitecode_core::WorkspaceRestorePolicy::Skip {
+                None
+            } else {
+                let restore_candidates =
+                    discover_restore_candidates(&target_turn_items, target_turn_id);
+                let restore_candidate_files = candidate_files(&restore_candidates);
+                let (restore_record, restore_id) = infinitecode_core::plan_workspace_restore(
+                    params.session_id,
+                    target_turn_id,
+                    restore_candidate_files,
+                    workspace_restore_policy,
                 );
+                let infinitecode_core::DurableRecord::TurnWorkspaceRestoreStarted(
+                    restore_started_record,
+                ) = restore_record
+                else {
+                    return self.error_response(
+                        request_id,
+                        ProtocolErrorCode::InternalError,
+                        "message/editPrevious created unexpected workspace restore record",
+                    );
+                };
+                superseded_record.restore_id = Some(restore_id);
+                Some((restore_started_record, restore_candidates))
             };
-            superseded_record.restore_id = Some(restore_id);
-            Some((restore_started_record, restore_candidates))
-        };
         let replacement_turn_id = superseded_record.replacement_turn_id;
         let now = Utc::now();
         let replacement_turn = TurnMetadata {
@@ -308,59 +310,59 @@ impl ServerRuntime {
                 format!("failed to persist turn superseded record: {error}"),
             );
         }
-        let restore_event_payloads = if let Some((restore_started_record, restore_candidates)) =
-            restore_plan
-        {
-            if let Err(error) = self
-                .rollout_store
-                .append_workspace_restore_started(&record, restore_started_record.clone())
-            {
-                return self.error_response(
-                    request_id,
-                    ProtocolErrorCode::WorkspaceRestoreFailedToStart,
-                    format!("failed to persist workspace restore start: {error}"),
+        let restore_event_payloads =
+            if let Some((restore_started_record, restore_candidates)) = restore_plan {
+                if let Err(error) = self
+                    .rollout_store
+                    .append_workspace_restore_started(&record, restore_started_record.clone())
+                {
+                    return self.error_response(
+                        request_id,
+                        ProtocolErrorCode::WorkspaceRestoreFailedToStart,
+                        format!("failed to persist workspace restore start: {error}"),
+                    );
+                }
+                let restore_outcomes =
+                    apply_safe_workspace_restore(&workspace_root, &restore_candidates).await;
+                let restore_completed_record = infinitecode_core::complete_workspace_restore(
+                    params.session_id,
+                    restore_started_record.restore_id,
+                    restore_outcomes,
                 );
-            }
-            let restore_outcomes =
-                apply_safe_workspace_restore(&workspace_root, &restore_candidates).await;
-            let restore_completed_record = infinitecode_core::complete_workspace_restore(
-                params.session_id,
-                restore_started_record.restore_id,
-                restore_outcomes,
-            );
-            let infinitecode_core::DurableRecord::TurnWorkspaceRestoreCompleted(restore_completed_record) =
-                restore_completed_record
-            else {
-                return self.error_response(
-                    request_id,
-                    ProtocolErrorCode::InternalError,
-                    "message/editPrevious created unexpected workspace restore completion",
-                );
+                let infinitecode_core::DurableRecord::TurnWorkspaceRestoreCompleted(
+                    restore_completed_record,
+                ) = restore_completed_record
+                else {
+                    return self.error_response(
+                        request_id,
+                        ProtocolErrorCode::InternalError,
+                        "message/editPrevious created unexpected workspace restore completion",
+                    );
+                };
+                if let Err(error) = self
+                    .rollout_store
+                    .append_workspace_restore_completed(&record, restore_completed_record.clone())
+                {
+                    return self.error_response(
+                        request_id,
+                        ProtocolErrorCode::InternalError,
+                        format!("failed to persist workspace restore completion: {error}"),
+                    );
+                }
+                Some((
+                    restore_started_payload(
+                        &restore_started_record,
+                        &edit_record.edit_id.0.to_string(),
+                    ),
+                    restore_completed_payload(
+                        &restore_completed_record,
+                        &edit_record.edit_id.0.to_string(),
+                        superseded_record.superseded_turn_id,
+                    ),
+                ))
+            } else {
+                None
             };
-            if let Err(error) = self
-                .rollout_store
-                .append_workspace_restore_completed(&record, restore_completed_record.clone())
-            {
-                return self.error_response(
-                    request_id,
-                    ProtocolErrorCode::InternalError,
-                    format!("failed to persist workspace restore completion: {error}"),
-                );
-            }
-            Some((
-                restore_started_payload(
-                    &restore_started_record,
-                    &edit_record.edit_id.0.to_string(),
-                ),
-                restore_completed_payload(
-                    &restore_completed_record,
-                    &edit_record.edit_id.0.to_string(),
-                    superseded_record.superseded_turn_id,
-                ),
-            ))
-        } else {
-            None
-        };
         if let Err(error) = self
             .persist_turn_line_deduped(params.session_id, &replacement_turn)
             .await

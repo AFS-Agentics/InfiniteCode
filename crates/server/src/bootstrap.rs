@@ -341,7 +341,8 @@ mod tests {
 
     #[test]
     fn server_process_args_accept_websocket_transport_override() {
-        let args = ServerProcessArgs::parse_from(["infinitecode-server", "--transport", "websocket"]);
+        let args =
+            ServerProcessArgs::parse_from(["infinitecode-server", "--transport", "websocket"]);
 
         assert_eq!(args.transport, ServerTransportMode::WebSocket);
         assert_eq!(
@@ -382,8 +383,9 @@ mod tests {
 
     #[test]
     fn server_process_args_reject_working_root() {
-        let error = ServerProcessArgs::try_parse_from(["infinitecode-server", "--working-root", "."])
-            .expect_err("working root is no longer a server bootstrap parameter");
+        let error =
+            ServerProcessArgs::try_parse_from(["infinitecode-server", "--working-root", "."])
+                .expect_err("working root is no longer a server bootstrap parameter");
 
         assert_eq!(error.kind(), clap::error::ErrorKind::UnknownArgument);
     }

@@ -245,9 +245,9 @@ impl ToolHandler for AgentToolHandler {
                     .await_task(
                         session_id,
                         &input.task_id,
-                        std::time::Duration::from_secs(infinitecode_protocol::resolve_wait_agent_timeout(
-                            input.timeout_secs,
-                        )),
+                        std::time::Duration::from_secs(
+                            infinitecode_protocol::resolve_wait_agent_timeout(input.timeout_secs),
+                        ),
                     )
                     .await
                 {
@@ -292,7 +292,10 @@ impl ToolHandler for AgentToolHandler {
                     .cancel(session_id, &input.task_id)
                     .await
                 {
-                    return json_result(infinitecode_protocol::CancelTaskResult { task }, "task canceled");
+                    return json_result(
+                        infinitecode_protocol::CancelTaskResult { task },
+                        "task canceled",
+                    );
                 }
                 if input.task_id.0.starts_with("task-") {
                     return Err(ToolCallError::InvalidInput(format!(

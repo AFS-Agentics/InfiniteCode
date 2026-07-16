@@ -256,8 +256,11 @@ fn install_server_logging_for_dispatch() -> Option<infinitecode_core::LoggingRun
 async fn run_server_dispatch() {
     let args = parse_server_dispatch_args();
     let _logging = install_server_logging_for_dispatch();
-    if let Err(err) =
-        infinitecode_server::run_server_process(args, infinitecode_server::ServerProcessRunOptions::default()).await
+    if let Err(err) = infinitecode_server::run_server_process(
+        args,
+        infinitecode_server::ServerProcessRunOptions::default(),
+    )
+    .await
     {
         eprintln!("server error: {err}");
         std::process::exit(1);

@@ -794,7 +794,10 @@ fn register_infinitecode_protocol_schemas(
         methods,
         ClientMethod::SessionTitleUpdate,
     );
-    infinitecode_method::<SessionResumeParams, SessionResumeResult>(methods, ClientMethod::SessionResume);
+    infinitecode_method::<SessionResumeParams, SessionResumeResult>(
+        methods,
+        ClientMethod::SessionResume,
+    );
     infinitecode_method::<SessionForkParams, SessionForkResult>(methods, ClientMethod::SessionFork);
     infinitecode_method::<SessionRollbackParams, SessionRollbackResult>(
         methods,
@@ -805,14 +808,23 @@ fn register_infinitecode_protocol_schemas(
         ClientMethod::SessionCompact,
     );
     infinitecode_method::<SkillListParams, SkillListResult>(methods, ClientMethod::SkillsList);
-    infinitecode_method::<SkillChangedParams, SkillChangedResult>(methods, ClientMethod::SkillsChanged);
+    infinitecode_method::<SkillChangedParams, SkillChangedResult>(
+        methods,
+        ClientMethod::SkillsChanged,
+    );
     infinitecode_method::<SkillSetEnabledParams, SkillSetEnabledResult>(
         methods,
         ClientMethod::SkillsSetEnabled,
     );
-    infinitecode_method::<ModelCatalogParams, ModelCatalogResult>(methods, ClientMethod::ModelCatalog);
+    infinitecode_method::<ModelCatalogParams, ModelCatalogResult>(
+        methods,
+        ClientMethod::ModelCatalog,
+    );
     infinitecode_method::<ModelConfigParams, ModelConfigResult>(methods, ClientMethod::ModelConfig);
-    infinitecode_method::<ModelConfigSetParams, ModelConfigResult>(methods, ClientMethod::ModelConfigSet);
+    infinitecode_method::<ModelConfigSetParams, ModelConfigResult>(
+        methods,
+        ClientMethod::ModelConfigSet,
+    );
     infinitecode_method::<ModelSavedParams, ModelSavedResult>(methods, ClientMethod::ModelSaved);
     infinitecode_method::<CommandExecParams, CommandExecResult>(methods, ClientMethod::CommandExec);
     infinitecode_method::<CommandExecWriteParams, CommandExecWriteResult>(
@@ -832,8 +844,14 @@ fn register_infinitecode_protocol_schemas(
         ClientMethod::MessageEditPrevious,
     );
     infinitecode_method::<TurnStartParams, TurnStartResult>(methods, ClientMethod::TurnStart);
-    infinitecode_method::<ShellCommandParams, ShellCommandResult>(methods, ClientMethod::TurnShellCommand);
-    infinitecode_method::<TurnInterruptParams, TurnInterruptResult>(methods, ClientMethod::TurnInterrupt);
+    infinitecode_method::<ShellCommandParams, ShellCommandResult>(
+        methods,
+        ClientMethod::TurnShellCommand,
+    );
+    infinitecode_method::<TurnInterruptParams, TurnInterruptResult>(
+        methods,
+        ClientMethod::TurnInterrupt,
+    );
     infinitecode_method::<TurnSteerParams, TurnSteerResult>(methods, ClientMethod::TurnSteer);
     infinitecode_method::<TurnQueueRemoveParams, TurnQueueRemoveResult>(
         methods,
@@ -847,7 +865,10 @@ fn register_infinitecode_protocol_schemas(
         methods,
         ClientMethod::WorkspaceChangesRead,
     );
-    infinitecode_notification::<WorkspaceChangesUpdatedPayload>(methods, "workspace/changes/updated");
+    infinitecode_notification::<WorkspaceChangesUpdatedPayload>(
+        methods,
+        "workspace/changes/updated",
+    );
     infinitecode_request_only::<RequestUserInputRespondParams>(
         methods,
         ClientMethod::RequestUserInputRespond,
@@ -892,7 +913,10 @@ fn register_infinitecode_protocol_schemas(
     infinitecode_method::<GoalClearParams, GoalClearResult>(methods, ClientMethod::GoalClear);
     infinitecode_method::<GoalStatusParams, GoalStatusResult>(methods, ClientMethod::GoalStatus);
     infinitecode_method::<SpawnAgentParams, SpawnAgentResult>(methods, ClientMethod::AgentSpawn);
-    infinitecode_method::<AgentMessageParams, AgentMessageResult>(methods, ClientMethod::AgentSendMessage);
+    infinitecode_method::<AgentMessageParams, AgentMessageResult>(
+        methods,
+        ClientMethod::AgentSendMessage,
+    );
     infinitecode_method::<WaitAgentParams, WaitAgentResult>(methods, ClientMethod::AgentWait);
     infinitecode_method::<AgentListParams, AgentListResult>(methods, ClientMethod::AgentList);
     infinitecode_method::<AgentStatusParams, AgentInfo>(methods, ClientMethod::AgentStatus);

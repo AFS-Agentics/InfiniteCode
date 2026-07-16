@@ -748,7 +748,8 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn exec_command_streams_progress_before_final_output() {
-        let root = std::env::temp_dir().join(format!("infinitecode-exec-stream-{}", Uuid::new_v4()));
+        let root =
+            std::env::temp_dir().join(format!("infinitecode-exec-stream-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).expect("create temp test dir");
         let handler = test_exec_handler();
 
@@ -845,7 +846,8 @@ mod tests {
 
     #[tokio::test]
     async fn exec_command_rejects_raw_apply_patch_body() {
-        let root = std::env::temp_dir().join(format!("infinitecode-apply-patch-{}", Uuid::new_v4()));
+        let root =
+            std::env::temp_dir().join(format!("infinitecode-apply-patch-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).expect("create temp test dir");
         let handler = test_exec_handler();
         let command = "*** Begin Patch\n*** Add File: file.txt\n+hello\n*** End Patch\n";
@@ -874,7 +876,8 @@ mod tests {
 
     #[tokio::test]
     async fn exec_command_intercepts_apply_patch_heredoc() {
-        let root = std::env::temp_dir().join(format!("infinitecode-apply-patch-{}", Uuid::new_v4()));
+        let root =
+            std::env::temp_dir().join(format!("infinitecode-apply-patch-{}", Uuid::new_v4()));
         std::fs::create_dir_all(&root).expect("create temp test dir");
         let handler = test_exec_handler();
         let command = "apply_patch <<'PATCH'\n*** Begin Patch\n*** Add File: file.txt\n+hello\n*** End Patch\nPATCH\n";
@@ -908,7 +911,8 @@ mod tests {
 
     #[tokio::test]
     async fn exec_command_intercepts_apply_patch_after_cd() {
-        let root = std::env::temp_dir().join(format!("infinitecode-apply-patch-{}", Uuid::new_v4()));
+        let root =
+            std::env::temp_dir().join(format!("infinitecode-apply-patch-{}", Uuid::new_v4()));
         let subdir = root.join("sub");
         std::fs::create_dir_all(&subdir).expect("create temp test dir");
         let handler = test_exec_handler();

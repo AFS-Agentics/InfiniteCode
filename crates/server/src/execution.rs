@@ -248,6 +248,7 @@ mod tests {
 
     use anyhow::Result;
     use async_trait::async_trait;
+    use futures::Stream;
     use infinitecode_core::AppConfigStore;
     use infinitecode_core::BundledSkillsConfig;
     use infinitecode_core::FileSystemSkillCatalog;
@@ -264,7 +265,6 @@ mod tests {
     use infinitecode_provider::ModelProviderSDK;
     use infinitecode_provider::ProviderRoute;
     use infinitecode_provider::SingleProviderRouter;
-    use futures::Stream;
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -370,8 +370,10 @@ mod tests {
         let root = unique_temp_dir("session-context-project-models");
         let workspace_a = root.join("workspace-a");
         let workspace_b = root.join("workspace-b");
-        std::fs::create_dir_all(workspace_a.join(".infinitecode")).expect("create workspace a config dir");
-        std::fs::create_dir_all(workspace_b.join(".infinitecode")).expect("create workspace b config dir");
+        std::fs::create_dir_all(workspace_a.join(".infinitecode"))
+            .expect("create workspace a config dir");
+        std::fs::create_dir_all(workspace_b.join(".infinitecode"))
+            .expect("create workspace b config dir");
         std::fs::write(
             workspace_a.join(".infinitecode").join("models.json"),
             r#"[{"slug":"workspace-a-model","display_name":"Workspace A","priority":10000}]"#,
@@ -423,7 +425,8 @@ invocation_method = "openai_chat_completions"
 "#,
         );
         let workspace = unique_temp_dir("session-context-provider-http");
-        std::fs::create_dir_all(workspace.join(".infinitecode")).expect("create workspace config dir");
+        std::fs::create_dir_all(workspace.join(".infinitecode"))
+            .expect("create workspace config dir");
         std::fs::write(
             workspace.join(".infinitecode").join("config.toml"),
             r#"

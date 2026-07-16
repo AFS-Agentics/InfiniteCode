@@ -32,7 +32,8 @@ pub(crate) async fn run_agent(
     dangerously_skip_permissions: bool,
 ) -> Result<infinitecode_tui::AppExit> {
     let cwd = std::env::current_dir()?;
-    let config_home = find_infinitecode_home().context("could not determine infinitecode home directory")?;
+    let config_home =
+        find_infinitecode_home().context("could not determine infinitecode home directory")?;
     let model_catalog = PresetModelCatalog::load_from_config(&config_home, Some(&cwd))?;
     let startup_warnings = model_catalog
         .warnings()

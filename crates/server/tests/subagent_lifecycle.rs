@@ -419,7 +419,9 @@ async fn wait_agent_preserves_full_child_report_for_parent_model() -> Result<()>
         .iter()
         .flat_map(|message| message.content.iter())
         .find_map(|content| match content {
-            infinitecode_protocol::RequestContent::ToolResult { content, .. } => Some(content.as_str()),
+            infinitecode_protocol::RequestContent::ToolResult { content, .. } => {
+                Some(content.as_str())
+            }
             infinitecode_protocol::RequestContent::Text { .. }
             | infinitecode_protocol::RequestContent::Reasoning { .. }
             | infinitecode_protocol::RequestContent::ProviderReasoning { .. }

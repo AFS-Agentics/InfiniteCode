@@ -456,14 +456,16 @@ impl ServerClientCore {
         &mut self,
         params: SessionTitleUpdateParams,
     ) -> Result<SessionTitleUpdateResult> {
-        self.request_infinitecode("session/title/update", params).await
+        self.request_infinitecode("session/title/update", params)
+            .await
     }
 
     pub(crate) async fn session_metadata_update(
         &mut self,
         params: SessionMetadataUpdateParams,
     ) -> Result<SessionMetadataUpdateResult> {
-        self.request_infinitecode("session/metadata/update", params).await
+        self.request_infinitecode("session/metadata/update", params)
+            .await
     }
 
     pub(crate) async fn session_permissions_update(
@@ -553,7 +555,8 @@ impl ServerClientCore {
         &mut self,
         params: SkillSetEnabledParams,
     ) -> Result<SkillSetEnabledResult> {
-        self.request_infinitecode("skills/set_enabled", params).await
+        self.request_infinitecode("skills/set_enabled", params)
+            .await
     }
 
     pub(crate) async fn model_catalog(
@@ -602,28 +605,32 @@ impl ServerClientCore {
         &mut self,
         params: CommandExecWriteParams,
     ) -> Result<CommandExecWriteResult> {
-        self.request_infinitecode("command/exec/write", params).await
+        self.request_infinitecode("command/exec/write", params)
+            .await
     }
 
     pub(crate) async fn command_exec_resize(
         &mut self,
         params: CommandExecResizeParams,
     ) -> Result<CommandExecResizeResult> {
-        self.request_infinitecode("command/exec/resize", params).await
+        self.request_infinitecode("command/exec/resize", params)
+            .await
     }
 
     pub(crate) async fn command_exec_terminate(
         &mut self,
         params: CommandExecTerminateParams,
     ) -> Result<CommandExecTerminateResult> {
-        self.request_infinitecode("command/exec/terminate", params).await
+        self.request_infinitecode("command/exec/terminate", params)
+            .await
     }
 
     pub(crate) async fn turn_shell_command(
         &mut self,
         params: ShellCommandParams,
     ) -> Result<ShellCommandResult> {
-        self.request_infinitecode("turn/shell_command", params).await
+        self.request_infinitecode("turn/shell_command", params)
+            .await
     }
 
     pub(crate) async fn turn_interrupt(

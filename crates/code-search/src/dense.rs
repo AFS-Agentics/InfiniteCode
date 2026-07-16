@@ -10,10 +10,10 @@
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use infinitecode_network_proxy::NetworkProxyConfig;
-use infinitecode_util_paths::find_infinitecode_home;
 use hf_hub::HFClient;
 use hf_hub::HFClientSync;
+use infinitecode_network_proxy::NetworkProxyConfig;
+use infinitecode_util_paths::find_infinitecode_home;
 use model2vec::model::Model2Vec;
 use sha2::{Digest, Sha256};
 

@@ -124,7 +124,11 @@ mod tests {
         touch(&sibling);
         touch(&path_rg);
 
-        let current_exe = bin_dir.join(if cfg!(windows) { "infinitecode.exe" } else { "infinitecode" });
+        let current_exe = bin_dir.join(if cfg!(windows) {
+            "infinitecode.exe"
+        } else {
+            "infinitecode"
+        });
         let path_env = env::join_paths([path_dir]).expect("join path");
 
         assert_eq!(
@@ -144,7 +148,11 @@ mod tests {
         let path_rg = path_dir.join(rg_binary_name());
         touch(&path_rg);
 
-        let current_exe = bin_dir.join(if cfg!(windows) { "infinitecode.exe" } else { "infinitecode" });
+        let current_exe = bin_dir.join(if cfg!(windows) {
+            "infinitecode.exe"
+        } else {
+            "infinitecode"
+        });
         let path_env = env::join_paths([path_dir]).expect("join path");
 
         assert_eq!(

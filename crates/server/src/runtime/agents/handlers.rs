@@ -64,9 +64,10 @@ impl ServerRuntime {
     ) -> serde_json::Value {
         match serde_json::from_value::<infinitecode_protocol::AgentListParams>(params) {
             Ok(params) => match Arc::clone(self).list_agents(params).await {
-                Ok(agents) => {
-                    success_response(request_id, infinitecode_protocol::AgentListResult { agents })
-                }
+                Ok(agents) => success_response(
+                    request_id,
+                    infinitecode_protocol::AgentListResult { agents },
+                ),
                 Err(error) => self.tool_error_response(request_id, error),
             },
             Err(error) => self.error_response(

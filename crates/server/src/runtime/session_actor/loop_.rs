@@ -144,7 +144,9 @@ pub(super) async fn run_session_actor(
                 let pending_texts: Vec<String> = queue
                     .iter()
                     .filter_map(|item| match &item.kind {
-                        infinitecode_core::PendingInputKind::UserText { text } => Some(text.clone()),
+                        infinitecode_core::PendingInputKind::UserText { text } => {
+                            Some(text.clone())
+                        }
                         infinitecode_core::PendingInputKind::UserInput { display_text, .. } => {
                             Some(display_text.clone())
                         }
@@ -443,7 +445,9 @@ pub(super) async fn run_session_actor(
                     .expect("pending turn queue mutex should not be poisoned")
                     .iter()
                     .filter_map(|item| match &item.kind {
-                        infinitecode_core::PendingInputKind::UserText { text } => Some(text.clone()),
+                        infinitecode_core::PendingInputKind::UserText { text } => {
+                            Some(text.clone())
+                        }
                         infinitecode_core::PendingInputKind::UserInput { display_text, .. } => {
                             Some(display_text.clone())
                         }
@@ -538,7 +542,8 @@ fn ensure_session_context_locked(state: &mut SessionActorState, turn_config: &Tu
     if state.core.session_context.is_some() {
         return;
     }
-    let agents_md_manager = infinitecode_core::AgentsMdManager::new(state.core.config.agents_md.clone());
+    let agents_md_manager =
+        infinitecode_core::AgentsMdManager::new(state.core.config.agents_md.clone());
     let locked_agents_snapshot =
         infinitecode_core::load_workspace_instructions(&state.core.cwd, &agents_md_manager);
     state.core.session_context = Some(infinitecode_core::SessionContext::capture(
@@ -618,10 +623,15 @@ fn model_selection_from_pending_metadata(metadata: Option<&serde_json::Value>) -
 
 fn subagent_usage_owner_from_pending_metadata(
     metadata: Option<&serde_json::Value>,
-) -> Option<(infinitecode_protocol::SessionId, Option<infinitecode_core::TurnId>)> {
-    let parent_session_id =
-        string_field_from_pending_metadata(metadata, "infinitecode_subagent_usage_parent_session_id")
-            .and_then(|value| infinitecode_protocol::SessionId::try_from(value).ok())?;
+) -> Option<(
+    infinitecode_protocol::SessionId,
+    Option<infinitecode_core::TurnId>,
+)> {
+    let parent_session_id = string_field_from_pending_metadata(
+        metadata,
+        "infinitecode_subagent_usage_parent_session_id",
+    )
+    .and_then(|value| infinitecode_protocol::SessionId::try_from(value).ok())?;
     let parent_turn_id =
         string_field_from_pending_metadata(metadata, "infinitecode_subagent_usage_parent_turn_id")
             .and_then(|value| infinitecode_core::TurnId::try_from(value).ok());

@@ -8,6 +8,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Datelike;
 use chrono::SecondsFormat;
+use futures::Stream;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
 use infinitecode_core::FileSystemSkillCatalog;
@@ -34,8 +36,6 @@ use infinitecode_provider::ModelProviderSDK;
 use infinitecode_provider::ProviderRoute;
 use infinitecode_provider::ProviderRouter;
 use infinitecode_provider::error::ProviderError;
-use futures::Stream;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -216,7 +216,9 @@ async fn exhausted_provider_retries_persist_for_history_but_do_not_enter_context
         .lines()
         .filter_map(|line| serde_json::from_str::<infinitecode_core::RolloutLine>(line).ok())
         .find_map(|line| match line {
-            infinitecode_core::RolloutLine::Turn(line) if line.turn.id == failed_turn_id => line.turn.error,
+            infinitecode_core::RolloutLine::Turn(line) if line.turn.id == failed_turn_id => {
+                line.turn.error
+            }
             _ => None,
         });
     assert_eq!(
@@ -484,7 +486,8 @@ fn original_event(value: &serde_json::Value) -> Option<ServerEvent> {
         value.get("params")?.clone(),
     )
     .ok()?;
-    infinitecode_protocol::original_event_from_acp_notification(&notification).map(|(_, event)| event)
+    infinitecode_protocol::original_event_from_acp_notification(&notification)
+        .map(|(_, event)| event)
 }
 
 async fn wait_for_original_event(

@@ -116,7 +116,9 @@ use acp_events::worker_events_from_acp_session_notification_with_terminal_state;
 const WORKER_SHUTDOWN_GRACE: Duration = Duration::from_millis(100);
 const WORKER_ABORT_JOIN_TIMEOUT: Duration = Duration::from_millis(500);
 
-fn active_agent_label_from_session(session: &infinitecode_server::SessionMetadata) -> Option<String> {
+fn active_agent_label_from_session(
+    session: &infinitecode_server::SessionMetadata,
+) -> Option<String> {
     session
         .agent_nickname
         .as_ref()
@@ -753,7 +755,10 @@ impl QueryWorkerHandle {
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
     }
 
-    pub(crate) fn update_permissions(&self, preset: infinitecode_protocol::PermissionPreset) -> Result<()> {
+    pub(crate) fn update_permissions(
+        &self,
+        preset: infinitecode_protocol::PermissionPreset,
+    ) -> Result<()> {
         self.command_tx
             .send(OperationCommand::UpdatePermissions { preset })
             .map_err(|_| anyhow::anyhow!("interactive worker is no longer running"))
@@ -3033,7 +3038,9 @@ fn is_stale_turn_interrupt_error(error: &anyhow::Error) -> bool {
         || message.contains("turn does not exist")
 }
 
-fn should_pause_goal_before_session_leave(goal: Option<&infinitecode_protocol::ThreadGoal>) -> bool {
+fn should_pause_goal_before_session_leave(
+    goal: Option<&infinitecode_protocol::ThreadGoal>,
+) -> bool {
     goal.is_some_and(|goal| {
         matches!(
             goal.status,
@@ -3374,7 +3381,8 @@ pub(crate) fn handle_completed_item(
             payload,
             ..
         } => {
-            let Ok(payload) = serde_json::from_value::<infinitecode_server::FileChangePayload>(payload)
+            let Ok(payload) =
+                serde_json::from_value::<infinitecode_server::FileChangePayload>(payload)
             else {
                 return;
             };
@@ -3895,17 +3903,16 @@ fn summarize_tool_call_update(payload: &ToolCallPayload) -> String {
     }
     if matches!(payload.tool_name.as_str(), "find" | "glob")
         && (summary == "find {}" || summary == "glob {}")
-        && let Some(cmd) = payload
-            .command_actions
-            .iter()
-            .find_map(|action| match action {
-                infinitecode_protocol::parse_command::ParsedCommand::ListFiles { cmd, .. }
-                    if !cmd.is_empty() =>
-                {
-                    Some(cmd.clone())
-                }
-                _ => None,
-            })
+        && let Some(cmd) =
+            payload
+                .command_actions
+                .iter()
+                .find_map(|action| match action {
+                    infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
+                        cmd, ..
+                    } if !cmd.is_empty() => Some(cmd.clone()),
+                    _ => None,
+                })
     {
         return cmd;
     }
@@ -3956,10 +3963,12 @@ fn find_command_action_from_parameters(
         Some(path) => format!("{pattern} in {path}"),
         None => pattern.to_string(),
     };
-    Some(infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
-        cmd: command.to_string(),
-        path: Some(display),
-    })
+    Some(
+        infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
+            cmd: command.to_string(),
+            path: Some(display),
+        },
+    )
 }
 
 fn tool_call_started_actions(
@@ -4038,25 +4047,29 @@ fn code_search_command_action_from_parameters(
                 .and_then(serde_json::Value::as_u64)
                 .map(|line| line.to_string())
                 .unwrap_or_else(|| "?".to_string());
-            Some(infinitecode_protocol::parse_command::ParsedCommand::Search {
-                cmd: command.to_string(),
-                query: Some(format!("related {path}:{line}")),
-                path: Some(path.to_string()),
-            })
+            Some(
+                infinitecode_protocol::parse_command::ParsedCommand::Search {
+                    cmd: command.to_string(),
+                    query: Some(format!("related {path}:{line}")),
+                    path: Some(path.to_string()),
+                },
+            )
         }
         _ => {
             let query = input
                 .get("query")
                 .and_then(serde_json::Value::as_str)
                 .filter(|query| !query.is_empty())?;
-            Some(infinitecode_protocol::parse_command::ParsedCommand::Search {
-                cmd: command.to_string(),
-                query: Some(query.to_string()),
-                path: input
-                    .get("path")
-                    .and_then(serde_json::Value::as_str)
-                    .map(ToOwned::to_owned),
-            })
+            Some(
+                infinitecode_protocol::parse_command::ParsedCommand::Search {
+                    cmd: command.to_string(),
+                    query: Some(query.to_string()),
+                    path: input
+                        .get("path")
+                        .and_then(serde_json::Value::as_str)
+                        .map(ToOwned::to_owned),
+                },
+            )
         }
     }
 }
@@ -4899,11 +4912,13 @@ mod tests {
                 tool_use_id: "call-1".to_string(),
                 summary: "Code-Search \"live tool feedback\" in crates".to_string(),
                 preparing: false,
-                parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-                    cmd: "code_search".to_string(),
-                    query: Some("live tool feedback".to_string()),
-                    path: Some("crates".to_string()),
-                }]),
+                parsed_commands: Some(vec![
+                    infinitecode_protocol::parse_command::ParsedCommand::Search {
+                        cmd: "code_search".to_string(),
+                        query: Some("live tool feedback".to_string()),
+                        path: Some("crates".to_string()),
+                    }
+                ]),
             }
         );
     }
@@ -4986,11 +5001,13 @@ mod tests {
                         tool_call_id: "call-1".to_string(),
                         tool_name: "read".to_string(),
                         parameters: serde_json::json!({}),
-                        command_actions: vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
-                            cmd: "read crates/tui/src/mod.rs".to_string(),
-                            name: "mod.rs".to_string(),
-                            path: PathBuf::from("crates/tui/src/mod.rs"),
-                        }],
+                        command_actions: vec![
+                            infinitecode_protocol::parse_command::ParsedCommand::Read {
+                                cmd: "read crates/tui/src/mod.rs".to_string(),
+                                name: "mod.rs".to_string(),
+                                path: PathBuf::from("crates/tui/src/mod.rs"),
+                            },
+                        ],
                     })
                     .expect("serialize tool call payload"),
                 },
@@ -5065,10 +5082,12 @@ mod tests {
             WorkerEvent::ToolCallUpdated {
                 tool_use_id: "call-1".to_string(),
                 summary: "List crates".to_string(),
-                parsed_commands: vec![infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
-                    cmd: "List crates".to_string(),
-                    path: Some("**/Cargo.toml in crates".to_string()),
-                }],
+                parsed_commands: vec![
+                    infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
+                        cmd: "List crates".to_string(),
+                        path: Some("**/Cargo.toml in crates".to_string()),
+                    }
+                ],
             }
         );
     }

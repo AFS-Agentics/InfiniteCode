@@ -322,7 +322,10 @@ fn durable_status_from_goal(status: GoalStatus) -> infinitecode_core::GoalStatus
     }
 }
 
-fn goal_status_from_durable(status: infinitecode_core::GoalStatus, reason: Option<&str>) -> GoalStatus {
+fn goal_status_from_durable(
+    status: infinitecode_core::GoalStatus,
+    reason: Option<&str>,
+) -> GoalStatus {
     match status {
         infinitecode_core::GoalStatus::Active => GoalStatus::Active,
         infinitecode_core::GoalStatus::Paused => GoalStatus::Paused,

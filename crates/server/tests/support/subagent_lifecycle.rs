@@ -263,7 +263,8 @@ pub fn build_runtime(
     provider: Arc<dyn ModelProviderSDK>,
 ) -> Result<Arc<ServerRuntime>> {
     let db_path = data_root.join("subagent_lifecycle.db");
-    let db = Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
+    let db =
+        Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
     Ok(ServerRuntime::new(
         data_root.to_path_buf(),
         ServerRuntimeDependencies::new(
@@ -341,14 +342,12 @@ pub async fn start_parent_session(
         )
         .await
         .context("session/start")?;
-    Ok(
-        serde_json::from_value::<infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>>(
-            response,
-        )?
-        .result
-        .session
-        .session_id,
-    )
+    Ok(serde_json::from_value::<
+        infinitecode_server::SuccessResponse<infinitecode_server::SessionStartResult>,
+    >(response)?
+    .result
+    .session
+    .session_id)
 }
 
 pub async fn spawn_child(
@@ -391,7 +390,10 @@ pub async fn spawn_child_with(
         )
         .await
         .context("agent/spawn")?;
-    Ok(serde_json::from_value::<infinitecode_server::SuccessResponse<SpawnAgentResult>>(response)?.result)
+    Ok(
+        serde_json::from_value::<infinitecode_server::SuccessResponse<SpawnAgentResult>>(response)?
+            .result,
+    )
 }
 
 pub async fn wait_for_child_turn_started(
@@ -451,7 +453,10 @@ pub async fn request_agent_list(
         )
         .await
         .context("agent/list")?;
-    Ok(serde_json::from_value::<infinitecode_server::SuccessResponse<AgentListResult>>(response)?.result)
+    Ok(
+        serde_json::from_value::<infinitecode_server::SuccessResponse<AgentListResult>>(response)?
+            .result,
+    )
 }
 
 pub async fn request_agent_wait(
@@ -499,7 +504,10 @@ pub async fn request_agent_wait_with<T: serde::Serialize>(
         )
         .await
         .context("agent/wait")?;
-    Ok(serde_json::from_value::<infinitecode_server::SuccessResponse<WaitAgentResult>>(response)?.result)
+    Ok(
+        serde_json::from_value::<infinitecode_server::SuccessResponse<WaitAgentResult>>(response)?
+            .result,
+    )
 }
 
 pub async fn request_agent_send_message<T: serde::Serialize>(
@@ -526,8 +534,10 @@ pub async fn request_agent_send_message<T: serde::Serialize>(
         .await
         .context("agent/send_message")?;
     Ok(
-        serde_json::from_value::<infinitecode_server::SuccessResponse<AgentMessageResult>>(response)?
-            .result,
+        serde_json::from_value::<infinitecode_server::SuccessResponse<AgentMessageResult>>(
+            response,
+        )?
+        .result,
     )
 }
 
@@ -552,12 +562,10 @@ pub async fn request_agent_close<T: serde::Serialize>(
         )
         .await
         .context("agent/close")?;
-    Ok(
-        serde_json::from_value::<infinitecode_server::SuccessResponse<infinitecode_protocol::CloseAgentResult>>(
-            response,
-        )?
-        .result,
-    )
+    Ok(serde_json::from_value::<
+        infinitecode_server::SuccessResponse<infinitecode_protocol::CloseAgentResult>,
+    >(response)?
+    .result)
 }
 
 pub async fn start_turn(
@@ -595,7 +603,10 @@ pub async fn start_turn_with_approval_policy(
         )
         .await
         .context("turn/start")?;
-    Ok(serde_json::from_value::<infinitecode_server::SuccessResponse<TurnStartResult>>(response)?.result)
+    Ok(
+        serde_json::from_value::<infinitecode_server::SuccessResponse<TurnStartResult>>(response)?
+            .result,
+    )
 }
 
 pub async fn wait_for_parent_turn_completed(

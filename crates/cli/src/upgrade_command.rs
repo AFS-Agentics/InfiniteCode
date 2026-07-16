@@ -21,9 +21,11 @@ use anyhow::Result;
 use anyhow::bail;
 
 #[cfg(unix)]
-const INSTALL_SH_URL: &str = "https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh";
+const INSTALL_SH_URL: &str =
+    "https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh";
 #[cfg(windows)]
-const INSTALL_PS1_URL: &str = "https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1";
+const INSTALL_PS1_URL: &str =
+    "https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1";
 
 pub fn run_upgrade() -> Result<()> {
     run_platform_upgrade()

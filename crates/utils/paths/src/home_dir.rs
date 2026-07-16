@@ -27,7 +27,9 @@ pub fn find_infinitecode_home() -> std::io::Result<PathBuf> {
     find_infinitecode_home_from_env(infinitecode_home_env.as_deref())
 }
 
-fn find_infinitecode_home_from_env(infinitecode_home_env: Option<&str>) -> std::io::Result<PathBuf> {
+fn find_infinitecode_home_from_env(
+    infinitecode_home_env: Option<&str>,
+) -> std::io::Result<PathBuf> {
     // Honor the `INFINITECODE_HOME` environment variable when it is set to allow users
     // (and tests) to override the default location.
     match infinitecode_home_env {
@@ -89,8 +91,8 @@ mod tests {
             .to_str()
             .expect("missing path should be valid utf-8");
 
-        let err =
-            find_infinitecode_home_from_env(Some(missing_str)).expect_err("missing INFINITECODE_HOME");
+        let err = find_infinitecode_home_from_env(Some(missing_str))
+            .expect_err("missing INFINITECODE_HOME");
         assert_eq!(err.kind(), ErrorKind::NotFound);
         assert!(
             err.to_string().contains("INFINITECODE_HOME"),
@@ -105,7 +107,8 @@ mod tests {
         fs::write(&file_path, "not a directory").expect("write temp file");
         let file_str = file_path.to_str().expect("file path should be valid utf-8");
 
-        let err = find_infinitecode_home_from_env(Some(file_str)).expect_err("file INFINITECODE_HOME");
+        let err =
+            find_infinitecode_home_from_env(Some(file_str)).expect_err("file INFINITECODE_HOME");
         assert_eq!(err.kind(), ErrorKind::InvalidInput);
         assert!(
             err.to_string().contains("not a directory"),
@@ -121,7 +124,8 @@ mod tests {
             .to_str()
             .expect("temp home path should be valid utf-8");
 
-        let resolved = find_infinitecode_home_from_env(Some(temp_str)).expect("valid INFINITECODE_HOME");
+        let resolved =
+            find_infinitecode_home_from_env(Some(temp_str)).expect("valid INFINITECODE_HOME");
         let expected = super::strip_unc_prefix(
             temp_home
                 .path()
@@ -133,8 +137,8 @@ mod tests {
 
     #[test]
     fn find_infinitecode_home_without_env_uses_default_home_dir() {
-        let resolved =
-            find_infinitecode_home_from_env(/*infinitecode_home_env*/ None).expect("default INFINITECODE_HOME");
+        let resolved = find_infinitecode_home_from_env(/*infinitecode_home_env*/ None)
+            .expect("default INFINITECODE_HOME");
         let mut expected = home_dir().expect("home dir");
         expected.push(".infinitecode");
         assert_eq!(resolved, expected);

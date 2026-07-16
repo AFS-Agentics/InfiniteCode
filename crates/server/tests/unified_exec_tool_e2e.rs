@@ -5,12 +5,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use futures::Stream;
 use infinitecode_protocol::{
     ModelRequest, ModelResponse, RequestContent, ResponseContent, ResponseMetadata, StopReason,
     StreamEvent, Usage,
 };
 use infinitecode_provider::ModelProviderSDK;
-use futures::Stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 

@@ -4,13 +4,13 @@
 use anyhow::Result;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyModifiers;
+use futures::StreamExt;
 use infinitecode_core::AppConfigLoader;
 use infinitecode_core::FileSystemAppConfigLoader;
 use infinitecode_protocol::Model;
 use infinitecode_protocol::ModelCatalog;
 use infinitecode_protocol::ProviderWireApi;
 use infinitecode_util_paths::find_infinitecode_home;
-use futures::StreamExt;
 use std::path::Path;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -917,7 +917,8 @@ fn handle_worker_event(
             ..
         } => {
             loop_state.session_switch_pending = false;
-            loop_state.session_id = infinitecode_core::SessionId::try_from(session_id.as_str()).ok();
+            loop_state.session_id =
+                infinitecode_core::SessionId::try_from(session_id.as_str()).ok();
             loop_state.total_input_tokens = *total_input_tokens;
             loop_state.total_output_tokens = *total_output_tokens;
             loop_state.total_tokens = *total_tokens;

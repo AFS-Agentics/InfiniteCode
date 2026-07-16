@@ -520,7 +520,9 @@ fn compute_store_key(server_name: &str, server_url: &str) -> Result<String> {
 }
 
 fn fallback_file_path() -> Result<PathBuf> {
-    Ok(find_infinitecode_home()?.join(FALLBACK_FILENAME).to_path_buf())
+    Ok(find_infinitecode_home()?
+        .join(FALLBACK_FILENAME)
+        .to_path_buf())
 }
 
 fn read_fallback_file() -> Result<Option<FallbackFile>> {

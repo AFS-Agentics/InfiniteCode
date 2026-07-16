@@ -157,7 +157,9 @@ mod tests {
                 ..AcpAgentCapabilities::default()
             },
             auth_methods: Vec::new(),
-            agent_info: Some(AcpImplementation::new("infinitecode", "1.2.3").with_title("InfiniteCode")),
+            agent_info: Some(
+                AcpImplementation::new("infinitecode", "1.2.3").with_title("InfiniteCode"),
+            ),
             meta: None,
         };
 

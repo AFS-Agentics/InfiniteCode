@@ -17,7 +17,9 @@ const SYSTEM_SKILLS_MARKER_FILENAME: &str = ".infinitecode-system-skills.marker"
 const SYSTEM_SKILLS_MARKER_SALT: &str = "v1";
 
 pub fn system_cache_root_dir(infinitecode_home: &Path) -> PathBuf {
-    infinitecode_home.join(SKILLS_DIR_NAME).join(SYSTEM_SKILLS_DIR_NAME)
+    infinitecode_home
+        .join(SKILLS_DIR_NAME)
+        .join(SYSTEM_SKILLS_DIR_NAME)
 }
 
 pub fn install_system_skills(infinitecode_home: &Path) -> Result<(), SystemSkillsError> {

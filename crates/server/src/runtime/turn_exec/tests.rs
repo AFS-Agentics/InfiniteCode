@@ -1,4 +1,4 @@
-﻿use super::tool_display::*;
+use super::tool_display::*;
 use super::types::*;
 use crate::*;
 use infinitecode_core::ItemId;
@@ -120,11 +120,13 @@ fn grep_tool_start_item_contains_live_search_action() {
             tool_call_id: "call-1".to_string(),
             tool_name: "grep".to_string(),
             parameters: input,
-            command_actions: vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-                cmd: "grep ToolUseStart in crates/server/src".to_string(),
-                query: Some("ToolUseStart".to_string()),
-                path: Some("crates/server/src".to_string()),
-            }],
+            command_actions: vec![
+                infinitecode_protocol::parse_command::ParsedCommand::Search {
+                    cmd: "grep ToolUseStart in crates/server/src".to_string(),
+                    query: Some("ToolUseStart".to_string()),
+                    path: Some("crates/server/src".to_string()),
+                }
+            ],
         }
     );
 }
@@ -155,11 +157,13 @@ fn code_search_tool_start_item_contains_live_search_action() {
             tool_call_id: "call-1".to_string(),
             tool_name: "code_search".to_string(),
             parameters: input,
-            command_actions: vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-                cmd: "code_search live tool feedback in crates".to_string(),
-                query: Some("live tool feedback".to_string()),
-                path: Some("crates".to_string()),
-            }],
+            command_actions: vec![
+                infinitecode_protocol::parse_command::ParsedCommand::Search {
+                    cmd: "code_search live tool feedback in crates".to_string(),
+                    query: Some("live tool feedback".to_string()),
+                    path: Some("crates".to_string()),
+                }
+            ],
         }
     );
 }
@@ -347,10 +351,12 @@ fn command_actions_from_glob_tool_input_include_pattern_and_path() {
     );
     assert_eq!(
         actions,
-        vec![infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
-            cmd: "glob **/Cargo.toml in crates".to_string(),
-            path: Some("**/Cargo.toml in crates".to_string()),
-        }]
+        vec![
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
+                cmd: "glob **/Cargo.toml in crates".to_string(),
+                path: Some("**/Cargo.toml in crates".to_string()),
+            }
+        ]
     );
 }
 
@@ -366,10 +372,12 @@ fn command_actions_from_find_tool_input_include_pattern_and_path() {
     );
     assert_eq!(
         actions,
-        vec![infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
-            cmd: "find **/Cargo.toml in crates".to_string(),
-            path: Some("**/Cargo.toml in crates".to_string()),
-        }]
+        vec![
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
+                cmd: "find **/Cargo.toml in crates".to_string(),
+                path: Some("**/Cargo.toml in crates".to_string()),
+            }
+        ]
     );
 }
 

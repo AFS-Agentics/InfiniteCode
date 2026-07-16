@@ -494,7 +494,8 @@ impl TurnProjector for DefaultProjection {
 
 fn summarize_tool_call(tool_name: &str, input: &serde_json::Value) -> String {
     let cwd = std::env::current_dir().unwrap_or_default();
-    infinitecode_core::tools::tool_summary::tool_summary(tool_name, input, &cwd).replacen(": ", " ", 1)
+    infinitecode_core::tools::tool_summary::tool_summary(tool_name, input, &cwd)
+        .replacen(": ", " ", 1)
 }
 
 fn summarize_tool_result(tool_name: Option<&str>, is_error: bool) -> String {

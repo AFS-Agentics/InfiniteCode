@@ -522,16 +522,14 @@ fn webfetch_schema() -> JsonSchema {
 fn app_config_uses_local_web_search(config: &AppConfig) -> bool {
     config.tools.web_search.mode == infinitecode_config::WebSearchMode::Local
         || config.provider.providers.values().any(|provider| {
-            provider
-                .web_search
-                .as_ref()
-                .is_some_and(|web_search| web_search.mode == infinitecode_config::WebSearchMode::Local)
+            provider.web_search.as_ref().is_some_and(|web_search| {
+                web_search.mode == infinitecode_config::WebSearchMode::Local
+            })
         })
         || config.provider.model_bindings.values().any(|binding| {
-            binding
-                .web_search
-                .as_ref()
-                .is_some_and(|web_search| web_search.mode == infinitecode_config::WebSearchMode::Local)
+            binding.web_search.as_ref().is_some_and(|web_search| {
+                web_search.mode == infinitecode_config::WebSearchMode::Local
+            })
         })
 }
 

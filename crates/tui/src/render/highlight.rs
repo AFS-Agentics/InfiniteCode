@@ -102,7 +102,10 @@ pub(crate) fn set_theme_override(
 
 /// Check whether a theme name resolves to a bundled theme or a custom
 /// `.tmTheme` file.  Returns a user-facing warning when it does not.
-pub(crate) fn validate_theme_name(name: Option<&str>, infinitecode_home: Option<&Path>) -> Option<String> {
+pub(crate) fn validate_theme_name(
+    name: Option<&str>,
+    infinitecode_home: Option<&Path>,
+) -> Option<String> {
     let name = name?;
     let custom_theme_path_display = infinitecode_home
         .map(|home| custom_theme_path(name, home).display().to_string())
@@ -173,7 +176,9 @@ fn parse_theme_name(name: &str) -> Option<EmbeddedThemeName> {
 
 /// Build the expected path for a custom theme file.
 fn custom_theme_path(name: &str, infinitecode_home: &Path) -> PathBuf {
-    infinitecode_home.join("themes").join(format!("{name}.tmTheme"))
+    infinitecode_home
+        .join("themes")
+        .join(format!("{name}.tmTheme"))
 }
 
 /// Try to load a custom `.tmTheme` file from `{infinitecode_home}/themes/{name}.tmTheme`.
@@ -227,7 +232,9 @@ fn resolve_theme_with_override(name: Option<&str>, infinitecode_home: Option<&Pa
 /// Extracted from the old `theme()` init closure so it can be reused.
 fn build_default_theme() -> Theme {
     let name = THEME_OVERRIDE.get().and_then(|name| name.as_deref());
-    let infinitecode_home = CLAWR_HOME.get().and_then(|infinitecode_home| infinitecode_home.as_deref());
+    let infinitecode_home = CLAWR_HOME
+        .get()
+        .and_then(|infinitecode_home| infinitecode_home.as_deref());
     resolve_theme_with_override(name, infinitecode_home)
 }
 

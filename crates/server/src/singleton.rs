@@ -193,7 +193,9 @@ pub(crate) fn acquire_singleton_role(infinitecode_home: &Path) -> Result<Singlet
         })),
         Err(error) if is_lock_temporarily_unavailable(&error) => {
             // Real server may be mid-startup; retry until metadata appears.
-            Ok(SingletonRole::Proxy(read_metadata_with_retry(infinitecode_home)?))
+            Ok(SingletonRole::Proxy(read_metadata_with_retry(
+                infinitecode_home,
+            )?))
         }
         Err(error) => {
             Err(error).with_context(|| format!("lock server singleton {}", lock_path.display()))

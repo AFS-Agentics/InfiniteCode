@@ -206,7 +206,10 @@ async fn complete_file_change_tool_call(
 
 fn file_changes_from_output(
     output_json: &serde_json::Value,
-) -> Vec<(std::path::PathBuf, infinitecode_protocol::protocol::FileChange)> {
+) -> Vec<(
+    std::path::PathBuf,
+    infinitecode_protocol::protocol::FileChange,
+)> {
     let changes = output_json
         .get("files")
         .and_then(serde_json::Value::as_array)

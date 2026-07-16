@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::ValueEnum;
+use futures::Stream;
 use infinitecode_core::AgentsMdConfig;
 use infinitecode_core::AppConfig;
 use infinitecode_core::AppConfigLoader;
@@ -19,7 +20,6 @@ use infinitecode_provider::ModelProviderSDK;
 use infinitecode_provider::ProviderRoute;
 use infinitecode_provider::ProviderRouter;
 use infinitecode_util_paths::find_infinitecode_home;
-use futures::Stream;
 use serde::Serialize;
 use std::io::Write;
 use std::path::Path;
@@ -492,11 +492,15 @@ fn write_query_event_jsonl(session_id: &str, event: &QueryEvent) -> Result<()> {
             progress,
         } => {
             let delta = match progress {
-                infinitecode_core::tools::ToolProgress::OutputDelta { delta } => Some(delta.as_str()),
+                infinitecode_core::tools::ToolProgress::OutputDelta { delta } => {
+                    Some(delta.as_str())
+                }
                 infinitecode_core::tools::ToolProgress::StatusUpdate { message, .. } => {
                     Some(message.as_str())
                 }
-                infinitecode_core::tools::ToolProgress::Completion { summary } => Some(summary.as_str()),
+                infinitecode_core::tools::ToolProgress::Completion { summary } => {
+                    Some(summary.as_str())
+                }
                 infinitecode_core::tools::ToolProgress::Terminal { .. } => None,
             };
             if let Some(delta) = delta {

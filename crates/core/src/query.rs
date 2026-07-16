@@ -4,6 +4,8 @@ use std::io::ErrorKind;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::StreamExt;
+use futures::future::BoxFuture;
 use infinitecode_protocol::HostedToolDefinition;
 use infinitecode_protocol::HostedWebFetchTool;
 use infinitecode_protocol::HostedWebSearchTool;
@@ -18,8 +20,6 @@ use infinitecode_protocol::StopReason;
 use infinitecode_protocol::StreamEvent;
 use infinitecode_protocol::ToolDefinition;
 use infinitecode_protocol::TruncationPolicy;
-use futures::StreamExt;
-use futures::future::BoxFuture;
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
@@ -77,7 +77,10 @@ fn hosted_tools_for_web_capabilities(
     web_fetch: infinitecode_config::ResolvedWebFetchConfig,
 ) -> Vec<HostedToolDefinition> {
     let mut hosted_tools = Vec::new();
-    if matches!(web_search, infinitecode_config::ResolvedWebSearchConfig::Provider) {
+    if matches!(
+        web_search,
+        infinitecode_config::ResolvedWebSearchConfig::Provider
+    ) {
         hosted_tools.push(HostedToolDefinition::WebSearch(HostedWebSearchTool::new()));
     }
     if web_fetch.is_provider() {
@@ -97,7 +100,10 @@ fn hosted_tool_name_for_reminder(tool: &HostedToolDefinition) -> &'static str {
 fn hosted_tools_for_web_search(
     web_search: &infinitecode_config::ResolvedWebSearchConfig,
 ) -> Vec<HostedToolDefinition> {
-    hosted_tools_for_web_capabilities(web_search, infinitecode_config::ResolvedWebFetchConfig::Disabled)
+    hosted_tools_for_web_capabilities(
+        web_search,
+        infinitecode_config::ResolvedWebFetchConfig::Disabled,
+    )
 }
 
 fn estimate_request_prompt_tokens(request: &ModelRequest) -> usize {
@@ -1950,6 +1956,7 @@ mod tests {
     use crate::tools::tool_spec::ToolSpec;
     use anyhow::Result;
     use async_trait::async_trait;
+    use futures::Stream;
     use infinitecode_protocol::CollaborationMode;
     use infinitecode_protocol::ModelRequest;
     use infinitecode_protocol::ModelResponse;
@@ -1964,7 +1971,6 @@ mod tests {
     use infinitecode_protocol::ThreadGoalStatus;
     use infinitecode_provider::ModelProviderSDK;
     use infinitecode_safety::PermissionMode;
-    use futures::Stream;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use tokio_util::sync::CancellationToken;
@@ -2035,7 +2041,8 @@ mod tests {
 
     #[test]
     fn hosted_tools_follow_resolved_web_search_mode() {
-        let hosted = hosted_tools_for_web_search(&infinitecode_config::ResolvedWebSearchConfig::Provider);
+        let hosted =
+            hosted_tools_for_web_search(&infinitecode_config::ResolvedWebSearchConfig::Provider);
         assert_eq!(hosted.len(), 1);
         assert!(matches!(
             hosted.as_slice(),
@@ -2079,10 +2086,12 @@ mod tests {
                 std::io::ErrorKind::TimedOut,
                 "socket timed out",
             )),
-            anyhow::Error::new(infinitecode_provider::error::ProviderError::ProviderTimeoutError {
-                message: "provider request timed out".into(),
-                provider_name: Some("test-provider".into()),
-            }),
+            anyhow::Error::new(
+                infinitecode_provider::error::ProviderError::ProviderTimeoutError {
+                    message: "provider request timed out".into(),
+                    provider_name: Some("test-provider".into()),
+                },
+            ),
         ];
 
         for error in cases {
@@ -4348,11 +4357,13 @@ mod tests {
         let first_prefix = &captured[0].messages[0];
         let second_prefix = &captured[1].messages[0];
         assert_eq!(first_prefix.role, second_prefix.role);
-        let infinitecode_protocol::RequestContent::Text { text: first_text } = &first_prefix.content[0]
+        let infinitecode_protocol::RequestContent::Text { text: first_text } =
+            &first_prefix.content[0]
         else {
             panic!("expected text prefix");
         };
-        let infinitecode_protocol::RequestContent::Text { text: second_text } = &second_prefix.content[0]
+        let infinitecode_protocol::RequestContent::Text { text: second_text } =
+            &second_prefix.content[0]
         else {
             panic!("expected text prefix");
         };
@@ -4681,7 +4692,10 @@ mod tests {
                 .messages
                 .iter()
                 .flat_map(|message| message.content.iter())
-                .all(|content| !matches!(content, infinitecode_protocol::RequestContent::ToolUse { .. })),
+                .all(|content| !matches!(
+                    content,
+                    infinitecode_protocol::RequestContent::ToolUse { .. }
+                )),
             "expected orphaned tool calls to be removed from prompt history"
         );
     }

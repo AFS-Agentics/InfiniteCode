@@ -293,7 +293,10 @@ fn skills_runtime_config(
     }
 }
 
-fn skill_source(skill: &infinitecode_skills::SkillMetadata, workspace_root: Option<&Path>) -> SkillSource {
+fn skill_source(
+    skill: &infinitecode_skills::SkillMetadata,
+    workspace_root: Option<&Path>,
+) -> SkillSource {
     match skill.scope {
         SkillScope::Repo => SkillSource::Workspace {
             cwd: workspace_root.map(Path::to_path_buf).unwrap_or_default(),

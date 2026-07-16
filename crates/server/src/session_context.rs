@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
 use anyhow::Context;
+use futures::Stream;
 use infinitecode_core::AUTH_CONFIG_FILE_NAME;
 use infinitecode_core::AgentsMdConfig;
 use infinitecode_core::AppConfig;
@@ -48,7 +49,6 @@ use infinitecode_protocol::StreamEvent;
 use infinitecode_provider::ModelProviderSDK;
 use infinitecode_provider::ProviderRoute;
 use infinitecode_provider::ProviderRouter;
-use futures::Stream;
 
 use crate::InputItem;
 use crate::SkillRecord;
@@ -188,14 +188,14 @@ impl SessionRuntimeContext {
         let skill_workspace_root = workspace_root
             .map(Path::to_path_buf)
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-        let skill_catalog = Arc::new(StdMutex::new(
-            Box::new(FileSystemSkillCatalog::with_infinitecode_home(
+        let skill_catalog = Arc::new(StdMutex::new(Box::new(
+            FileSystemSkillCatalog::with_infinitecode_home(
                 config.skills.clone(),
                 user_config_dir,
                 skill_workspace_root,
                 config.project_root_markers.clone(),
-            )) as Box<dyn SkillCatalog + Send>,
-        ));
+            ),
+        ) as Box<dyn SkillCatalog + Send>));
 
         Ok(Arc::new(Self::from_parts(
             provider,
@@ -594,7 +594,9 @@ fn core_skill_record_to_protocol(record: infinitecode_core::CoreSkillRecord) -> 
 fn core_skill_source_to_protocol(source: infinitecode_core::CoreSkillSource) -> crate::SkillSource {
     match source {
         infinitecode_core::CoreSkillSource::User => crate::SkillSource::User,
-        infinitecode_core::CoreSkillSource::Workspace { cwd } => crate::SkillSource::Workspace { cwd },
+        infinitecode_core::CoreSkillSource::Workspace { cwd } => {
+            crate::SkillSource::Workspace { cwd }
+        }
         infinitecode_core::CoreSkillSource::Plugin { plugin_id } => {
             crate::SkillSource::Plugin { plugin_id }
         }

@@ -768,7 +768,9 @@ fn parse_session_metadata_row(
 
     let title_state = match title_state_str.as_str() {
         "provisional" => SessionTitleState::Provisional,
-        "final" => SessionTitleState::Final(infinitecode_protocol::SessionTitleFinalSource::ModelGenerated),
+        "final" => {
+            SessionTitleState::Final(infinitecode_protocol::SessionTitleFinalSource::ModelGenerated)
+        }
         _ => SessionTitleState::Unset,
     };
 

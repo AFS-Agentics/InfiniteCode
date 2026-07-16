@@ -8,9 +8,9 @@ use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
-use infinitecode_protocol::*;
 use futures::SinkExt;
 use futures::StreamExt;
+use infinitecode_protocol::*;
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 use tokio_tungstenite::connect_async;
@@ -143,7 +143,9 @@ impl WebSocketServerClient {
         &mut self,
         params: SessionTitleUpdateParams,
     ) -> Result<SessionTitleUpdateResult> {
-        self.core.request_infinitecode("session/title/update", params).await
+        self.core
+            .request_infinitecode("session/title/update", params)
+            .await
     }
 
     pub async fn session_metadata_update(
@@ -168,7 +170,9 @@ impl WebSocketServerClient {
         &mut self,
         params: SessionCompactParams,
     ) -> Result<SessionCompactResult> {
-        self.core.request_infinitecode("session/compact", params).await
+        self.core
+            .request_infinitecode("session/compact", params)
+            .await
     }
 
     pub async fn goal_create(&mut self, params: GoalCreateParams) -> Result<GoalCreateResult> {
@@ -198,7 +202,9 @@ impl WebSocketServerClient {
         &mut self,
         params: GoalSetStatusParams,
     ) -> Result<GoalSetStatusResult> {
-        self.core.request_infinitecode("goal/complete", params).await
+        self.core
+            .request_infinitecode("goal/complete", params)
+            .await
     }
 
     pub async fn goal_clear(&mut self, params: GoalClearParams) -> Result<GoalClearResult> {
@@ -213,7 +219,9 @@ impl WebSocketServerClient {
         &mut self,
         params: SessionRollbackParams,
     ) -> Result<SessionRollbackResult> {
-        self.core.request_infinitecode("session/rollback", params).await
+        self.core
+            .request_infinitecode("session/rollback", params)
+            .await
     }
 
     pub async fn skills_list(&mut self, params: SkillListParams) -> Result<SkillListResult> {
@@ -224,21 +232,27 @@ impl WebSocketServerClient {
         &mut self,
         params: SkillChangedParams,
     ) -> Result<SkillChangedResult> {
-        self.core.request_infinitecode("skills/changed", params).await
+        self.core
+            .request_infinitecode("skills/changed", params)
+            .await
     }
 
     pub async fn skills_set_enabled(
         &mut self,
         params: SkillSetEnabledParams,
     ) -> Result<SkillSetEnabledResult> {
-        self.core.request_infinitecode("skills/set_enabled", params).await
+        self.core
+            .request_infinitecode("skills/set_enabled", params)
+            .await
     }
 
     pub async fn model_catalog(
         &mut self,
         params: ModelCatalogParams,
     ) -> Result<ModelCatalogResult> {
-        self.core.request_infinitecode("model/catalog", params).await
+        self.core
+            .request_infinitecode("model/catalog", params)
+            .await
     }
 
     pub async fn model_saved(&mut self, params: ModelSavedParams) -> Result<ModelSavedResult> {
@@ -249,21 +263,27 @@ impl WebSocketServerClient {
         &mut self,
         params: ProviderVendorListParams,
     ) -> Result<ProviderVendorListResult> {
-        self.core.request_infinitecode("provider/list", params).await
+        self.core
+            .request_infinitecode("provider/list", params)
+            .await
     }
 
     pub async fn provider_vendor_upsert(
         &mut self,
         params: ProviderVendorUpsertParams,
     ) -> Result<ProviderVendorUpsertResult> {
-        self.core.request_infinitecode("provider/upsert", params).await
+        self.core
+            .request_infinitecode("provider/upsert", params)
+            .await
     }
 
     pub async fn provider_validate(
         &mut self,
         params: ProviderValidateParams,
     ) -> Result<ProviderValidateResult> {
-        self.core.request_infinitecode("provider/validate", params).await
+        self.core
+            .request_infinitecode("provider/validate", params)
+            .await
     }
 
     pub async fn command_exec(&mut self, params: CommandExecParams) -> Result<CommandExecResult> {
@@ -274,14 +294,18 @@ impl WebSocketServerClient {
         &mut self,
         params: CommandExecWriteParams,
     ) -> Result<CommandExecWriteResult> {
-        self.core.request_infinitecode("command/exec/write", params).await
+        self.core
+            .request_infinitecode("command/exec/write", params)
+            .await
     }
 
     pub async fn command_exec_resize(
         &mut self,
         params: CommandExecResizeParams,
     ) -> Result<CommandExecResizeResult> {
-        self.core.request_infinitecode("command/exec/resize", params).await
+        self.core
+            .request_infinitecode("command/exec/resize", params)
+            .await
     }
 
     pub async fn command_exec_terminate(
@@ -301,14 +325,18 @@ impl WebSocketServerClient {
         &mut self,
         params: ShellCommandParams,
     ) -> Result<ShellCommandResult> {
-        self.core.request_infinitecode("turn/shell_command", params).await
+        self.core
+            .request_infinitecode("turn/shell_command", params)
+            .await
     }
 
     pub async fn turn_interrupt(
         &mut self,
         params: TurnInterruptParams,
     ) -> Result<TurnInterruptResult> {
-        self.core.request_infinitecode("turn/interrupt", params).await
+        self.core
+            .request_infinitecode("turn/interrupt", params)
+            .await
     }
 
     pub async fn turn_steer(&mut self, params: TurnSteerParams) -> Result<TurnSteerResult> {
@@ -337,14 +365,18 @@ impl WebSocketServerClient {
         &mut self,
         params: ReferenceSearchUpdateParams,
     ) -> Result<ReferenceSearchUpdateResult> {
-        self.core.request_infinitecode("search/update", params).await
+        self.core
+            .request_infinitecode("search/update", params)
+            .await
     }
 
     pub async fn reference_search_cancel(
         &mut self,
         params: ReferenceSearchCancelParams,
     ) -> Result<ReferenceSearchCancelResult> {
-        self.core.request_infinitecode("search/cancel", params).await
+        self.core
+            .request_infinitecode("search/cancel", params)
+            .await
     }
 
     pub async fn recv_notification(&mut self) -> Option<ServerNotificationMessage> {

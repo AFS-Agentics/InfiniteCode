@@ -301,7 +301,10 @@ mod tests {
             Path::new("/home/tester/.infinitecode"),
             Some(Path::new("diagnostics")),
         );
-        assert_eq!(resolved, PathBuf::from("/home/tester/.infinitecode/diagnostics"));
+        assert_eq!(
+            resolved,
+            PathBuf::from("/home/tester/.infinitecode/diagnostics")
+        );
     }
 
     #[cfg(unix)]

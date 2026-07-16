@@ -63,11 +63,13 @@ fn streaming_read_and_glob_updates_render_in_one_explored_cell() {
         tool_use_id: "read-1".to_string(),
         summary: "read {}".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
-            cmd: String::new(),
-            name: String::new(),
-            path: PathBuf::new(),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Read {
+                cmd: String::new(),
+                name: String::new(),
+                path: PathBuf::new(),
+            },
+        ]),
     });
     assert_eq!(
         active_display(&widget).contains("Running read {}"),
@@ -106,10 +108,12 @@ fn streaming_read_and_glob_updates_render_in_one_explored_cell() {
     widget.handle_worker_event(WorkerEvent::ToolCallUpdated {
         tool_use_id: "glob-1".to_string(),
         summary: "glob **/Cargo.toml in crates".to_string(),
-        parsed_commands: vec![infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
-            cmd: "glob **/Cargo.toml in crates".to_string(),
-            path: Some("**/Cargo.toml in crates".to_string()),
-        }],
+        parsed_commands: vec![
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
+                cmd: "glob **/Cargo.toml in crates".to_string(),
+                path: Some("**/Cargo.toml in crates".to_string()),
+            },
+        ],
     });
     widget.handle_worker_event(WorkerEvent::ToolResult {
         tool_use_id: "glob-1".to_string(),

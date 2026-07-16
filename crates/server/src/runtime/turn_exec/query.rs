@@ -77,15 +77,18 @@ impl ServerRuntime {
             }
         }
         let event_callback_tx = event_tx.clone();
-        let callback: infinitecode_core::EventCallback = std::sync::Arc::new(move |event: QueryEvent| {
-            let event_callback_tx = event_callback_tx.clone();
-            Box::pin(async move {
-                enqueue_query_event(&event_callback_tx, event).await;
-            })
-        });
+        let callback: infinitecode_core::EventCallback =
+            std::sync::Arc::new(move |event: QueryEvent| {
+                let event_callback_tx = event_callback_tx.clone();
+                Box::pin(async move {
+                    enqueue_query_event(&event_callback_tx, event).await;
+                })
+            });
         let tool_execution_start_tx = event_tx.clone();
         let registry = match agent_tool_policy {
-            infinitecode_protocol::AgentToolPolicy::Inherit if usage_parent_session_id.is_some() => {
+            infinitecode_protocol::AgentToolPolicy::Inherit
+                if usage_parent_session_id.is_some() =>
+            {
                 Arc::new(without_agent_coordination_tools(&session_tool_registry))
             }
             infinitecode_protocol::AgentToolPolicy::Inherit => session_tool_registry,
@@ -123,7 +126,9 @@ impl ServerRuntime {
                 client_terminal: Some(Arc::clone(self) as Arc<dyn ClientTerminal>),
                 file_read_ledger: Arc::clone(&state.file_read_ledger),
                 local_web_search: match &turn_config.web_search {
-                    infinitecode_core::ResolvedWebSearchConfig::Local(config) => Some(config.clone()),
+                    infinitecode_core::ResolvedWebSearchConfig::Local(config) => {
+                        Some(config.clone())
+                    }
                     infinitecode_core::ResolvedWebSearchConfig::Disabled
                     | infinitecode_core::ResolvedWebSearchConfig::Provider => None,
                 },

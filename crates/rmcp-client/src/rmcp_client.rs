@@ -11,9 +11,9 @@ use std::time::Instant;
 
 use anyhow::Result;
 use anyhow::anyhow;
-use infinitecode_config::McpServerEnvVar;
 use futures::FutureExt;
 use futures::future::BoxFuture;
+use infinitecode_config::McpServerEnvVar;
 use oauth2::TokenResponse;
 use reqwest::header::AUTHORIZATION;
 use reqwest::header::HeaderMap;

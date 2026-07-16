@@ -25,7 +25,9 @@ impl CodeSearchHandler {
         Self::with_service(Arc::new(CodeSearchService::production()))
     }
 
-    pub fn new_with_network_proxy(network_proxy: infinitecode_network_proxy::NetworkProxyConfig) -> Self {
+    pub fn new_with_network_proxy(
+        network_proxy: infinitecode_network_proxy::NetworkProxyConfig,
+    ) -> Self {
         Self::with_service(Arc::new(CodeSearchService::production_with_network_proxy(
             network_proxy,
         )))

@@ -554,7 +554,9 @@ fn permission_preset_from_value(value: &str) -> Option<PermissionPreset> {
     }
 }
 
-fn permission_preset_from_safety(preset: infinitecode_safety::PermissionPreset) -> PermissionPreset {
+fn permission_preset_from_safety(
+    preset: infinitecode_safety::PermissionPreset,
+) -> PermissionPreset {
     match preset {
         infinitecode_safety::PermissionPreset::ReadOnly => PermissionPreset::ReadOnly,
         infinitecode_safety::PermissionPreset::Default => PermissionPreset::Default,

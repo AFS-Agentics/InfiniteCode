@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use infinitecode_protocol::{
-    ACP_SESSION_UPDATE_METHOD, AcpSessionNotification, AcpSessionUpdate, INFINITECODE_TURN_USAGE_META,
-    ServerEvent, SessionCompactionFailedPayload, SessionEventPayload, TurnEventPayload,
-    TurnFailedPayload, TurnUsageUpdatedPayload,
+    ACP_SESSION_UPDATE_METHOD, AcpSessionNotification, AcpSessionUpdate,
+    INFINITECODE_TURN_USAGE_META, ServerEvent, SessionCompactionFailedPayload, SessionEventPayload,
+    TurnEventPayload, TurnFailedPayload, TurnUsageUpdatedPayload,
 };
 
 use crate::client_core::ServerNotificationMessage;
@@ -34,7 +34,8 @@ pub fn client_event_from_notification(
                 .and_then(|meta| meta.get(INFINITECODE_TURN_USAGE_META))
         {
             return Ok(Some(ClientEvent::TurnUsageUpdated(
-                serde_json::from_value(payload.clone()).context("decode InfiniteCode usage metadata")?,
+                serde_json::from_value(payload.clone())
+                    .context("decode InfiniteCode usage metadata")?,
             )));
         }
         return Ok(None);

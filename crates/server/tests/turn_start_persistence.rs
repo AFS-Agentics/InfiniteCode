@@ -7,6 +7,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Datelike;
 use chrono::SecondsFormat;
+use futures::Stream;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
 use infinitecode_core::FileSystemSkillCatalog;
@@ -28,8 +30,6 @@ use infinitecode_provider::ModelProviderSDK;
 use infinitecode_provider::ProviderRoute;
 use infinitecode_provider::ProviderRouter;
 use infinitecode_provider::error::ProviderError;
-use futures::Stream;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -143,7 +143,10 @@ async fn turn_start_append_failure_does_not_launch_model_turn_or_leave_session_a
         .context("successful turn/start response")?;
     let response: infinitecode_server::SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(successful_start)?;
-    assert_eq!(response.result.status(), infinitecode_protocol::TurnStatus::Running);
+    assert_eq!(
+        response.result.status(),
+        infinitecode_protocol::TurnStatus::Running
+    );
     stream_calls_rx
         .recv()
         .await
@@ -216,8 +219,9 @@ async fn message_edit_previous_accepts_skip_restore_and_replaces_prompt_branch()
         )
         .await
         .context("message/editPrevious response")?;
-    let edit_response: infinitecode_server::SuccessResponse<infinitecode_server::MessageEditPreviousResult> =
-        serde_json::from_value(edit_response)?;
+    let edit_response: infinitecode_server::SuccessResponse<
+        infinitecode_server::MessageEditPreviousResult,
+    > = serde_json::from_value(edit_response)?;
     let replacement_turn_id = edit_response
         .result
         .replacement_turn_id
@@ -308,8 +312,9 @@ async fn message_edit_previous_default_safe_restore_records_and_broadcasts() -> 
         )
         .await
         .context("message/editPrevious response")?;
-    let edit_response: infinitecode_server::SuccessResponse<infinitecode_server::MessageEditPreviousResult> =
-        serde_json::from_value(edit_response)?;
+    let edit_response: infinitecode_server::SuccessResponse<
+        infinitecode_server::MessageEditPreviousResult,
+    > = serde_json::from_value(edit_response)?;
     let replacement_turn_id = edit_response
         .result
         .replacement_turn_id

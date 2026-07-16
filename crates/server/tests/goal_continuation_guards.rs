@@ -8,6 +8,8 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::Stream;
+use futures::stream;
 use infinitecode_core::tools::ToolCallError;
 use infinitecode_core::tools::ToolHandler;
 use infinitecode_core::tools::ToolRegistry;
@@ -27,8 +29,6 @@ use infinitecode_protocol::StopReason;
 use infinitecode_protocol::StreamEvent;
 use infinitecode_protocol::Usage;
 use infinitecode_provider::ModelProviderSDK;
-use futures::Stream;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 

@@ -8,6 +8,8 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::Stream;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
 use infinitecode_core::FileSystemSkillCatalog;
@@ -29,8 +31,6 @@ use infinitecode_provider::SingleProviderRouter;
 use infinitecode_server::ClientTransportKind;
 use infinitecode_server::ServerRuntime;
 use infinitecode_server::ServerRuntimeDependencies;
-use futures::Stream;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -337,9 +337,10 @@ fn decode_acp_session_list_response(
     response: serde_json::Value,
 ) -> Result<Vec<infinitecode_server::SessionMetadata>> {
     let response_value = response.clone();
-    let response: infinitecode_server::AcpSuccessResponse<infinitecode_server::AcpListSessionsResult> =
-        serde_json::from_value(response)
-            .with_context(|| format!("decode ACP session/list response: {response_value}"))?;
+    let response: infinitecode_server::AcpSuccessResponse<
+        infinitecode_server::AcpListSessionsResult,
+    > = serde_json::from_value(response)
+        .with_context(|| format!("decode ACP session/list response: {response_value}"))?;
     response
         .result
         .sessions

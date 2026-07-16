@@ -6,6 +6,7 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
 use infinitecode_core::FileSystemSkillCatalog;
@@ -43,7 +44,6 @@ use infinitecode_server::AcpSuccessResponse;
 use infinitecode_server::ClientTransportKind;
 use infinitecode_server::ServerRuntime;
 use infinitecode_server::ServerRuntimeDependencies;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::mpsc;
@@ -359,14 +359,21 @@ async fn acp_session_load_replays_history_and_rejects_relative_roots() -> Result
     )
     .await?;
 
-    assert_legacy_session_method_removed(&runtime, connection_id, 25, "_infinitecode/session/start")
+    assert_legacy_session_method_removed(
+        &runtime,
+        connection_id,
+        25,
+        "_infinitecode/session/start",
+    )
+    .await?;
+    assert_legacy_session_method_removed(&runtime, connection_id, 26, "_infinitecode/session/list")
         .await?;
-    assert_legacy_session_method_removed(&runtime, connection_id, 26, "_infinitecode/session/list").await?;
     Ok(())
 }
 
 #[tokio::test]
-async fn acp_session_prompt_streams_session_updates_without_infinitecode_subscriptions() -> Result<()> {
+async fn acp_session_prompt_streams_session_updates_without_infinitecode_subscriptions()
+-> Result<()> {
     let data_root = TempDir::new()?;
     let runtime = build_runtime(data_root.path())?;
     let (connection_id, mut notifications_rx, _) =
@@ -1408,7 +1415,9 @@ async fn assert_legacy_session_method_removed(
     Ok(())
 }
 
-fn decode_infinitecode_session_meta(meta: &Option<infinitecode_protocol::AcpMeta>) -> Result<SessionMetadata> {
+fn decode_infinitecode_session_meta(
+    meta: &Option<infinitecode_protocol::AcpMeta>,
+) -> Result<SessionMetadata> {
     let session = meta
         .as_ref()
         .and_then(|meta| meta.get(infinitecode_protocol::INFINITECODE_SESSION_META))

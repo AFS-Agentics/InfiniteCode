@@ -3,13 +3,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures::StreamExt;
+use futures::future::BoxFuture;
+use futures::stream::FuturesUnordered;
 use infinitecode_config::ResolvedLocalWebSearchConfig;
 use infinitecode_safety::ResourceKind;
 use infinitecode_tools::contracts::ToolBudgets;
 use infinitecode_tools::contracts::ToolProgress;
-use futures::StreamExt;
-use futures::future::BoxFuture;
-use futures::stream::FuturesUnordered;
 use tokio::sync::RwLock;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -1265,7 +1265,10 @@ mod tests {
 
         assert!(result.is_error);
         assert_eq!(request.tool_name, "read");
-        assert_eq!(request.resource, infinitecode_safety::ResourceKind::FileRead);
+        assert_eq!(
+            request.resource,
+            infinitecode_safety::ResourceKind::FileRead
+        );
         assert_eq!(
             request.path,
             Some(PathBuf::from("C:/workspace").join("src/lib.rs"))
@@ -1320,7 +1323,10 @@ mod tests {
         assert_eq!(request.tool_name, "write_tool");
         assert_eq!(request.session_id, "session-1");
         assert_eq!(request.turn_id, Some("turn-1".into()));
-        assert_eq!(request.resource, infinitecode_safety::ResourceKind::FileWrite);
+        assert_eq!(
+            request.resource,
+            infinitecode_safety::ResourceKind::FileWrite
+        );
     }
 
     #[tokio::test]
@@ -1366,7 +1372,10 @@ mod tests {
 
         assert!(result.is_error);
         assert_eq!(request.tool_name, "shell_command");
-        assert_eq!(request.resource, infinitecode_safety::ResourceKind::ShellExec);
+        assert_eq!(
+            request.resource,
+            infinitecode_safety::ResourceKind::ShellExec
+        );
         assert_eq!(request.target.as_deref(), Some("git status"));
         assert_eq!(
             request.command_prefix,
@@ -1479,7 +1488,10 @@ mod tests {
 
         assert!(result.is_error);
         assert_eq!(request.tool_name, "code_search");
-        assert_eq!(request.resource, infinitecode_safety::ResourceKind::FileRead);
+        assert_eq!(
+            request.resource,
+            infinitecode_safety::ResourceKind::FileRead
+        );
         assert_eq!(request.path, Some(PathBuf::from("C:/workspace").join(".")));
         assert!(result.content.into_string().contains("permission denied"));
     }
@@ -2119,9 +2131,8 @@ mod tests {
             Arc::new(builder.build()),
             PermissionChecker::always_allow(),
             ToolRuntimeContext {
-                agent_coordinator: Some(
-                    Arc::new(FakeAgentCoordinator) as Arc<dyn infinitecode_tools::AgentToolCoordinator>
-                ),
+                agent_coordinator: Some(Arc::new(FakeAgentCoordinator)
+                    as Arc<dyn infinitecode_tools::AgentToolCoordinator>),
                 ..ToolRuntimeContext::default()
             },
             ToolExecutionOptions::default(),

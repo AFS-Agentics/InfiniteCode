@@ -200,7 +200,8 @@ impl ServerRuntime {
                                     display_input: String::new(),
                                     input: String::new(),
                                     input_messages: Vec::new(),
-                                    collaboration_mode: infinitecode_protocol::CollaborationMode::Build,
+                                    collaboration_mode:
+                                        infinitecode_protocol::CollaborationMode::Build,
                                     input_mode: TurnInputMode::HiddenGoalContinuation {
                                         goal: task_goal,
                                     },
@@ -238,7 +239,8 @@ impl ServerRuntime {
         if reservation.active_turn.is_some() {
             return false;
         }
-        if session_handle.collaboration_mode().await == Some(infinitecode_protocol::CollaborationMode::Plan)
+        if session_handle.collaboration_mode().await
+            == Some(infinitecode_protocol::CollaborationMode::Plan)
         {
             return false;
         }

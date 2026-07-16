@@ -3,11 +3,11 @@ use std::time::Instant;
 use std::{collections::BTreeMap, pin::Pin};
 
 use anyhow::{Context, Result};
+use futures::Stream;
 use infinitecode_protocol::{
     ModelRequest, ModelResponse, ResponseContent, ResponseExtra, ResponseMetadata, StopReason,
     StreamEvent, Usage,
 };
-use futures::Stream;
 use reqwest_eventsource::{Event, EventSource};
 use serde::Deserialize;
 use serde_json::Value;

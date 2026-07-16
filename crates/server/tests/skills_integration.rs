@@ -7,9 +7,9 @@ use std::sync::Mutex;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::ProviderVendorCatalog;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use tempfile::TempDir;
@@ -156,7 +156,8 @@ fn build_runtime_with_registry(
         .collect::<Vec<_>>();
     write_test_config(data_root, &user_skill_root, &workspace_skill_roots);
     let db_path = data_root.join("test_skills.db");
-    let db = Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
+    let db =
+        Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
     ServerRuntime::new(
         data_root.to_path_buf(),
         ServerRuntimeDependencies::new(
@@ -488,7 +489,10 @@ async fn start_auto_review_turn(
     let result: SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(response.clone())
             .with_context(|| format!("turn/start response: {response}"))?;
-    assert_eq!(result.result.status(), infinitecode_core::TurnStatus::Running);
+    assert_eq!(
+        result.result.status(),
+        infinitecode_core::TurnStatus::Running
+    );
     Ok(())
 }
 
@@ -959,7 +963,10 @@ async fn turn_start_resolves_skill_content_into_model_request() -> Result<()> {
     let start_result: SuccessResponse<infinitecode_server::TurnStartResult> =
         serde_json::from_value(response.clone())
             .with_context(|| format!("turn/start response: {response}"))?;
-    assert_eq!(start_result.result.status(), infinitecode_core::TurnStatus::Running);
+    assert_eq!(
+        start_result.result.status(),
+        infinitecode_core::TurnStatus::Running
+    );
 
     wait_for_turn_completed(&mut notifications_rx).await?;
 

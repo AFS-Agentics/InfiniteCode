@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use base64::Engine;
 #[cfg(unix)]
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use futures::Stream;
 use infinitecode_core::AgentsMdConfig;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
@@ -31,7 +32,6 @@ use infinitecode_server::ClientTransportKind;
 use infinitecode_server::ProtocolErrorCode;
 use infinitecode_server::ServerRuntime;
 use infinitecode_server::ServerRuntimeDependencies;
-use futures::Stream;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::sync::mpsc;

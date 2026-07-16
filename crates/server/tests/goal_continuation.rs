@@ -90,7 +90,10 @@ async fn goal_token_budget_reached_after_turn_enters_budget_limited() -> Result<
         serde_json::from_value(status_response)?;
 
     let goal = response.result.goal.expect("goal");
-    assert_eq!(goal.status, infinitecode_protocol::ThreadGoalStatus::BudgetLimited);
+    assert_eq!(
+        goal.status,
+        infinitecode_protocol::ThreadGoalStatus::BudgetLimited
+    );
     assert_eq!(goal.tokens_used, 160);
     assert_eq!(provider.requests.load(Ordering::SeqCst), 2);
     let requests = provider.captured_requests.lock().expect("lock requests");

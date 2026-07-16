@@ -1,10 +1,12 @@
 use std::io;
 
-use infinitecode_protocol::{ModelRequest, RequestContent, RequestMessage, ResponseContent, StreamEvent};
+use futures::StreamExt;
+use infinitecode_protocol::{
+    ModelRequest, RequestContent, RequestMessage, ResponseContent, StreamEvent,
+};
 use infinitecode_provider::ModelProviderSDK;
 use infinitecode_provider::error::ProviderError;
 use infinitecode_provider::openai::OpenAIProvider;
-use futures::StreamExt;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

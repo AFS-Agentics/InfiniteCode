@@ -693,10 +693,12 @@ async fn handle_tool_progress(
 ) {
     let content = match progress {
         infinitecode_core::tools::ToolProgress::OutputDelta { delta } => Some(delta),
-        infinitecode_core::tools::ToolProgress::StatusUpdate { message, percent } => Some(match percent {
-            Some(percent) => format!("{message} ({percent}%)"),
-            None => message,
-        }),
+        infinitecode_core::tools::ToolProgress::StatusUpdate { message, percent } => {
+            Some(match percent {
+                Some(percent) => format!("{message} ({percent}%)"),
+                None => message,
+            })
+        }
         infinitecode_core::tools::ToolProgress::Completion { summary } => Some(summary),
         infinitecode_core::tools::ToolProgress::Terminal { terminal_id } => {
             runtime

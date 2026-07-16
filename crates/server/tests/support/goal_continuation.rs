@@ -10,6 +10,9 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
+use futures::Stream;
+use futures::StreamExt;
+use futures::stream;
 use infinitecode_core::AppConfigStore;
 use infinitecode_core::BundledSkillsConfig;
 use infinitecode_core::FileSystemSkillCatalog;
@@ -32,9 +35,6 @@ use infinitecode_provider::SingleProviderRouter;
 use infinitecode_server::ClientTransportKind;
 use infinitecode_server::ServerRuntime;
 use infinitecode_server::ServerRuntimeDependencies;
-use futures::Stream;
-use futures::StreamExt;
-use futures::stream;
 use pretty_assertions::assert_eq;
 use tokio::sync::Notify;
 use tokio::sync::mpsc;
@@ -513,12 +513,13 @@ fn legacy_event_from_acp_notification(value: serde_json::Value) -> serde_json::V
     if value.get("method") != Some(&serde_json::json!("session/update")) {
         return value;
     }
-    let Ok(notification) =
-        serde_json::from_value::<infinitecode_protocol::AcpSessionNotification>(value["params"].clone())
-    else {
+    let Ok(notification) = serde_json::from_value::<infinitecode_protocol::AcpSessionNotification>(
+        value["params"].clone(),
+    ) else {
         return value;
     };
-    let Some((method, event)) = infinitecode_protocol::original_event_from_acp_notification(&notification)
+    let Some((method, event)) =
+        infinitecode_protocol::original_event_from_acp_notification(&notification)
     else {
         return value;
     };

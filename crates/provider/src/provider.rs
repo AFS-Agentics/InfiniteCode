@@ -1,12 +1,12 @@
 use std::pin::Pin;
 
 use async_trait::async_trait;
+use futures::Stream;
 use infinitecode_protocol::ModelRequest;
 use infinitecode_protocol::ModelResponse;
 use infinitecode_protocol::ProviderWireApi;
 use infinitecode_protocol::RequestRole;
 use infinitecode_protocol::StreamEvent;
-use futures::Stream;
 
 /// Capability flags that describe what a provider family or model can emit.
 #[derive(Debug, Clone, PartialEq, Eq)]

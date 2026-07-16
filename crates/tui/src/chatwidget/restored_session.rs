@@ -163,7 +163,8 @@ impl ChatWidget {
                         let result_item = paired_result_index
                             .map(|result_index| &history_items[result_index])
                             .or_else(|| {
-                                (item.kind != infinitecode_protocol::SessionHistoryItemKind::ToolCall)
+                                (item.kind
+                                    != infinitecode_protocol::SessionHistoryItemKind::ToolCall)
                                     .then_some(item)
                             });
                         self.apply_restored_exec_tool_io(item, result_item);
@@ -352,7 +353,9 @@ impl ChatWidget {
             ToolIoCellOptions {
                 title_line: (!call_item.title.is_empty())
                     .then(|| Self::ran_tool_line(&call_item.title)),
-                dot_prefix: if result_item.kind == infinitecode_protocol::SessionHistoryItemKind::Error {
+                dot_prefix: if result_item.kind
+                    == infinitecode_protocol::SessionHistoryItemKind::Error
+                {
                     Self::failed_dot_prefix()
                 } else {
                     Self::tool_dot_prefix()

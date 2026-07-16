@@ -136,9 +136,10 @@ async fn search_exa(
         proxy_url: network_proxy,
         no_proxy: network_no_proxy,
     };
-    let client = infinitecode_network_proxy::build_client_config(&proxy_config).map_err(|error| {
-        ToolCallError::ExecutionFailed(format!("Failed to create HTTP client: {error}"))
-    })?;
+    let client =
+        infinitecode_network_proxy::build_client_config(&proxy_config).map_err(|error| {
+            ToolCallError::ExecutionFailed(format!("Failed to create HTTP client: {error}"))
+        })?;
     let response = client
         .post(url)
         .header("x-api-key", &config.api_key)
@@ -171,9 +172,10 @@ async fn search_tavily(
         proxy_url: network_proxy,
         no_proxy: network_no_proxy,
     };
-    let client = infinitecode_network_proxy::build_client_config(&proxy_config).map_err(|error| {
-        ToolCallError::ExecutionFailed(format!("Failed to create HTTP client: {error}"))
-    })?;
+    let client =
+        infinitecode_network_proxy::build_client_config(&proxy_config).map_err(|error| {
+            ToolCallError::ExecutionFailed(format!("Failed to create HTTP client: {error}"))
+        })?;
     let response = client
         .post(url)
         .bearer_auth(&config.api_key)

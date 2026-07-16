@@ -34,9 +34,12 @@ struct RealLlmConfig {
 impl RealLlmConfig {
     fn from_env() -> Result<Self> {
         Ok(Self {
-            base_url: std::env::var("INFINITECODE_E2E_BASE_URL").context("missing INFINITECODE_E2E_BASE_URL")?,
-            api_key: std::env::var("INFINITECODE_E2E_API_KEY").context("missing INFINITECODE_E2E_API_KEY")?,
-            model_slug: std::env::var("INFINITECODE_E2E_MODEL").context("missing INFINITECODE_E2E_MODEL")?,
+            base_url: std::env::var("INFINITECODE_E2E_BASE_URL")
+                .context("missing INFINITECODE_E2E_BASE_URL")?,
+            api_key: std::env::var("INFINITECODE_E2E_API_KEY")
+                .context("missing INFINITECODE_E2E_API_KEY")?,
+            model_slug: std::env::var("INFINITECODE_E2E_MODEL")
+                .context("missing INFINITECODE_E2E_MODEL")?,
             max_tokens: std::env::var("INFINITECODE_E2E_MAX_TOKENS")
                 .ok()
                 .and_then(|value| value.parse::<u32>().ok())

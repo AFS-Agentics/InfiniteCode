@@ -1146,7 +1146,10 @@ fn shift_tab_plan_submission_marks_user_turn_plan_mode() {
     else {
         panic!("expected user turn command");
     };
-    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Plan);
+    assert_eq!(
+        collaboration_mode,
+        infinitecode_protocol::CollaborationMode::Plan
+    );
 }
 
 fn status_row_starting_with(rows: &[String], mode: &str) -> String {
@@ -1533,7 +1536,10 @@ fn bang_command_from_build_submits_one_shot_shell_command() {
             text: "next task".to_string()
         }]
     );
-    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Build);
+    assert_eq!(
+        collaboration_mode,
+        infinitecode_protocol::CollaborationMode::Build
+    );
 }
 
 /// Trace: L2-DES-TUI-003
@@ -1564,7 +1570,10 @@ fn escaped_bang_prefix_submits_normal_chat() {
             text: "!important".to_string()
         }]
     );
-    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Build);
+    assert_eq!(
+        collaboration_mode,
+        infinitecode_protocol::CollaborationMode::Build
+    );
 }
 
 /// Trace: L2-DES-TUI-003
@@ -1595,7 +1604,10 @@ fn leading_space_before_bang_submits_normal_chat() {
             text: "!pwd".to_string()
         }]
     );
-    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Build);
+    assert_eq!(
+        collaboration_mode,
+        infinitecode_protocol::CollaborationMode::Build
+    );
 }
 
 #[test]
@@ -2515,7 +2527,10 @@ fn proposed_plan_implement_action_sends_build_turn() {
         panic!("expected build user turn");
     };
     assert_eq!(event_cwd, Some(cwd));
-    assert_eq!(collaboration_mode, infinitecode_protocol::CollaborationMode::Build);
+    assert_eq!(
+        collaboration_mode,
+        infinitecode_protocol::CollaborationMode::Build
+    );
     assert_eq!(
         input,
         vec![InputItem::Text {
@@ -2778,11 +2793,13 @@ fn session_switch_merges_consecutive_explored_items() {
                 body: String::new(),
                 tool_io: None,
                 metadata: Some(infinitecode_protocol::SessionHistoryMetadata::Explored {
-                    actions: vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-                        cmd: "grep command_actions in crates/tui/src/worker.rs".to_string(),
-                        query: Some("command_actions".to_string()),
-                        path: Some("crates/tui/src/worker.rs".to_string()),
-                    }],
+                    actions: vec![
+                        infinitecode_protocol::parse_command::ParsedCommand::Search {
+                            cmd: "grep command_actions in crates/tui/src/worker.rs".to_string(),
+                            query: Some("command_actions".to_string()),
+                            path: Some("crates/tui/src/worker.rs".to_string()),
+                        },
+                    ],
                 }),
                 duration_ms: None,
             },
@@ -3943,10 +3960,12 @@ fn user_shell_command_renders_direct_output_and_shell_summary() {
         command: "ls".to_string(),
         input: None,
         source: infinitecode_protocol::protocol::ExecCommandSource::UserShell,
-        command_actions: vec![infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
-            cmd: "ls".to_string(),
-            path: None,
-        }],
+        command_actions: vec![
+            infinitecode_protocol::parse_command::ParsedCommand::ListFiles {
+                cmd: "ls".to_string(),
+                path: None,
+            },
+        ],
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolOutputDelta {
         tool_use_id: "user-shell-1".to_string(),
@@ -4252,7 +4271,8 @@ fn active_assistant_renders_resume_like_markdown_without_fragment_gaps() {
         "Command dispatch (/crates/cli/src/main.rs)\n\n".to_string(),
     ));
     widget.handle_worker_event(crate::events::WorkerEvent::TextDelta(
-        "infinitecode                 -> run_agent()            interactive TUI (default)\n".to_string(),
+        "infinitecode                 -> run_agent()            interactive TUI (default)\n"
+            .to_string(),
     ));
 
     let rows = rendered_rows(&widget, 180, 24);
@@ -4801,11 +4821,13 @@ fn interrupted_turn_flushes_explored_cell_before_summary() {
         tool_use_id: "tool-1".to_string(),
         summary: "code_search update_plan tool handler".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "code_search update_plan tool handler".to_string(),
-            query: Some("update_plan tool handler".to_string()),
-            path: Some("crates/core/src/tools/handlers".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "code_search update_plan tool handler".to_string(),
+                query: Some("update_plan tool handler".to_string()),
+                path: Some("crates/core/src/tools/handlers".to_string()),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
         tool_use_id: "tool-1".to_string(),
@@ -4878,11 +4900,13 @@ fn widget_with_live_explored_cell() -> ChatWidget {
         tool_use_id: "tool-1".to_string(),
         summary: "code_search update_plan tool handler".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "code_search update_plan tool handler".to_string(),
-            query: Some("update_plan tool handler".to_string()),
-            path: Some("crates/core/src/tools/handlers".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "code_search update_plan tool handler".to_string(),
+                query: Some("update_plan tool handler".to_string()),
+                path: Some("crates/core/src/tools/handlers".to_string()),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
         tool_use_id: "tool-1".to_string(),
@@ -6955,7 +6979,12 @@ fn new_session_prepared_does_not_duplicate_startup_header_without_history() {
     });
 
     let rows = rendered_rows(&widget, 80, 16);
-    assert_eq!(rows.iter().filter(|row| row.contains("InfiniteCode")).count(), 1);
+    assert_eq!(
+        rows.iter()
+            .filter(|row| row.contains("InfiniteCode"))
+            .count(),
+        1
+    );
     assert!(widget.status_summary_text().contains("cached 0 0%"));
 }
 
@@ -7560,11 +7589,13 @@ fn transcript_overlay_lines_include_completed_read_input_and_full_output() {
         tool_use_id: "tool-1".to_string(),
         summary: "read src/lib.rs".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
-            cmd: "read src/lib.rs".to_string(),
-            name: "lib.rs".to_string(),
-            path: PathBuf::from("src/lib.rs"),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Read {
+                cmd: "read src/lib.rs".to_string(),
+                name: "lib.rs".to_string(),
+                path: PathBuf::from("src/lib.rs"),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolCallDetails {
         tool_use_id: "tool-1".to_string(),
@@ -7869,11 +7900,13 @@ fn read_tool_call_renders_relative_path_with_line_range() {
         tool_use_id: "tool-1".to_string(),
         summary: "read crates/core/src/query.rs".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
-            cmd: "read crates/core/src/query.rs".to_string(),
-            name: "crates/core/src/query.rs L:10-19".to_string(),
-            path: PathBuf::from("crates/core/src/query.rs"),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Read {
+                cmd: "read crates/core/src/query.rs".to_string(),
+                name: "crates/core/src/query.rs L:10-19".to_string(),
+                path: PathBuf::from("crates/core/src/query.rs"),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
         tool_use_id: "tool-1".to_string(),
@@ -7914,11 +7947,13 @@ fn read_tool_call_falls_back_to_path_when_read_name_is_empty() {
         tool_use_id: "tool-1".to_string(),
         summary: "read crates/tui/src/mod.rs".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
-            cmd: "read crates/tui/src/mod.rs".to_string(),
-            name: String::new(),
-            path: PathBuf::from("crates/tui/src/mod.rs"),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Read {
+                cmd: "read crates/tui/src/mod.rs".to_string(),
+                name: String::new(),
+                path: PathBuf::from("crates/tui/src/mod.rs"),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolResult {
         tool_use_id: "tool-1".to_string(),
@@ -7963,11 +7998,13 @@ fn read_tool_call_updates_placeholder_from_completed_tool_call_metadata() {
         tool_use_id: "tool-1".to_string(),
         summary: "read {}".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
-            cmd: String::new(),
-            name: String::new(),
-            path: PathBuf::new(),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Read {
+                cmd: String::new(),
+                name: String::new(),
+                path: PathBuf::new(),
+            },
+        ]),
     });
 
     let initial_display = widget
@@ -8067,11 +8104,13 @@ fn consecutive_read_tool_calls_render_on_one_line_with_spaces() {
             tool_use_id: tool_use_id.clone(),
             summary: "read {}".to_string(),
             preparing: false,
-            parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Read {
-                cmd: String::new(),
-                name: String::new(),
-                path: PathBuf::new(),
-            }]),
+            parsed_commands: Some(vec![
+                infinitecode_protocol::parse_command::ParsedCommand::Read {
+                    cmd: String::new(),
+                    name: String::new(),
+                    path: PathBuf::new(),
+                },
+            ]),
         });
         widget.handle_worker_event(crate::events::WorkerEvent::ToolCallUpdated {
             tool_use_id: tool_use_id.clone(),
@@ -8171,11 +8210,13 @@ fn grep_tool_call_renders_as_explored_group_in_viewport() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'rebuild_restored_session' in crates/tui/src".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "grep 'rebuild_restored_session' in crates/tui/src".to_string(),
-            query: Some("rebuild_restored_session".to_string()),
-            path: Some("crates/tui/src".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "grep 'rebuild_restored_session' in crates/tui/src".to_string(),
+                query: Some("rebuild_restored_session".to_string()),
+                path: Some("crates/tui/src".to_string()),
+            },
+        ]),
     });
 
     let live_display = widget
@@ -8239,11 +8280,13 @@ fn code_search_tool_call_renders_as_explored_group_in_viewport() {
         tool_use_id: "tool-1".to_string(),
         summary: "code_search live tool feedback in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "code_search live tool feedback in crates".to_string(),
-            query: Some("live tool feedback".to_string()),
-            path: Some("crates".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "code_search live tool feedback in crates".to_string(),
+                query: Some("live tool feedback".to_string()),
+                path: Some("crates".to_string()),
+            },
+        ]),
     });
 
     let live_display = widget
@@ -8285,11 +8328,13 @@ fn exploring_code_search_with_details_shows_input_in_active_cell() {
         tool_use_id: "tool-1".to_string(),
         summary: "code_search live tool feedback in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "code_search live tool feedback in crates".to_string(),
-            query: Some("live tool feedback".to_string()),
-            path: Some("crates".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "code_search live tool feedback in crates".to_string(),
+                query: Some("live tool feedback".to_string()),
+                path: Some("crates".to_string()),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolCallDetails {
         tool_use_id: "tool-1".to_string(),
@@ -8340,11 +8385,13 @@ fn merged_explored_group_becomes_explored_after_all_results_arrive() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "grep 'plan' in crates".to_string(),
-            query: Some("plan".to_string()),
-            path: Some("crates".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "grep 'plan' in crates".to_string(),
+                query: Some("plan".to_string()),
+                path: Some("crates".to_string()),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
         tool_use_id: "tool-2".to_string(),
@@ -8408,11 +8455,13 @@ fn live_viewport_shows_explored_group_while_active() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "grep 'plan' in crates".to_string(),
-            query: Some("plan".to_string()),
-            path: Some("crates".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "grep 'plan' in crates".to_string(),
+                query: Some("plan".to_string()),
+                path: Some("crates".to_string()),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
         tool_use_id: "tool-2".to_string(),
@@ -8465,11 +8514,13 @@ fn reasoning_start_closes_current_explored_group() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "grep 'plan' in crates".to_string(),
-            query: Some("plan".to_string()),
-            path: Some("crates".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "grep 'plan' in crates".to_string(),
+                query: Some("plan".to_string()),
+                path: Some("crates".to_string()),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::TextItemStarted {
         item_id: infinitecode_core::ItemId::new(),
@@ -8519,11 +8570,13 @@ fn assistant_text_start_closes_current_explored_group() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "grep 'plan' in crates".to_string(),
-            query: Some("plan".to_string()),
-            path: Some("crates".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "grep 'plan' in crates".to_string(),
+                query: Some("plan".to_string()),
+                path: Some("crates".to_string()),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::TextItemStarted {
         item_id: infinitecode_core::ItemId::new(),
@@ -8573,11 +8626,13 @@ fn merged_explored_group_stays_completed_when_tool_results_arrive_after_tool_cal
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "grep 'plan' in crates".to_string(),
-            query: Some("plan".to_string()),
-            path: Some("crates".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "grep 'plan' in crates".to_string(),
+                query: Some("plan".to_string()),
+                path: Some("crates".to_string()),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
         tool_use_id: "tool-2".to_string(),
@@ -8655,11 +8710,13 @@ fn explored_group_in_history_can_finish_late_completions() {
         tool_use_id: "tool-1".to_string(),
         summary: "grep 'plan' in crates".to_string(),
         preparing: false,
-        parsed_commands: Some(vec![infinitecode_protocol::parse_command::ParsedCommand::Search {
-            cmd: "grep 'plan' in crates".to_string(),
-            query: Some("plan".to_string()),
-            path: Some("crates".to_string()),
-        }]),
+        parsed_commands: Some(vec![
+            infinitecode_protocol::parse_command::ParsedCommand::Search {
+                cmd: "grep 'plan' in crates".to_string(),
+                query: Some("plan".to_string()),
+                path: Some("crates".to_string()),
+            },
+        ]),
     });
     widget.handle_worker_event(crate::events::WorkerEvent::ToolCall {
         tool_use_id: "tool-2".to_string(),

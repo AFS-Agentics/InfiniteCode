@@ -8,10 +8,10 @@ use std::time::Duration;
 use anyhow::Context;
 use anyhow::Result;
 use async_trait::async_trait;
-use infinitecode_core::AppConfigStore;
-use infinitecode_core::ProviderVendorCatalog;
 use futures::SinkExt;
 use futures::StreamExt;
+use infinitecode_core::AppConfigStore;
+use infinitecode_core::ProviderVendorCatalog;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use tokio::io::AsyncBufReadExt;
@@ -23,6 +23,7 @@ use tokio::time::timeout;
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
 
+use futures::stream;
 use infinitecode_core::FileSystemSkillCatalog;
 use infinitecode_core::PresetModelCatalog;
 use infinitecode_core::SkillsConfig;
@@ -37,7 +38,6 @@ use infinitecode_provider::ModelProviderSDK;
 use infinitecode_provider::SingleProviderRouter;
 use infinitecode_server::ServerRuntime;
 use infinitecode_server::ServerRuntimeDependencies;
-use futures::stream;
 
 const STDIO_SERVER_STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
 const STDIO_SERVER_LINE_TIMEOUT: Duration = Duration::from_secs(30);
@@ -442,7 +442,8 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
     };
     let bind_address = format!("127.0.0.1:{port}");
     let db_path = std::env::temp_dir().join("test_end_to_end.db");
-    let db = Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
+    let db =
+        Arc::new(infinitecode_server::db::Database::open(db_path).expect("open test database"));
     let provider: Arc<dyn ModelProviderSDK> = Arc::new(PendingProvider);
     let runtime = ServerRuntime::new(
         std::env::temp_dir(),
@@ -462,10 +463,9 @@ async fn websocket_listener_supports_handshake_subscription_and_turn_lifecycle()
         ),
     );
     let listen = vec![format!("ws://{bind_address}")];
-    let listener_task =
-        tokio::spawn(
-            async move { infinitecode_server::run_listeners(Arc::clone(&runtime), &listen).await },
-        );
+    let listener_task = tokio::spawn(async move {
+        infinitecode_server::run_listeners(Arc::clone(&runtime), &listen).await
+    });
 
     tokio::time::sleep(Duration::from_millis(200)).await;
 
@@ -680,10 +680,9 @@ async fn websocket_turn_streams_final_tool_metadata_for_read_and_glob() -> Resul
         ),
     );
     let listen = vec![format!("ws://{bind_address}")];
-    let listener_task =
-        tokio::spawn(
-            async move { infinitecode_server::run_listeners(Arc::clone(&runtime), &listen).await },
-        );
+    let listener_task = tokio::spawn(async move {
+        infinitecode_server::run_listeners(Arc::clone(&runtime), &listen).await
+    });
 
     tokio::time::sleep(Duration::from_millis(200)).await;
 
@@ -855,7 +854,11 @@ fn infinitecode_binary_path() -> Result<PathBuf> {
     let mut path = std::env::current_exe()?;
     path.pop();
     path.pop();
-    path.push(if cfg!(windows) { "infinitecode.exe" } else { "infinitecode" });
+    path.push(if cfg!(windows) {
+        "infinitecode.exe"
+    } else {
+        "infinitecode"
+    });
     Ok(path)
 }
 
