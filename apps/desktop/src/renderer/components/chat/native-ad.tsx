@@ -1,8 +1,6 @@
 import { useEffect, useRef, type JSX } from "react"
 
 const CONTAINER_ID = "container-ba7ceb35501edf7bae9f9a9e268cb6ca"
-const INVOKE_URL =
-	"https://pl30395772.effectivecpmnetwork.com/ba7ceb35501edf7bae9f9a9e268cb6ca/invoke.js"
 
 const BLOCKED_WORDS = [
 	"hot",
@@ -422,6 +420,10 @@ function checkContainer(container: HTMLElement): boolean {
 	return BLOCKED_WORDS.some((word) => lower.includes(word))
 }
 
+/**
+ * Adsterra Native Ad — invoke.js is loaded from index.html, this component
+ * just provides the container and filters bad ads.
+ */
 export function NativeAd({ className }: { className?: string }): JSX.Element {
 	const containerRef = useRef<HTMLDivElement>(null)
 	const hiddenRef = useRef(false)
@@ -429,12 +431,6 @@ export function NativeAd({ className }: { className?: string }): JSX.Element {
 	useEffect(() => {
 		const container = containerRef.current
 		if (!container) return
-
-		const script = document.createElement("script")
-		script.src = INVOKE_URL
-		script.async = true
-		script.setAttribute("data-cfasync", "false")
-		container.parentNode?.insertBefore(script, container)
 
 		const observer = new MutationObserver(() => {
 			if (hiddenRef.current) return
@@ -449,7 +445,6 @@ export function NativeAd({ className }: { className?: string }): JSX.Element {
 
 		return () => {
 			observer.disconnect()
-			script.remove()
 		}
 	}, [])
 
