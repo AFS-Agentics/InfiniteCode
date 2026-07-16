@@ -6,10 +6,11 @@ const INVOKE_URL =
 const WORDLIST_URL =
 	"https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en"
 
-/** Extra words the LDNOOBW list misses — e.g. "hot" catches "hottest" */
+/** Extra words the LDNOOBW list misses */
 const EXTRA_WORDS = ["hot", "sexy", "beauty", "beautiful", "cam", "live sex", "dating"]
 
 let cachedWords: string[] | null = null
+let wordLoadCallbacks: Array<() => void> = []
 
 async function fetchBlockedWords(): Promise<string[]> {
 	if (cachedWords) return cachedWords
@@ -21,10 +22,22 @@ async function fetchBlockedWords(): Promise<string[]> {
 			.map((w) => w.trim().toLowerCase())
 			.filter((w) => w.length > 0 && !w.startsWith("#"))
 		cachedWords = [...new Set([...base, ...EXTRA_WORDS])]
+		// Notify all waiting instances
+		wordLoadCallbacks.forEach((cb) => cb())
+		wordLoadCallbacks = []
 		return cachedWords
 	} catch {
-		return EXTRA_WORDS
+		cachedWords = EXTRA_WORDS
+		wordLoadCallbacks.forEach((cb) => cb())
+		wordLoadCallbacks = []
+		return cachedWords
 	}
+}
+
+function checkContainer(container: HTMLElement, words: string[]): boolean {
+	const text = container.textContent ?? ""
+	const lower = text.toLowerCase()
+	return words.some((word) => lower.includes(word))
 }
 
 /**
@@ -36,15 +49,7 @@ async function fetchBlockedWords(): Promise<string[]> {
 export function NativeAd({ className }: { className?: string }): JSX.Element {
 	const containerRef = useRef<HTMLDivElement>(null)
 	const wordsRef = useRef<string[]>(cachedWords ?? [])
-
-	// Fetch word list once per session
-	useEffect(() => {
-		if (wordsRef.current.length === 0) {
-			fetchBlockedWords().then((words) => {
-				wordsRef.current = words
-			})
-		}
-	}, [])
+	const checkedRef = useRef(false)
 
 	useEffect(() => {
 		const container = containerRef.current
@@ -57,19 +62,37 @@ export function NativeAd({ className }: { className?: string }): JSX.Element {
 		script.setAttribute("data-cfasync", "false")
 		container.parentNode?.insertBefore(script, container)
 
+		// Try checking immediately (if words already cached)
+		const tryCheck = () => {
+			if (checkedRef.current) return
+			const words = wordsRef.current
+			if (words.length === 0) return false
+			if (checkContainer(container, words)) {
+				container.style.display = "none"
+				checkedRef.current = true
+				observer.disconnect()
+			}
+			checkedRef.current = true
+			return true
+		}
+
 		// Watch for ad content injected into the container
 		const observer = new MutationObserver(() => {
-			const blockedWords = wordsRef.current
-			if (blockedWords.length === 0) return
-			const text = container.textContent ?? ""
-			const lower = text.toLowerCase()
-			if (blockedWords.some((word) => lower.includes(word))) {
-				container.style.display = "none"
+			if (tryCheck()) {
 				observer.disconnect()
 			}
 		})
 
 		observer.observe(container, { childList: true, subtree: true, characterData: true })
+
+		// If words aren't loaded yet, register callback for when they arrive
+		if (wordsRef.current.length === 0) {
+			fetchBlockedWords()
+			wordLoadCallbacks.push(() => {
+				wordsRef.current = cachedWords!
+				tryCheck()
+			})
+		}
 
 		return () => {
 			observer.disconnect()
