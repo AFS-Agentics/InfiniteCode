@@ -1087,10 +1087,8 @@ export function ChatView({
 								</div>
 							)}
 
-							{/* Native ad in-feed — shows while AI is responding */}
-							{isWorking && turns.length > 0 && (
-								<NativeAd />
-							)}
+							{/* Native ad — always part of the scroll feed, scrolls with messages */}
+							{turns.length > 0 && <NativeAd />}
 
 							{/* Session-level error from session.error events */}
 							{showSessionError && sessionErrorText && (
