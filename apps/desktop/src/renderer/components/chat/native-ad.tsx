@@ -1,19 +1,51 @@
+import { useEffect, useRef, type JSX } from "react"
+
+const AD_CONFIG = {
+	key: "5b745c463fe72d3d709601ffd3946e06",
+	format: "iframe",
+	height: 60,
+	width: 468,
+	params: {},
+}
+
 /**
- * Adsterra Native Ad component.
+ * 468×60 iframe banner ad.
  *
- * Renders the container div that the Adsterra invoke.js script discovers
- * and fills with a native widget. The invoke.js script is loaded once
- * in index.html via a <script> tag.
+ * Renders a self-contained ad script that sets `atOptions` then loads the
+ * invoke.js. Each <NativeAd /> instance creates its own script context so
+ * multiple instances on the same page all show ads.
  *
- * Placement tips:
- * - Above the input card → feels like a native banner before composing
- * - In the message feed   → feels like a native in-feed ad while scrolling
+ * The invoke.js loads synchronously (no `async`), so scripts execute in
+ * DOM order — each instance gets its own `atOptions` before invoking.
  */
-export function NativeAd({ className }: { className?: string }) {
+export function NativeAd({ className }: { className?: string }): JSX.Element {
+	const containerRef = useRef<HTMLDivElement>(null)
+
+	useEffect(() => {
+		const container = containerRef.current
+		if (!container) return
+
+		// atOptions config script
+		const configScript = document.createElement("script")
+		configScript.text = `atOptions = ${JSON.stringify(AD_CONFIG)};`
+		container.appendChild(configScript)
+
+		// invoke.js loader script
+		const invokeScript = document.createElement("script")
+		invokeScript.src =
+			"https://www.highperformanceformat.com/5b745c463fe72d3d709601ffd3946e06/invoke.js"
+		container.appendChild(invokeScript)
+
+		return () => {
+			container.innerHTML = ""
+		}
+	}, [])
+
 	return (
 		<div
-			id="container-ba7ceb35501edf7bae9f9a9e268cb6ca"
+			ref={containerRef}
 			className={className}
+			style={{ minHeight: 60, width: "100%" }}
 		/>
 	)
 }
