@@ -1076,15 +1076,19 @@ export function ChatView({
 								</div>
 							) : turns.length > 0 ? (
 								turns.length > VIRTUALIZE_TURN_THRESHOLD ? (
-									<VirtualizedTurnList turns={turns} renderTurn={renderTurn} />
+									<>
+										<VirtualizedTurnList turns={turns} renderTurn={renderTurn} />
+										<NativeAd />
+									</>
 								) : (
-									turns.map((turn, index) => (
-										<React.Fragment key={turn.id}>
-											{renderTurn(turn, index)}
-										</React.Fragment>
-									))
-									{/* Single native ad at bottom — moves down as new turns stream in */}
-									<NativeAd />
+									<>
+										{turns.map((turn, index) => (
+											<React.Fragment key={turn.id}>
+												{renderTurn(turn, index)}
+											</React.Fragment>
+										))}
+										<NativeAd />
+									</>
 								)
 							) : setupPhase ? (
 								<WorktreeSetupProgress phase={setupPhase} />
