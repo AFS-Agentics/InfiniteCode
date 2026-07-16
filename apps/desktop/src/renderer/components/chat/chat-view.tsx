@@ -104,7 +104,7 @@ import {
 	type ComposerGoalStatus,
 } from "./composer-status-stack"
 import { ContextItems } from "./context-items"
-import { NativeAd } from "./native-ad"
+import { GravityAd } from "./gravity-ad"
 import type { MentionOption } from "./mention-popover"
 import { MentionPopover, type MentionPopoverHandle } from "./mention-popover"
 import { PromptAttachmentPreview } from "./prompt-attachments"
@@ -1037,6 +1037,31 @@ export function ChatView({
 		],
 	)
 
+	// Extract last 4 turn messages for Gravity ad contextual matching
+	const adMessages = useMemo(() => {
+		const msgs: { role: string; content: string }[] = []
+		// Walk backwards through turns, collect user + first assistant text
+		for (let i = turns.length - 1; i >= 0 && msgs.length < 4; i--) {
+			const turn = turns[i]
+			// User message — collect "text" and "reasoning" parts
+			const userText = turn.userMessage.parts
+				.filter((p) => p.type === "text" || p.type === "reasoning")
+				.map((p) => p.text)
+				.join(" ")
+			if (userText) msgs.unshift({ role: "user", content: userText.slice(0, 500) })
+			// First assistant message
+			const firstAssistant = turn.assistantMessages[0]
+			if (firstAssistant) {
+				const assistantText = firstAssistant.parts
+					.filter((p) => p.type === "text" || p.type === "reasoning")
+					.map((p) => p.text)
+					.join(" ")
+				if (assistantText) msgs.unshift({ role: "assistant", content: assistantText.slice(0, 500) })
+			}
+		}
+		return msgs
+	}, [turns])
+
 	return (
 		<div
 			className="relative flex h-full min-w-0 flex-col overflow-hidden"
@@ -1078,7 +1103,7 @@ export function ChatView({
 								turns.length > VIRTUALIZE_TURN_THRESHOLD ? (
 									<>
 										<VirtualizedTurnList turns={turns} renderTurn={renderTurn} />
-										<NativeAd />
+										<GravityAd messages={adMessages} />
 									</>
 								) : (
 									<>
@@ -1087,7 +1112,7 @@ export function ChatView({
 												{renderTurn(turn, index)}
 											</React.Fragment>
 										))}
-										<NativeAd />
+										<GravityAd messages={adMessages} />
 									</>
 								)
 							) : setupPhase ? (

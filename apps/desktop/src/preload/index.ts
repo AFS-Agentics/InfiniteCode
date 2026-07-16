@@ -332,4 +332,11 @@ contextBridge.exposeInMainWorld("infinitecode", {
 		/** Restore the most recent migration backup. */
 		restoreBackup: () => ipcRenderer.invoke("onboarding:restore-backup"),
 	},
+
+	// --- Gravity Ads ---
+
+	gravity: {
+		getAds: (messages: { role: string; content: string }[]) =>
+			ipcRenderer.invoke("gravity:get-ads", messages),
+	},
 })

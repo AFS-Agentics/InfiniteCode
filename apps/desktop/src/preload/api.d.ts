@@ -619,6 +619,11 @@ export interface InfiniteCodeAPI {
 			errors: string[]
 		}>
 	}
+
+	// Gravity Ads
+	gravity: {
+		getAds: (messages: { role: string; content: string }[]) => Promise<Record<string, unknown>[]>
+	}
 }
 
 declare global {

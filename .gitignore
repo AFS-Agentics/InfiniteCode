@@ -10,3 +10,4 @@ node_modules
 /apps/website/dist/
 .vercel
 devlog.txt
+.env

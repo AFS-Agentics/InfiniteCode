@@ -15,6 +15,7 @@ import {
 import type { CreateAutomationInput, UpdateAutomationInput } from "./automation/types"
 import { deleteCredential, getCredential, storeCredential } from "./credential-store"
 import { checkDesktopRuntime } from "./desktop-runtime-check"
+import { gravityAds } from "@gravity-ai/api"
 import { createDesktopFolder, statDesktopFolders } from "./desktop-folders"
 import {
 	applyChangesToLocal,
@@ -662,6 +663,31 @@ export function registerIpcHandlers(): void {
 		withLogging("automation:preview-schedule", (_, rrule: string, timezone: string) =>
 			previewSchedule(rrule, timezone),
 		),
+	)
+
+	// --- Gravity Ads ---
+
+	ipcMain.handle(
+		"gravity:get-ads",
+		withLogging("gravity:get-ads", async (_, messages: { role: string; content: string }[]) => {
+			// Minimal req mock — Electron's main process isn't an HTTP server.
+			// gravityAds needs body (for gravity_context, optional) and headers
+			// (for IP extraction, optional — falls back gracefully).
+			const req: Parameters<typeof gravityAds>[0] = {
+				body: { messages },
+				headers: {},
+			}
+			const result = await gravityAds(
+				req,
+				messages as import("@gravity-ai/api").MessageObject[],
+				[{ placement: "below_response" as const, placement_id: "main" as const }] as import("@gravity-ai/api").PlacementObject[],
+				{
+					production: !app.isPackaged ? false : true,
+					timeoutMs: 5000,
+				},
+			)
+			return result.ads
+		}),
 	)
 
 	// --- Settings push channel (main -> renderer) ---
