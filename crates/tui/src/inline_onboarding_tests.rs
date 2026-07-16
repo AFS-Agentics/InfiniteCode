@@ -115,7 +115,7 @@ fn first_run_onboarding_starts_with_logo_and_hides_composer() {
     let (mut widget, _app_event_rx) = onboarding_widget_with_available_model(test_model(), cwd);
 
     let scrollback = scrollback_plain_lines(&widget.drain_scrollback_lines(100)).join("\n");
-    assert!(scrollback.contains("██████"));
+    assert!(scrollback.contains("|_ _|"));
     assert!(!scrollback.contains("Workspace"));
     assert!(!scrollback.contains("Model      deepseek-v4-flash"));
 

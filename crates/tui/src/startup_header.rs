@@ -335,10 +335,8 @@ mod tests {
         assert_eq!(9, rows.len());
         assert!(rows[0].starts_with('┏'));
         assert!(rows[2].contains("|_ _|"));
-        // v0.1.3 version appears on the 3rd logo line (idx==2), which is rows[3]
+        // v0.1.3 version appears on the middle line (logo index 2), which is rows[3]
         assert!(rows[3].contains("v0.1.3") || rows[3].contains("0.1.3"));
-        // v0.1.3 version appears on the middle line (index 2 with 5 rows)
-        assert!(rows[2].contains("v0.1.3") || rows[2].contains("0.1.3"));
         assert!(rows[7].contains("Workspace"));
         let rendered = rows.join("\n");
         assert!(!rendered.contains("Model"));
