@@ -1077,7 +1077,13 @@ export function ChatView({
 								turns.length > VIRTUALIZE_TURN_THRESHOLD ? (
 									<VirtualizedTurnList turns={turns} renderTurn={renderTurn} />
 								) : (
-									turns.map(renderTurn)
+									turns.map((turn, index) => (
+										<React.Fragment key={turn.id}>
+											{renderTurn(turn, index)}
+											{/* Native ad after each turn — scrolls naturally with messages */}
+											<NativeAd />
+										</React.Fragment>
+									))
 								)
 							) : setupPhase ? (
 								<WorktreeSetupProgress phase={setupPhase} />
@@ -1086,9 +1092,6 @@ export function ChatView({
 									<p className="text-sm text-muted-foreground">No messages yet</p>
 								</div>
 							)}
-
-							{/* Native ad — always part of the scroll feed, scrolls with messages */}
-							{turns.length > 0 && <NativeAd />}
 
 							{/* Session-level error from session.error events */}
 							{showSessionError && sessionErrorText && (
