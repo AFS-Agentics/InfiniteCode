@@ -3,96 +3,449 @@ import { useEffect, useRef, type JSX } from "react"
 const CONTAINER_ID = "container-ba7ceb35501edf7bae9f9a9e268cb6ca"
 const INVOKE_URL =
 	"https://pl30395772.effectivecpmnetwork.com/ba7ceb35501edf7bae9f9a9e268cb6ca/invoke.js"
-const WORDLIST_URL =
-	"https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/master/en"
 
-/** Extra words the LDNOOBW list misses */
-const EXTRA_WORDS = ["hot", "sexy", "beauty", "beautiful", "cam", "live sex", "dating"]
+const BLOCKED_WORDS = [
+	"hot",
+	"beauty",
+	"beautiful",
+	"cam",
+	"live sex",
+	"dating",
+	"2 girls 1 cup",
+	"2g1c",
+	"acrotomophilia",
+	"alabama hot pocket",
+	"alaskan pipeline",
+	"anal",
+	"anilingus",
+	"anus",
+	"apeshit",
+	"arsehole",
+	"ass",
+	"asshole",
+	"assmunch",
+	"auto erotic",
+	"autoerotic",
+	"babeland",
+	"baby batter",
+	"baby juice",
+	"ball gag",
+	"ball gravy",
+	"ball kicking",
+	"ball licking",
+	"ball sack",
+	"ball sucking",
+	"bangbros",
+	"bangbus",
+	"bareback",
+	"barely legal",
+	"barenaked",
+	"bastard",
+	"bastardo",
+	"bastinado",
+	"bbw",
+	"bdsm",
+	"beaner",
+	"beaners",
+	"beastiality",
+	"beaver cleaver",
+	"beaver lips",
+	"bestiality",
+	"big black",
+	"big breasts",
+	"big knockers",
+	"big tits",
+	"bimbos",
+	"birdlock",
+	"bitch",
+	"bitches",
+	"black cock",
+	"blonde action",
+	"blonde on blonde action",
+	"blow job",
+	"blow your load",
+	"blowjob",
+	"blue waffle",
+	"blumpkin",
+	"bollocks",
+	"bondage",
+	"boner",
+	"boob",
+	"boobs",
+	"booty call",
+	"brown showers",
+	"brunette action",
+	"bukkake",
+	"bulldyke",
+	"bullet vibe",
+	"bullshit",
+	"bung hole",
+	"bunghole",
+	"busty",
+	"butt",
+	"buttcheeks",
+	"butthole",
+	"camel toe",
+	"camgirl",
+	"camslut",
+	"camwhore",
+	"carpet muncher",
+	"carpetmuncher",
+	"chocolate rosebuds",
+	"cialis",
+	"circlejerk",
+	"cleveland steamer",
+	"clit",
+	"clitoris",
+	"clover clamps",
+	"clusterfuck",
+	"cock",
+	"cocks",
+	"coon",
+	"coons",
+	"coprolagnia",
+	"coprophilia",
+	"cornhole",
+	"creampie",
+	"cum",
+	"cumming",
+	"cumshot",
+	"cumshots",
+	"cunnilingus",
+	"cunt",
+	"darkie",
+	"date rape",
+	"daterape",
+	"deep throat",
+	"deepthroat",
+	"dendrophilia",
+	"dick",
+	"dildo",
+	"dingleberries",
+	"dingleberry",
+	"dirty pillows",
+	"dirty sanchez",
+	"dog style",
+	"doggie style",
+	"doggiestyle",
+	"doggy style",
+	"doggystyle",
+	"dolcett",
+	"domination",
+	"dominatrix",
+	"dommes",
+	"donkey punch",
+	"double dong",
+	"double penetration",
+	"dp action",
+	"dry hump",
+	"dvda",
+	"eat my ass",
+	"ecchi",
+	"ejaculation",
+	"erotic",
+	"erotism",
+	"escort",
+	"eunuch",
+	"fag",
+	"faggot",
+	"fecal",
+	"felch",
+	"fellatio",
+	"feltch",
+	"female squirting",
+	"femdom",
+	"figging",
+	"fingerbang",
+	"fingering",
+	"fisting",
+	"foot fetish",
+	"footjob",
+	"frotting",
+	"fuck",
+	"fuck buttons",
+	"fuckin",
+	"fucking",
+	"fucktards",
+	"fudge packer",
+	"fudgepacker",
+	"futanari",
+	"g-spot",
+	"gang bang",
+	"gangbang",
+	"gay sex",
+	"genitals",
+	"giant cock",
+	"girl on",
+	"girl on top",
+	"girls gone wild",
+	"goatcx",
+	"goatse",
+	"god damn",
+	"gokkun",
+	"golden shower",
+	"goo girl",
+	"goodpoop",
+	"goregasm",
+	"grope",
+	"group sex",
+	"guro",
+	"hand job",
+	"handjob",
+	"hard core",
+	"hardcore",
+	"hentai",
+	"homoerotic",
+	"honkey",
+	"hooker",
+	"horny",
+	"hot carl",
+	"hot chick",
+	"how to kill",
+	"how to murder",
+	"huge fat",
+	"humping",
+	"incest",
+	"intercourse",
+	"jack off",
+	"jail bait",
+	"jailbait",
+	"jelly donut",
+	"jerk off",
+	"jigaboo",
+	"jiggaboo",
+	"jiggerboo",
+	"jizz",
+	"juggs",
+	"kike",
+	"kinbaku",
+	"kinkster",
+	"kinky",
+	"knobbing",
+	"leather restraint",
+	"leather straight jacket",
+	"lemon party",
+	"livesex",
+	"lolita",
+	"lovemaking",
+	"make me come",
+	"male squirting",
+	"masturbate",
+	"masturbating",
+	"masturbation",
+	"menage a trois",
+	"milf",
+	"missionary position",
+	"mong",
+	"motherfucker",
+	"mound of venus",
+	"mr hands",
+	"muff diver",
+	"muffdiving",
+	"nambla",
+	"nawashi",
+	"negro",
+	"neonazi",
+	"nig nog",
+	"nigga",
+	"nigger",
+	"nimphomania",
+	"nipple",
+	"nipples",
+	"nsfw",
+	"nsfw images",
+	"nude",
+	"nudity",
+	"nutten",
+	"nympho",
+	"nymphomania",
+	"octopussy",
+	"omorashi",
+	"one cup two girls",
+	"one guy one jar",
+	"orgasm",
+	"orgy",
+	"paedophile",
+	"paki",
+	"panties",
+	"panty",
+	"pedobear",
+	"pedophile",
+	"pegging",
+	"penis",
+	"phone sex",
+	"piece of shit",
+	"pikey",
+	"piss pig",
+	"pissing",
+	"pisspig",
+	"playboy",
+	"pleasure chest",
+	"pole smoker",
+	"ponyplay",
+	"poof",
+	"poon",
+	"poontang",
+	"poop chute",
+	"poopchute",
+	"porn",
+	"porno",
+	"pornography",
+	"prince albert piercing",
+	"pthc",
+	"pubes",
+	"punany",
+	"pussy",
+	"queaf",
+	"queef",
+	"quim",
+	"raghead",
+	"raging boner",
+	"rape",
+	"raping",
+	"rapist",
+	"rectum",
+	"reverse cowgirl",
+	"rimjob",
+	"rimming",
+	"rosy palm",
+	"rosy palm and her 5 sisters",
+	"rusty trombone",
+	"s&m",
+	"sadism",
+	"santorum",
+	"scat",
+	"schlong",
+	"scissoring",
+	"semen",
+	"sex",
+	"sexcam",
+	"sexo",
+	"sexual",
+	"sexuality",
+	"sexually",
+	"sexy",
+	"shaved beaver",
+	"shaved pussy",
+	"shemale",
+	"shibari",
+	"shit",
+	"shitblimp",
+	"shitty",
+	"shota",
+	"shrimping",
+	"skeet",
+	"slanteye",
+	"slut",
+	"smut",
+	"snatch",
+	"snowballing",
+	"sodomize",
+	"sodomy",
+	"spastic",
+	"spic",
+	"splooge",
+	"splooge moose",
+	"spooge",
+	"spread legs",
+	"spunk",
+	"strap on",
+	"strapon",
+	"strappado",
+	"strip club",
+	"style doggy",
+	"suck",
+	"sucks",
+	"suicide girls",
+	"sultry women",
+	"swastika",
+	"swinger",
+	"tainted love",
+	"taste my",
+	"tea bagging",
+	"threesome",
+	"throating",
+	"thumbzilla",
+	"tied up",
+	"tight white",
+	"tit",
+	"tits",
+	"titties",
+	"titty",
+	"tongue in a",
+	"topless",
+	"tosser",
+	"towelhead",
+	"tranny",
+	"tribadism",
+	"tub girl",
+	"tubgirl",
+	"tushy",
+	"twat",
+	"twink",
+	"twinkie",
+	"two girls one cup",
+	"undressing",
+	"upskirt",
+	"urethra play",
+	"urophilia",
+	"vagina",
+	"venus mound",
+	"viagra",
+	"vibrator",
+	"violet wand",
+	"vorarephilia",
+	"voyeur",
+	"voyeurweb",
+	"voyuer",
+	"vulva",
+	"wank",
+	"wet dream",
+	"wetback",
+	"white power",
+	"whore",
+	"worldsex",
+	"wrapping men",
+	"wrinkled starfish",
+	"xx",
+	"xxx",
+	"yaoi",
+	"yellow showers",
+	"yiffy",
+	"zoophilia",
+	"🖕",
+]
 
-let cachedWords: string[] | null = null
-let wordLoadCallbacks: Array<() => void> = []
-
-async function fetchBlockedWords(): Promise<string[]> {
-	if (cachedWords) return cachedWords
-	try {
-		const res = await fetch(WORDLIST_URL)
-		const text = await res.text()
-		const base = text
-			.split("\n")
-			.map((w) => w.trim().toLowerCase())
-			.filter((w) => w.length > 0 && !w.startsWith("#"))
-		cachedWords = [...new Set([...base, ...EXTRA_WORDS])]
-		// Notify all waiting instances
-		wordLoadCallbacks.forEach((cb) => cb())
-		wordLoadCallbacks = []
-		return cachedWords
-	} catch {
-		cachedWords = EXTRA_WORDS
-		wordLoadCallbacks.forEach((cb) => cb())
-		wordLoadCallbacks = []
-		return cachedWords
-	}
-}
-
-function checkContainer(container: HTMLElement, words: string[]): boolean {
+function checkContainer(container: HTMLElement): boolean {
 	const text = container.textContent ?? ""
 	const lower = text.toLowerCase()
-	return words.some((word) => lower.includes(word))
+	return BLOCKED_WORDS.some((word) => lower.includes(word))
 }
 
-/**
- * Adsterra Native Ad with client-side content filtering.
- *
- * The invoke.js script is loaded in the document body (before the container)
- * so it can find the container by ID and inject content properly.
- */
 export function NativeAd({ className }: { className?: string }): JSX.Element {
 	const containerRef = useRef<HTMLDivElement>(null)
-	const wordsRef = useRef<string[]>(cachedWords ?? [])
-	const checkedRef = useRef(false)
+	const hiddenRef = useRef(false)
 
 	useEffect(() => {
 		const container = containerRef.current
 		if (!container) return
 
-		// Load invoke.js into document body before the container
 		const script = document.createElement("script")
 		script.src = INVOKE_URL
 		script.async = true
 		script.setAttribute("data-cfasync", "false")
 		container.parentNode?.insertBefore(script, container)
 
-		// Try checking immediately (if words already cached)
-		const tryCheck = () => {
-			if (checkedRef.current) return
-			const words = wordsRef.current
-			if (words.length === 0) return false
-			if (checkContainer(container, words)) {
-				container.style.display = "none"
-				checkedRef.current = true
-				observer.disconnect()
-			}
-			checkedRef.current = true
-			return true
-		}
-
-		// Watch for ad content injected into the container
 		const observer = new MutationObserver(() => {
-			if (tryCheck()) {
+			if (hiddenRef.current) return
+			if (checkContainer(container)) {
+				container.style.display = "none"
+				hiddenRef.current = true
 				observer.disconnect()
 			}
 		})
 
 		observer.observe(container, { childList: true, subtree: true, characterData: true })
-
-		// If words aren't loaded yet, register callback for when they arrive
-		if (wordsRef.current.length === 0) {
-			fetchBlockedWords()
-			wordLoadCallbacks.push(() => {
-				wordsRef.current = cachedWords!
-				tryCheck()
-			})
-		}
 
 		return () => {
 			observer.disconnect()
