@@ -119,7 +119,7 @@ impl LegacySseTransportWorker {
             return Err(LegacySseTransportError::GetContentType { content_type, body });
         }
 
-        Ok(SseStream::from_byte_stream(
+        Ok(SseStream::from_bytes_stream(
             response
                 .bytes_stream()
                 .map(|result| result.map_err(std::io::Error::other)),

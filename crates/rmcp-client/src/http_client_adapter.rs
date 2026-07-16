@@ -349,7 +349,7 @@ async fn collect_body(
 fn sse_stream_from_body(
     response: Response,
 ) -> BoxStream<'static, std::result::Result<Sse, sse_stream::Error>> {
-    SseStream::from_byte_stream(
+    SseStream::from_bytes_stream(
         response
             .bytes_stream()
             .map(|result| result.map_err(io::Error::other)),
