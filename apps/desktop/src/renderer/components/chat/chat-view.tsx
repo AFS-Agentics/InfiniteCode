@@ -1,4 +1,3 @@
-import React from "react"
 import {
 	Conversation,
 	ConversationContent,
@@ -104,7 +103,10 @@ import {
 	type ComposerGoalStatus,
 } from "./composer-status-stack"
 import { ContextItems } from "./context-items"
-import { GravityAd } from "./gravity-ad"
+import {
+	GravityBottomPageAd,
+
+} from "./gravity-ad"
 import type { MentionOption } from "./mention-popover"
 import { MentionPopover, type MentionPopoverHandle } from "./mention-popover"
 import { PromptAttachmentPreview } from "./prompt-attachments"
@@ -1037,30 +1039,48 @@ export function ChatView({
 		],
 	)
 
-	// Extract last 4 turn messages for Gravity ad contextual matching
-	const adMessages = useMemo(() => {
-		const msgs: { role: string; content: string }[] = []
-		// Walk backwards through turns, collect user + first assistant text
-		for (let i = turns.length - 1; i >= 0 && msgs.length < 4; i--) {
-			const turn = turns[i]
-			// User message — collect "text" and "reasoning" parts
-			const userText = turn.userMessage.parts
-				.filter((p) => p.type === "text" || p.type === "reasoning")
-				.map((p) => p.text)
-				.join(" ")
-			if (userText) msgs.unshift({ role: "user", content: userText.slice(0, 500) })
-			// First assistant message
-			const firstAssistant = turn.assistantMessages[0]
-			if (firstAssistant) {
-				const assistantText = firstAssistant.parts
-					.filter((p) => p.type === "text" || p.type === "reasoning")
-					.map((p) => p.text)
-					.join(" ")
-				if (assistantText) msgs.unshift({ role: "assistant", content: assistantText.slice(0, 500) })
+	// Gravity ad pills (above_response + below_response + inline_response) are
+	// rendered inside ChatTurnComponent so they share a per-turn context slice
+	// (THIS turn's user prompt + assistant response) and stay stable when the
+	// user sends a new message. Rendering them here with a global last-4-turns
+	// useMemo caused every prior pill to refetch on every streamed token, which
+	// churned Gravity's sessionId and made them all fall back to "Sponsored ·
+	// none". Single source of truth is the per-turn structure, not a chat-view
+	// window.
+
+	// Ambient context for the always-on bottom-page ad. We use the most recent
+	// user turn's text (or a fallback ambient identifier when there are no
+	// turns yet) so Gravity has something concrete to match on while still
+	// letting the rotation counter inside GravityBottomPageAd drive fresh
+	// auctions on its timer. Keeping this stable across token churn — we
+	// intentionally sample user text content rather than reference the live
+	// turns atom — means a new turn's response stream never refires the
+	// bottom-page auction. The auction refreshes:
+	//   1. when the user sends a NEW message (lastTurn.userMessage changes)
+	//   2. once per `refreshIntervalMs` (rotation counter ticks)
+	// Both are intentional and complementary.
+	const bottomAdMessages = useMemo<{ role: string; content: string }[]>(
+		() => {
+			const lastTurn = turns.at(-1)
+			const userText = lastTurn
+				? lastTurn.userMessage.parts
+						.filter((p) => p.type === "text" || p.type === "reasoning")
+						.map((p) => p.text)
+						.join(" ")
+						.trim()
+						.slice(0, 800)
+				: ""
+			if (userText) {
+				return [{ role: "user", content: userText }]
 			}
-		}
-		return msgs
-	}, [turns])
+			// No turns yet — fall back to ambient identifiers so Gravity has
+			// a stable, non-empty context to anchor the auction on. The
+			// directory is the most project-shaped signal we have pre-conversation.
+			const fallback = agent.directory ?? agent.sessionId ?? "infinitecode"
+			return [{ role: "user", content: fallback }]
+		},
+		[turns.at(-1)?.id, agent.directory, agent.sessionId],
+	)
 
 	return (
 		<div
@@ -1101,19 +1121,9 @@ export function ChatView({
 								</div>
 							) : turns.length > 0 ? (
 								turns.length > VIRTUALIZE_TURN_THRESHOLD ? (
-									<>
-										<VirtualizedTurnList turns={turns} renderTurn={renderTurn} />
-										<GravityAd messages={adMessages} />
-									</>
+									<VirtualizedTurnList turns={turns} renderTurn={renderTurn} />
 								) : (
-									<>
-										{turns.map((turn, index) => (
-											<React.Fragment key={turn.id}>
-												{renderTurn(turn, index)}
-											</React.Fragment>
-										))}
-										<GravityAd messages={adMessages} />
-									</>
+									turns.map((turn, index) => renderTurn(turn, index))
 								)
 							) : setupPhase ? (
 								<WorktreeSetupProgress phase={setupPhase} />
@@ -1135,31 +1145,64 @@ export function ChatView({
 					<ConversationScrollButton className="!bottom-[calc(var(--chat-composer-inset)+1rem)]" />
 				</Conversation>
 
-				{/* Top fade */}
-				<div
-					data-slot="scroll-fade"
-					aria-hidden="true"
-					className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-gradient-to-b from-background/30 to-transparent"
-				/>
-				{/* Bottom fade */}
-				<div
-					data-slot="scroll-fade"
-					aria-hidden="true"
-					className="pointer-events-none absolute inset-x-0 bottom-[var(--chat-composer-inset)] z-10 h-6 bg-gradient-to-t from-background/30 to-transparent"
-				/>
-			</div>
+			{/* Top fade */}
+			<div
+				data-slot="scroll-fade"
+				aria-hidden="true"
+				className="pointer-events-none absolute inset-x-0 top-0 z-10 h-6 bg-gradient-to-b from-background/30 to-transparent"
+			/>
+			{/* Bottom fade */}
+			<div
+				data-slot="scroll-fade"
+				aria-hidden="true"
+				className="pointer-events-none absolute inset-x-0 bottom-[var(--chat-composer-inset)] z-10 h-6 bg-gradient-to-t from-background/30 to-transparent"
+			/>
+		</div>
 
-			{/* Bottom input section — hidden during worktree setup since the stub session
-			   cannot accept prompts yet. Extracted into its own component so toolbar,
-			   popover, mention, and model-selection state changes don't re-render the
-			   conversation turn list above. */}
-			{!setupPhase && (
-				<div
-					ref={composerRef}
-					className="pointer-events-none absolute bottom-0 left-0 right-3.5 z-30 overflow-visible pt-3"
-				>
-					<ChatInputSection
-						agent={agent}
+		{/* Bottom input section — the composer panel. Hidden during worktree
+		   setup since the stub session cannot accept prompts yet. Extracted
+		   into its own component so toolbar, popover, mention, and
+		   model-selection state changes don't re-render the conversation
+		   turn list above. The bottom-page Gravity ad is rendered ABOVE
+		   ChatInputSection inside the same compositor container.
+
+		   Composer panel chrome (not the ad itself):
+		     - `border-t border-border` gives a strict top divider so the
+		       composer reads as its own physical surface, not a floating overlay.
+		     - `bg-background/95 backdrop-blur` is a solid, slightly translucent
+		       surface — modern chat-app feel without losing the chat tint
+		       behind the input.
+		     - `px-3.5 pt-3 pb-2` ensures the pill + input sit comfily inside
+		       the panel; `pb-2` (vs the original `pb-4`) avoids doubling
+		       bottom padding with ChatInputSection's own internal gutter.
+		     - `overflow-visible` is set explicitly (matches the CSS default)
+		       so any future isolation change to the wrapper (e.g. adding
+		       `overflow-hidden` for a blur treatment) can't silently trap
+		       overflow content from children like the mention popover or
+		       model-selector dropdown.
+		     - composerRef's height measurement (used as composerInset padding
+		       on the conversation scroll) still works correctly because the
+		       absolute positioning is preserved — the visible chrome just
+		       gains a solid background. `right-0` (vs the old `right-3.5`)
+		       lets the panel fill the full chat width so the search-result
+		       popover and other UI don't get clipped on the right edge. */}		{!setupPhase && (
+			<div
+				ref={composerRef}
+				className="absolute bottom-0 left-0 right-0 z-30 overflow-visible border-t border-border bg-background/95 px-3.5 pt-3 pb-2 backdrop-blur"
+			>
+				{/* Width constraint mirrors `contentWidthClass` (defined above) so
+				    this pill is always the same width as the message field below
+				    it, including dynamic parity when the review panel opens and
+				    strips the max-w. Pill's own className (gravity-ad.tsx
+				    ThemedGravityBottomPagePill) carries the default `mb-2`
+				    spacing so this wrapper is content-only — no need to repeat
+				    the margin here. The pill's `w-full` then fills this wrapper
+				    edge-to-edge. */}
+				<div className={contentWidthClass}>
+					<GravityBottomPageAd messages={bottomAdMessages} />
+				</div>
+				<ChatInputSection
+							agent={agent}
 						turns={turns}
 						isConnected={isConnected}
 						isWorking={isWorking}

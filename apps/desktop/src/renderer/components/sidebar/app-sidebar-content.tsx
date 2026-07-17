@@ -32,6 +32,7 @@ import {
 import { AddProjectMenu, SidebarMainMenu } from "./sidebar-menus"
 import { sidebarPreferencesAtom } from "./sidebar-preferences"
 import { ProjectRow, SessionRow } from "./sidebar-rows"
+import { GravitySidebarBanner } from "../chat/gravity-ad"
 
 interface AppSidebarContentProps {
 	agents: Agent[]
@@ -304,6 +305,20 @@ export function AppSidebarContent({
 		],
 	)
 
+	// Stable ambient context for the sidebar Gravity banner. Memoize so the
+	// hook's content-derived key stays stable across AppSidebarContent
+	// re-renders (the banner would otherwise fetch a new auction every
+	// time the sidebar re-renders for any unrelated reason).
+	const sidebarBannerMessages = useMemo<{ role: string; content: string }[]>(
+		() => [
+			{
+				role: "user",
+				content: projects.map((project) => project.name).join(", "),
+			},
+		],
+		[projects],
+	)
+
 	const hasContent = sidebarItems.length > 0
 
 	const handleNewChat = useCallback(() => {
@@ -469,6 +484,33 @@ export function AppSidebarContent({
 					</div>
 				)}
 			</SidebarContent>
+
+			{/* Sidebar Gravity banner — always-on rotating slot that earns
+			    impressions on every page the sidebar is visible (chat, settings,
+			    review, etc). Project names act as ambient context so the auction
+			    sees something semantically meaningful even when no session is
+			    open. 180-s rotation offset vs the chat surface's 60/90/120/150-s
+			    offsets keeps auction bursts de-synced. Memoize the messages
+			    array on [projects] so the hook's content-derived key stays
+			    stable across re-renders. Sits just above <SidebarFooter> so
+			    the Settings/copyright chrome stays anchored to the bottom.
+
+			    px-3 + pb-2 wrapper matches the <SidebarFooter>'s gutter so
+			    the compact horizontal pill lines up with the Settings +
+			    copyright chrome width. Sidebar uses the default "pill"
+			    variant inside GravitySidebarBanner (matches the chat pills
+			    so the shape is consistent across surfaces and takes
+			    less vertical space inside the narrow sidebar gutter).
+			    pb-2 instead of pb-3 tightens the bottom gap to the
+			    <SidebarFooter> directly below — the pill's rounded
+			    footprint flows into the footer chrome with a cleaner
+			    8 px baseline instead of the prior 12 px gap. */}
+			<div className="px-3 pb-2">
+				<GravitySidebarBanner
+					messages={sidebarBannerMessages}
+					refreshIntervalMs={180 * 1000}
+				/>
+			</div>
 
 			<SidebarFooter className="gap-1 px-3 pt-0 pb-3">
 				<button

@@ -28,6 +28,7 @@ import {
 } from "react"
 import { useReferenceSearch } from "../../hooks/use-reference-search"
 import type { SdkAgent } from "../../hooks/use-infinitecode-data"
+import { GravitySearchResultAd } from "./gravity-ad"
 
 // ============================================================
 // Types
@@ -144,9 +145,27 @@ export const MentionPopover = memo(
 			[agents],
 		)
 
-		// --- Data: server-ranked Skill, MCP, and File references ---
-		const { results, isLoading, error } = useReferenceSearch(directory, query, open)
-		const referenceOptions = useMemo(() => mapReferenceSearchResults(results), [results])
+	// --- Data: server-ranked Skill, MCP, and File references ---
+	const { results, isLoading, error } = useReferenceSearch(directory, query, open)
+	const referenceOptions = useMemo(() => mapReferenceSearchResults(results), [results])
+
+	// --- Search Result Gravity ad context ---
+	// We feed Gravity `@<query>` as the only message so the contextual match
+	// aligns with whatever the user is currently searching for. The
+	// `results.length` dep is an implicit "server responded" signal — it
+	// cycles the contextKey each time the server returns a fresh snapshot
+	// (so we re-bid in tandem with the actual search result list), but stays
+	// stable across keystroke noise that hasn't yet triggered a server
+	// response. This keeps a per-keystroke character from burning an
+	// auction while still updating the ad when the user's intent visibly
+	// shifts.
+	const searchAdMessages = useMemo<
+		{ role: string; content: string }[]
+	>(() => {
+		const q = query.trim()
+		if (!q) return []
+		return [{ role: "user", content: `@${q}` }]
+	}, [query, results.length])
 
 		// --- Merge and filter ---
 		const allOptions = useMemo<MentionOption[]>(() => {
@@ -264,6 +283,21 @@ export const MentionPopover = memo(
 											? "No results found"
 											: "No references or agents available"}
 							</div>
+						)}
+
+						{/* Search-Result Gravity ad — sits at the very top of the
+						    result list, styled as a result entry (same row layout
+						    as MentionItem). Earns an impression on first 50%
+						    scroll-in. Per-query contextKey via the upstream
+						    `results.length` dep ensures one auction per actual
+						    server response, not per keystroke.
+
+						    Gated on `hasResults` so the sponsored row doesn't
+						    appear next to a literal "No results found" — that pair
+						    reads as a confused fallback and forces a wasted
+						    auction on every failed search. */}
+						{hasResults && searchAdMessages.length > 0 && (
+							<GravitySearchResultAd messages={searchAdMessages} />
 						)}
 
 						{/* Agent group */}

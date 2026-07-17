@@ -16,6 +16,7 @@
 import { useAtomValue } from "jotai"
 import { useEffect, useRef, useState } from "react"
 import { discoveryPhaseAtom } from "../atoms/discovery"
+import { GravityStartupOverlayAd } from "./chat/gravity-ad"
 
 // ============================================================
 // Constants
@@ -100,6 +101,18 @@ export function StartupOverlay() {
 					<span />
 					<span />
 				</div>
+			</div>
+			{/*
+			 * Gravity startup-overlay ad: rendered above the "By AFS Agentics"
+			 * attribution line so the cold-boot wait time earns impressions on
+			 * a placement that would otherwise be a dead pixel. Full-width with
+			 * px-6 horizontal padding so the pill spans the splash chrome edge-
+			 * to-edge minus a 24 px gutter — keeps consistent L/R breathing
+			 * room so the pill content visually anchors to the splash chrome
+			 * centerline.
+			 */}
+			<div className="mb-3 w-full px-6">
+				<GravityStartupOverlayAd />
 			</div>
 			<p className="pb-4 text-center text-xs text-muted-foreground">By AFS Agentics</p>
 		</div>

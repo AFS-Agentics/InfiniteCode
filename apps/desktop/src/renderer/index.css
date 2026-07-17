@@ -239,9 +239,68 @@ body {
 	background-color: var(--card) !important;
 }
 
+/* Hover glow for Gravity ad pills (below_response + inline_response).
+   Adapts to the user's chosen theme via --primary when the theme system
+   defines it; falls back to --foreground (always defined). The 3-layer
+   box-shadow stacks a 1px ring + ~14px halo for the "glowing border"
+   effect requested for the ad pills. */
+:root {
+	--infinitecode-gravity-ad-accent: var(--primary, var(--foreground));
+}
+
+[data-gravity-ad-slot] {
+	transition:
+		box-shadow 220ms ease-out,
+		border-color 220ms ease-out,
+		background-color 220ms ease-out;
+}
+
+[data-gravity-ad-slot]:hover,
+[data-gravity-ad-slot]:focus-visible {
+	border-color: color-mix(
+		in srgb,
+		var(--infinitecode-gravity-ad-accent) 60%,
+		transparent
+	);
+	background-color: color-mix(
+		in srgb,
+		var(--infinitecode-gravity-ad-accent) 5%,
+		var(--card)
+	);
+	box-shadow:
+		0 0 0 1px color-mix(
+			in srgb,
+			var(--infinitecode-gravity-ad-accent) 70%,
+			transparent
+		),
+		0 0 14px -3px color-mix(
+			in srgb,
+			var(--infinitecode-gravity-ad-accent) 60%,
+			transparent
+		),
+		0 0 32px -10px color-mix(
+			in srgb,
+			var(--infinitecode-gravity-ad-accent) 35%,
+			transparent
+		);
+}
+
+[data-gravity-ad-slot]:focus-visible {
+	outline: 2px solid
+		color-mix(
+			in srgb,
+			var(--infinitecode-gravity-ad-accent) 75%,
+			transparent
+		);
+	outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.infinitecode-brand-mark-attention,
 	.infinitecode-brand-word-attention .infinitecode-brand-word-track {
 		animation: none;
+	}
+	[data-gravity-ad-slot] {
+		transition: none;
 	}
 }

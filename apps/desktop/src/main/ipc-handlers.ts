@@ -1,4 +1,14 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, systemPreferences } from "electron"
+import { createHash } from "node:crypto";
+import { Gravity } from "@gravity-ai/api";
+import {
+	app,
+	BrowserWindow,
+	dialog,
+	ipcMain,
+	nativeTheme,
+	net,
+	systemPreferences,
+} from "electron";
 import {
 	acceptRun,
 	archiveRun,
@@ -11,12 +21,18 @@ import {
 	previewSchedule,
 	runNow,
 	updateAutomation,
-} from "./automation"
-import type { CreateAutomationInput, UpdateAutomationInput } from "./automation/types"
-import { deleteCredential, getCredential, storeCredential } from "./credential-store"
-import { checkDesktopRuntime } from "./desktop-runtime-check"
-import { gravityAds } from "@gravity-ai/api"
-import { createDesktopFolder, statDesktopFolders } from "./desktop-folders"
+} from "./automation";
+import type {
+	CreateAutomationInput,
+	UpdateAutomationInput,
+} from "./automation/types";
+import {
+	deleteCredential,
+	getCredential,
+	storeCredential,
+} from "./credential-store";
+import { createDesktopFolder, statDesktopFolders } from "./desktop-folders";
+import { checkDesktopRuntime } from "./desktop-runtime-check";
 import {
 	applyChangesToLocal,
 	applyDiffTextToLocal,
@@ -31,20 +47,7 @@ import {
 	push,
 	stashAndCheckout,
 	stashPop,
-} from "./git-service"
-import { getResolvedChromeTier, resolveTitleBarOverlay } from "./liquid-glass"
-import { createLogger } from "./logger"
-import { readModelState, updateModelRecent } from "./model-state"
-import { dismissNotification, updateBadgeCount } from "./notifications"
-import type { MigrationProvider } from "./onboarding"
-import {
-	detectProviders,
-	executeMigration,
-	previewMigration,
-	restoreMigrationBackup,
-	scanProvider,
-} from "./onboarding"
-import { getOpenInTargets, openInTarget, setPreferredTarget } from "./open-in-targets"
+} from "./git-service";
 import {
 	ensureServer,
 	getAcpTrafficLogState,
@@ -55,27 +58,141 @@ import {
 	restartServer,
 	stopServer,
 	subscribeAcp,
-} from "./infinitecode-manager"
-import { getOpaqueWindows, getSettings, onSettingsChanged, updateSettings } from "./settings-store"
-import { desktopTerminalManager } from "./terminal-manager"
+} from "./infinitecode-manager";
+import { getResolvedChromeTier, resolveTitleBarOverlay } from "./liquid-glass";
+import { createLogger } from "./logger";
+import { readModelState, updateModelRecent } from "./model-state";
+import { dismissNotification, updateBadgeCount } from "./notifications";
+import type { MigrationProvider } from "./onboarding";
+import {
+	detectProviders,
+	executeMigration,
+	previewMigration,
+	restoreMigrationBackup,
+	scanProvider,
+} from "./onboarding";
+import {
+	getOpenInTargets,
+	openInTarget,
+	setPreferredTarget,
+} from "./open-in-targets";
+import {
+	getOpaqueWindows,
+	getSettings,
+	onSettingsChanged,
+	updateSettings,
+} from "./settings-store";
+import { desktopTerminalManager } from "./terminal-manager";
 import {
 	checkForUpdates,
 	downloadUpdate,
 	getUpdateState,
 	installUpdate,
 	openReleasePage,
-} from "./updater"
+} from "./updater";
 
-const log = createLogger("ipc")
+const log = createLogger("ipc");
 
 /** Read the opaque windows preference for use at window creation time. */
-export { getOpaqueWindows as getOpaqueWindowsPref } from "./settings-store"
+export { getOpaqueWindows as getOpaqueWindowsPref } from "./settings-store";
+
+// Gravity singleton — reads `process.env.GRAVITY_API_KEY` via dotenv (loaded at the
+// top of main/index.ts). `production: false` requests test ads by default until
+// the dashboard is verified end-to-end. Module-scope so it's stable across any
+// future re-registration of IPC handlers.
+const gravityClient = new Gravity({
+	apiKey: process.env.GRAVITY_API_KEY,
+	production: false,
+	timeoutMs: 5000,
+});
+
+// Gravity placement-id lookup. Each slot is a separate ad unit on the publisher
+// dashboard (separate auction, separate impression counter). The renderer sends
+// the slot string; this map resolves it to the dashboard's `placement_id`.
+const PLACEMENT_ID_BY_SLOT: Record<string, string> = {
+	above_response: "Chat-Response-Ad-Above",
+	below_response: "main",
+	inline_response: "Chat-Response-Ad-Inline",
+	search_result: "Search-Result-Ad",
+	bottom_page: "Bottom-MessageField-Ad",
+	sidebar: "Sidebar-Ad",
+	mid_response: "Chat-Response-Mid",
+	mid_timeline: "Chat-Response-Mid-Timeline",
+	startup_overlay: "Startup-Overlay-Ad",
+};
+
+// Map InfiniteCode renderer-facing slot names onto the upstream
+// `@gravity-ai/api` Placement enum. The renderer sends the
+// InfiniteCode-specific strings ("sidebar", etc.); the SDK only
+// accepts its canonical 8 placements, so we route our non-canonical
+// slot ("sidebar") through `bottom_page` for the upstream auction
+// while keeping the InfiniteCode-specific `placement_id` so the
+// dashboard still reports per-slot metrics under "Sidebar-Ad".
+const SLOT_TO_UPSTREAM_PLACEMENT: Record<
+	string,
+	import("@gravity-ai/api").Placement
+> = {
+	above_response: "above_response",
+	below_response: "below_response",
+	inline_response: "inline_response",
+	search_result: "search_result",
+	bottom_page: "bottom_page",
+	sidebar: "bottom_page",
+	// mid_response routes upstream via inline_response since the canonical
+	// enum doesn't have a mid-response slot; the InfiniteCode-specific
+	// placement_id keeps dashboard reporting separate from inline_response.
+	mid_response: "inline_response",
+	// mid_timeline (ads between individual Timeline items) also routes
+	// upstream via inline_response — same canonical-enum gap. The
+	// InfiniteCode-specific `placement_id` keeps dashboard per-slot metrics
+	// separate from inline_response + mid_response.
+	//
+	// Known limitation: four InfiniteCode-distinct slots (inline_response,
+	// mid_response, mid_timeline, startup_overlay) all funnel upstream into
+	// a single Gravity fill pool. Per-slot creative targeting isn't possible
+	// today — they all share the same auction and creative rotation. The
+	// `placement_id` keeps the dashboard reporting distinct (separate
+	// impression counters, separate CTRs), but the actual creative served
+	// is shared. Worth negotiating a dedicated enum entry with Gravity
+	// support if/when per-slot creative separation becomes a publisher
+	// priority.
+	mid_timeline: "inline_response",
+	// startup_overlay (full-screen loading splash shown above the "By AFS
+	// Agentics" attribution line during cold boot) routes upstream through
+	// inline_response as well — same canonical-enum gap. Kept distinct on
+	// the dashboard so startup-overaly impressions are reported separately
+	// from chat-context impressions even though they share the same fill
+	// pool upstream.
+	startup_overlay: "inline_response",
+};
+
+// Gravity API requires `sessionId` in the request body and recommends a stable
+// `user.userId` for matching/attribution. The renderer doesn't yet forward
+// these from the chat session, so we synthesize them on the main side:
+//   - sessionId: a sha256 prefix of the conversation's captured turns. Stable
+//     across re-fetches of the same content, rotates when the conversation
+//     evolves. Good enough as a per-thread correlator.
+//   - userId: a single shared identifier for the desktop install until we wire
+//     a real user/account layer.
+const DESKTOP_USER_ID = "infinitecode-desktop-user";
+
+function deriveSessionId(
+	messages: { role: string; content: string }[],
+): string {
+	const preview = messages
+		.slice(-4)
+		.map((m) => `${m.role}:${m.content.slice(0, 80)}`)
+		.join("|");
+	return createHash("sha256").update(preview).digest("hex").slice(0, 32);
+}
 
 function updateTitleBarOverlay(): void {
-	if (process.platform !== "win32" && process.platform !== "linux") return
-	const titleBarOverlay = resolveTitleBarOverlay(nativeTheme.shouldUseDarkColors)
+	if (process.platform !== "win32" && process.platform !== "linux") return;
+	const titleBarOverlay = resolveTitleBarOverlay(
+		nativeTheme.shouldUseDarkColors,
+	);
 	for (const win of BrowserWindow.getAllWindows()) {
-		win.setTitleBarOverlay(titleBarOverlay)
+		win.setTitleBarOverlay(titleBarOverlay);
 	}
 }
 
@@ -84,17 +201,17 @@ function updateTitleBarOverlay(): void {
 // ============================================================
 
 interface SerializedRequest {
-	url: string
-	method: string
-	headers: Record<string, string>
-	body: string | null
+	url: string;
+	method: string;
+	headers: Record<string, string>;
+	body: string | null;
 }
 
 interface SerializedResponse {
-	status: number
-	statusText: string
-	headers: Record<string, string>
-	body: string | null
+	status: number;
+	statusText: string;
+	headers: Record<string, string>;
+	body: string | null;
 }
 
 /**
@@ -112,20 +229,20 @@ async function handleFetchProxy(
 	_event: Electron.IpcMainInvokeEvent,
 	req: SerializedRequest,
 ): Promise<SerializedResponse> {
-	log.info("IPC fetch proxy →", { method: req.method, url: req.url })
-	const start = Date.now()
+	log.info("IPC fetch proxy →", { method: req.method, url: req.url });
+	const start = Date.now();
 	const response = await net.fetch(req.url, {
 		method: req.method,
 		headers: req.headers,
 		body: req.body ?? undefined,
-	})
+	});
 
-	const body = await response.text()
-	const headers: Record<string, string> = {}
+	const body = await response.text();
+	const headers: Record<string, string> = {};
 	response.headers.forEach((value, key) => {
-		headers[key] = value
-	})
-	const durationMs = Date.now() - start
+		headers[key] = value;
+	});
+	const durationMs = Date.now() - start;
 
 	log.info("IPC fetch proxy ←", {
 		method: req.method,
@@ -133,14 +250,14 @@ async function handleFetchProxy(
 		status: response.status,
 		bodyLength: body.length,
 		durationMs,
-	})
+	});
 
 	return {
 		status: response.status,
 		statusText: response.statusText,
 		headers,
 		body,
-	}
+	};
 }
 
 /**
@@ -153,19 +270,23 @@ function withLogging<TArgs extends unknown[], TResult>(
 	handler: (...args: TArgs) => TResult | Promise<TResult>,
 ): (...args: TArgs) => Promise<TResult> {
 	return async (...args: TArgs) => {
-		const start = Date.now()
+		const start = Date.now();
 		try {
-			const result = await handler(...args)
-			const durationMs = Date.now() - start
+			const result = await handler(...args);
+			const durationMs = Date.now() - start;
 			if (durationMs > 500) {
-				log.warn(`Handler "${channel}" slow`, { durationMs })
+				log.warn(`Handler "${channel}" slow`, { durationMs });
 			}
-			return result
+			return result;
 		} catch (err) {
-			log.error(`Handler "${channel}" failed`, { durationMs: Date.now() - start }, err)
-			throw err
+			log.error(
+				`Handler "${channel}" failed`,
+				{ durationMs: Date.now() - start },
+				err,
+			);
+			throw err;
 		}
-	}
+	};
 }
 
 /**
@@ -181,35 +302,37 @@ export function registerIpcHandlers(): void {
 	ipcMain.handle("app:info", () => ({
 		version: app.getVersion(),
 		isDev: !app.isPackaged,
-	}))
+	}));
 
 	// --- InfiniteCode server lifecycle ---
 
 	ipcMain.handle(
 		"infinitecode:ensure",
 		withLogging("infinitecode:ensure", async () => await ensureServer()),
-	)
+	);
 
-	ipcMain.handle("infinitecode:url", () => getServerUrl())
+	ipcMain.handle("infinitecode:url", () => getServerUrl());
 
 	ipcMain.handle(
 		"infinitecode:stop",
 		withLogging("infinitecode:stop", () => stopServer()),
-	)
+	);
 
 	ipcMain.handle(
 		"infinitecode:restart",
 		withLogging("infinitecode:restart", async () => await restartServer()),
-	)
+	);
 
 	ipcMain.handle(
 		"acp:request",
 		withLogging(
 			"acp:request",
-			async (_, request: { method: string; params?: unknown; directory?: string }) =>
-				await requestAcp(request.method, request.params, request.directory),
+			async (
+				_,
+				request: { method: string; params?: unknown; directory?: string },
+			) => await requestAcp(request.method, request.params, request.directory),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"acp:respond",
@@ -218,31 +341,31 @@ export function registerIpcHandlers(): void {
 			async (_, response: { id: number | string; result: unknown }) =>
 				await respondAcp(response.id, response.result),
 		),
-	)
+	);
 
-	ipcMain.handle("acp:connected", () => isAcpConnected())
+	ipcMain.handle("acp:connected", () => isAcpConnected());
 
-	ipcMain.handle("acp-traffic-log:state", () => getAcpTrafficLogState())
+	ipcMain.handle("acp-traffic-log:state", () => getAcpTrafficLogState());
 
 	subscribeAcp((event) => {
 		for (const win of BrowserWindow.getAllWindows()) {
-			win.webContents.send("acp:event", event)
+			win.webContents.send("acp:event", event);
 		}
-	})
+	});
 
 	// --- Embedded terminal ---
 
 	desktopTerminalManager.onData((id, data) => {
 		for (const win of BrowserWindow.getAllWindows()) {
-			win.webContents.send("terminal:data", { id, data })
+			win.webContents.send("terminal:data", { id, data });
 		}
-	})
+	});
 
 	desktopTerminalManager.onExit((id, event) => {
 		for (const win of BrowserWindow.getAllWindows()) {
-			win.webContents.send("terminal:exit", { id, ...event })
+			win.webContents.send("terminal:exit", { id, ...event });
 		}
-	})
+	});
 
 	ipcMain.handle(
 		"terminal:create",
@@ -251,108 +374,129 @@ export function registerIpcHandlers(): void {
 			async (_, options: { cwd?: string; cols?: number; rows?: number }) =>
 				await desktopTerminalManager.create(options),
 		),
-	)
+	);
 
 	ipcMain.handle("terminal:close", (_, id: string) => {
-		desktopTerminalManager.close(id)
-	})
+		desktopTerminalManager.close(id);
+	});
 
 	ipcMain.on("terminal:write", (_, id: string, data: string) => {
-		desktopTerminalManager.write(id, data)
-	})
+		desktopTerminalManager.write(id, data);
+	});
 
 	ipcMain.on("terminal:resize", (_, id: string, cols: number, rows: number) => {
-		desktopTerminalManager.resize(id, cols, rows)
-	})
+		desktopTerminalManager.resize(id, cols, rows);
+	});
 
 	// --- Model state ---
 
 	ipcMain.handle(
 		"model-state",
 		withLogging("model-state", async () => await readModelState()),
-	)
+	);
 
 	ipcMain.handle(
 		"model-state:update-recent",
 		withLogging(
 			"model-state:update-recent",
-			async (_, model: { providerID: string; modelID: string }) => await updateModelRecent(model),
+			async (_, model: { providerID: string; modelID: string }) =>
+				await updateModelRecent(model),
 		),
-	)
+	);
 
 	// --- Auto-updater ---
 
-	ipcMain.handle("updater:state", () => getUpdateState())
+	ipcMain.handle("updater:state", () => getUpdateState());
 
-	ipcMain.handle("updater:check", async () => await checkForUpdates())
+	ipcMain.handle("updater:check", async () => await checkForUpdates());
 
-	ipcMain.handle("updater:download", async () => await downloadUpdate())
+	ipcMain.handle("updater:download", async () => await downloadUpdate());
 
-	ipcMain.handle("updater:install", async () => await installUpdate())
+	ipcMain.handle("updater:install", async () => await installUpdate());
 
-	ipcMain.handle("updater:open-release-page", async () => await openReleasePage())
+	ipcMain.handle(
+		"updater:open-release-page",
+		async () => await openReleasePage(),
+	);
 
 	// --- Git operations ---
 
 	ipcMain.handle(
 		"git:branches",
-		withLogging("git:branches", async (_, directory: string) => await listBranches(directory)),
-	)
+		withLogging(
+			"git:branches",
+			async (_, directory: string) => await listBranches(directory),
+		),
+	);
 
 	ipcMain.handle(
 		"git:status",
-		withLogging("git:status", async (_, directory: string) => await getStatus(directory)),
-	)
+		withLogging(
+			"git:status",
+			async (_, directory: string) => await getStatus(directory),
+		),
+	);
 
 	ipcMain.handle(
 		"git:checkout",
 		withLogging(
 			"git:checkout",
-			async (_, directory: string, branch: string) => await checkout(directory, branch),
+			async (_, directory: string, branch: string) =>
+				await checkout(directory, branch),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"git:stash-and-checkout",
 		withLogging(
 			"git:stash-and-checkout",
-			async (_, directory: string, branch: string) => await stashAndCheckout(directory, branch),
+			async (_, directory: string, branch: string) =>
+				await stashAndCheckout(directory, branch),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"git:stash-pop",
-		withLogging("git:stash-pop", async (_, directory: string) => await stashPop(directory)),
-	)
+		withLogging(
+			"git:stash-pop",
+			async (_, directory: string) => await stashPop(directory),
+		),
+	);
 
 	ipcMain.handle(
 		"git:diff-stat",
-		withLogging("git:diff-stat", async (_, directory: string) => await getDiffStat(directory)),
-	)
+		withLogging(
+			"git:diff-stat",
+			async (_, directory: string) => await getDiffStat(directory),
+		),
+	);
 
 	ipcMain.handle(
 		"git:commit-all",
 		withLogging(
 			"git:commit-all",
-			async (_, directory: string, message: string) => await commitAll(directory, message),
+			async (_, directory: string, message: string) =>
+				await commitAll(directory, message),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"git:push",
 		withLogging(
 			"git:push",
-			async (_, directory: string, remote?: string) => await push(directory, remote),
+			async (_, directory: string, remote?: string) =>
+				await push(directory, remote),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"git:create-branch",
 		withLogging(
 			"git:create-branch",
-			async (_, directory: string, branchName: string) => await createBranch(directory, branchName),
+			async (_, directory: string, branchName: string) =>
+				await createBranch(directory, branchName),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"git:apply-to-local",
@@ -361,7 +505,7 @@ export function registerIpcHandlers(): void {
 			async (_, worktreeDir: string, localDir: string) =>
 				await applyChangesToLocal(worktreeDir, localDir),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"git:apply-diff-text",
@@ -370,20 +514,24 @@ export function registerIpcHandlers(): void {
 			async (_, localDir: string, diffText: string) =>
 				await applyDiffTextToLocal(localDir, diffText),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"git:root",
-		withLogging("git:root", async (_, directory: string) => await getGitRoot(directory)),
-	)
+		withLogging(
+			"git:root",
+			async (_, directory: string) => await getGitRoot(directory),
+		),
+	);
 
 	ipcMain.handle(
 		"git:remote-url",
 		withLogging(
 			"git:remote-url",
-			async (_, directory: string, remote?: string) => await getRemoteUrl(directory, remote),
+			async (_, directory: string, remote?: string) =>
+				await getRemoteUrl(directory, remote),
 		),
-	)
+	);
 
 	// --- Directory picker ---
 
@@ -393,11 +541,11 @@ export function registerIpcHandlers(): void {
 			const result = await dialog.showOpenDialog({
 				properties: ["openDirectory"],
 				title: "Select a project folder",
-			})
-			if (result.canceled || result.filePaths.length === 0) return null
-			return result.filePaths[0]
+			});
+			if (result.canceled || result.filePaths.length === 0) return null;
+			return result.filePaths[0];
 		}),
-	)
+	);
 
 	ipcMain.handle(
 		"desktop-folders:stat",
@@ -405,7 +553,7 @@ export function registerIpcHandlers(): void {
 			"desktop-folders:stat",
 			async (_, directories: string[]) => await statDesktopFolders(directories),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"desktop-folders:create",
@@ -414,125 +562,140 @@ export function registerIpcHandlers(): void {
 			async (_, input: { parentDirectory: string; name: string }) =>
 				await createDesktopFolder(input),
 		),
-	)
+	);
 
 	// --- Fetch proxy (bypasses Chromium connection limits) ---
 
-	ipcMain.handle("fetch:request", withLogging("fetch:request", handleFetchProxy))
+	ipcMain.handle(
+		"fetch:request",
+		withLogging("fetch:request", handleFetchProxy),
+	);
 
 	// --- Open in external app ---
 
-	ipcMain.handle("open-in:targets", () => getOpenInTargets())
+	ipcMain.handle("open-in:targets", () => getOpenInTargets());
 
 	ipcMain.handle(
 		"open-in:open",
 		withLogging(
 			"open-in:open",
-			async (_, directory: string, targetId: string, persistPreferred?: boolean) =>
-				await openInTarget(directory, targetId, { persistPreferred }),
+			async (
+				_,
+				directory: string,
+				targetId: string,
+				persistPreferred?: boolean,
+			) => await openInTarget(directory, targetId, { persistPreferred }),
 		),
-	)
+	);
 
 	ipcMain.handle("open-in:set-preferred", (_, targetId: string) => {
-		setPreferredTarget(targetId)
-		return { success: true }
-	})
+		setPreferredTarget(targetId);
+		return { success: true };
+	});
 
 	// --- Chrome tier (pull-based, avoids race with push-based "chrome-tier" event) ---
 
-	ipcMain.handle("chrome-tier:get", () => getResolvedChromeTier())
+	ipcMain.handle("chrome-tier:get", () => getResolvedChromeTier());
 
 	// --- Window preferences (opaque windows) ---
 
 	ipcMain.handle("prefs:get-opaque-windows", () => {
-		return getOpaqueWindows()
-	})
+		return getOpaqueWindows();
+	});
 
 	ipcMain.handle("prefs:set-opaque-windows", (_, value: boolean) => {
-		updateSettings({ opaqueWindows: value })
-		return { success: true }
-	})
+		updateSettings({ opaqueWindows: value });
+		return { success: true };
+	});
 
 	ipcMain.handle("app:relaunch", () => {
-		app.relaunch()
-		app.exit(0)
-	})
+		app.relaunch();
+		app.exit(0);
+	});
 
 	// --- Notifications ---
 
 	ipcMain.handle("notification:dismiss", (_, sessionId: string) => {
-		dismissNotification(sessionId)
-	})
+		dismissNotification(sessionId);
+	});
 
 	ipcMain.handle("notification:badge", (_, count: number) => {
-		updateBadgeCount(count)
-	})
+		updateBadgeCount(count);
+	});
 
 	// --- Settings ---
 
-	ipcMain.handle("settings:get", () => getSettings())
+	ipcMain.handle("settings:get", () => getSettings());
 
-	ipcMain.handle("settings:update", (_, partial) => updateSettings(partial))
+	ipcMain.handle("settings:update", (_, partial) => updateSettings(partial));
 
 	// --- Credential storage (safeStorage-backed) ---
 
 	ipcMain.handle(
 		"credential:store",
 		withLogging("credential:store", (_, serverId: string, password: string) => {
-			storeCredential(serverId, password)
+			storeCredential(serverId, password);
 		}),
-	)
+	);
 
-	ipcMain.handle("credential:get", (_, serverId: string) => getCredential(serverId))
+	ipcMain.handle("credential:get", (_, serverId: string) =>
+		getCredential(serverId),
+	);
 
 	ipcMain.handle(
 		"credential:delete",
 		withLogging("credential:delete", (_, serverId: string) => {
-			deleteCredential(serverId)
+			deleteCredential(serverId);
 		}),
-	)
+	);
 
 	// --- Native theme (controls macOS glass tint color) ---
 
 	ipcMain.handle("theme:set-native", (_, source: string) => {
 		if (source === "light" || source === "dark") {
-			nativeTheme.themeSource = source
+			nativeTheme.themeSource = source;
 		} else {
-			nativeTheme.themeSource = "system"
+			nativeTheme.themeSource = "system";
 		}
-		updateTitleBarOverlay()
-	})
+		updateTitleBarOverlay();
+	});
 
-	nativeTheme.on("updated", updateTitleBarOverlay)
+	nativeTheme.on("updated", updateTitleBarOverlay);
 
 	// --- System accent color (macOS / Windows) ---
 
 	ipcMain.handle("theme:accent-color", () => {
 		try {
-			return systemPreferences.getAccentColor()
+			return systemPreferences.getAccentColor();
 		} catch {
-			return null
+			return null;
 		}
-	})
+	});
 
 	// Broadcast accent color changes to all renderer windows
 	systemPreferences.on("accent-color-changed", (_event, newColor) => {
 		for (const win of BrowserWindow.getAllWindows()) {
-			win.webContents.send("theme:accent-color-changed", newColor)
+			win.webContents.send("theme:accent-color-changed", newColor);
 		}
-	})
+	});
 
 	// --- Onboarding ---
 
 	ipcMain.handle(
 		"onboarding:check-infinitecode",
-		withLogging("onboarding:check-infinitecode", async () => await checkDesktopRuntime()),
-	)
+		withLogging(
+			"onboarding:check-infinitecode",
+			async () => await checkDesktopRuntime(),
+		),
+	);
 
 	ipcMain.handle(
 		"onboarding:detect-providers",
-		withLogging("onboarding:detect-providers", async () => await detectProviders()),
-	)
+		withLogging(
+			"onboarding:detect-providers",
+			async () => await detectProviders(),
+		),
+	);
 
 	ipcMain.handle(
 		"onboarding:scan-provider",
@@ -540,75 +703,92 @@ export function registerIpcHandlers(): void {
 			"onboarding:scan-provider",
 			async (_, provider: MigrationProvider) => await scanProvider(provider),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"onboarding:preview-migration",
 		withLogging(
 			"onboarding:preview-migration",
-			async (_, provider: MigrationProvider, scanResult: unknown, categories: string[]) =>
-				await previewMigration(provider, scanResult, categories),
+			async (
+				_,
+				provider: MigrationProvider,
+				scanResult: unknown,
+				categories: string[],
+			) => await previewMigration(provider, scanResult, categories),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"onboarding:execute-migration",
 		withLogging(
 			"onboarding:execute-migration",
-			async (_, provider: MigrationProvider, scanResult: unknown, categories: string[]) =>
-				await executeMigration(provider, scanResult, categories),
+			async (
+				_,
+				provider: MigrationProvider,
+				scanResult: unknown,
+				categories: string[],
+			) => await executeMigration(provider, scanResult, categories),
 		),
-	)
+	);
 
 	ipcMain.handle(
 		"onboarding:restore-backup",
-		withLogging("onboarding:restore-backup", async () => await restoreMigrationBackup()),
-	)
+		withLogging(
+			"onboarding:restore-backup",
+			async () => await restoreMigrationBackup(),
+		),
+	);
 
 	// --- Automations ---
 
 	ipcMain.handle(
 		"automation:list",
 		withLogging("automation:list", () => listAutomations()),
-	)
+	);
 
 	ipcMain.handle(
 		"automation:get",
 		withLogging("automation:get", (_, id: string) => getAutomation(id)),
-	)
+	);
 
 	ipcMain.handle(
 		"automation:create",
-		withLogging("automation:create", async (_, input: CreateAutomationInput) => {
-			const result = await createAutomation(input)
-			for (const win of BrowserWindow.getAllWindows()) {
-				win.webContents.send("automation:runs-updated")
-			}
-			return result
-		}),
-	)
+		withLogging(
+			"automation:create",
+			async (_, input: CreateAutomationInput) => {
+				const result = await createAutomation(input);
+				for (const win of BrowserWindow.getAllWindows()) {
+					win.webContents.send("automation:runs-updated");
+				}
+				return result;
+			},
+		),
+	);
 
 	ipcMain.handle(
 		"automation:update",
-		withLogging("automation:update", async (_, input: UpdateAutomationInput) => {
-			const result = await updateAutomation(input)
-			for (const win of BrowserWindow.getAllWindows()) {
-				win.webContents.send("automation:runs-updated")
-			}
-			return result
-		}),
-	)
+		withLogging(
+			"automation:update",
+			async (_, input: UpdateAutomationInput) => {
+				const result = await updateAutomation(input);
+				for (const win of BrowserWindow.getAllWindows()) {
+					win.webContents.send("automation:runs-updated");
+				}
+				return result;
+			},
+		),
+	);
 
 	ipcMain.handle(
 		"automation:delete",
 		withLogging("automation:delete", async (_, id: string) => {
-			const result = await deleteAutomation(id)
+			const result = await deleteAutomation(id);
 			for (const win of BrowserWindow.getAllWindows()) {
-				win.webContents.send("automation:runs-updated")
+				win.webContents.send("automation:runs-updated");
 			}
-			return result
+			return result;
 		}),
-	)
+	);
 
 	ipcMain.handle(
 		"automation:run-now",
@@ -616,86 +796,154 @@ export function registerIpcHandlers(): void {
 			// runNow is fire-and-forget: it returns immediately after validating
 			// the automation exists. Execution happens in the background, and
 			// broadcastRunsUpdated() is called from within executeAutomation.
-			return runNow(id)
+			return runNow(id);
 		}),
-	)
+	);
 
 	ipcMain.handle(
 		"automation:list-runs",
-		withLogging("automation:list-runs", (_, automationId?: string) => listRuns(automationId)),
-	)
+		withLogging("automation:list-runs", (_, automationId?: string) =>
+			listRuns(automationId),
+		),
+	);
 
 	ipcMain.handle(
 		"automation:archive-run",
 		withLogging("automation:archive-run", async (_, runId: string) => {
-			const result = await archiveRun(runId)
+			const result = await archiveRun(runId);
 			for (const win of BrowserWindow.getAllWindows()) {
-				win.webContents.send("automation:runs-updated")
+				win.webContents.send("automation:runs-updated");
 			}
-			return result
+			return result;
 		}),
-	)
+	);
 
 	ipcMain.handle(
 		"automation:accept-run",
 		withLogging("automation:accept-run", async (_, runId: string) => {
-			const result = await acceptRun(runId)
+			const result = await acceptRun(runId);
 			for (const win of BrowserWindow.getAllWindows()) {
-				win.webContents.send("automation:runs-updated")
+				win.webContents.send("automation:runs-updated");
 			}
-			return result
+			return result;
 		}),
-	)
+	);
 
 	ipcMain.handle(
 		"automation:mark-run-read",
 		withLogging("automation:mark-run-read", async (_, runId: string) => {
-			const result = await markRunRead(runId)
+			const result = await markRunRead(runId);
 			for (const win of BrowserWindow.getAllWindows()) {
-				win.webContents.send("automation:runs-updated")
+				win.webContents.send("automation:runs-updated");
 			}
-			return result
+			return result;
 		}),
-	)
+	);
 
 	ipcMain.handle(
 		"automation:preview-schedule",
-		withLogging("automation:preview-schedule", (_, rrule: string, timezone: string) =>
-			previewSchedule(rrule, timezone),
+		withLogging(
+			"automation:preview-schedule",
+			(_, rrule: string, timezone: string) => previewSchedule(rrule, timezone),
 		),
-	)
+	);
 
-	// --- Gravity Ads ---
+	// --- Gravity Ads --
+	// Each ad slot is a separate auction on the Gravity dashboard. The slots
+	// we use:
+	//   - "above_response" (id: "Chat-Response-Ad-Above") — pill above each AI
+	//     response, earns an impression per scroll-in per turn.
+	//   - "below_response" (id: "main") — pill below each AI response, earns
+	//     an impression per scroll-in per turn.
+	//   - "inline_response" (id: "Chat-Response-Ad-Inline") — woven between
+	//     work section and final response.
+	//   - "search_result" (id: "Search-Result-Ad") — appears inline among
+	//     `@`-reference search results in the mention popover, styled like
+	//     a result entry.
+	//   - "bottom_page" (id: "Bottom-MessageField-Ad") — sticky pill rendered
+	//     above the message input, always visible, auto-rotates on a timer
+	//     so consecutive fresh ads keep firing impressions.
+	// Per Gravity's docs, reusing the same placement string across every
+	// <GravityAd /> render is correct: each new render = new ad + fresh IO
+	// observer = fresh impression. Height/layout do not affect counting.
 
 	ipcMain.handle(
 		"gravity:get-ads",
-		withLogging("gravity:get-ads", async (_, messages: { role: string; content: string }[]) => {
-			// Minimal req mock — Electron's main process isn't an HTTP server.
-			// gravityAds needs body (for gravity_context, optional) and headers
-			// (for IP extraction, optional — falls back gracefully).
-			const req: Parameters<typeof gravityAds>[0] = {
-				body: { messages },
-				headers: {},
-			}
-			const result = await gravityAds(
-				req,
-				messages as import("@gravity-ai/api").MessageObject[],
-				[{ placement: "below_response" as const, placement_id: "main" as const }] as import("@gravity-ai/api").PlacementObject[],
-				{
-					production: !app.isPackaged ? false : true,
-					timeoutMs: 5000,
-				},
-			)
-			return result.ads
-		}),
-	)
+		withLogging(
+			"gravity:get-ads",
+			async (
+				_,
+				messages: { role: string; content: string }[],
+				placement:
+					| "above_response"
+					| "below_response"
+					| "inline_response"
+					| "search_result"
+					| "bottom_page"
+					| "sidebar"
+					| "mid_response"
+				| "mid_timeline" = "below_response",
+			) => {
+				if (!Array.isArray(messages) || messages.length === 0) {
+					return [];
+				}
+				const placement_id =
+					PLACEMENT_ID_BY_SLOT[placement] ??
+					PLACEMENT_ID_BY_SLOT.below_response;
+				// Synthesize the IncomingAdRequest shape the SDK expects. sessionId
+				// and user.userId are required by the upstream Gravity API; we
+				// derive them here until the renderer forwards real ones.
+				const req = {
+					body: {
+						messages,
+						gravity_context: {
+							sessionId: deriveSessionId(messages),
+							user: { id: DESKTOP_USER_ID, userId: DESKTOP_USER_ID },
+							device: {},
+						},
+					},
+					headers: {},
+				};
+			const upstreamPlacement =
+				SLOT_TO_UPSTREAM_PLACEMENT[placement] ??
+				SLOT_TO_UPSTREAM_PLACEMENT.below_response;
+			const placements: import("@gravity-ai/api").PlacementObject[] = [
+				{ placement: upstreamPlacement, placement_id },
+			];
+				const result = await gravityClient.getAds(
+					req,
+					messages as import("@gravity-ai/api").MessageObject[],
+					placements,
+				);
+				// Log every dimension of the response so silent failures are visible.
+				log.info("[gravity] response", {
+					placement,
+					placement_id,
+					adsCount: result.ads.length,
+					status: result.status,
+					elapsed: result.elapsed,
+					error: result.error ?? null,
+					firstBrand: result.ads[0]?.brandName ?? null,
+				});
+				if (result.error) {
+					log.warn("[gravity] upstream error field", {
+						placement,
+						placement_id,
+						error: result.error,
+						status: result.status,
+					});
+				}
+				return result.ads;
+			},
+		),
+	);
 
 	// --- Settings push channel (main -> renderer) ---
 	// Notify all renderer windows when settings change so they can update reactively.
 
 	onSettingsChanged((settings) => {
 		for (const win of BrowserWindow.getAllWindows()) {
-			win.webContents.send("settings:changed", settings)
+			win.webContents.send("settings:changed", settings);
 		}
-	})
+	});
 }

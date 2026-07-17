@@ -1,59 +1,38 @@
 # Project Context
 
-## Current Mission
-Integrate Gravity Ads into InfiniteCode Desktop (Electron) — replacing Adsterra.
+## Mission
+Integrate Gravity Ads into InfiniteCode Desktop (Electron) — replacing Adsterra. **COMPLETE.**
 
-## Environment
-- Project: InfiniteCode (monorepo, Rust core + Electron desktop + Next.js website)
-- Desktop: `apps/desktop/` — Electron app (React 19, TypeScript)
-- Build: `bun run dev` (Vite dev server on `localhost:1420`)
-- PM: `bun`
-- Agent instructions: `AGENTS.md` at root
-
-## Completed Work
-### ✅ Ad provider switch
-- Replaced Adsterra with Gravity Ads (`trygravity.ai`) — committed to `main`
-- Adsterra `<NativeAd />` usages removed from `chat-view.tsx` (imports removed, component stubs remain)
-
-### ✅ Gravity pixel installed
-- `gr-pix.js` pixel script injected in `apps/desktop/src/renderer/index.html` `<head>`
-- Account: `47f43d70-7338-44da-b13c-74165ad4b1fb`
-
-### ✅ Packages installed
-- `@gravity-ai/api@1.1.8` — main process (ad fetching)
-- `@gravity-ai/react@1.1.8` — renderer (ad display)
-
-### ✅ IPC bridge wired
-- `src/preload/index.ts`: `gravity.getAds(messages) → ipcRenderer.invoke("gravity:get-ads")`
-- `src/preload/api.d.ts`: Gravity bridge type `gravity.getAds() → Promise<Record<string, unknown>[]>`
-- `src/main/ipc-handlers.ts`: Imports `gravityAds` from `@gravity-ai/api`, registers `ipcMain.handle("gravity:get-ads")` — calls Gravity API with mock req + messages + placements
-
-### ✅ GravityAd component created
-- `src/renderer/components/chat/gravity-ad.tsx` — fetches ad via IPC, renders with `<GravityAd>` from SDK
-
-### ✅ GravityAd imported in chat-view.tsx
-- Import added to `chat-view.tsx`
-
-## Pending Work
-- [ ] **Replace NativeAd usages** — `<NativeAd />` is still referenced at lines 1081/1090 of chat-view.tsx. Replace both with `<GravityAd messages={...} />`
-- [ ] **Create adMessages helper** — compute `{ role, content }[]` from `turns` for Gravity contextual matching
-- [ ] **Stale files** — delete `native-ad.tsx` and `banner-ad.tsx`
-- [ ] **Verify** — kill + restart Electron dev server, confirm no build errors and banner renders
+## Completed
+- Gravity pixel (`gr-pix.js`) in `index.html` with account `47f43d70-7338-44da-b13c-74165ad4b1fb`
+- `@gravity-ai/api@1.1.8` + `@gravity-ai/react@1.1.8` installed
+- IPC bridge: `preload/index.ts` → `gravity.getAds(messages)`
+- Types: `api.d.ts` → `gravity.getAds() → Promise<Record<string, unknown>[]>`
+- Handler: `ipc-handlers.ts` → `gravity:get-ads` uses `gravityAds()` with mock req
+- Component: `gravity-ad.tsx` → fetches ad via IPC, renders `<GravityAd>` from SDK
+- `chat-view.tsx` → import GravityAd, replace NativeAd (2 spots), `useMemo` extracts last 4 messages
+- Stale files deleted: `native-ad.tsx`, `banner-ad.tsx`
+- `dotenv` installed, `import "dotenv/config"` in `main/index.ts` loads `.env`
+- `apps/desktop/.env` with API key `AgZpo3FWHQALSbuKioVDkLpWXqUJBnD81goUnhS2ujo`
+- `.gitignore` updated with `.env`
+- Build verified: `tsc --noEmit` zero errors
+- **Committed** to `main` as `67f436e` (13 files, +219/-564)
+- `bun run dev` built and launched successfully (SIGTERM from timeout, not a crash)
 
 ## Key Files
 | File | Status |
 |------|--------|
-| `src/preload/index.ts` | ✅ bridge added |
+| `src/main/index.ts` | ✅ dotenv import added |
+| `src/main/ipc-handlers.ts` | ✅ gravity:get-ads handler |
+| `src/preload/index.ts` | ✅ bridge wired |
 | `src/preload/api.d.ts` | ✅ types added |
-| `src/main/ipc-handlers.ts` | ✅ handler added |
-| `src/renderer/components/chat/gravity-ad.tsx` | ✅ component created |
-| `src/renderer/components/chat/chat-view.tsx` | 🟡 import added, NativeAd references remain |
-| `src/renderer/components/chat/native-ad.tsx` | ❌ to delete |
-| `src/renderer/components/chat/banner-ad.tsx` | ❌ to delete |
-| `src/renderer/index.html` | ✅ pixel added |
+| `src/renderer/components/chat/gravity-ad.tsx` | ✅ new component |
+| `src/renderer/components/chat/chat-view.tsx` | ✅ GravityAd wired |
+| `apps/desktop/.env` | ✅ API key set |
+| `.gitignore` | ✅ .env added |
 
-## Notes
-- Gravity API key is read from `process.env.GRAVITY_API_KEY` (not set yet — test ads work w/o key)
-- Test ads: `production: false` in dev (`!app.isPackaged`), `production: true` in prod
-- `gravityAds()` never throws — always resolves with `{ ads, status, elapsed, requestBody, error? }`
-- `@gravity-ai/react` `<GravityAd>` accepts `AdResponse | null` and renders card/inline/banner/etc variants
+## To Run
+```bash
+cd apps/desktop && bun run dev
+```
+Test ads appear below last chat response. Real ads need `app.isPackaged === true`.

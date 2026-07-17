@@ -622,7 +622,19 @@ export interface InfiniteCodeAPI {
 
 	// Gravity Ads
 	gravity: {
-		getAds: (messages: { role: string; content: string }[]) => Promise<Record<string, unknown>[]>
+		getAds: (
+			messages: { role: string; content: string }[],
+			placement?:
+				| "above_response"
+				| "below_response"
+				| "inline_response"
+				| "search_result"
+				| "bottom_page"
+				| "sidebar"
+				| "mid_response"
+				| "mid_timeline"
+				| "startup_overlay",
+	) => Promise<Record<string, unknown>[]>
 	}
 }
 

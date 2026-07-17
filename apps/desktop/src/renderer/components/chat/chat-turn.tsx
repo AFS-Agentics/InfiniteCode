@@ -4,9 +4,14 @@ import {
 	MessageActions,
 	MessageContent,
 	MessageResponse,
-} from "@infinitecode/ui/components/ai-elements/message"
-import { Shimmer } from "@infinitecode/ui/components/ai-elements/shimmer"
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@infinitecode/ui/components/dialog"
+} from "@infinitecode/ui/components/ai-elements/message";
+import { Shimmer } from "@infinitecode/ui/components/ai-elements/shimmer";
+import {
+	Dialog,
+	DialogContent,
+	DialogTitle,
+	DialogTrigger,
+} from "@infinitecode/ui/components/dialog";
 
 import {
 	ArrowUpToLineIcon,
@@ -19,19 +24,30 @@ import {
 	Loader2Icon,
 	Undo2Icon,
 	XIcon,
-} from "lucide-react"
-import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
-import { useDisplayMode } from "../../hooks/use-agents"
-import type { SessionCompactionStatus } from "../../atoms/compaction"
-import type { ProviderRetryStatus } from "../../atoms/sessions"
-import type { ChatMessageEntry, ChatTurn as ChatTurnType } from "../../hooks/use-session-chat"
+} from "lucide-react";
+import {
+	memo,
+	useCallback,
+	useDeferredValue,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
+import type { SessionCompactionStatus } from "../../atoms/compaction";
+import type { ProviderRetryStatus } from "../../atoms/sessions";
+import { useDisplayMode } from "../../hooks/use-agents";
+import type {
+	ChatMessageEntry,
+	ChatTurn as ChatTurnType,
+} from "../../hooks/use-session-chat";
 import {
 	computeTurnCost,
 	computeTurnWorkTime,
 	formatCost,
 	formatWorkDuration,
 	shortModelName,
-} from "../../lib/session-metrics"
+} from "../../lib/session-metrics";
 import type {
 	Agent,
 	FilePart,
@@ -40,28 +56,35 @@ import type {
 	ReasoningPart,
 	TextPart,
 	ToolPart,
-} from "../../lib/types"
-import { buildProcessTimeline } from "./process-timeline"
-import { ProcessTimelineView } from "./process-timeline-view"
+} from "../../lib/types";
+import { PermissionItem } from "./chat-permission";
 import {
 	CompactionStatusDivider,
 	isCompactionStatusText,
-} from "./compaction-status-divider"
-import { PermissionItem } from "./chat-permission"
+} from "./compaction-status-divider";
+import {
+	GravityAd,
+	GravityInlineAd,
+	GravityMidResponseAd,
+	GravityMidTimelineAd,
+} from "./gravity-ad";
+import { buildProcessTimeline } from "./process-timeline";
+import { ProcessTimelineView } from "./process-timeline-view";
 
 // ============================================================
 // Utility functions
 // ============================================================
 
-const INFINITECODE_ITEM_KIND_META = "infinitecode/itemKind"
-const INFINITECODE_RESEARCH_ARTIFACT_TITLE_META = "infinitecode/researchArtifactTitle"
+const INFINITECODE_ITEM_KIND_META = "infinitecode/itemKind";
+const INFINITECODE_RESEARCH_ARTIFACT_TITLE_META =
+	"infinitecode/researchArtifactTitle";
 
 /**
  * Formats a timestamp (milliseconds) to relative or absolute time.
  */
 export function formatTimestamp(ms: number): string {
-	const date = new Date(ms)
-	return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+	const date = new Date(ms);
+	return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 // ============================================================
@@ -74,42 +97,43 @@ export function formatTimestamp(ms: number): string {
  */
 function computeStatus(parts: Part[]): string {
 	for (let i = parts.length - 1; i >= 0; i--) {
-		const part = parts[i]
+		const part = parts[i];
 		if (part.type === "tool") {
 			switch (part.tool) {
 				case "task": {
 					// Show what the sub-agent is actually doing
-					const desc = part.state.input?.description as string | undefined
-					const shortDesc = desc && desc.length > 30 ? `${desc.slice(0, 27)}...` : desc
-					return shortDesc ? `Agent: ${shortDesc}` : "Delegating..."
+					const desc = part.state.input?.description as string | undefined;
+					const shortDesc =
+						desc && desc.length > 30 ? `${desc.slice(0, 27)}...` : desc;
+					return shortDesc ? `Agent: ${shortDesc}` : "Delegating...";
 				}
 				case "todowrite":
 				case "todoread":
-					return "Planning..."
+					return "Planning...";
 				case "read":
-					return "Reading files..."
+					return "Reading files...";
 				case "list":
 				case "grep":
 				case "glob":
-					return "Searching codebase..."
+					return "Searching codebase...";
 				case "webfetch":
-					return "Fetching web content..."
+					return "Fetching web content...";
 				case "edit":
 				case "write":
 				case "apply_patch":
-					return "Making edits..."
+					return "Making edits...";
 				case "bash":
-					return "Running command..."
+					return "Running command...";
 				case "question":
-					return "Asking a question..."
+					return "Asking a question...";
 				default:
-					return `Running ${part.tool}...`
+					return `Running ${part.tool}...`;
 			}
 		}
-		if (part.type === "reasoning") return "Thinking..."
-		if (part.type === "text") return "Composing response..."
+		if (part.type === "reasoning") return "Thinking...";
+		if (part.type === "text") return "Composing response...";
 	}
-	return "Working..."
+	return "Working...";
 }
 
 // ============================================================
@@ -117,19 +141,20 @@ function computeStatus(parts: Part[]): string {
 // ============================================================
 
 function isSyntheticMessage(entry: ChatMessageEntry): boolean {
-	const textParts = entry.parts.filter((p): p is TextPart => p.type === "text")
+	const textParts = entry.parts.filter((p): p is TextPart => p.type === "text");
 	// All text parts are synthetic (e.g. compaction continuation, shell execution)
-	if (textParts.length > 0 && textParts.every((p) => p.synthetic === true)) return true
+	if (textParts.length > 0 && textParts.every((p) => p.synthetic === true))
+		return true;
 	// No text parts at all — e.g. a user message with only a compaction part
-	if (textParts.length === 0 && entry.parts.length > 0) return true
-	return false
+	if (textParts.length === 0 && entry.parts.length > 0) return true;
+	return false;
 }
 
 function getUserText(entry: ChatMessageEntry): string {
 	return entry.parts
 		.filter((p): p is TextPart => p.type === "text" && !p.synthetic)
 		.map((p) => p.text)
-		.join("\n")
+		.join("\n");
 }
 
 function getSyntheticLabel(entry: ChatMessageEntry): string {
@@ -137,24 +162,29 @@ function getSyntheticLabel(entry: ChatMessageEntry): string {
 		.filter((p): p is TextPart => p.type === "text")
 		.map((p) => p.text)
 		.join("\n")
-		.toLowerCase()
+		.toLowerCase();
 
-	if (text.includes("continue if you have next steps")) return "Auto-continued after compaction"
-	if (text.includes("summarize the task tool output")) return "Auto-continued after task"
-	if (text.includes("tool was executed by the user")) return "Shell command executed"
-	if (text.includes("plan has been approved")) return "Plan approved"
-	if (text.includes("enter plan mode")) return "Entered plan mode"
-	if (text.includes("switch") && text.includes("plan")) return "Mode switched"
+	if (text.includes("continue if you have next steps"))
+		return "Auto-continued after compaction";
+	if (text.includes("summarize the task tool output"))
+		return "Auto-continued after task";
+	if (text.includes("tool was executed by the user"))
+		return "Shell command executed";
+	if (text.includes("plan has been approved")) return "Plan approved";
+	if (text.includes("enter plan mode")) return "Entered plan mode";
+	if (text.includes("switch") && text.includes("plan")) return "Mode switched";
 	// No text parts — check for compaction part (user message that triggers compaction)
-	if (entry.parts.some((p) => p.type === "compaction")) return "Compacting conversation"
-	return "Auto-continued"
+	if (entry.parts.some((p) => p.type === "compaction"))
+		return "Compacting conversation";
+	return "Auto-continued";
 }
 
 function getFileParts(entry: ChatMessageEntry): FilePart[] {
 	return entry.parts.filter(
 		(p): p is FilePart =>
-			p.type === "file" && (p.mime.startsWith("image/") || p.mime === "application/pdf"),
-	)
+			p.type === "file" &&
+			(p.mime.startsWith("image/") || p.mime === "application/pdf"),
+	);
 }
 
 // ============================================================
@@ -164,37 +194,43 @@ function getFileParts(entry: ChatMessageEntry): FilePart[] {
 const AttachmentGrid = memo(function AttachmentGrid({
 	files,
 	onDelete,
-}: { files: FilePart[]; onDelete?: (file: FilePart) => void }) {
-	if (files.length === 0) return null
+}: {
+	files: FilePart[];
+	onDelete?: (file: FilePart) => void;
+}) {
+	if (files.length === 0) return null;
 	return (
 		<div className="flex flex-wrap gap-2">
 			{files.map((file) => (
 				<AttachmentThumbnail key={file.id} file={file} onDelete={onDelete} />
 			))}
 		</div>
-	)
-})
+	);
+});
 
 function AttachmentThumbnail({
 	file,
 	onDelete,
-}: { file: FilePart; onDelete?: (file: FilePart) => void }) {
-	const isImage = file.mime.startsWith("image/")
-	const [deleting, setDeleting] = useState(false)
+}: {
+	file: FilePart;
+	onDelete?: (file: FilePart) => void;
+}) {
+	const isImage = file.mime.startsWith("image/");
+	const [deleting, setDeleting] = useState(false);
 
 	const handleDelete = useCallback(
 		async (e: React.MouseEvent) => {
-			e.stopPropagation()
-			if (!onDelete || deleting) return
-			setDeleting(true)
+			e.stopPropagation();
+			if (!onDelete || deleting) return;
+			setDeleting(true);
 			try {
-				await onDelete(file)
+				await onDelete(file);
 			} finally {
-				setDeleting(false)
+				setDeleting(false);
 			}
 		},
 		[onDelete, file, deleting],
-	)
+	);
 
 	return (
 		<Dialog>
@@ -237,7 +273,9 @@ function AttachmentThumbnail({
 				</DialogTrigger>
 			</div>
 			<DialogContent className="max-h-[90vh] max-w-4xl overflow-auto p-0">
-				<DialogTitle className="sr-only">{file.filename ?? "Attachment preview"}</DialogTitle>
+				<DialogTitle className="sr-only">
+					{file.filename ?? "Attachment preview"}
+				</DialogTitle>
 				{isImage ? (
 					<img
 						src={file.url}
@@ -247,12 +285,14 @@ function AttachmentThumbnail({
 				) : (
 					<div className="flex flex-col items-center justify-center gap-2 p-8">
 						<FileIcon className="size-12 text-muted-foreground" />
-						<p className="text-sm text-muted-foreground">{file.filename ?? "PDF attachment"}</p>
+						<p className="text-sm text-muted-foreground">
+							{file.filename ?? "PDF attachment"}
+						</p>
 					</div>
 				)}
 			</DialogContent>
 		</Dialog>
-	)
+	);
 }
 
 // ============================================================
@@ -262,10 +302,15 @@ function AttachmentThumbnail({
 /** A renderable part — either a tool call, an intermediate text block, or reasoning */
 type RenderablePart =
 	| { kind: "tool"; part: ToolPart }
-	| { kind: "text"; id: string; text: string; metadata?: Record<string, unknown> }
-	| { kind: "reasoning"; part: ReasoningPart }
+	| {
+			kind: "text";
+			id: string;
+			text: string;
+			metadata?: Record<string, unknown>;
+	  }
+	| { kind: "reasoning"; part: ReasoningPart };
 
-type TextRenderablePart = Extract<RenderablePart, { kind: "text" }>
+type TextRenderablePart = Extract<RenderablePart, { kind: "text" }>;
 
 /**
  * Flattens all assistant parts into an ordered list of renderable items
@@ -275,81 +320,143 @@ type TextRenderablePart = Extract<RenderablePart, { kind: "text" }>
  * Strips OpenRouter [REDACTED] chunks from reasoning and skips empty reasoning.
  */
 function getPartsAndTools(assistantMessages: ChatMessageEntry[]): {
-	ordered: RenderablePart[]
-	tools: ToolPart[]
+	ordered: RenderablePart[];
+	tools: ToolPart[];
 } {
-	const ordered: RenderablePart[] = []
-	const tools: ToolPart[] = []
+	const ordered: RenderablePart[] = [];
+	const tools: ToolPart[] = [];
 	for (const msg of assistantMessages) {
 		for (const part of msg.parts) {
 			if (part.type === "tool") {
-				tools.push(part)
-				if (part.tool === "todoread" && part.state.status !== "completed") continue
-				ordered.push({ kind: "tool", part })
+				tools.push(part);
+				if (part.tool === "todoread" && part.state.status !== "completed")
+					continue;
+				ordered.push({ kind: "tool", part });
 			} else if (part.type === "text" && !part.synthetic && part.text.trim()) {
-				if (isCompactionStatusText(part.text)) continue
-				const metadata = (part as { metadata?: Record<string, unknown> }).metadata
-				ordered.push({ kind: "text", id: part.id, text: part.text, metadata })
+				if (isCompactionStatusText(part.text)) continue;
+				const metadata = (part as { metadata?: Record<string, unknown> })
+					.metadata;
+				ordered.push({ kind: "text", id: part.id, text: part.text, metadata });
 			} else if (part.type === "reasoning") {
 				// Strip OpenRouter's encrypted [REDACTED] chunks
-				const cleaned = part.text.replace("[REDACTED]", "").trim()
+				const cleaned = part.text.replace("[REDACTED]", "").trim();
 				if (cleaned) {
-					ordered.push({ kind: "reasoning", part })
+					ordered.push({ kind: "reasoning", part });
 				}
 			}
 		}
 	}
-	return { ordered, tools }
+	return { ordered, tools };
 }
 
-function hasCompactionStatusMarker(assistantMessages: ChatMessageEntry[]): boolean {
+function hasCompactionStatusMarker(
+	assistantMessages: ChatMessageEntry[],
+): boolean {
 	return assistantMessages.some((msg) =>
-		msg.parts.some((part) => part.type === "text" && isCompactionStatusText(part.text)),
-	)
+		msg.parts.some(
+			(part) => part.type === "text" && isCompactionStatusText(part.text),
+		),
+	);
 }
 
 /**
  * Gets the last text part's content — used for the final streaming response
  * and the copy action. Returns undefined if no text parts exist.
  */
-function getLastResponseText(orderedParts: RenderablePart[]): string | undefined {
+function getLastResponseText(
+	orderedParts: RenderablePart[],
+): string | undefined {
 	for (let i = orderedParts.length - 1; i >= 0; i--) {
-		const item = orderedParts[i]
-		if (item.kind === "text") return item.text
+		const item = orderedParts[i];
+		if (item.kind === "text") return item.text;
 	}
-	return undefined
+	return undefined;
 }
 
 function splitCompletedTurnParts(orderedParts: RenderablePart[]): {
-	completedProcessParts: RenderablePart[]
-	finalResponsePart: TextRenderablePart | undefined
+	completedProcessParts: RenderablePart[];
+	finalResponsePart: TextRenderablePart | undefined;
 } {
-	let finalResponseIndex = -1
+	let finalResponseIndex = -1;
 	for (let i = orderedParts.length - 1; i >= 0; i--) {
 		if (orderedParts[i].kind === "text") {
-			finalResponseIndex = i
-			break
+			finalResponseIndex = i;
+			break;
 		}
 	}
 
 	if (finalResponseIndex === -1) {
-		return { completedProcessParts: orderedParts, finalResponsePart: undefined }
+		return {
+			completedProcessParts: orderedParts,
+			finalResponsePart: undefined,
+		};
 	}
 
-	const finalResponsePart = orderedParts[finalResponseIndex] as TextRenderablePart
-	const completedProcessParts = orderedParts.filter((_, index) => index !== finalResponseIndex)
-	return { completedProcessParts, finalResponsePart }
+	const finalResponsePart = orderedParts[
+		finalResponseIndex
+	] as TextRenderablePart;
+	const completedProcessParts = orderedParts.filter(
+		(_, index) => index !== finalResponseIndex,
+	);
+	return { completedProcessParts, finalResponsePart };
+}
+
+/**
+ * Threshold below which a turn is considered "short" and defaults the
+ * "Worked for Xs" expandable summary to OPEN. Tuned for ad-visibility UX:
+ *   - ≤ SHORT_TURN_ITEM_LIMIT items: default OPEN so mid_timeline +
+ *     mid_response Gravity ads are visible without a manual click.
+ *   -  > SHORT_TURN_ITEM_LIMIT items: default CLOSED to keep density
+ *     UX manageable on long agentic turns (no first-paint flood of
+ *     shell/think/edit blocks when no ad is involved).
+ *
+ * Centralizing the threshold as a named constant — rather than a bare
+ * `<= 3` literal in the helper — makes future tuning a one-edit change
+ * that future reviewers can audit instead of re-introducing the bug
+ * that motivated this rule (always-expanded → 50-card flood).
+ */
+const SHORT_TURN_ITEM_LIMIT = 3;
+
+/**
+ * Returns true when this turn's completed process timeline has few grouped
+ * items (≤ SHORT_TURN_ITEM_LIMIT) — used to decide the default for the
+ * "Worked for Xs" expandable summary (`completedProcessExpanded` in
+ * ChatTurnComponent).
+ *
+ * Active-turn note: when `isWorking` is true the turn is still streaming
+ * and the completed-parts slice is partial. The helper still runs at
+ * first mount with whatever the completed slice has so far, which means:
+ *   - For a streaming turn with < LIMIT items at first mount: default
+ *     OPEN, persisting for the lifetime of that turn. If a later chunk
+ *     pushes the count past LIMIT within the same turn, the chevron
+ *     does NOT auto-collapse — the user retains whichever state they
+ *     had at first mount. (The rule re-applies only on `turn.id` change
+ *     via the useEffect reset, so each fresh turn gets the right default
+ *     for its starting shape.)
+ *   - This avoids re-evaluating the rule on every streaming chunk and
+ *     prevents mid-stream UI jank.
+ *
+ * Mirrors the same `processOrderedParts → buildProcessTimeline` chain as
+ * `processTimelineItems` useMemo downstream, but uses the *completed*
+ * branch (not the active-turn branch) because this toggle only resolves
+ * for completed turns where the "Worked for Xs" header is rendered.
+ */
+function defaultCompletedProcessExpanded(turn: ChatTurnType): boolean {
+	const { ordered: orderedParts } = getPartsAndTools(turn.assistantMessages);
+	const { completedProcessParts } = splitCompletedTurnParts(orderedParts);
+	return buildProcessTimeline(completedProcessParts).length <= SHORT_TURN_ITEM_LIMIT;
 }
 
 function researchArtifactTitle(item: TextRenderablePart): string | undefined {
-	const metadata = item.metadata
-	if (metadata?.[INFINITECODE_ITEM_KIND_META] !== "research_artifact") return undefined
-	const title = metadata[INFINITECODE_RESEARCH_ARTIFACT_TITLE_META]
-	return typeof title === "string" && title.trim() ? title : undefined
+	const metadata = item.metadata;
+	if (metadata?.[INFINITECODE_ITEM_KIND_META] !== "research_artifact")
+		return undefined;
+	const title = metadata[INFINITECODE_RESEARCH_ARTIFACT_TITLE_META];
+	return typeof title === "string" && title.trim() ? title : undefined;
 }
 
 function ResearchArtifactBlock({ item }: { item: TextRenderablePart }) {
-	const title = researchArtifactTitle(item)
+	const title = researchArtifactTitle(item);
 	if (!title) {
 		return (
 			<Message from="assistant">
@@ -357,7 +464,7 @@ function ResearchArtifactBlock({ item }: { item: TextRenderablePart }) {
 					<MessageResponse>{item.text}</MessageResponse>
 				</MessageContent>
 			</Message>
-		)
+		);
 	}
 	return (
 		<div className="border-l border-primary/30 pl-3">
@@ -371,26 +478,31 @@ function ResearchArtifactBlock({ item }: { item: TextRenderablePart }) {
 				</MessageContent>
 			</Message>
 		</div>
-	)
+	);
 }
 
 function getError(assistantMessages: ChatMessageEntry[]): string | undefined {
 	for (const msg of assistantMessages) {
 		if (msg.info.role === "assistant" && msg.info.error) {
-			const error = msg.info.error
-			const errorData = error.data
+			const error = msg.info.error;
+			const errorData = error.data;
 			// Most error types have a `message` string in data
 			if ("message" in errorData && errorData.message) {
-				return typeof errorData.message === "string" ? errorData.message : String(errorData.message)
+				return typeof errorData.message === "string"
+					? errorData.message
+					: String(errorData.message);
 			}
 			// Fallback: use the error name (e.g. "MessageOutputLengthError") +
 			// any stringifiable data for types like MessageOutputLengthError
 			// whose data is { [key: string]: unknown }
-			const dataStr = Object.keys(errorData).length > 0 ? JSON.stringify(errorData) : undefined
-			return dataStr ? `${error.name}: ${dataStr}` : error.name
+			const dataStr =
+				Object.keys(errorData).length > 0
+					? JSON.stringify(errorData)
+					: undefined;
+			return dataStr ? `${error.name}: ${dataStr}` : error.name;
 		}
 	}
-	return undefined
+	return undefined;
 }
 
 // ============================================================
@@ -403,20 +515,22 @@ function getError(assistantMessages: ChatMessageEntry[]): string | undefined {
  * but kept local to avoid coupling.
  */
 function messageEntryFingerprint(entry: ChatMessageEntry): string {
-	const lastPart = entry.parts.at(-1)
-	const completed = entry.info.role === "assistant" ? (entry.info.time.completed ?? 0) : 0
-	let textLen = 0
-	const toolSegments: string[] = []
-	const textMetadataSegments: string[] = []
+	const lastPart = entry.parts.at(-1);
+	const completed =
+		entry.info.role === "assistant" ? (entry.info.time.completed ?? 0) : 0;
+	let textLen = 0;
+	const toolSegments: string[] = [];
+	const textMetadataSegments: string[] = [];
 	for (const part of entry.parts) {
 		if (part.type === "text" || part.type === "reasoning") {
-			textLen += part.text.length
+			textLen += part.text.length;
 			if (part.type === "text") {
-				const metadata = (part as { metadata?: Record<string, unknown> }).metadata
+				const metadata = (part as { metadata?: Record<string, unknown> })
+					.metadata;
 				if (metadata?.[INFINITECODE_ITEM_KIND_META] === "research_artifact") {
 					textMetadataSegments.push(
 						`${part.id}:${metadata[INFINITECODE_ITEM_KIND_META]}:${metadata[INFINITECODE_RESEARCH_ARTIFACT_TITLE_META] ?? ""}`,
-					)
+					);
 				}
 			}
 		} else if (part.type === "tool") {
@@ -425,28 +539,31 @@ function messageEntryFingerprint(entry: ChatMessageEntry): string {
 					? part.state.output.length
 					: part.state.status === "error"
 						? part.state.error.length
-						: 0
-			toolSegments.push(`${part.id}:${part.state.status}:${outLen}`)
+						: 0;
+			toolSegments.push(`${part.id}:${part.state.status}:${outLen}`);
 		}
 	}
-	return `${entry.info.id}:${completed}:${entry.parts.length}:${lastPart?.id ?? ""}:${textLen}:${textMetadataSegments.join(",")}:${toolSegments.join(",")}`
+	return `${entry.info.id}:${completed}:${entry.parts.length}:${lastPart?.id ?? ""}:${textLen}:${textMetadataSegments.join(",")}:${toolSegments.join(",")}`;
 }
 
 /** Compare two turns by content fingerprint rather than reference equality */
 function areTurnsEqual(a: ChatTurnType, b: ChatTurnType): boolean {
-	if (a === b) return true
-	if (a.id !== b.id) return false
-	if (messageEntryFingerprint(a.userMessage) !== messageEntryFingerprint(b.userMessage))
-		return false
-	if (a.assistantMessages.length !== b.assistantMessages.length) return false
+	if (a === b) return true;
+	if (a.id !== b.id) return false;
+	if (
+		messageEntryFingerprint(a.userMessage) !==
+		messageEntryFingerprint(b.userMessage)
+	)
+		return false;
+	if (a.assistantMessages.length !== b.assistantMessages.length) return false;
 	for (let i = 0; i < a.assistantMessages.length; i++) {
 		if (
 			messageEntryFingerprint(a.assistantMessages[i]) !==
 			messageEntryFingerprint(b.assistantMessages[i])
 		)
-			return false
+			return false;
 	}
-	return true
+	return true;
 }
 
 // ============================================================
@@ -454,83 +571,95 @@ function areTurnsEqual(a: ChatTurnType, b: ChatTurnType): boolean {
 // ============================================================
 
 type PendingPermission = {
-	request: PermissionRequest
-	sessionId: string
-}
+	request: PermissionRequest;
+	sessionId: string;
+};
 
 interface ChatTurnProps {
-	turn: ChatTurnType
-	isLast: boolean
-	isWorking: boolean
-	agent?: Agent
-	pendingPermission?: PendingPermission
-	isConnected?: boolean
-	compactionStatus?: SessionCompactionStatus | null
-	retryStatus?: ProviderRetryStatus
+	turn: ChatTurnType;
+	isLast: boolean;
+	isWorking: boolean;
+	agent?: Agent;
+	pendingPermission?: PendingPermission;
+	isConnected?: boolean;
+	compactionStatus?: SessionCompactionStatus | null;
+	retryStatus?: ProviderRetryStatus;
 	onApprovePermission?: (
 		agent: Agent,
 		permissionSessionId: string,
 		permissionId: string,
 		response?: "once" | "always",
-	) => Promise<void>
+	) => Promise<void>;
 	onDenyPermission?: (
 		agent: Agent,
 		permissionSessionId: string,
 		permissionId: string,
-	) => Promise<void>
+	) => Promise<void>;
 	/** Revert to this turn's user message (for per-turn undo) */
-	onRevertToMessage?: (messageId: string) => Promise<void>
+	onRevertToMessage?: (messageId: string) => Promise<void>;
 	/** Fork the conversation from this turn boundary */
-	onForkFromTurn?: () => Promise<void>
+	onForkFromTurn?: () => Promise<void>;
 	/** Delete a specific part from a message (for error recovery) */
-	onDeletePart?: (sessionId: string, messageId: string, partId: string) => Promise<void>
+	onDeletePart?: (
+		sessionId: string,
+		messageId: string,
+		partId: string,
+	) => Promise<void>;
 }
 
-function pendingPermissionFingerprint(permission: PendingPermission | undefined): string {
-	if (!permission) return ""
+function pendingPermissionFingerprint(
+	permission: PendingPermission | undefined,
+): string {
+	if (!permission) return "";
 	const requestId =
 		typeof permission.request.id === "string"
 			? permission.request.id
 			: typeof permission.request.requestID === "string"
 				? permission.request.requestID
-				: ""
-	return `${permission.sessionId}:${requestId}`
+				: "";
+	return `${permission.sessionId}:${requestId}`;
 }
 
 function retryStatusText(status: ProviderRetryStatus): string {
-	if (status.message.trim()) return status.message
-	const seconds = Math.max(status.backoffMs / 1000, 0.1)
-	return `Retrying provider request in ${seconds.toFixed(1)}s (attempt ${status.attempt})`
+	if (status.message.trim()) return status.message;
+	const seconds = Math.max(status.backoffMs / 1000, 0.1);
+	return `Retrying provider request in ${seconds.toFixed(1)}s (attempt ${status.attempt})`;
 }
 
 function WorkingTurnStatusStrip({
 	turn,
 	retryStatus,
 }: {
-	turn: ChatTurnType
-	retryStatus?: ProviderRetryStatus
+	turn: ChatTurnType;
+	retryStatus?: ProviderRetryStatus;
 }) {
 	const [display, setDisplay] = useState(() =>
 		formatWorkDuration(computeTurnWorkTime(turn, { active: true })),
-	)
+	);
 
 	useEffect(() => {
 		const updateDisplay = () => {
-			setDisplay(formatWorkDuration(computeTurnWorkTime(turn, { active: true })))
-		}
-		updateDisplay()
-		const id = setInterval(updateDisplay, 1_000)
-		return () => clearInterval(id)
-	}, [turn])
+			setDisplay(
+				formatWorkDuration(computeTurnWorkTime(turn, { active: true })),
+			);
+		};
+		updateDisplay();
+		const id = setInterval(updateDisplay, 1_000);
+		return () => clearInterval(id);
+	}, [turn]);
 
 	return (
 		<div className="space-y-2 pt-1">
 			<div className="text-sm tabular-nums text-muted-foreground/70">
-				{retryStatus ? retryStatusText(retryStatus) : <>Working for {display}</>}
+				{retryStatus ? (
+					retryStatusText(retryStatus)
+				) : (
+					<>Working for {display}</>
+				)}
 			</div>
 			<div className="h-px bg-border/70" />
 		</div>
-	)
+	);
 }
 
 function CompletedTurnProcessDisclosure({
@@ -539,10 +668,10 @@ function CompletedTurnProcessDisclosure({
 	hasProcessDetails,
 	onToggle,
 }: {
-	duration: string
-	expanded: boolean
-	hasProcessDetails: boolean
-	onToggle: () => void
+	duration: string;
+	expanded: boolean;
+	hasProcessDetails: boolean;
+	onToggle: () => void;
 }) {
 	const content = (
 		<>
@@ -552,19 +681,23 @@ function CompletedTurnProcessDisclosure({
 			</span>
 			{hasProcessDetails && (
 				<ChevronDownIcon
-					className={expanded ? "size-4 rotate-180 transition-transform" : "size-4 transition-transform"}
+					className={
+						expanded
+							? "size-4 rotate-180 transition-transform"
+							: "size-4 transition-transform"
+					}
 					aria-hidden="true"
 				/>
 			)}
 		</>
-	)
+	);
 
 	if (!hasProcessDetails) {
 		return (
 			<div className="flex w-fit max-w-full items-center gap-1.5 border-b border-border/70 pb-1 text-sm tabular-nums text-muted-foreground/70">
 				{content}
 			</div>
-		)
+		);
 	}
 
 	return (
@@ -576,7 +709,7 @@ function CompletedTurnProcessDisclosure({
 		>
 			{content}
 		</button>
-	)
+	);
 }
 
 /**
@@ -608,170 +741,280 @@ export const ChatTurnComponent = memo(
 		onForkFromTurn,
 		onDeletePart,
 	}: ChatTurnProps) {
-		const [completedProcessExpanded, setCompletedProcessExpanded] = useState(false)
-		const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(() => new Set())
-		const [copied, setCopied] = useState(false)
-		const displayMode = useDisplayMode()
-		const toolPathRoot = agent?.worktreePath ?? agent?.directory ?? agent?.projectDirectory
-		const turnRef = useRef<HTMLDivElement>(null)
+		const [completedProcessExpanded, setCompletedProcessExpanded] = useState(
+			// Lazy init: smart-default reads from `turn.assistantMessages`
+			// and we don't want to recompute on every render. We reuse
+			// `defaultCompletedProcessExpanded` (defined at module scope
+			// above) — can't reference the in-component
+			// `processTimelineItems` useMemo here because it's declared
+			// later in the function body.
+			() => defaultCompletedProcessExpanded(turn),
+		);
+		const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(
+			() => new Set(),
+		);
+		const [copied, setCopied] = useState(false);
+		const displayMode = useDisplayMode();
+		const toolPathRoot =
+			agent?.worktreePath ?? agent?.directory ?? agent?.projectDirectory;
+		const turnRef = useRef<HTMLDivElement>(null);
 		useEffect(() => {
-			setCompletedProcessExpanded(false)
-			setExpandedRowIds(new Set())
-		}, [turn.id])
+			// Smart default per fresh turn: short turns expand (ads visible);
+			// long turns stay collapsed (density UX preserved). User can
+			// override either way by clicking the chevron. The helper here
+			// is the same one used for lazy useState init above so first
+			// render and post-mount navigation both apply the same rule.
+			//
+			// Deps are scoped to `turn.id` deliberately: within-turn
+			// streaming pushes that change `turn.assistantMessages`
+			// should NOT re-fire the smart default (the chevron override
+			// stays valid until turn roll-over). Adding `turn` or
+			// `turn.assistantMessages` to deps would re-fire on every
+			// streaming chunk and cause UI jank. Don't widen this array
+			// without a real reason.
+			setCompletedProcessExpanded(defaultCompletedProcessExpanded(turn));
+			setExpandedRowIds(new Set());
+		}, [turn.id]);
 
-		const isSynthetic = useMemo(() => isSyntheticMessage(turn.userMessage), [turn.userMessage])
-		const userText = useMemo(() => getUserText(turn.userMessage), [turn.userMessage])
+		const isSynthetic = useMemo(
+			() => isSyntheticMessage(turn.userMessage),
+			[turn.userMessage],
+		);
+		const userText = useMemo(
+			() => getUserText(turn.userMessage),
+			[turn.userMessage],
+		);
 		const syntheticLabel = useMemo(
 			() => (isSynthetic ? getSyntheticLabel(turn.userMessage) : ""),
 			[isSynthetic, turn.userMessage],
-		)
-		const userFiles = useMemo(() => getFileParts(turn.userMessage), [turn.userMessage])
+		);
+		const userFiles = useMemo(
+			() => getFileParts(turn.userMessage),
+			[turn.userMessage],
+		);
 
 		// Ordered parts + tool-only subset in a single pass (avoids double iteration)
 		const { ordered: orderedParts } = useMemo(
 			() => getPartsAndTools(turn.assistantMessages),
 			[turn.assistantMessages],
-		)
+		);
 
 		const { completedProcessParts, finalResponsePart } = useMemo(
 			() => splitCompletedTurnParts(orderedParts),
 			[orderedParts],
-		)
+		);
 		const hasCompactionMarker = useMemo(
 			() => hasCompactionStatusMarker(turn.assistantMessages),
 			[turn.assistantMessages],
-		)
-		const displayedCompactionStatus: SessionCompactionStatus | null = hasCompactionMarker
-			? compactionStatus === "completed"
-				? "completed"
-				: "started"
-			: null
+		);
+		const displayedCompactionStatus: SessionCompactionStatus | null =
+			hasCompactionMarker
+				? compactionStatus === "completed"
+					? "completed"
+					: "started"
+				: null;
 
 		// The last text for streaming display and copy action
-		const rawResponseText = useMemo(() => getLastResponseText(orderedParts), [orderedParts])
-		const responseText = useDeferredValue(rawResponseText)
+		const rawResponseText = useMemo(
+			() => getLastResponseText(orderedParts),
+			[orderedParts],
+		);
+		const responseText = useDeferredValue(rawResponseText);
 
-		const errorText = useMemo(() => getError(turn.assistantMessages), [turn.assistantMessages])
+		// Per-turn Gravity ad context (above_response, inline_response, and
+		// below_response all read this). Captures THIS turn's user prompt +
+		// final assistant response so the contextual match aligns with the
+		// response that each ad sits next to. Derived per-turn rather than a
+		// shared ChatView-level last-4-turns slice so prior turns' ads stay
+		// stable when a new turn begins (the slice would shift, every pill
+		// would reset to "none", and Gravity's per-session sessionId would
+		// churn on every streamed token). Single source of truth here is
+		// critical — feed all three slots this exact array reference.
+		const turnAdMessages = useMemo<{ role: string; content: string }[]>(() => {
+			const msgs: { role: string; content: string }[] = [];
+			const userText = turn.userMessage.parts
+				.filter((p) => p.type === "text" || p.type === "reasoning")
+				.map((p) => p.text)
+				.join(" ")
+				.trim();
+			if (userText) msgs.push({ role: "user", content: userText.slice(0, 800) });
+			if (responseText)
+				msgs.push({ role: "assistant", content: responseText.slice(0, 800) });
+			return msgs;
+		}, [turn.userMessage.parts, responseText]);
+
+		const errorText = useMemo(
+			() => getError(turn.assistantMessages),
+			[turn.assistantMessages],
+		);
 
 		// Compute status by walking the last message's parts in reverse — no
 		// need to flatMap all messages into a temporary array.
 		const statusText = useMemo(() => {
-			if (retryStatus) return retryStatusText(retryStatus)
+			if (retryStatus) return retryStatusText(retryStatus);
 			for (let m = turn.assistantMessages.length - 1; m >= 0; m--) {
-				const status = computeStatus(turn.assistantMessages[m].parts)
-				if (status !== "Working...") return status
+				const status = computeStatus(turn.assistantMessages[m].parts);
+				if (status !== "Working...") return status;
 			}
-			return "Working..."
-		}, [retryStatus, turn.assistantMessages])
+			return "Working...";
+		}, [retryStatus, turn.assistantMessages]);
 
-		const working = isLast && isWorking
+		const working = isLast && isWorking;
 
 		// User requirement: queue state belongs in the composer status stack;
 		// this transcript must not infer queued state from an empty assistant response.
-		const processOrderedParts = working ? orderedParts : completedProcessParts
+		const processOrderedParts = working ? orderedParts : completedProcessParts;
 		const processTimelineItems = useMemo(
 			() => buildProcessTimeline(processOrderedParts),
 			[processOrderedParts],
-		)
+		);
 		const processToolParts = useMemo(
-			() => processOrderedParts.flatMap((part) => (part.kind === "tool" ? [part.part] : [])),
+			() =>
+				processOrderedParts.flatMap((part) =>
+					part.kind === "tool" ? [part.part] : [],
+				),
 			[processOrderedParts],
-		)
-		const hasSteps = processToolParts.length > 0
-		const hasWorkToDisclose = !working && processTimelineItems.length > 0
-		const hasCompletedProcessDetails = hasWorkToDisclose
+		);
+		const hasSteps = processToolParts.length > 0;
+		const hasWorkToDisclose = !working && processTimelineItems.length > 0;
+		const hasCompletedProcessDetails = hasWorkToDisclose;
 		const workTimeMs = useMemo(
 			() => computeTurnWorkTime(turn, { active: working }),
 			[turn, working],
-		)
+		);
 		const showWorkedForSummary = useMemo(() => {
-			if (working) return false
-			return turn.assistantMessages.length > 0
-		}, [turn.assistantMessages.length, working])
+			if (working) return false;
+			return turn.assistantMessages.length > 0;
+		}, [turn.assistantMessages.length, working]);
 		const processSectionVisible =
 			(working && processTimelineItems.length > 0) ||
-			(!working && hasCompletedProcessDetails && completedProcessExpanded)
+			(!working && hasCompletedProcessDetails && completedProcessExpanded);
 
 		const duration = useMemo(() => {
-			if (workTimeMs <= 0) return ""
-			return formatWorkDuration(workTimeMs)
-		}, [workTimeMs])
+			if (workTimeMs <= 0) return "";
+			return formatWorkDuration(workTimeMs);
+		}, [workTimeMs]);
 		const turnCostStr = useMemo(() => {
-			const cost = computeTurnCost(turn)
-			return cost > 0 ? formatCost(cost) : ""
-		}, [turn])
+			const cost = computeTurnCost(turn);
+			return cost > 0 ? formatCost(cost) : "";
+		}, [turn]);
 		const turnModel = useMemo(() => {
 			for (let i = turn.assistantMessages.length - 1; i >= 0; i--) {
-				const info = turn.assistantMessages[i].info
+				const info = turn.assistantMessages[i].info;
 				if (info.role === "assistant" && info.modelID) {
-					return shortModelName(info.modelID)
+					return shortModelName(info.modelID);
 				}
 			}
-			return ""
-		}, [turn.assistantMessages])
+			return "";
+		}, [turn.assistantMessages]);
 
 		// Determine if tools should be shown individually (active turn behavior)
-		const isActiveTurn = working
-		const showVerboseTools = displayMode === "verbose"
+		const isActiveTurn = working;
+		const showVerboseTools = displayMode === "verbose";
+
+		// Mid-timeline ad cadence:
+		//   - Dev mode: every 2 items to make the placement visibly verifiable
+		//     during UI iteration (without a real GRAVITY_API_KEY).
+		//   - Prod mode: every 3 items so real auction density stays sane.
+		//   - Capped at MAX_MID_TIMELINE_ADS_PER_TURN so a 20-tool turn doesn't
+		//     flood the page. Slots 5+ render without an ad.
+		const MID_TIMELINE_CADENCE = import.meta.env.DEV ? 2 : 3;
+		const MAX_MID_TIMELINE_ADS_PER_TURN = 4;
+
+		// Stable closure so ProcessTimelineView's memo doesn't re-mount on
+		// every render. Index math: `(index + 1) % cadence === 0` fires after
+		// every N items; `(index + 1) / cadence <= MAX` caps the per-turn
+		// total. The `paused={!isActiveTurn}` flag freezes the rotation
+		// interval on off-screen turns — without this, a 10-turn chat would
+		// fire ~40 API calls per minute for ads the user can't see.
+		//
+		// Stamping `key={`ad-${rowId}`}` on the returned element is critical:
+		// it keeps the ad's React identity stable across renders even when
+		// the cadence Math flips between null and JSX. Without it, mid-
+		// streaming churn would tear down + re-register the Intersection-
+		// Observer, inflating impression-tracking noise.
+		const renderMidAd = useCallback(
+			(itemIndex: number, rowId: string) => {
+				if (turnAdMessages.length === 0) return null;
+				const slotNumber = (itemIndex + 1) / MID_TIMELINE_CADENCE;
+				const isCadenceHit = (itemIndex + 1) % MID_TIMELINE_CADENCE === 0;
+				if (!isCadenceHit || slotNumber > MAX_MID_TIMELINE_ADS_PER_TURN) {
+					return null;
+				}
+				return (
+					<GravityMidTimelineAd
+						key={`ad-${rowId}`}
+						messages={turnAdMessages}
+						paused={!isActiveTurn}
+						refreshIntervalMs={60 * 1000}
+					/>
+				);
+			},
+			[isActiveTurn, turnAdMessages],
+		);
 
 		const textAlreadyInline =
-			processSectionVisible && processOrderedParts.some((p) => p.kind === "text")
+			processSectionVisible &&
+			processOrderedParts.some((p) => p.kind === "text");
 
-		const handleToggleTimelineRow = useCallback((rowId: string, open: boolean) => {
-			setExpandedRowIds((previous) => {
-				const next = new Set(previous)
-				if (open) next.add(rowId)
-				else next.delete(rowId)
-				return next
-			})
-		}, [])
+		const handleToggleTimelineRow = useCallback(
+			(rowId: string, open: boolean) => {
+				setExpandedRowIds((previous) => {
+					const next = new Set(previous);
+					if (open) next.add(rowId);
+					else next.delete(rowId);
+					return next;
+				});
+			},
+			[],
+		);
 
 		const handleCopyResponse = useCallback(async () => {
-			if (!responseText) return
-			await navigator.clipboard.writeText(responseText)
-			setCopied(true)
-			setTimeout(() => setCopied(false), 2000)
-		}, [responseText])
+			if (!responseText) return;
+			await navigator.clipboard.writeText(responseText);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		}, [responseText]);
 
 		const handleRevertHere = useCallback(async () => {
-			if (!onRevertToMessage) return
-			await onRevertToMessage(turn.userMessage.info.id)
-		}, [onRevertToMessage, turn.userMessage.info.id])
+			if (!onRevertToMessage) return;
+			await onRevertToMessage(turn.userMessage.info.id);
+		}, [onRevertToMessage, turn.userMessage.info.id]);
 
 		const handleScrollToTop = useCallback(() => {
-			turnRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-		}, [])
+			turnRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+		}, []);
 
 		const handleToggleCompletedProcess = useCallback(() => {
-			setCompletedProcessExpanded((expanded) => !expanded)
-		}, [])
+			setCompletedProcessExpanded((expanded) => !expanded);
+		}, []);
 
-		const [forking, setForking] = useState(false)
+		const [forking, setForking] = useState(false);
 		const handleFork = useCallback(async () => {
-			if (!onForkFromTurn || forking) return
-			setForking(true)
+			if (!onForkFromTurn || forking) return;
+			setForking(true);
 			try {
-				await onForkFromTurn()
+				await onForkFromTurn();
 			} finally {
-				setForking(false)
+				setForking(false);
 			}
-		}, [onForkFromTurn, forking])
+		}, [onForkFromTurn, forking]);
 
 		const handleDeleteFile = useCallback(
 			async (file: FilePart) => {
-				if (!onDeletePart) return
-				await onDeletePart(file.sessionID, file.messageID, file.id)
+				if (!onDeletePart) return;
+				await onDeletePart(file.sessionID, file.messageID, file.id);
 			},
 			[onDeletePart],
-		)
+		);
 
 		const handleDeleteToolPart = useCallback(
 			async (toolPart: ToolPart) => {
-				if (!onDeletePart) return
-				await onDeletePart(toolPart.sessionID, toolPart.messageID, toolPart.id)
+				if (!onDeletePart) return;
+				await onDeletePart(toolPart.sessionID, toolPart.messageID, toolPart.id);
 			},
 			[onDeletePart],
-		)
+		);
 
 		return (
 			<div ref={turnRef} className="group/turn space-y-4">
@@ -795,7 +1038,9 @@ export const ChatTurnComponent = memo(
 					</Message>
 				)}
 
-				{working && <WorkingTurnStatusStrip turn={turn} retryStatus={retryStatus} />}
+				{working && (
+					<WorkingTurnStatusStrip turn={turn} retryStatus={retryStatus} />
+				)}
 
 				{!working && showWorkedForSummary && (
 					<CompletedTurnProcessDisclosure
@@ -815,9 +1060,12 @@ export const ChatTurnComponent = memo(
 							isActiveTurn={isActiveTurn}
 							items={processTimelineItems}
 							onDeleteToolPart={onDeletePart ? handleDeleteToolPart : undefined}
-							onToggleRow={showVerboseTools ? undefined : handleToggleTimelineRow}
+							onToggleRow={
+								showVerboseTools ? undefined : handleToggleTimelineRow
+							}
 							orderedParts={processOrderedParts}
 							projectRoot={toolPathRoot}
+							renderMidAd={renderMidAd}
 							renderText={(item) => (
 								<div className="py-0.5">
 									<ResearchArtifactBlock item={item} />
@@ -850,21 +1098,77 @@ export const ChatTurnComponent = memo(
 				{/* Error */}
 				{errorText && (
 					<div className="rounded-md border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs text-red-400">
-						{errorText.length > 300 ? `${errorText.slice(0, 300)}...` : errorText}
+						{errorText.length > 300
+							? `${errorText.slice(0, 300)}...`
+							: errorText}
 					</div>
+				)}			{/* Mid-response Gravity section divider — mounted between the
+		    active process timeline and the final response Message bubble.
+		    Same ready-gate as inline_response / below_response (only after
+		    `!working && finalResponsePart && responseText`) plus the extra
+		    `processTimelineItems.length > 0` requirement so a thought-only
+		    response without tool activity doesn't get the divider.
+		    60-s rotation offset vs the bottom-page 60-s timer. */}
+			{!working &&
+				finalResponsePart &&
+				responseText &&
+				turnAdMessages.length > 0 &&
+				processTimelineItems.length > 0 && (
+					<GravityMidResponseAd
+						messages={turnAdMessages}
+						refreshIntervalMs={60 * 1000}
+					/>
 				)}
 
-				{/* Completed final response */}
-				{!working && finalResponsePart && responseText && (
-					researchArtifactTitle(finalResponsePart) ? (
-						<ResearchArtifactBlock item={{ ...finalResponsePart, text: responseText }} />
-					) : (
-						<Message from="assistant">
-							<MessageContent>
-								<MessageResponse>{responseText}</MessageResponse>
-							</MessageContent>
-						</Message>
-					)
+			{/* Completed final response — only mounts after the response has
+		    settled so the IO observer counts a stable impression (no
+		    mid-stream impression). */}
+			{!working &&
+				finalResponsePart &&
+				responseText &&
+				(researchArtifactTitle(finalResponsePart) ? (
+					<ResearchArtifactBlock
+						item={{ ...finalResponsePart, text: responseText }}
+					/>
+				) : (
+					<Message from="assistant">
+						<MessageContent>
+							<MessageResponse>{responseText}</MessageResponse>
+						</MessageContent>
+					</Message>
+				))}
+
+			{/* Inline Gravity float-note attached at the very bottom of the
+		    response bubble (sibling of the bubble, NOT inside it). Per-turn
+		    context keeps prior turns' pills stable across the user's next
+		    message, and the ready-gate prevents mid-stream impression
+		    corruption.
+
+		    Note: the chat carries 2 ads per turn total — Inline footer note
+		    + Below-Response pill — matching freebuff's "Chat Response (Inline)"
+		    + "Chat Response (Below)" pair exactly. */
+
+		    /* Below-response Gravity pill — sibling of the inline float-note.
+		    Per-turn context keeps prior turns' pills stable across the user's
+		    next message. Ready-gate prevents mid-stream refetches. */}
+			{!working &&
+				finalResponsePart &&
+				responseText &&
+				turnAdMessages.length > 0 && (
+					<GravityInlineAd messages={turnAdMessages} />
+				)}
+
+			{/* Below-response Gravity pill — sibling of the inline float-note.
+		    Per-turn context keeps prior turns' pills stable across the user's
+		    next message. Ready-gate prevents mid-stream refetches. */}
+			{!working &&
+				finalResponsePart &&
+				responseText &&
+				turnAdMessages.length > 0 && (
+					<GravityAd
+						placement="below_response"
+						messages={turnAdMessages}
+					/>
 				)}
 
 				{/* Streaming response — visible while working, when text isn't already inline */}
@@ -883,13 +1187,15 @@ export const ChatTurnComponent = memo(
 				)}
 
 				{/* Per-turn metadata — shown on completed turns so badges are visible after long responses */}
-				{!working && turn.assistantMessages.length > 0 && (turnModel || turnCostStr) && (
-					<div className="flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground/40">
-						{turnModel && <span>{turnModel}</span>}
-						{turnModel && turnCostStr && <span>·</span>}
-						{turnCostStr && <span>{turnCostStr}</span>}
-					</div>
-				)}
+				{!working &&
+					turn.assistantMessages.length > 0 &&
+					(turnModel || turnCostStr) && (
+						<div className="flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground/40">
+							{turnModel && <span>{turnModel}</span>}
+							{turnModel && turnCostStr && <span>·</span>}
+							{turnCostStr && <span>{turnCostStr}</span>}
+						</div>
+					)}
 
 				{/* Turn-level message actions — always visible across all display modes */}
 				{responseText && (
@@ -901,46 +1207,54 @@ export const ChatTurnComponent = memo(
 							tooltip={copied ? "Copied" : "Copy response"}
 							onClick={handleCopyResponse}
 						>
-							{copied ? <CheckIcon className="size-3" /> : <CopyIcon className="size-3" />}
+							{copied ? (
+								<CheckIcon className="size-3" />
+							) : (
+								<CopyIcon className="size-3" />
+							)}
 						</MessageAction>
-					{onForkFromTurn && !working && (
-						<MessageAction
-							tooltip={forking ? "Forking..." : "Fork from here"}
-							onClick={handleFork}
-							disabled={forking}
-						>
-							<GitForkIcon className="size-3" />
-						</MessageAction>
-					)}
-					{onRevertToMessage && !working && (
-						<MessageAction tooltip="Undo from here" onClick={handleRevertHere}>
-							<Undo2Icon className="size-3" />
-						</MessageAction>
-					)}
+						{onForkFromTurn && !working && (
+							<MessageAction
+								tooltip={forking ? "Forking..." : "Fork from here"}
+								onClick={handleFork}
+								disabled={forking}
+							>
+								<GitForkIcon className="size-3" />
+							</MessageAction>
+						)}
+						{onRevertToMessage && !working && (
+							<MessageAction
+								tooltip="Undo from here"
+								onClick={handleRevertHere}
+							>
+								<Undo2Icon className="size-3" />
+							</MessageAction>
+						)}
 					</MessageActions>
 				)}
 			</div>
-		)
+		);
 	},
 	(prev, next) => {
-		if (!areTurnsEqual(prev.turn, next.turn)) return false
-		if (prev.isLast !== next.isLast) return false
-		if (prev.isWorking !== next.isWorking) return false
-		if (prev.retryStatus !== next.retryStatus) return false
-		if (prev.agent?.sessionId !== next.agent?.sessionId) return false
-		if (prev.agent?.directory !== next.agent?.directory) return false
-		if (prev.agent?.projectDirectory !== next.agent?.projectDirectory) return false
-		if (prev.agent?.worktreePath !== next.agent?.worktreePath) return false
-		if (prev.isConnected !== next.isConnected) return false
-		if (prev.compactionStatus !== next.compactionStatus) return false
+		if (!areTurnsEqual(prev.turn, next.turn)) return false;
+		if (prev.isLast !== next.isLast) return false;
+		if (prev.isWorking !== next.isWorking) return false;
+		if (prev.retryStatus !== next.retryStatus) return false;
+		if (prev.agent?.sessionId !== next.agent?.sessionId) return false;
+		if (prev.agent?.directory !== next.agent?.directory) return false;
+		if (prev.agent?.projectDirectory !== next.agent?.projectDirectory)
+			return false;
+		if (prev.agent?.worktreePath !== next.agent?.worktreePath) return false;
+		if (prev.isConnected !== next.isConnected) return false;
+		if (prev.compactionStatus !== next.compactionStatus) return false;
 		if (
 			pendingPermissionFingerprint(prev.pendingPermission) !==
 			pendingPermissionFingerprint(next.pendingPermission)
 		) {
-			return false
+			return false;
 		}
 		// Skip reference comparison for callbacks - they close over stable values
 		// and their identity changes don't affect rendered output
-		return true
+		return true;
 	},
-)
+);

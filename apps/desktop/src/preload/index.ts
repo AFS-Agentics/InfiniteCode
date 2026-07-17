@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron"
+import { contextBridge, ipcRenderer } from "electron";
 
 /**
  * Preload bridge — exposes a typed API from the main process to the renderer.
@@ -14,8 +14,10 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	getAppInfo: () => ipcRenderer.invoke("app:info"),
 
 	appMenu: {
-		popup: (id: "edit" | "view" | "window", position?: { x: number; y: number }) =>
-			ipcRenderer.invoke("app-menu:popup", { id, ...position }),
+		popup: (
+			id: "edit" | "view" | "window",
+			position?: { x: number; y: number },
+		) => ipcRenderer.invoke("app-menu:popup", { id, ...position }),
 	},
 
 	// --- Window chrome / liquid glass ---
@@ -26,11 +28,11 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	 * Tier values: "liquid-glass" | "vibrancy" | "transparent" | "opaque"
 	 */
 	onChromeTier: (callback: (tier: string) => void) => {
-		const listener = (_event: unknown, tier: string) => callback(tier)
-		ipcRenderer.on("chrome-tier", listener)
+		const listener = (_event: unknown, tier: string) => callback(tier);
+		ipcRenderer.on("chrome-tier", listener);
 		return () => {
-			ipcRenderer.removeListener("chrome-tier", listener)
-		}
+			ipcRenderer.removeListener("chrome-tier", listener);
+		};
 	},
 
 	/** Get the current chrome tier (pull-based, avoids race with push event). */
@@ -49,25 +51,28 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	restartInfiniteCode: () => ipcRenderer.invoke("infinitecode:restart"),
 
 	onTerminalToggle: (callback: () => void) => {
-		const listener = () => callback()
-		ipcRenderer.on("terminal:toggle", listener)
+		const listener = () => callback();
+		ipcRenderer.on("terminal:toggle", listener);
 		return () => {
-			ipcRenderer.removeListener("terminal:toggle", listener)
-		}
+			ipcRenderer.removeListener("terminal:toggle", listener);
+		};
 	},
 
 	acp: {
-		request: (request: { method: string; params?: unknown; directory?: string }) =>
-			ipcRenderer.invoke("acp:request", request),
+		request: (request: {
+			method: string;
+			params?: unknown;
+			directory?: string;
+		}) => ipcRenderer.invoke("acp:request", request),
 		respond: (response: { id: number | string; result: unknown }) =>
 			ipcRenderer.invoke("acp:respond", response),
 		connected: () => ipcRenderer.invoke("acp:connected"),
 		subscribe: (callback: (event: unknown) => void) => {
-			const listener = (_event: unknown, value: unknown) => callback(value)
-			ipcRenderer.on("acp:event", listener)
+			const listener = (_event: unknown, value: unknown) => callback(value);
+			ipcRenderer.on("acp:event", listener);
 			return () => {
-				ipcRenderer.removeListener("acp:event", listener)
-			}
+				ipcRenderer.removeListener("acp:event", listener);
+			};
 		},
 	},
 
@@ -78,28 +83,34 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	terminal: {
 		create: (options: { cwd?: string; cols?: number; rows?: number }) =>
 			ipcRenderer.invoke("terminal:create", options),
-		write: (id: string, data: string) => ipcRenderer.send("terminal:write", id, data),
+		write: (id: string, data: string) =>
+			ipcRenderer.send("terminal:write", id, data),
 		resize: (id: string, cols: number, rows: number) =>
 			ipcRenderer.send("terminal:resize", id, cols, rows),
 		close: (id: string) => ipcRenderer.invoke("terminal:close", id),
 		onData: (callback: (event: { id: string; data: string }) => void) => {
-			const listener = (_event: unknown, value: { id: string; data: string }) => callback(value)
-			ipcRenderer.on("terminal:data", listener)
+			const listener = (_event: unknown, value: { id: string; data: string }) =>
+				callback(value);
+			ipcRenderer.on("terminal:data", listener);
 			return () => {
-				ipcRenderer.removeListener("terminal:data", listener)
-			}
+				ipcRenderer.removeListener("terminal:data", listener);
+			};
 		},
 		onExit: (
-			callback: (event: { id: string; exitCode: number; signal?: number }) => void,
+			callback: (event: {
+				id: string;
+				exitCode: number;
+				signal?: number;
+			}) => void,
 		) => {
 			const listener = (
 				_event: unknown,
 				value: { id: string; exitCode: number; signal?: number },
-			) => callback(value)
-			ipcRenderer.on("terminal:exit", listener)
+			) => callback(value);
+			ipcRenderer.on("terminal:exit", listener);
 			return () => {
-				ipcRenderer.removeListener("terminal:exit", listener)
-			}
+				ipcRenderer.removeListener("terminal:exit", listener);
+			};
 		},
 	},
 
@@ -109,7 +120,8 @@ contextBridge.exposeInMainWorld("infinitecode", {
 		store: (serverId: string, password: string) =>
 			ipcRenderer.invoke("credential:store", serverId, password),
 		get: (serverId: string) => ipcRenderer.invoke("credential:get", serverId),
-		delete: (serverId: string) => ipcRenderer.invoke("credential:delete", serverId),
+		delete: (serverId: string) =>
+			ipcRenderer.invoke("credential:delete", serverId),
 	},
 
 	/** Reads model state (recent models, favorites, variants). */
@@ -138,28 +150,33 @@ contextBridge.exposeInMainWorld("infinitecode", {
 
 	/** Subscribes to update state changes pushed from the main process. */
 	onUpdateStateChanged: (callback: (state: unknown) => void) => {
-		const listener = (_event: unknown, state: unknown) => callback(state)
-		ipcRenderer.on("updater:state-changed", listener)
+		const listener = (_event: unknown, state: unknown) => callback(state);
+		ipcRenderer.on("updater:state-changed", listener);
 		return () => {
-			ipcRenderer.removeListener("updater:state-changed", listener)
-		}
+			ipcRenderer.removeListener("updater:state-changed", listener);
+		};
 	},
 
 	// --- Git operations ---
 
 	git: {
-		listBranches: (directory: string) => ipcRenderer.invoke("git:branches", directory),
-		getStatus: (directory: string) => ipcRenderer.invoke("git:status", directory),
+		listBranches: (directory: string) =>
+			ipcRenderer.invoke("git:branches", directory),
+		getStatus: (directory: string) =>
+			ipcRenderer.invoke("git:status", directory),
 		checkout: (directory: string, branch: string) =>
 			ipcRenderer.invoke("git:checkout", directory, branch),
 		stashAndCheckout: (directory: string, branch: string) =>
 			ipcRenderer.invoke("git:stash-and-checkout", directory, branch),
-		stashPop: (directory: string) => ipcRenderer.invoke("git:stash-pop", directory),
+		stashPop: (directory: string) =>
+			ipcRenderer.invoke("git:stash-pop", directory),
 		getRoot: (directory: string) => ipcRenderer.invoke("git:root", directory),
-		diffStat: (directory: string) => ipcRenderer.invoke("git:diff-stat", directory),
+		diffStat: (directory: string) =>
+			ipcRenderer.invoke("git:diff-stat", directory),
 		commitAll: (directory: string, message: string) =>
 			ipcRenderer.invoke("git:commit-all", directory, message),
-		push: (directory: string, remote?: string) => ipcRenderer.invoke("git:push", directory, remote),
+		push: (directory: string, remote?: string) =>
+			ipcRenderer.invoke("git:push", directory, remote),
 		createBranch: (directory: string, branchName: string) =>
 			ipcRenderer.invoke("git:create-branch", directory, branchName),
 		applyToLocal: (worktreeDir: string, localDir: string) =>
@@ -176,7 +193,8 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	getOpaqueWindows: () => ipcRenderer.invoke("prefs:get-opaque-windows"),
 
 	/** Set the opaque windows preference and persist it in the main process. */
-	setOpaqueWindows: (value: boolean) => ipcRenderer.invoke("prefs:set-opaque-windows", value),
+	setOpaqueWindows: (value: boolean) =>
+		ipcRenderer.invoke("prefs:set-opaque-windows", value),
 
 	/** Relaunch the app (used after toggling transparency, which requires a restart). */
 	relaunch: () => ipcRenderer.invoke("app:relaunch"),
@@ -187,24 +205,26 @@ contextBridge.exposeInMainWorld("infinitecode", {
 		getTargets: () => ipcRenderer.invoke("open-in:targets"),
 		open: (directory: string, targetId: string, persistPreferred?: boolean) =>
 			ipcRenderer.invoke("open-in:open", directory, targetId, persistPreferred),
-		setPreferred: (targetId: string) => ipcRenderer.invoke("open-in:set-preferred", targetId),
+		setPreferred: (targetId: string) =>
+			ipcRenderer.invoke("open-in:set-preferred", targetId),
 	},
 
 	// --- Native theme (syncs OS chrome to app color scheme) ---
 
 	/** Set the native theme source to control OS chrome tint and symbols. */
-	setNativeTheme: (source: string) => ipcRenderer.invoke("theme:set-native", source),
+	setNativeTheme: (source: string) =>
+		ipcRenderer.invoke("theme:set-native", source),
 
 	/** Get the system accent color as an 8-char hex RRGGBBAA string, or null if unavailable. */
 	getAccentColor: () => ipcRenderer.invoke("theme:accent-color"),
 
 	/** Subscribe to system accent color changes (fired when the user changes OS accent color). */
 	onAccentColorChanged: (callback: (color: string) => void) => {
-		const listener = (_event: unknown, color: string) => callback(color)
-		ipcRenderer.on("theme:accent-color-changed", listener)
+		const listener = (_event: unknown, color: string) => callback(color);
+		ipcRenderer.on("theme:accent-color-changed", listener);
 		return () => {
-			ipcRenderer.removeListener("theme:accent-color-changed", listener)
-		}
+			ipcRenderer.removeListener("theme:accent-color-changed", listener);
+		};
 	},
 
 	// --- Directory picker ---
@@ -213,7 +233,8 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	pickDirectory: () => ipcRenderer.invoke("dialog:open-directory"),
 
 	desktopFolders: {
-		stat: (directories: string[]) => ipcRenderer.invoke("desktop-folders:stat", directories),
+		stat: (directories: string[]) =>
+			ipcRenderer.invoke("desktop-folders:stat", directories),
 		create: (input: { parentDirectory: string; name: string }) =>
 			ipcRenderer.invoke("desktop-folders:create", input),
 	},
@@ -227,10 +248,10 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	 * a serialized Response.
 	 */
 	fetch: (req: {
-		url: string
-		method: string
-		headers: Record<string, string>
-		body: string | null
+		url: string;
+		method: string;
+		headers: Record<string, string>;
+		body: string | null;
 	}) => ipcRenderer.invoke("fetch:request", req),
 
 	// --- Notifications ---
@@ -241,27 +262,30 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	 * should navigate to the specified session.
 	 */
 	onNotificationNavigate: (callback: (data: { sessionId: string }) => void) => {
-		const listener = (_event: unknown, data: { sessionId: string }) => callback(data)
-		ipcRenderer.on("notification:navigate", listener)
+		const listener = (_event: unknown, data: { sessionId: string }) =>
+			callback(data);
+		ipcRenderer.on("notification:navigate", listener);
 		return () => {
-			ipcRenderer.removeListener("notification:navigate", listener)
-		}
+			ipcRenderer.removeListener("notification:navigate", listener);
+		};
 	},
 
 	/** Subscribe to tray New Chat requests from the main process. */
 	onTrayNewChat: (callback: () => void) => {
-		const listener = () => callback()
-		ipcRenderer.on("tray:new-chat", listener)
+		const listener = () => callback();
+		ipcRenderer.on("tray:new-chat", listener);
 		return () => {
-			ipcRenderer.removeListener("tray:new-chat", listener)
-		}
+			ipcRenderer.removeListener("tray:new-chat", listener);
+		};
 	},
 
 	/** Dismiss any active notification for a session (e.g. when the user navigates to it). */
-	dismissNotification: (sessionId: string) => ipcRenderer.invoke("notification:dismiss", sessionId),
+	dismissNotification: (sessionId: string) =>
+		ipcRenderer.invoke("notification:dismiss", sessionId),
 
 	/** Update the dock badge / app badge count. */
-	updateBadgeCount: (count: number) => ipcRenderer.invoke("notification:badge", count),
+	updateBadgeCount: (count: number) =>
+		ipcRenderer.invoke("notification:badge", count),
 
 	// --- Settings ---
 
@@ -274,11 +298,11 @@ contextBridge.exposeInMainWorld("infinitecode", {
 
 	/** Subscribe to settings changes pushed from the main process. */
 	onSettingsChanged: (callback: (settings: unknown) => void) => {
-		const listener = (_event: unknown, settings: unknown) => callback(settings)
-		ipcRenderer.on("settings:changed", listener)
+		const listener = (_event: unknown, settings: unknown) => callback(settings);
+		ipcRenderer.on("settings:changed", listener);
 		return () => {
-			ipcRenderer.removeListener("settings:changed", listener)
-		}
+			ipcRenderer.removeListener("settings:changed", listener);
+		};
 	},
 
 	// --- Automations ---
@@ -290,44 +314,69 @@ contextBridge.exposeInMainWorld("infinitecode", {
 		update: (input: unknown) => ipcRenderer.invoke("automation:update", input),
 		delete: (id: string) => ipcRenderer.invoke("automation:delete", id),
 		runNow: (id: string) => ipcRenderer.invoke("automation:run-now", id),
-		listRuns: (automationId?: string) => ipcRenderer.invoke("automation:list-runs", automationId),
-		archiveRun: (runId: string) => ipcRenderer.invoke("automation:archive-run", runId),
-		acceptRun: (runId: string) => ipcRenderer.invoke("automation:accept-run", runId),
-		markRunRead: (runId: string) => ipcRenderer.invoke("automation:mark-run-read", runId),
+		listRuns: (automationId?: string) =>
+			ipcRenderer.invoke("automation:list-runs", automationId),
+		archiveRun: (runId: string) =>
+			ipcRenderer.invoke("automation:archive-run", runId),
+		acceptRun: (runId: string) =>
+			ipcRenderer.invoke("automation:accept-run", runId),
+		markRunRead: (runId: string) =>
+			ipcRenderer.invoke("automation:mark-run-read", runId),
 		previewSchedule: (rrule: string, timezone: string) =>
 			ipcRenderer.invoke("automation:preview-schedule", rrule, timezone),
 	},
 
 	onAutomationRunsUpdated: (callback: () => void) => {
-		const listener = () => callback()
-		ipcRenderer.on("automation:runs-updated", listener)
+		const listener = () => callback();
+		ipcRenderer.on("automation:runs-updated", listener);
 		return () => {
-			ipcRenderer.removeListener("automation:runs-updated", listener)
-		}
+			ipcRenderer.removeListener("automation:runs-updated", listener);
+		};
 	},
 
 	// --- Onboarding ---
 
 	onboarding: {
 		/** Check if the bundled InfiniteCode runtime is installed and compatible. */
-		checkInfiniteCode: () => ipcRenderer.invoke("onboarding:check-infinitecode"),
+		checkInfiniteCode: () =>
+			ipcRenderer.invoke("onboarding:check-infinitecode"),
 		/** Quick detect all supported providers (Claude Code, Cursor, InfiniteCode). */
 		detectProviders: () => ipcRenderer.invoke("onboarding:detect-providers"),
 		/** Full scan of a specific provider's configuration. */
-		scanProvider: (provider: string) => ipcRenderer.invoke("onboarding:scan-provider", provider),
+		scanProvider: (provider: string) =>
+			ipcRenderer.invoke("onboarding:scan-provider", provider),
 		/** Dry-run migration preview for a provider. */
-		previewMigration: (provider: string, scanResult: unknown, categories: string[]) =>
-			ipcRenderer.invoke("onboarding:preview-migration", provider, scanResult, categories),
+		previewMigration: (
+			provider: string,
+			scanResult: unknown,
+			categories: string[],
+		) =>
+			ipcRenderer.invoke(
+				"onboarding:preview-migration",
+				provider,
+				scanResult,
+				categories,
+			),
 		/** Execute migration (writes files with backup). */
-		executeMigration: (provider: string, scanResult: unknown, categories: string[]) =>
-			ipcRenderer.invoke("onboarding:execute-migration", provider, scanResult, categories),
+		executeMigration: (
+			provider: string,
+			scanResult: unknown,
+			categories: string[],
+		) =>
+			ipcRenderer.invoke(
+				"onboarding:execute-migration",
+				provider,
+				scanResult,
+				categories,
+			),
 		/** Subscribe to migration progress updates (history writing). */
 		onMigrationProgress: (callback: (progress: unknown) => void) => {
-			const listener = (_event: unknown, progress: unknown) => callback(progress)
-			ipcRenderer.on("onboarding:migration-progress", listener)
+			const listener = (_event: unknown, progress: unknown) =>
+				callback(progress);
+			ipcRenderer.on("onboarding:migration-progress", listener);
 			return () => {
-				ipcRenderer.removeListener("onboarding:migration-progress", listener)
-			}
+				ipcRenderer.removeListener("onboarding:migration-progress", listener);
+			};
 		},
 		/** Restore the most recent migration backup. */
 		restoreBackup: () => ipcRenderer.invoke("onboarding:restore-backup"),
@@ -336,7 +385,24 @@ contextBridge.exposeInMainWorld("infinitecode", {
 	// --- Gravity Ads ---
 
 	gravity: {
-		getAds: (messages: { role: string; content: string }[]) =>
-			ipcRenderer.invoke("gravity:get-ads", messages),
+		/**
+		 * Fetch contextual ads from Gravity. Each placement string is a
+		 * separate ad slot on the publisher dashboard (separate auction,
+		 * separate impression counter). Caller should reuse the same slot
+		 * string across every render so per-turn ads accumulate impressions.
+		 */
+		getAds: (
+			messages: { role: string; content: string }[],
+			placement:
+				| "above_response"
+				| "below_response"
+				| "inline_response"
+				| "search_result"
+				| "bottom_page"
+				| "sidebar"
+				| "mid_response"
+				| "mid_timeline"
+				| "startup_overlay" = "below_response",
+		) => ipcRenderer.invoke("gravity:get-ads", messages, placement),
 	},
-})
+});
