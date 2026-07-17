@@ -1651,6 +1651,173 @@ impl HistoryCell for FinalMessageSeparator {
     }
 }
 
+/// A Gravity ad displayed in the chat history after a turn completes.
+///
+/// Renders as:
+/// ```text
+///   ┌── Sponsored ─────────────────────┐
+///   │ BrandName · Description text    Ad│
+///   └──────────────────────────────────┘
+/// ```
+/// Uses the terminal's dim/bold styles to keep it visually distinct from
+/// conversation content.
+#[derive(Debug)]
+pub struct GravityAdCell {
+    pub brand_name: String,
+    pub description: String,
+    pub url: Option<String>,
+    pub click_url: Option<String>,
+    pub cta: Option<String>,
+}
+
+impl GravityAdCell {
+    pub fn new(ad: &infinitecode_core::gravity::GravityAdData) -> Self {
+        let brand_name = ad
+            .brand_name
+            .clone()
+            .unwrap_or_else(|| "Sponsored".to_string());
+        let description = if ad.ad_text.is_empty() {
+            ad.title.clone().unwrap_or_default()
+        } else {
+            ad.ad_text.clone()
+        };
+        Self {
+            brand_name,
+            description,
+            url: ad.url.clone(),
+            click_url: ad.click_url.clone(),
+            cta: ad.cta.clone(),
+        }
+    }
+}
+
+impl HistoryCell for GravityAdCell {
+    fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
+        if width < 8 {
+            return Vec::new();
+        }
+        let inner_width = width.saturating_sub(4).max(1) as usize;
+        let brand = self.brand_name.clone();
+        let description = self.description.clone();
+        let cta = self.cta.clone().unwrap_or_default();
+
+        let link = self
+            .click_url
+            .as_deref()
+            .or(self.url.as_deref())
+            .unwrap_or("");
+
+        let mut lines: Vec<Line<'static>> = Vec::new();
+
+        // Top border: "┌─ Sponsored ─────────┐"
+        let label = " Sponsored ";
+        let label_width = unicode_width::UnicodeWidthStr::width(label);
+        let border_total = inner_width.saturating_sub(label_width).saturating_sub(2);
+        let left_dash = border_total / 2;
+        let right_dash = border_total - left_dash;
+        let top = format!(
+            " ┌{}",
+            "─".repeat(left_dash + label_width + right_dash)
+        );
+        lines.push(Line::from(Span::styled(top, Style::default().dim())));
+
+        // Content: brand · description    Ad
+        let ad_label = "Ad";
+        let ad_label_width = unicode_width::UnicodeWidthStr::width(ad_label);
+        let brand_display = format!("{} · {}", brand, description);
+        let brand_width = unicode_width::UnicodeWidthStr::width(brand_display.as_str());
+        let available = inner_width.saturating_sub(ad_label_width).saturating_sub(2);
+        let truncated = if brand_width > available {
+            let max_desc = available.saturating_sub(
+                unicode_width::UnicodeWidthStr::width(brand.as_str()) + 3, // " · " + 
+            );
+            format!(
+                "{} · {}",
+                brand,
+                truncate_str(&description, max_desc)
+            )
+        } else {
+            brand_display
+        };
+        let padding = inner_width
+            .saturating_sub(unicode_width::UnicodeWidthStr::width(truncated.as_str()))
+            .saturating_sub(ad_label_width);
+        // The content line is built from styled spans above; this raw format
+        // is kept as a comment for visual reference.
+        // format!(" │ {truncated}{} {ad_label}│", " ".repeat(padding))
+        lines.push(
+            Line::from(vec![
+                Span::raw(" │ ".to_string()),
+                Span::styled(
+                    truncated.clone(),
+                    Style::default(),
+                ),
+                Span::raw(" ".repeat(padding)),
+                Span::styled(ad_label, Style::default().dim().bold()),
+                Span::raw(" │".to_string()),
+            ])
+            .style(Style::default().dim()),
+        );
+
+        if !cta.is_empty() {
+            let cta_padding = inner_width
+                .saturating_sub(unicode_width::UnicodeWidthStr::width(cta.as_str()));
+            lines.push(
+                Line::from(vec![
+                    Span::raw(" │ ".to_string()),
+                    Span::styled(cta.clone(), Style::default().fg(Color::Cyan).bold()),
+                    Span::raw(" ".repeat(cta_padding)),
+                    Span::raw(" │".to_string()),
+                ])
+                .style(Style::default().dim()),
+            );
+        }
+
+        // Bottom border
+        let bottom = format!(" └{}┘", "─".repeat(inner_width));
+        lines.push(Line::from(Span::styled(bottom, Style::default().dim())));
+
+        if !link.is_empty() {
+            let truncated_link = truncate_str(link, inner_width);
+            let link_padding = inner_width.saturating_sub(unicode_width::UnicodeWidthStr::width(truncated_link.as_str()));
+            lines.push(
+                Line::from(vec![
+                    Span::raw("   ".to_string()),
+                    Span::styled(truncated_link, Style::default().fg(Color::Blue).dim()),
+                    Span::raw(" ".repeat(link_padding)),
+                ])
+            );
+        }
+
+        lines
+    }
+}
+
+fn truncate_str(s: &str, max_width: usize) -> String {
+    if max_width < 3 {
+        return String::new();
+    }
+    let width = unicode_width::UnicodeWidthStr::width(s);
+    if width <= max_width {
+        return s.to_string();
+    }
+    let mut result = String::with_capacity(s.len());
+    let mut current_width = 0;
+    let ellipsis = "…";
+    let ellipsis_width = unicode_width::UnicodeWidthStr::width(ellipsis);
+    let target = max_width.saturating_sub(ellipsis_width);
+    for ch in s.chars() {
+        let ch_width = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+        if current_width + ch_width > target {
+            result.push_str(ellipsis);
+            break;
+        }
+        result.push(ch);
+        current_width += ch_width;
+    }
+    result
+}
+
 /// End-of-turn summary showing ▣ symbol, input mode, model name, and outcome.
 ///
 /// Inspired by opencode's assistant message footer, with InfiniteCode's mode label included:

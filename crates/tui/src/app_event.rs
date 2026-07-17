@@ -178,6 +178,9 @@ pub(crate) enum AppEvent {
     ThemeSelected { name: String },
     /// Result of computing a `/diff` command (ANSI-colored diff text).
     DiffResult(String),
+
+    /// Gravity ad fetched asynchronously — serialized JSON string.
+    GravityAdResult(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

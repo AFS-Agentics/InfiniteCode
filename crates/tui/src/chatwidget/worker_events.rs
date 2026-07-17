@@ -29,6 +29,10 @@ use super::ActiveToolCall;
 use super::ChatWidget;
 use super::DotStatus;
 use super::PendingApprovalRequest;
+
+use crate::app_event::AppEvent;
+use crate::history_cell::HistoryCell;
+use infinitecode_core::gravity::{MessageEntry, fetch_gravity_ad};
 use super::SKILLS_TRANSCRIPT_TITLE;
 use super::session_header::is_web_search_title;
 use super::text_stream::ActiveTextItemId;
@@ -39,6 +43,63 @@ fn format_retry_status_message(attempt: usize, backoff_ms: u64) -> String {
 }
 
 impl ChatWidget {
+    /// Spawns a background task that fetches a Gravity ad for the current
+    /// conversation context and sends the result back through the app event
+    /// channel. The ad is rendered as a `GravityAdCell` in the chat history.
+    ///
+    /// This is called after a successful `TurnFinished` event. The fetch is
+    /// fire-and-forget — errors or no-fill produce no event so the UI is
+    /// never blocked or disrupted.
+    fn spawn_gravity_ad_fetch(&self) {
+        // Don't fetch if no ad context is available.
+        let Some(model) = self.session.model.as_ref() else {
+            return;
+        };
+        // Build a minimal conversation context from the last user turn + model response.
+        let session_id = model.slug.clone();
+        let app_event_tx = self.app_event_tx.clone();
+
+        // Collect the last few text items for ad context, skipping the most
+        // recent entry (the just-added TurnSummaryCell).
+        let mut messages: Vec<MessageEntry> = Vec::new();
+        // Skip the first item (TurnSummaryCell) by using a flag.
+        let mut first = true;
+        for cell in self.history.iter().rev() {
+            if first {
+                first = false;
+                continue;
+            }
+            let text = cell_text_for_ad(cell.as_ref());
+            if text.trim().is_empty() {
+                continue;
+            }
+            messages.push(MessageEntry {
+                role: "user".into(),
+                content: text,
+            });
+            if messages.len() >= 6 {
+                break;
+            }
+        }
+
+        if messages.is_empty() {
+            return;
+        }
+
+        tokio::spawn(async move {
+            let result = fetch_gravity_ad(&messages, "below_response", "cli-main", &session_id).await;
+            match result {
+                Ok(Some(ad_data)) => {
+                    let json = serde_json::to_string(&ad_data).unwrap_or_default();
+                    app_event_tx.send(AppEvent::GravityAdResult(json));
+                }
+                _ => {
+                    // No ad, no event — UI continues as normal.
+                }
+            }
+        });
+    }
+
     fn start_command_execution_cell(
         &mut self,
         tool_use_id: String,
@@ -975,6 +1036,10 @@ impl ChatWidget {
                 self.current_turn_mode = InputMode::Build;
                 if was_failed {
                     self.pending_proposed_plan_actions = false;
+                } else if !was_interrupted {
+                    self.maybe_open_proposed_plan_actions();
+                    // Spawn an async ad fetch after a successful turn.
+                    self.spawn_gravity_ad_fetch();
                 } else {
                     self.maybe_open_proposed_plan_actions();
                 }
@@ -1399,4 +1464,14 @@ impl ChatWidget {
             }
         }
     }
+}
+
+/// Extract plain text from a history cell for use as Gravity ad context.
+fn cell_text_for_ad(cell: &dyn HistoryCell) -> String {
+    let lines = cell.display_lines(120);
+    lines
+        .iter()
+        .flat_map(|line| line.spans.iter().map(|s| s.content.as_ref()))
+        .collect::<Vec<_>>()
+        .join(" ")
 }

@@ -7,6 +7,7 @@ mod conversation;
 mod durable_record;
 mod error;
 pub mod execution;
+pub mod gravity;
 pub mod fork;
 pub mod fuzzy_search;
 mod goal_prompts;

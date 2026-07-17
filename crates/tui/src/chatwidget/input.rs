@@ -308,6 +308,9 @@ impl ChatWidget {
                 self.bottom_pane.on_reference_search_result(snapshot);
                 self.frame_requester.schedule_frame();
             }
+            AppEvent::GravityAdResult(_) => {
+                // Handled at the host level in interactive.rs
+            }
             AppEvent::DiffResult(text) => {
                 let lines: Vec<Line<'static>> = if text.trim().is_empty() {
                     vec!["No changes detected.".italic().into()]

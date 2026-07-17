@@ -782,6 +782,14 @@ fn handle_app_event(
         return Ok(LoopAction::Continue);
     }
 
+    if let AppEvent::GravityAdResult(json) = &app_event {
+        if let Ok(ad) = serde_json::from_str::<infinitecode_core::gravity::GravityAdData>(json) {
+            let cell = crate::history_cell::GravityAdCell::new(&ad);
+            chat_widget.add_to_history(cell);
+        }
+        return Ok(LoopAction::Continue);
+    }
+
     if let AppEvent::DiffResult(text) = app_event {
         loop_state.overlay.open_diff(tui, chat_widget, text)?;
         return Ok(LoopAction::Continue);

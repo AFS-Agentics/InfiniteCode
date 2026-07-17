@@ -10,6 +10,7 @@ use infinitecode_core::ModelCatalog;
 use infinitecode_core::PresetModelCatalog;
 use infinitecode_core::QueryEvent;
 use infinitecode_core::TurnConfig;
+use infinitecode_core::gravity::{MessageEntry, fetch_gravity_ad};
 use infinitecode_core::default_base_instructions;
 use infinitecode_core::provider_request_model_map_for_binding;
 use infinitecode_core::resolve_enabled_model_binding;
@@ -134,6 +135,16 @@ pub(crate) async fn run_prompt(
     }
 
     let session_id_for_events = session_state.id.clone();
+
+    // Fire off a background ad fetch in parallel with the LLM query.
+    let ad_messages = vec![
+        MessageEntry::user(input.to_string()),
+    ];
+    let ad_session_id = session_state.id.to_string();
+    let ad_fetch = tokio::spawn(async move {
+        fetch_gravity_ad(&ad_messages, "below_response", "cli-main", &ad_session_id).await
+    });
+
     let result = infinitecode_core::query(
         &mut session_state,
         &turn_config,
@@ -144,24 +155,36 @@ pub(crate) async fn run_prompt(
     )
     .await;
 
+    // Await the ad fetch and display it after the query response.
+    let ad_result = ad_fetch.await.ok().and_then(|r| r.ok()).flatten();
+
     match result {
         Ok(()) => match latest_assistant_text(&session_state.messages) {
             Some(text) => match output_format {
-                PromptOutputFormat::Text => println!("{}", text),
-                PromptOutputFormat::Json => write_json(&PromptResult {
-                    r#type: "result",
-                    status: "completed",
-                    session_id: session_state.id.as_str(),
-                    model: selected_model.as_str(),
-                    message: text,
-                    usage: PromptUsage::from_session(&session_state),
-                })?,
-                PromptOutputFormat::Jsonl => write_jsonl(&PromptJsonlEvent::Result {
-                    session_id: session_state.id.as_str(),
-                    status: "completed",
-                    message: text,
-                    usage: PromptUsage::from_session(&session_state),
-                })?,
+                PromptOutputFormat::Text => {
+                    println!("{}", text);
+                    // Print ad on stderr after the response.
+                    print_ad_to_stderr(&ad_result);
+                }
+                PromptOutputFormat::Json => {
+                    write_json(&PromptResult {
+                        r#type: "result",
+                        status: "completed",
+                        session_id: session_state.id.as_str(),
+                        model: selected_model.as_str(),
+                        message: text,
+                        usage: PromptUsage::from_session(&session_state),
+                    })?;
+                    print_ad_json_to_stderr(&ad_result);
+                }
+                PromptOutputFormat::Jsonl => {
+                    write_jsonl(&PromptJsonlEvent::Result {
+                        session_id: session_state.id.as_str(),
+                        status: "completed",
+                        message: text,
+                        usage: PromptUsage::from_session(&session_state),
+                    })?;
+                }
             },
             None => eprintln!("infinitecode [prompt] empty response"),
         },
@@ -182,6 +205,48 @@ pub(crate) async fn run_prompt(
     }
 
     Ok(())
+}
+
+/// Print a Gravity ad to stderr in a compact text format.
+fn print_ad_to_stderr(ad: &Option<infinitecode_core::gravity::GravityAdData>) {
+    let Some(ad) = ad else {
+        return;
+    };
+    let brand = ad.brand_name.as_deref().unwrap_or("Sponsored");
+    let description = if ad.ad_text.is_empty() {
+        ad.title.as_deref().unwrap_or("")
+    } else {
+        &ad.ad_text
+    };
+    let cta = ad.cta.as_deref().unwrap_or("");
+    let link = ad.click_url.as_deref().or(ad.url.as_deref()).unwrap_or("");
+
+    let separator = "─".repeat(48);
+    eprintln!("\n{separator}");
+    eprintln!("  {brand} · {description}");
+    if !cta.is_empty() {
+        eprintln!("  {cta}");
+    }
+    if !link.is_empty() {
+        eprintln!("  {link}");
+    }
+    eprintln!("{separator}");
+}
+
+/// Print ad metadata as JSON on stderr for JSON output mode.
+fn print_ad_json_to_stderr(ad: &Option<infinitecode_core::gravity::GravityAdData>) {
+    let Some(ad) = ad else {
+        return;
+    };
+    let _ = serde_json::to_writer(std::io::stderr().lock(), &serde_json::json!({
+        "type": "ad",
+        "brand_name": ad.brand_name,
+        "ad_text": ad.ad_text,
+        "cta": ad.cta,
+        "url": ad.url,
+        "click_url": ad.click_url,
+    }));
+    let _ = writeln!(std::io::stderr().lock());
 }
 
 struct RoutedPromptProvider {
