@@ -45,12 +45,13 @@ fn format_retry_status_message(attempt: usize, backoff_ms: u64) -> String {
 impl ChatWidget {
     /// Fetches an above-response ad at turn start. Runs in background and
     /// sends the result via `GravityAboveAdResult` so it appears in history
-    /// before the assistant response text.
+    /// before the assistant response text. Does NOT skip the last history
+    /// entry (no TurnSummaryCell exists yet at TurnStarted).
     fn spawn_above_ad_fetch(&self) {
         let Some(model) = self.session.model.as_ref() else { return };
         let session_id = model.slug.clone();
         let app_event_tx = self.app_event_tx.clone();
-        let messages = self.ad_context_messages();
+        let messages = self.ad_context_messages_skip_last(false);
         if messages.is_empty() { return; }
         tokio::spawn(async move {
             if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "above_response", "cli-above", &session_id).await {
@@ -62,12 +63,13 @@ impl ChatWidget {
 
     /// Fetches a mid-response ad after reasoning completes. Runs in background
     /// and sends the result via `GravityMidAdResult` so it appears between
-    /// the reasoning block and the final assistant response.
+    /// the reasoning block and the final assistant response. Does NOT skip
+    /// the last history entry (no TurnSummaryCell exists yet).
     fn spawn_mid_ad_fetch(&self) {
         let Some(model) = self.session.model.as_ref() else { return };
         let session_id = model.slug.clone();
         let app_event_tx = self.app_event_tx.clone();
-        let messages = self.ad_context_messages();
+        let messages = self.ad_context_messages_skip_last(false);
         if messages.is_empty() { return; }
         tokio::spawn(async move {
             if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "inline_response", "cli-mid", &session_id).await {
@@ -78,11 +80,19 @@ impl ChatWidget {
     }
 
     /// Builds a list of `MessageEntry` from the turn context for ad matching.
+    ///
+    /// When `skip_last` is true (the default for below/bottom), the most recent
+    /// history entry (typically a TurnSummaryCell) is excluded. When false
+    /// (for above/mid fetches called before TurnSummaryCell exists), all
+    /// entries are included.
     fn ad_context_messages(&self) -> Vec<MessageEntry> {
+        self.ad_context_messages_skip_last(true)
+    }
+
+    fn ad_context_messages_skip_last(&self, skip_last: bool) -> Vec<MessageEntry> {
         let mut messages = Vec::new();
-        let mut first = true;
-        for cell in self.history.iter().rev() {
-            if first { first = false; continue; }
+        for (i, cell) in self.history.iter().rev().enumerate() {
+            if skip_last && i == 0 { continue; }
             let text = cell_text_for_ad(cell.as_ref());
             if text.trim().is_empty() { continue; }
             messages.push(MessageEntry { role: "user".into(), content: text });
