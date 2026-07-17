@@ -43,6 +43,54 @@ fn format_retry_status_message(attempt: usize, backoff_ms: u64) -> String {
 }
 
 impl ChatWidget {
+    /// Fetches an above-response ad at turn start. Runs in background and
+    /// sends the result via `GravityAboveAdResult` so it appears in history
+    /// before the assistant response text.
+    fn spawn_above_ad_fetch(&self) {
+        let Some(model) = self.session.model.as_ref() else { return };
+        let session_id = model.slug.clone();
+        let app_event_tx = self.app_event_tx.clone();
+        let messages = self.ad_context_messages();
+        if messages.is_empty() { return; }
+        tokio::spawn(async move {
+            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "above_response", "cli-above", &session_id).await {
+                let json = serde_json::to_string(&ad).unwrap_or_default();
+                app_event_tx.send(AppEvent::GravityAboveAdResult(json));
+            }
+        });
+    }
+
+    /// Fetches a mid-response ad after reasoning completes. Runs in background
+    /// and sends the result via `GravityMidAdResult` so it appears between
+    /// the reasoning block and the final assistant response.
+    fn spawn_mid_ad_fetch(&self) {
+        let Some(model) = self.session.model.as_ref() else { return };
+        let session_id = model.slug.clone();
+        let app_event_tx = self.app_event_tx.clone();
+        let messages = self.ad_context_messages();
+        if messages.is_empty() { return; }
+        tokio::spawn(async move {
+            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "inline_response", "cli-mid", &session_id).await {
+                let json = serde_json::to_string(&ad).unwrap_or_default();
+                app_event_tx.send(AppEvent::GravityMidAdResult(json));
+            }
+        });
+    }
+
+    /// Builds a list of `MessageEntry` from the turn context for ad matching.
+    fn ad_context_messages(&self) -> Vec<MessageEntry> {
+        let mut messages = Vec::new();
+        let mut first = true;
+        for cell in self.history.iter().rev() {
+            if first { first = false; continue; }
+            let text = cell_text_for_ad(cell.as_ref());
+            if text.trim().is_empty() { continue; }
+            messages.push(MessageEntry { role: "user".into(), content: text });
+            if messages.len() >= 6 { break; }
+        }
+        messages
+    }
+
     /// Spawns a background task that fetches a Gravity ad for the current
     /// conversation context and sends the result back through the app event
     /// channel. The ad is rendered as a `GravityAdCell` in the chat history.
@@ -51,51 +99,32 @@ impl ChatWidget {
     /// fire-and-forget — errors or no-fill produce no event so the UI is
     /// never blocked or disrupted.
     fn spawn_gravity_ad_fetch(&self) {
-        // Don't fetch if no ad context is available.
-        let Some(model) = self.session.model.as_ref() else {
-            return;
-        };
-        // Build a minimal conversation context from the last user turn + model response.
+        let Some(model) = self.session.model.as_ref() else { return };
         let session_id = model.slug.clone();
         let app_event_tx = self.app_event_tx.clone();
-
-        // Collect the last few text items for ad context, skipping the most
-        // recent entry (the just-added TurnSummaryCell).
-        let mut messages: Vec<MessageEntry> = Vec::new();
-        // Skip the first item (TurnSummaryCell) by using a flag.
-        let mut first = true;
-        for cell in self.history.iter().rev() {
-            if first {
-                first = false;
-                continue;
-            }
-            let text = cell_text_for_ad(cell.as_ref());
-            if text.trim().is_empty() {
-                continue;
-            }
-            messages.push(MessageEntry {
-                role: "user".into(),
-                content: text,
-            });
-            if messages.len() >= 6 {
-                break;
-            }
-        }
-
-        if messages.is_empty() {
-            return;
-        }
-
+        let messages = self.ad_context_messages();
+        if messages.is_empty() { return; }
         tokio::spawn(async move {
-            let result = fetch_gravity_ad(&messages, "below_response", "cli-main", &session_id).await;
-            match result {
-                Ok(Some(ad_data)) => {
-                    let json = serde_json::to_string(&ad_data).unwrap_or_default();
-                    app_event_tx.send(AppEvent::GravityAdResult(json));
-                }
-                _ => {
-                    // No ad, no event — UI continues as normal.
-                }
+            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "below_response", "cli-main", &session_id).await {
+                let json = serde_json::to_string(&ad).unwrap_or_default();
+                app_event_tx.send(AppEvent::GravityAdResult(json));
+            }
+        });
+    }
+
+    /// Spawns a background fetch for the bottom-page always-visible ad.
+    /// Sends result via `GravityBottomAdResult` which gets stored in
+    /// `ChatWidget::bottom_ad` for always-visible rendering above the composer.
+    pub(crate) fn spawn_bottom_ad_fetch(&self) {
+        let Some(model) = self.session.model.as_ref() else { return };
+        let session_id = model.slug.clone();
+        let app_event_tx = self.app_event_tx.clone();
+        let messages = self.ad_context_messages();
+        if messages.is_empty() { return; }
+        tokio::spawn(async move {
+            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "bottom_page", "cli-bottom", &session_id).await {
+                let json = serde_json::to_string(&ad).unwrap_or_default();
+                app_event_tx.send(AppEvent::GravityBottomAdResult(json));
             }
         });
     }
@@ -207,6 +236,8 @@ impl ChatWidget {
                 self.active_proposed_plan = None;
                 self.stream_chunking_policy.reset();
                 self.bottom_pane.set_task_running(true);
+                // Fire an above-response ad fetch in the background.
+                self.spawn_above_ad_fetch();
             }
             WorkerEvent::InterruptFailed { message } => {
                 self.interrupt_failed(message);
@@ -334,6 +365,8 @@ impl ChatWidget {
                     );
                 }
                 self.set_status_message("Thought");
+                // Fire a mid-response ad fetch after reasoning completes.
+                self.spawn_mid_ad_fetch();
             }
             WorkerEvent::ToolCall {
                 tool_use_id,

@@ -1793,7 +1793,7 @@ impl HistoryCell for GravityAdCell {
     }
 }
 
-fn truncate_str(s: &str, max_width: usize) -> String {
+pub(crate) fn truncate_str(s: &str, max_width: usize) -> String {
     if max_width < 3 {
         return String::new();
     }

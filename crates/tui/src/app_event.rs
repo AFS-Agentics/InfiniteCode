@@ -179,8 +179,17 @@ pub(crate) enum AppEvent {
     /// Result of computing a `/diff` command (ANSI-colored diff text).
     DiffResult(String),
 
-    /// Gravity ad fetched asynchronously — serialized JSON string.
+    /// Gravity ad fetched asynchronously — below the response (after turn finished).
     GravityAdResult(String),
+
+    /// Gravity ad fetched asynchronously — above the response (at turn start).
+    GravityAboveAdResult(String),
+
+    /// Gravity ad fetched asynchronously — mid-response (after reasoning).
+    GravityMidAdResult(String),
+
+    /// Gravity ad fetched asynchronously — bottom-page always-visible banner.
+    GravityBottomAdResult(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

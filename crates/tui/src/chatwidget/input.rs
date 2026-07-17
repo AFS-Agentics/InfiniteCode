@@ -229,6 +229,8 @@ impl ChatWidget {
         self.run_stream_commit_tick();
         self.tick_subagent_monitor(Instant::now());
         self.bottom_pane.pre_draw_tick();
+        // Rotate the bottom-page ad every 60 seconds.
+        self.maybe_rotate_bottom_ad();
     }
 
     pub(crate) fn handle_app_event(&mut self, event: AppEvent) {
@@ -308,7 +310,10 @@ impl ChatWidget {
                 self.bottom_pane.on_reference_search_result(snapshot);
                 self.frame_requester.schedule_frame();
             }
-            AppEvent::GravityAdResult(_) => {
+            AppEvent::GravityAdResult(_)
+            | AppEvent::GravityAboveAdResult(_)
+            | AppEvent::GravityMidAdResult(_)
+            | AppEvent::GravityBottomAdResult(_) => {
                 // Handled at the host level in interactive.rs
             }
             AppEvent::DiffResult(text) => {

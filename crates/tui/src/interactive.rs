@@ -790,6 +790,29 @@ fn handle_app_event(
         return Ok(LoopAction::Continue);
     }
 
+    if let AppEvent::GravityAboveAdResult(json) = &app_event {
+        if let Ok(ad) = serde_json::from_str::<infinitecode_core::gravity::GravityAdData>(json) {
+            let cell = crate::history_cell::GravityAdCell::new(&ad);
+            chat_widget.add_to_history(cell);
+        }
+        return Ok(LoopAction::Continue);
+    }
+
+    if let AppEvent::GravityMidAdResult(json) = &app_event {
+        if let Ok(ad) = serde_json::from_str::<infinitecode_core::gravity::GravityAdData>(json) {
+            let cell = crate::history_cell::GravityAdCell::new(&ad);
+            chat_widget.add_to_history(cell);
+        }
+        return Ok(LoopAction::Continue);
+    }
+
+    if let AppEvent::GravityBottomAdResult(json) = &app_event {
+        if let Ok(ad) = serde_json::from_str::<infinitecode_core::gravity::GravityAdData>(json) {
+            chat_widget.set_bottom_ad(ad);
+        }
+        return Ok(LoopAction::Continue);
+    }
+
     if let AppEvent::DiffResult(text) = app_event {
         loop_state.overlay.open_diff(tui, chat_widget, text)?;
         return Ok(LoopAction::Continue);

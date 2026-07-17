@@ -307,6 +307,9 @@ pub(crate) struct ChatWidget {
     startup_header_mascot_frame_index: usize,
     startup_header_next_animation_at: Instant,
     next_seq: u64,
+    // Bottom-page always-visible ad (above composer). Auto-rotates on a timer.
+    bottom_ad: Option<infinitecode_core::gravity::GravityAdData>,
+    bottom_ad_last_fetch_at: Instant,
 }
 
 impl ChatWidget {
@@ -369,12 +372,28 @@ impl ChatWidget {
 }
 
 impl ChatWidget {
+    /// Sets the always-visible bottom-page ad data (from a background fetch).
+    pub(crate) fn set_bottom_ad(&mut self, ad: infinitecode_core::gravity::GravityAdData) {
+        self.bottom_ad = Some(ad);
+        self.bottom_ad_last_fetch_at = Instant::now();
+        self.frame_requester.schedule_frame();
+    }
+
     fn format_git_diff_result(result: std::io::Result<(bool, String)>) -> String {
         diff_rules::format_git_diff_result(result)
     }
 
     pub(crate) fn should_auto_show_git_diff(tool_title: &str, is_error: bool) -> bool {
         diff_rules::should_auto_show_git_diff(tool_title, is_error)
+    }
+
+    /// Checks if the bottom-page ad needs rotation (every 60 seconds)
+    /// and spawns a fresh fetch if so.
+    fn maybe_rotate_bottom_ad(&mut self) {
+        let elapsed = self.bottom_ad_last_fetch_at.elapsed();
+        if elapsed >= std::time::Duration::from_secs(60) {
+            self.spawn_bottom_ad_fetch();
+        }
     }
 
     pub(crate) fn should_auto_show_git_diff_for_turn(
@@ -529,6 +548,8 @@ impl ChatWidget {
             startup_header_mascot_frame_index: 0,
             startup_header_next_animation_at: Instant::now() + STARTUP_HEADER_ANIMATION_INTERVAL,
             next_seq: 0,
+            bottom_ad: None,
+            bottom_ad_last_fetch_at: Instant::now() - std::time::Duration::from_secs(120),
         };
 
         // Model onboarding can inject additional startup UI before the first frame is drawn.

@@ -53,7 +53,7 @@ impl Renderable for ChatWidget {
             return;
         }
 
-        let (history_area, subagent_area, bottom_area) = self.chat_layout_areas(area);
+        let (history_area, subagent_area, bottom_ad_area, bottom_area) = self.chat_layout_areas(area);
 
         {
             if tracing::enabled!(tracing::Level::DEBUG)
@@ -104,6 +104,10 @@ impl Renderable for ChatWidget {
         }
 
         self.render_subagent_live_list(subagent_area, buf);
+
+        // Bottom-page ad banner (always visible above the composer).
+        self.render_bottom_ad(bottom_ad_area, buf);
+
         self.bottom_pane.render(bottom_area, buf);
     }
 
@@ -118,6 +122,7 @@ impl Renderable for ChatWidget {
             u16::try_from(self.active_viewport_lines(width.max(1)).len()).unwrap_or(u16::MAX);
         history_height
             .saturating_add(self.subagent_live_list_desired_height())
+            .saturating_add(self.bottom_ad_height())
             .saturating_add(self.bottom_pane.desired_height(width))
             .saturating_add(2)
     }
@@ -129,27 +134,114 @@ impl Renderable for ChatWidget {
         if let Some(onboarding) = &self.onboarding {
             return onboarding.cursor_pos(area);
         }
-        let (_history_area, _subagent_area, bottom_area) = self.chat_layout_areas(area);
+        let (_history_area, _subagent_area, _bottom_ad_area, bottom_area) = self.chat_layout_areas(area);
         self.bottom_pane.cursor_pos(bottom_area)
     }
 }
 
 impl ChatWidget {
-    fn chat_layout_areas(&self, area: Rect) -> (Rect, Rect, Rect) {
+    /// Returns the desired height for the bottom-page ad banner.
+    fn bottom_ad_height(&self) -> u16 {
+        if self.bottom_ad.is_some() { 3 } else { 0 }
+    }
+
+    /// Renders the always-visible bottom-page ad banner above the composer.
+    fn render_bottom_ad(&self, area: Rect, buf: &mut Buffer) {
+        use ratatui::style::Style;
+        use ratatui::style::Stylize;
+        use ratatui::text::Span;
+        use unicode_width::UnicodeWidthStr;
+        let Some(ref ad) = self.bottom_ad else {
+            return;
+        };
+        if area.width < 8 || area.height == 0 {
+            return;
+        }
+        let inner_width = area.width.saturating_sub(4).max(1) as usize;
+        let brand = ad.brand_name.as_deref().unwrap_or("Sponsored");
+        let description = if ad.ad_text.is_empty() {
+            ad.title.as_deref().unwrap_or("")
+        } else {
+            ad.ad_text.as_str()
+        };
+        let link = ad.click_url.as_deref().or(ad.url.as_deref()).unwrap_or("");
+
+        // Top border
+        let label = " Sponsored ";
+        let label_width = UnicodeWidthStr::width(label);
+        let border_total = inner_width.saturating_sub(label_width).saturating_sub(2);
+        let left_dash = border_total / 2;
+        let right_dash = border_total - left_dash;
+        let top = format!(" ┌{}┤", "─".repeat(left_dash + label_width + right_dash));
+        let top_span = Span::styled(top, Style::default().dim());
+        Paragraph::new(Line::from(top_span)).render(
+            Rect::new(area.x, area.y, area.width, 1),
+            buf,
+        );
+
+        // Body line: brand · description   Ad
+        let ad_label = "Ad";
+        let ad_label_width = UnicodeWidthStr::width(ad_label);
+        let brand_text: &str = brand;
+        let desc_text: &str = description;
+        let brand_display = format!("{brand_text} · {desc_text}");
+        let brand_width = UnicodeWidthStr::width(brand_display.as_str());
+        let available = inner_width.saturating_sub(ad_label_width).saturating_sub(2);
+        let truncated = if brand_width > available {
+            let max_desc = available.saturating_sub(
+                UnicodeWidthStr::width(brand_text) + 3,
+            );
+            format!("{brand_text} · {}", crate::history_cell::truncate_str(desc_text, max_desc))
+        } else {
+            brand_display
+        };
+        let padding = inner_width
+            .saturating_sub(UnicodeWidthStr::width(truncated.as_str()))
+            .saturating_sub(ad_label_width);
+        let body_line = Line::from(vec![
+            Span::raw(" │ "),
+            Span::raw(truncated),
+            Span::raw(" ".repeat(padding)),
+            Span::styled(ad_label, Style::default().dim().bold()),
+            Span::raw(" │"),
+        ])
+        .style(Style::default().dim());
+        Paragraph::new(body_line).render(
+            Rect::new(area.x, area.y.saturating_add(1), area.width, 1),
+            buf,
+        );
+
+        // If there's space, show the URL
+        if area.height >= 3 && !link.is_empty() {
+            let truncated_link = crate::history_cell::truncate_str(link, inner_width);
+            Paragraph::new(Line::from(vec![
+                Span::raw("   "),
+                Span::styled(truncated_link, Style::default().fg(ratatui::style::Color::Blue).dim()),
+            ]))
+            .render(
+                Rect::new(area.x, area.y.saturating_add(2), area.width, 1),
+                buf,
+            );
+        }
+    }
+
+    fn chat_layout_areas(&self, area: Rect) -> (Rect, Rect, Rect, Rect) {
         let bottom_height = self
             .bottom_pane
             .desired_height(area.width)
             .min(area.height.saturating_sub(1).max(3));
+        let bottom_ad_height = self.bottom_ad_height();
         let subagent_height = self
             .subagent_live_list_desired_height()
-            .min(area.height.saturating_sub(bottom_height).saturating_sub(1));
-        let [history_area, subagent_area, bottom_area] = Layout::vertical([
+            .min(area.height.saturating_sub(bottom_height + bottom_ad_height).saturating_sub(1));
+        let [history_area, subagent_area, bottom_ad_area, bottom_area] = Layout::vertical([
             Constraint::Min(1),
             Constraint::Length(subagent_height),
+            Constraint::Length(bottom_ad_height),
             Constraint::Length(bottom_height),
         ])
         .areas(area);
-        (history_area, subagent_area, bottom_area)
+        (history_area, subagent_area, bottom_ad_area, bottom_area)
     }
 
     pub(crate) fn active_assistant_render_snapshot(
@@ -160,7 +252,7 @@ impl ChatWidget {
             return None;
         }
 
-        let (history_area, _subagent_area, _bottom_area) = self.chat_layout_areas(area);
+        let (history_area, _subagent_area, _bottom_ad_area, _bottom_area) = self.chat_layout_areas(area);
         let width = history_area.width.max(1);
         let full_viewport_line_count = self.active_viewport_lines(width).len();
         let viewport_scroll_offset =

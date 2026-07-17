@@ -4,6 +4,10 @@ Thanks for your interest in contributing — really appreciate it.
 
 This project is still in an early stage, so small, focused contributions are especially helpful.
 
+## Project structure
+
+Before contributing, read [`PROJECT_STRUCTURE.md`](../PROJECT_STRUCTURE.md) — it lists every user-facing surface (CLI, TUI, Desktop, Docs, Website) and where each one lives in the repo. Most cross-cutting changes touch **both** the Rust crates (`infinitecode/crates/*`) **and** the Bun/Electron workspaces (`infinitecode/apps/*`); check both before opening a PR.
+
 ## How to Contribute
 
 * Open an issue for bugs, ideas, or design discussions
