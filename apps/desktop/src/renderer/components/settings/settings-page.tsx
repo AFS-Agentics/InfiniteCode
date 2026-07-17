@@ -177,7 +177,7 @@ function SettingsSidebarContent() {
 			    bottom of SidebarContent so the Back-to-app button and the
 			    tab list stay above. 167 s rotation (LCM(167, 180) ≈ 501 min)
 			    keeps it off-beat from the main sidebar's 180 s cadence. px-3
-			    + pb-3 + shrink-0 match the main sidebar's gutter pattern.
+			    + pb-2 + shrink-0 match the main sidebar's gutter pattern.
 
 			    Future per-context reporting — to split this into a separate
 			    `settings_sidebar` slot: add `'settings_sidebar': 'Settings-
@@ -192,7 +192,7 @@ function SettingsSidebarContent() {
 			    4-5 IPC + preload + 5 renderer-side component refactor. The IPC
 			    + preload side is the easy part; the renderer-side split needs
 			    a 5-line component refactor. */}
-			<div className="mt-auto shrink-0 px-3 pb-3">
+			<div className="mt-auto shrink-0 px-3 pb-2">
 				<GravitySidebarBanner
 					messages={SETTINGS_SIDEBAR_MESSAGES}
 					refreshIntervalMs={167 * 1000}

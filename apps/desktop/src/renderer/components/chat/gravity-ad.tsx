@@ -75,12 +75,7 @@ function ThemedGravityEmptySlot({
 				/>
 			);
 		case "mid_response":
-			return (
-				<ThemedGravityCornerPill
-					ad={GRAVITY_DEMO_AD}
-					placement={placement}
-				/>
-			);
+			return <ThemedGravityInlineFootnote ad={GRAVITY_DEMO_AD} slot="mid_response" />;
 		case "mid_timeline":
 			return <ThemedGravityMidTimelineCard ad={GRAVITY_DEMO_AD} />;
 		case "startup_overlay":
