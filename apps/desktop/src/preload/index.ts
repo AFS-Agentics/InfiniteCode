@@ -405,4 +405,43 @@ contextBridge.exposeInMainWorld("infinitecode", {
 				| "startup_overlay" = "below_response",
 		) => ipcRenderer.invoke("gravity:get-ads", messages, placement),
 	},
+
+	// --- Artifact store ---
+
+	artifact: {
+		list: () => ipcRenderer.invoke("artifact:list"),
+		get: (id: string) => ipcRenderer.invoke("artifact:get", id),
+		store: (input: unknown) => ipcRenderer.invoke("artifact:store", input),
+		delete: (id: string) => ipcRenderer.invoke("artifact:delete", id),
+		clear: () => ipcRenderer.invoke("artifact:clear"),
+		onChanged: (callback: () => void) => {
+			const listener = () => callback();
+			ipcRenderer.on("artifact:changed", listener);
+			return () => {
+				ipcRenderer.removeListener("artifact:changed", listener);
+			};
+		},
+	},
+
+	// --- Long-term memory store ---
+
+	memory: {
+		list: () => ipcRenderer.invoke("memory:list"),
+		get: (id: string) => ipcRenderer.invoke("memory:get", id),
+		store: (input: unknown) => ipcRenderer.invoke("memory:store", input),
+		update: (id: string, patch: unknown) =>
+			ipcRenderer.invoke("memory:update", id, patch),
+		delete: (id: string) => ipcRenderer.invoke("memory:delete", id),
+		search: (query: string, limit?: number) =>
+			ipcRenderer.invoke("memory:search", query, limit),
+		clear: () => ipcRenderer.invoke("memory:clear"),
+		stats: () => ipcRenderer.invoke("memory:stats"),
+		onChanged: (callback: () => void) => {
+			const listener = () => callback();
+			ipcRenderer.on("memory:changed", listener);
+			return () => {
+				ipcRenderer.removeListener("memory:changed", listener);
+			};
+		},
+	},
 });

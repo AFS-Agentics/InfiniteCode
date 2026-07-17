@@ -57,6 +57,7 @@ import {
 	shortenPathForDisplay,
 	type ToolPathDisplayOptions,
 } from "./tool-paths"
+import { SaveArtifactButton } from "../artifacts/save-artifact-button"
 
 // ============================================================
 // Constants
@@ -1117,26 +1118,35 @@ export const ChatToolCall = memo(
 
 		// Combine trailing element with "View diff" button for edit-category tools
 		const combinedTrailing = useMemo(() => {
-			if (!editFilePath || status !== "completed") return trailingElement
-			const viewButton = (
-				<button
-					key="view-diff"
-					type="button"
-					onClick={handleViewDiff}
-					className="rounded p-0.5 text-muted-foreground/40 transition-colors hover:bg-muted hover:text-foreground"
-					title="View in diff panel"
-				>
-					<DiffIcon className="size-3" aria-hidden="true" />
-				</button>
-			)
-			if (!trailingElement) return viewButton
-			return (
-				<span className="flex items-center gap-2">
-					{trailingElement}
-					{viewButton}
-				</span>
-			)
-		}, [editFilePath, status, trailingElement, handleViewDiff])
+			const trailingItems: ReactNode[] = []
+			if (trailingElement) trailingItems.push(trailingElement)
+			if (editFilePath && status === "completed") {
+				trailingItems.push(
+					<button
+						key="view-diff"
+						type="button"
+						onClick={handleViewDiff}
+						className="rounded p-0.5 text-muted-foreground/40 transition-colors hover:bg-muted hover:text-foreground"
+						title="View in diff panel"
+					>
+						<DiffIcon className="size-3" aria-hidden="true" />
+					</button>,
+				)
+			}
+			// Save-to-artifacts button — only meaningful when there's output to save.
+			if (status === "completed" || status === "error") {
+				trailingItems.push(
+					<SaveArtifactButton
+						key="save-artifact"
+						part={part}
+						projectRoot={projectRoot}
+					/>,
+				)
+			}
+			if (trailingItems.length === 0) return undefined
+			if (trailingItems.length === 1) return trailingItems[0]
+			return <span className="flex items-center gap-2">{trailingItems}</span>
+		}, [editFilePath, status, trailingElement, handleViewDiff, part, projectRoot])
 
 		// When the turn has an error, add a delete button so the user can
 		// surgically remove a problematic tool part and continue the conversation.

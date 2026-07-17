@@ -9,6 +9,7 @@ import { useAtomValue } from "jotai"
 import {
 	ArrowLeftIcon,
 	BellIcon,
+	BrainIcon,
 	GitForkIcon,
 	InfoIcon,
 	ServerIcon,
@@ -60,6 +61,7 @@ type SettingsTab =
 	| "notifications"
 	| "providers"
 	| "worktrees"
+	| "memory"
 	| "setup"
 	| "about"
 
@@ -69,6 +71,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof SettingsIcon }[] = [
 	{ id: "notifications", label: "Notifications", icon: BellIcon },
 	// { id: "providers", label: "Providers", icon: PlugIcon },
 	{ id: "worktrees", label: "Worktrees", icon: GitForkIcon },
+	{ id: "memory", label: "Memory", icon: BrainIcon },
 	{ id: "setup", label: "Setup", icon: WrenchIcon },
 	{ id: "about", label: "About", icon: InfoIcon },
 ]

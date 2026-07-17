@@ -618,9 +618,7 @@ export interface InfiniteCodeAPI {
 			removed: string[]
 			errors: string[]
 		}>
-	}
-
-	// Gravity Ads
+	}	// Gravity Ads
 	gravity: {
 		getAds: (
 			messages: { role: string; content: string }[],
@@ -634,8 +632,129 @@ export interface InfiniteCodeAPI {
 				| "mid_response"
 				| "mid_timeline"
 				| "startup_overlay",
-	) => Promise<Record<string, unknown>[]>
+		) => Promise<Record<string, unknown>[]>
 	}
+
+	// ============================================================
+	// Artifact store types
+	// ============================================================
+
+	artifact: {
+		list: () => Promise<Artifact[]>
+		get: (id: string) => Promise<Artifact | null>
+		store: (input: ArtifactInput) => Promise<Artifact>
+		delete: (id: string) => Promise<boolean>
+		clear: () => Promise<void>
+		/** Subscribe to artifact mutations pushed from the main process. */
+		onChanged: (callback: () => void) => () => void
+	}
+
+	// ============================================================
+	// Long-term memory store types
+	// ============================================================
+
+	memory: {
+		list: () => Promise<Memory[]>
+		get: (id: string) => Promise<Memory | null>
+		store: (input: MemoryInput) => Promise<Memory>
+		update: (
+			id: string,
+			patch: { content?: string; category?: MemoryCategory; tags?: string[] },
+		) => Promise<Memory | null>
+		delete: (id: string) => Promise<boolean>
+		search: (query: string, limit?: number) => Promise<ScoredMemory[]>
+		clear: () => Promise<void>
+		stats: () => Promise<MemoryStats>
+		/** Subscribe to memory mutations pushed from the main process. */
+		onChanged: (callback: () => void) => () => void
+	}
+}
+
+// ============================================================
+// Artifact schema (shared between main and renderer)
+// ============================================================
+
+export type ArtifactKind =
+	| "code"
+	| "diff"
+	| "text"
+	| "json"
+	| "image"
+	| "html"
+	| "bash"
+	| "file"
+	| "log"
+
+export interface Artifact {
+	id: string
+	sessionId: string | null
+	turnId: string | null
+	toolCallId: string | null
+	kind: ArtifactKind
+	title: string
+	subtitle: string | null
+	content: string
+	language: string | null
+	mime: string | null
+	sizeBytes: number
+	createdAt: number
+	source: "tool" | "user" | "auto"
+	tags: string[]
+}
+
+export interface ArtifactInput {
+	sessionId?: string | null
+	turnId?: string | null
+	toolCallId?: string | null
+	kind: ArtifactKind
+	title: string
+	subtitle?: string | null
+	content: string
+	language?: string | null
+	mime?: string | null
+	source?: Artifact["source"]
+	tags?: string[]
+}
+
+// ============================================================
+// Memory schema (shared between main and renderer)
+// ============================================================
+
+export type MemoryCategory =
+	| "preference"
+	| "fact"
+	| "project"
+	| "note"
+	| "feedback"
+
+export type MemorySource = "user" | "inferred" | "tool"
+
+export interface Memory {
+	id: string
+	content: string
+	category: MemoryCategory
+	tags: string[]
+	source: MemorySource
+	createdAt: number
+	lastUsedAt: number | null
+	useCount: number
+}
+
+export interface MemoryInput {
+	content: string
+	category?: MemoryCategory
+	tags?: string[]
+	source?: MemorySource
+}
+
+export interface ScoredMemory {
+	memory: Memory
+	score: number
+}
+
+export interface MemoryStats {
+	total: number
+	byCategory: Record<MemoryCategory, number>
 }
 
 declare global {

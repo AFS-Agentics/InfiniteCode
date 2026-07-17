@@ -90,6 +90,26 @@ import {
 	installUpdate,
 	openReleasePage,
 } from "./updater";
+import {
+	clearArtifacts,
+	deleteArtifact,
+	getArtifact,
+	listArtifacts,
+	storeArtifact,
+	type ArtifactInput,
+} from "./artifacts-store";
+import {
+	clearMemories,
+	deleteMemory,
+	getMemory,
+	listMemories,
+	memoryStats,
+	searchMemories,
+	storeMemory,
+	updateMemory,
+	type Memory,
+	type MemoryInput,
+} from "./memory-store";
 
 const log = createLogger("ipc");
 
@@ -946,4 +966,151 @@ export function registerIpcHandlers(): void {
 			win.webContents.send("settings:changed", settings);
 		}
 	});
+
+	// --- Artifact store ---
+	// Persistent right-pane of saved tool outputs / file snapshots / fetched
+	// content. JSON file at `app.getPath('userData')/artifacts.json` with FIFO
+	// eviction. Broadcasts `artifact:changed` on every mutation so all windows
+	// refresh their lists without polling.
+
+	ipcMain.handle(
+		"artifact:list",
+		withLogging("artifact:list", () => listArtifacts()),
+	);
+
+	ipcMain.handle(
+		"artifact:get",
+		withLogging("artifact:get", (_, id: string) => getArtifact(id)),
+	);
+
+	ipcMain.handle(
+		"artifact:store",
+		withLogging(
+			"artifact:store",
+			async (_, input: ArtifactInput) => {
+				const result = storeArtifact(input);
+				for (const win of BrowserWindow.getAllWindows()) {
+					win.webContents.send("artifact:changed");
+				}
+				return result;
+			},
+		),
+	);
+
+	ipcMain.handle(
+		"artifact:delete",
+		withLogging(
+			"artifact:delete",
+			async (_, id: string) => {
+				const ok = deleteArtifact(id);
+				for (const win of BrowserWindow.getAllWindows()) {
+					win.webContents.send("artifact:changed");
+				}
+				return ok;
+			},
+		),
+	);
+
+	ipcMain.handle(
+		"artifact:clear",
+		withLogging(
+			"artifact:clear",
+			async () => {
+				clearArtifacts();
+				for (const win of BrowserWindow.getAllWindows()) {
+					win.webContents.send("artifact:changed");
+				}
+			},
+		),
+	);
+
+	// --- Long-term memory store ---
+	// Persistent facts/preferences that survive across sessions. JSON file at
+	// `app.getPath('userData')/memories.json`. Search is a simple tf + tag
+	// overlap score with a recency tiebreaker (good enough for v1; embeddings
+	// can replace this later). Broadcasts `memory:changed` on mutations.
+
+	ipcMain.handle(
+		"memory:list",
+		withLogging("memory:list", () => listMemories()),
+	);
+
+	ipcMain.handle(
+		"memory:get",
+		withLogging("memory:get", (_, id: string) => getMemory(id)),
+	);
+
+	ipcMain.handle(
+		"memory:store",
+		withLogging(
+			"memory:store",
+			async (_, input: MemoryInput) => {
+				const result = storeMemory(input);
+				for (const win of BrowserWindow.getAllWindows()) {
+					win.webContents.send("memory:changed");
+				}
+				return result;
+			},
+		),
+	);
+
+	ipcMain.handle(
+		"memory:update",
+		withLogging(
+			"memory:update",
+			async (
+				_,
+				id: string,
+				patch: Partial<Pick<Memory, "content" | "category" | "tags">>,
+			) => {
+				const result = updateMemory(id, patch);
+				if (result) {
+					for (const win of BrowserWindow.getAllWindows()) {
+						win.webContents.send("memory:changed");
+					}
+				}
+				return result;
+			},
+		),
+	);
+
+	ipcMain.handle(
+		"memory:delete",
+		withLogging(
+			"memory:delete",
+			async (_, id: string) => {
+				const ok = deleteMemory(id);
+				for (const win of BrowserWindow.getAllWindows()) {
+					win.webContents.send("memory:changed");
+				}
+				return ok;
+			},
+		),
+	);
+
+	ipcMain.handle(
+		"memory:search",
+		withLogging(
+			"memory:search",
+			(_, query: string, limit?: number) => searchMemories(query, limit ?? 5),
+		),
+	);
+
+	ipcMain.handle(
+		"memory:clear",
+		withLogging(
+			"memory:clear",
+			async () => {
+				clearMemories();
+				for (const win of BrowserWindow.getAllWindows()) {
+					win.webContents.send("memory:changed");
+				}
+			},
+		),
+	);
+
+	ipcMain.handle(
+		"memory:stats",
+		withLogging("memory:stats", () => memoryStats()),
+	);
 }

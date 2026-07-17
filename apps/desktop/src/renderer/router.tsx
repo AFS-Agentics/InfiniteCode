@@ -16,6 +16,7 @@ import { RootLayout } from "./components/root-layout"
 import { SessionRoute } from "./components/session-route"
 import { AboutSettings } from "./components/settings/about-settings"
 import { GeneralSettings } from "./components/settings/general-settings"
+import { MemorySettings } from "./components/settings/memory-settings-page"
 import { NotificationSettings } from "./components/settings/notification-settings"
 import { ProviderSettings } from "./components/settings/provider-settings"
 import { ServerSettings } from "./components/settings/server-settings"
@@ -113,6 +114,12 @@ const settingsWorktreesRoute = createRoute({
 	component: WorktreeSettings,
 })
 
+const settingsMemoryRoute = createRoute({
+	getParentRoute: () => settingsRoute,
+	path: "memory",
+	component: MemorySettings,
+})
+
 const settingsAboutRoute = createRoute({
 	getParentRoute: () => settingsRoute,
 	path: "about",
@@ -163,6 +170,7 @@ const routeTree = rootRoute.addChildren([
 			settingsNotificationsRoute,
 			settingsProvidersRoute,
 			settingsWorktreesRoute,
+			settingsMemoryRoute,
 			settingsSetupRoute,
 			settingsAboutRoute,
 		]),

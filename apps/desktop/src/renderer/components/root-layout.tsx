@@ -8,6 +8,7 @@ import { Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { useAtomValue, useSetAtom } from "jotai"
 import { useCallback, useEffect, useMemo } from "react"
 import { Toaster } from "sonner"
+import { artifactPaneOpenAtom } from "../atoms/artifacts"
 import { discoveryPhaseAtom } from "../atoms/discovery"
 import { onboardingStateAtom } from "../atoms/onboarding"
 import { terminalPanelOpenAtom } from "../atoms/terminal"
@@ -23,6 +24,9 @@ import { useSystemAccentColor } from "../hooks/use-system-accent-color"
 import { useThemeEffect } from "../hooks/use-theme"
 import { useWaitingIndicator } from "../hooks/use-waiting-indicator"
 import { isTerminalToggleShortcut } from "../lib/terminal-shortcut"
+import { refreshArtifacts } from "../services/artifact-service"
+import { refreshMemories, refreshMemoryStats } from "../services/memory-service"
+import { ArtifactPane } from "./artifacts/artifact-pane"
 import { AppBarProvider } from "./app-bar-context"
 import { CommandPalette } from "./command-palette"
 import { OnboardingOverlay } from "./onboarding/onboarding-overlay"
@@ -55,12 +59,28 @@ export function RootLayout() {
 	const commandPaletteOpen = useCommandPaletteOpen()
 	const setCommandPaletteOpen = useSetCommandPaletteOpen()
 	const setTerminalPanelOpen = useSetAtom(terminalPanelOpenAtom)
+	const setArtifactPaneOpen = useSetAtom(artifactPaneOpenAtom)
 	const navigate = useNavigate()
 	const params = useParams({ strict: false })
 	const sessionId = (params as Record<string, string | undefined>).sessionId
 
 	// Native OS notifications: badge sync, click-to-navigate, auto-dismiss
 	useNotifications(navigate, sessionId)
+
+	// One-time eager-load for the artifact pane + memory store so the right
+	// pane and settings page have data ready by the time the user navigates
+	// to them. Both services are tolerant of the Electron bridge being absent.
+	useEffect(() => {
+		refreshArtifacts().catch(() => {
+			/* logged */
+		})
+		refreshMemories().catch(() => {
+			/* logged */
+		})
+		refreshMemoryStats().catch(() => {
+			/* logged */
+		})
+	}, [])
 
 	// ========== Command palette: fork session ==========
 
@@ -135,8 +155,22 @@ export function RootLayout() {
 				setCommandPaletteOpen(true)
 				return
 			}
+
+			// ⌘. / Ctrl+. — toggle the artifact pane
+			if ((e.metaKey || e.ctrlKey) && e.key === ".") {
+				e.preventDefault()
+				setArtifactPaneOpen((open) => !open)
+				return
+			}
 		},
-		[sessionId, visibleAgents, navigate, setCommandPaletteOpen, setTerminalPanelOpen],
+		[
+			sessionId,
+			visibleAgents,
+			navigate,
+			setCommandPaletteOpen,
+			setTerminalPanelOpen,
+			setArtifactPaneOpen,
+		],
 	)
 
 	useEffect(() => {
@@ -207,14 +241,15 @@ export function RootLayout() {
 					<div
 						className={`transition-opacity duration-300 ${contentReady ? "opacity-100" : "opacity-0"}`}
 					>
-						<Outlet />
-						<CommandPalette
-							open={commandPaletteOpen}
-							onOpenChange={setCommandPaletteOpen}
-							agents={agents}
-							onForkSession={activeAgent ? handleForkSession : undefined}
-						/>
-						<Toaster position="bottom-right" />
+					<Outlet />
+					<CommandPalette
+						open={commandPaletteOpen}
+						onOpenChange={setCommandPaletteOpen}
+						agents={agents}
+						onForkSession={activeAgent ? handleForkSession : undefined}
+					/>
+					<ArtifactPane />
+					<Toaster position="bottom-right" />
 					</div>
 					<StartupOverlay />
 				</SidebarSlotProvider>
