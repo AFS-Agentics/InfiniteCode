@@ -58,6 +58,11 @@ import type {
 	ToolPart,
 } from "../../lib/types";
 import { PermissionItem } from "./chat-permission";
+import { SuggestFollowups } from "./suggest-followups";
+import { useAgentActions } from "../../hooks/use-server";
+import { createLogger } from "../../lib/logger";
+
+const log = createLogger("chat-turn");
 import {
 	CompactionStatusDivider,
 	isCompactionStatusText,
@@ -861,6 +866,28 @@ export const ChatTurnComponent = memo(
 
 		const working = isLast && isWorking;
 
+		// Suggested-followup chip handler. Clicking a chip sends the chip's
+		// `prompt` as a new user turn via the existing agent socket.
+		const { sendPrompt } = useAgentActions();
+		const handleFollowupSubmit = useCallback(
+			async (prompt: string) => {
+				if (!agent) return;
+				log.debug("followup submit", { prompt, agent: agent.name });
+				try {
+					await sendPrompt(agent.directory, agent.sessionId, prompt, {
+						agent: agent.name,
+					});
+				} catch (error) {
+					log.error(
+						"followup submit failed",
+						{ prompt, agent: agent.name },
+						error,
+					);
+				}
+			},
+			[agent, sendPrompt],
+		);
+
 		// User requirement: queue state belongs in the composer status stack;
 		// this transcript must not infer queued state from an empty assistant response.
 		const processOrderedParts = working ? orderedParts : completedProcessParts;
@@ -1133,10 +1160,21 @@ export const ChatTurnComponent = memo(
 				) : (
 					<Message from="assistant">
 						<MessageContent>
-							<MessageResponse>{responseText}</MessageResponse>
-						</MessageContent>
-					</Message>
-				))}
+							<MessageResponse>{responseText}</MessageResponse>				</MessageContent>
+				</Message>
+			))}
+
+			{/* Suggested followups chips sent by the agent's
+		    `suggest_followups` tool. Only the LAST turn shows live; older
+		    turns collapse into a toggle inside the component itself. */}
+			{!working && finalResponsePart && responseText && (
+				<SuggestFollowups
+					turn={turn}
+					isLast={isLast}
+					isWorking={working}
+					onSubmit={handleFollowupSubmit}
+				/>
+			)}
 
 			{/* Inline Gravity float-note attached at the very bottom of the
 		    response bubble (sibling of the bubble, NOT inside it). Per-turn
