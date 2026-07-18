@@ -13,6 +13,7 @@ use clap::builder::PossibleValuesParser;
 use clap::builder::TypedValueParser as _;
 use infinitecode_core::AppConfig;
 use infinitecode_core::AppConfigLoader;
+use infinitecode_core::CompactStrategy;
 use infinitecode_core::FileSystemAppConfigLoader;
 use infinitecode_core::LoggingBootstrap;
 use infinitecode_core::LoggingRuntime;
@@ -67,6 +68,36 @@ struct Cli {
         global = true
     )]
     dangerously_skip_permissions: bool,
+
+    /// Opt-in self-verification: the model gets a `<verify_solution_protocol>`
+    /// block in its system prompt and is encouraged to call the
+    /// `verify_solution` tool before submitting non-trivial final answers.
+    /// Off by default. Use `--no-self-verify` to explicitly disable.
+    #[arg(
+        long = "self-verify",
+        global = true,
+        default_missing_value = "true",
+        num_args = 0..=1,
+        conflicts_with = "no_self_verify"
+    )]
+    self_verify: Option<bool>,
+
+    /// Explicitly disable self-verification, overriding any config.toml or
+    /// env-var setting.
+    #[arg(long = "no-self-verify", global = true)]
+    no_self_verify: bool,
+
+    /// Context-compaction strategy. `auto` preserves existing behavior
+    /// (compact at the configured threshold), `conservative` waits until
+    /// 95% of the input budget, `aggressive` triggers at 60%, `off`
+    /// disables auto-compaction entirely (manual `/compact` only).
+    #[arg(long = "compact-strategy", global = true, value_parser = PossibleValuesParser::new(["auto", "conservative", "aggressive", "off"]))]
+    compact_strategy: Option<String>,
+
+    /// Percent of the input budget at which auto-compaction fires, used
+    /// only when `--compact-strategy auto` (or unset). Range 50-95.
+    #[arg(long = "compact-threshold", global = true, value_parser = clap::value_parser!(u8).range(50..=95))]
+    compact_threshold: Option<u8>,
 }
 
 fn main() -> Result<()> {
@@ -335,7 +366,7 @@ async fn maybe_print_startup_update(cli: &Cli) {
         return;
     };
     let app_config = FileSystemAppConfigLoader::new(home_dir.clone())
-        .with_cli_overrides(cli_logging_overrides(cli))
+        .with_cli_overrides(merged_cli_overrides(cli))
         .load(Some(
             std::env::current_dir()
                 .ok()
@@ -357,7 +388,7 @@ async fn maybe_print_startup_update(cli: &Cli) {
 fn install_logging(cli: &Cli) -> Result<LoggingRuntime> {
     let home_dir = find_infinitecode_home()?;
     let app_config = infinitecode_core::FileSystemAppConfigLoader::new(home_dir.clone())
-        .with_cli_overrides(cli_logging_overrides(cli))
+        .with_cli_overrides(merged_cli_overrides(cli))
         .load(Some(std::env::current_dir()?.as_path()))
         .unwrap_or_else(|err| {
             eprintln!("warning: failed to load app config for logging: {err}");
@@ -375,7 +406,7 @@ fn install_logging(cli: &Cli) -> Result<LoggingRuntime> {
 fn install_server_logging(cli: &Cli) -> Result<LoggingRuntime> {
     let home_dir = find_infinitecode_home()?;
     let loader = infinitecode_core::FileSystemAppConfigLoader::new(home_dir.clone())
-        .with_cli_overrides(cli_logging_overrides(cli));
+        .with_cli_overrides(merged_cli_overrides(cli));
     let app_config = loader.load(/*workspace_root*/ None).unwrap_or_else(|err| {
         eprintln!("warning: failed to load app config for logging: {err}");
         infinitecode_core::AppConfig::default()
@@ -401,6 +432,81 @@ fn cli_logging_overrides(cli: &Cli) -> toml::Value {
             toml::Value::String(log_level.to_string()),
         )])),
     )]))
+}
+
+/// Builds a `toml::Value` overlay from CLI flags that override
+/// `AppConfig.agent_behavior`. Layered on top of the user/project TOML by
+/// the FileSystemAppConfigLoader. Env vars (`INFINITECODE_SELF_VERIFY`,
+/// `INFINITECODE_COMPACT_STRATEGY`, `INFINITECODE_COMPACT_THRESHOLD`) apply
+/// on top of this overlay at load time.
+fn cli_agent_behavior_overrides(cli: &Cli) -> toml::Value {
+    let self_verify: Option<bool> = if cli.no_self_verify {
+        Some(false)
+    } else {
+        cli.self_verify
+    };
+    if self_verify.is_none() && cli.compact_strategy.is_none() && cli.compact_threshold.is_none() {
+        return toml::Value::Table(Default::default());
+    }
+
+    let mut behavior_table = toml::map::Map::new();
+    if let Some(value) = self_verify {
+        behavior_table.insert("self_verify".to_string(), toml::Value::Boolean(value));
+    }
+    if let Some(strategy) = &cli.compact_strategy {
+        behavior_table.insert(
+            "compact_strategy".to_string(),
+            toml::Value::String(cli_strategy_to_toml(strategy).to_string()),
+        );
+    }
+    if let Some(threshold) = cli.compact_threshold {
+        behavior_table.insert(
+            "compact_threshold_percent".to_string(),
+            toml::Value::Integer(threshold as i64),
+        );
+    }
+
+    toml::Value::Table(toml::map::Map::from_iter([(
+        "agent_behavior".to_string(),
+        toml::Value::Table(behavior_table),
+    )]))
+}
+
+fn cli_strategy_to_toml(value: &str) -> &'static str {
+    match value {
+        "auto" => "auto",
+        "conservative" => "conservative",
+        "aggressive" => "aggressive",
+        "off" => "off",
+        _ => "auto",
+    }
+}
+
+/// Combines `--log-level` and the agent-behavior flags into a single
+/// `toml::Value` overlay for the FileSystemAppConfigLoader. Both are layered
+/// on top of the user/project TOML but under env-var overrides.
+fn merged_cli_overrides(cli: &Cli) -> toml::Value {
+    let logging = cli_logging_overrides(cli);
+    let behavior = cli_agent_behavior_overrides(cli);
+    if let (toml::Value::Table(_), toml::Value::Table(_)) = (&logging, &behavior) {
+        if logging.as_table().map_or(true, |t| t.is_empty())
+            && behavior.as_table().map_or(true, |t| t.is_empty())
+        {
+            return toml::Value::Table(Default::default());
+        }
+    }
+    let mut merged = toml::map::Map::new();
+    if let toml::Value::Table(logging_table) = logging {
+        for (key, value) in logging_table {
+            merged.insert(key, value);
+        }
+    }
+    if let toml::Value::Table(behavior_table) = behavior {
+        for (key, value) in behavior_table {
+            merged.insert(key, value);
+        }
+    }
+    toml::Value::Table(merged)
 }
 
 #[cfg(test)]
@@ -485,6 +591,10 @@ mod tests {
                 model: None,
                 log_level: Some(level),
                 dangerously_skip_permissions: false,
+                            self_verify: None,
+                no_self_verify: false,
+                compact_strategy: None,
+                compact_threshold: None,
             };
 
             assert_eq!(
@@ -508,12 +618,20 @@ mod tests {
                 model: None,
                 log_level: None,
                 dangerously_skip_permissions: false,
+                            self_verify: None,
+                no_self_verify: false,
+                compact_strategy: None,
+                compact_threshold: None,
             },
             Cli {
                 command: Some(Command::Onboard),
                 model: None,
                 log_level: None,
                 dangerously_skip_permissions: false,
+                            self_verify: None,
+                no_self_verify: false,
+                compact_strategy: None,
+                compact_threshold: None,
             },
             Cli {
                 command: Some(Command::Prompt {
@@ -523,6 +641,10 @@ mod tests {
                 model: None,
                 log_level: None,
                 dangerously_skip_permissions: false,
+                            self_verify: None,
+                no_self_verify: false,
+                compact_strategy: None,
+                compact_threshold: None,
             },
         ] {
             assert_eq!(
@@ -542,7 +664,11 @@ mod tests {
             model: None,
             log_level: None,
             dangerously_skip_permissions: false,
-        };
+                        self_verify: None,
+                no_self_verify: false,
+                compact_strategy: None,
+                compact_threshold: None,
+            };
         let server = Cli {
             command: Some(Command::Server {
                 transport: infinitecode_server::ServerTransportMode::Config,
@@ -552,7 +678,11 @@ mod tests {
             model: None,
             log_level: None,
             dangerously_skip_permissions: false,
-        };
+                        self_verify: None,
+                no_self_verify: false,
+                compact_strategy: None,
+                compact_threshold: None,
+            };
 
         assert_eq!(
             matches!(

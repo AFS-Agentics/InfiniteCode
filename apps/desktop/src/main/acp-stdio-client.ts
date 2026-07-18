@@ -13,6 +13,14 @@ export const DESKTOP_NETWORK_PROXY_MODE_ENV = "INFINITECODE_DESKTOP_NETWORK_PROX
 export const DESKTOP_NETWORK_PROXY_URL_ENV = "INFINITECODE_DESKTOP_NETWORK_PROXY_URL"
 export const DESKTOP_NETWORK_NO_PROXY_ENV = "INFINITECODE_DESKTOP_NETWORK_NO_PROXY"
 
+// Agent-behavior env keys forwarded from Desktop settings. Must match the
+// names the Rust server reads in `crates/config/src/app.rs` via
+// `apply_agent_behavior_env_overrides`. Keeping them in a single shared
+// module prevents typos drifting between surfaces.
+export const INFINITECODE_SELF_VERIFY_ENV = "INFINITECODE_SELF_VERIFY"
+export const INFINITECODE_COMPACT_STRATEGY_ENV = "INFINITECODE_COMPACT_STRATEGY"
+export const INFINITECODE_COMPACT_THRESHOLD_ENV = "INFINITECODE_COMPACT_THRESHOLD"
+
 const PROXY_ENV_KEYS = [
 	"HTTP_PROXY",
 	"HTTPS_PROXY",

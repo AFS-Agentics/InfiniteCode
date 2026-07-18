@@ -19,4 +19,9 @@ pub enum ToolHandlerKind {
     ExecCommand,
     WriteStdin,
     ToolSearch,
+    /// Structural self-verification reflection tool. The model calls this
+    /// voluntarily before submitting a final answer. Always registered
+    /// (cheap), opt-in via `AgentBehaviorConfig::self_verify` in the system
+    /// prompt. See `crates/core/src/tools/handlers/verify_solution.rs`.
+    VerifySolution,
 }

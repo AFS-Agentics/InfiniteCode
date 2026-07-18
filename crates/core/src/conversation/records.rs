@@ -882,6 +882,7 @@ mod tests {
                     reasoning_effort_selection: None,
                     reasoning_effort: None,
                     system_prompt_mode: crate::SystemPromptMode::CodingAgent,
+                    agent_behavior: infinitecode_config::AgentBehaviorConfig::default(),
                 },
                 schema_version: 1,
             })),

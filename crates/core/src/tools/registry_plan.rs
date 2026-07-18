@@ -826,6 +826,52 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
 
     plan.push(
         ToolSpec {
+            name: "verify_solution".to_string(),
+            description: "Perform a structured self-verification reflection before submitting your final answer. Returns a reflection prompt asking you to walk through each criterion and claim against your proposed answer. Use when the answer makes factual claims, includes code that will be executed, or when the task is non-trivial. Skips external tools; this is a structural reflection step that asks you to re-check your reasoning.".to_string(),
+            input_schema: JsonSchema::object(
+                BTreeMap::from([
+                    (
+                        "answer".to_string(),
+                        JsonSchema::string(Some(
+                            "Your proposed final answer — the text you would otherwise output now.",
+                        )),
+                    ),
+                    (
+                        "criteria".to_string(),
+                        JsonSchema::array(
+                            JsonSchema::string(None),
+                            Some(
+                                "Optional list of explicit constraints from the user's request to verify the answer against.",
+                            ),
+                        ),
+                    ),
+                    (
+                        "claims".to_string(),
+                        JsonSchema::array(
+                            JsonSchema::string(None),
+                            Some(
+                                "Optional list of factual claims in the answer that the user might want to verify.",
+                            ),
+                        ),
+                    ),
+                ]),
+                Some(vec!["answer".to_string()]),
+                Some(false),
+            ),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: true,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: Some("Verify solution".to_string()),
+            supports_cancellation: None,
+            supports_streaming: None,
+        },
+        ToolHandlerKind::VerifySolution,
+    );
+
+    plan.push(
+        ToolSpec {
             name: "update_plan".to_string(),
             description: "Updates the task plan.\nProvide an optional explanation and a list of plan items, each with a step and status.\nAt most one step can be in_progress at a time.".to_string(),
             input_schema: plan_schema(),

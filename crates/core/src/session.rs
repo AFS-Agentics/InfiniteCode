@@ -33,6 +33,9 @@ pub struct SessionConfig {
     pub permission_profile: RuntimePermissionProfile,
     pub agents_md: AgentsMdConfig,
     pub available_skills_instructions: Option<String>,
+    /// Agent behavior knobs (self-verify hint, compaction strategy). Sourced
+    /// from `AppConfig.agent_behavior` at session-creation time.
+    pub agent_behavior: infinitecode_config::AgentBehaviorConfig,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +64,7 @@ impl Default for SessionConfig {
             permission_profile,
             agents_md: AgentsMdConfig::default(),
             available_skills_instructions: None,
+            agent_behavior: infinitecode_config::AgentBehaviorConfig::default(),
         }
     }
 }

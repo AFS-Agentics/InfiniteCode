@@ -64,6 +64,26 @@ const defaultSettings: AppSettings = {
 			noProxy: "localhost,127.0.0.1,::1",
 		},
 	},
+	voice: {
+		enabled: false,
+		inputMode: "push_to_talk",
+		provider: "web_speech",
+		language: "en-US",
+		openaiApiKey: "",
+		maxDurationMs: 30_000,
+	},
+	webSearch: {
+		enabled: false,
+		defaultProvider: "duckduckgo",
+		braveApiKey: "",
+		tavilyApiKey: "",
+		maxResults: 5,
+	},
+	performance: {
+		selfVerify: false,
+		compactStrategy: "auto",
+		compactThresholdPercent: 80,
+	},
 }
 
 describe("renderer settings sync", () => {

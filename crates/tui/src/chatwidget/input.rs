@@ -258,6 +258,10 @@ impl ChatWidget {
             AppEvent::ClearTranscript => {
                 self.clear_transcript_view();
             }
+            AppEvent::GravityPinnedAdResult(_) => {
+                // Pinned ad result is dispatched to the pinned-ad slot directly;
+                // nothing for the input handler to do.
+            }
             AppEvent::Interrupt => {}
             AppEvent::Command(command) => {
                 if let AppCommand::UserTurn {

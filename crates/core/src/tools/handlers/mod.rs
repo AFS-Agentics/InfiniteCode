@@ -22,6 +22,7 @@ mod skill;
 mod tool_search;
 mod webfetch;
 mod websearch;
+mod verify_solution;
 
 pub(crate) use agent::register_agent_tools;
 pub use apply_patch::ApplyPatchHandler;
@@ -43,6 +44,7 @@ pub use read::ReadHandler;
 pub use shell_command::ShellCommandHandler;
 pub use skill::SkillHandler;
 pub use tool_search::{ToolSearchHandler, tool_search_spec};
+pub use verify_solution::VerifySolutionHandler;
 pub use webfetch::WebFetchHandler;
 pub use websearch::WebSearchHandler;
 
@@ -184,6 +186,7 @@ fn build_registry_from_builder(
                 Arc::clone(&loaded_deferred_tools),
                 builder.effective_deferred_loading_config(&DeferredLoadingConfig::default()),
             )),
+            ToolHandlerKind::VerifySolution => Arc::new(VerifySolutionHandler::new()),
         };
         let legacy_alias = match kind {
             ToolHandlerKind::Bash if name == "shell_command" => Some("bash"),

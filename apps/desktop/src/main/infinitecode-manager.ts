@@ -1,4 +1,9 @@
 import type { AcpTransport, AcpTransportEvent, AcpTransportListener, JsonRpcId } from "./acp-stdio-client"
+import {
+	INFINITECODE_COMPACT_STRATEGY_ENV,
+	INFINITECODE_COMPACT_THRESHOLD_ENV,
+	INFINITECODE_SELF_VERIFY_ENV,
+} from "./acp-stdio-client"
 import { app } from "electron"
 import {
 	INFINITECODE_HOME_ENV,
@@ -141,9 +146,7 @@ async function startServer(): Promise<InfiniteCodeServer> {
 async function ensureClient(): Promise<StdioAcpClient> {
 	await ensureServer()
 	return getOrCreateClient()
-}
-
-function getOrCreateClient(): StdioAcpClient {
+}function getOrCreateClient(): StdioAcpClient {
 	if (!stdioClient) {
 		const program = resolveProgram({
 			appPath: app.getAppPath(),
@@ -151,14 +154,49 @@ function getOrCreateClient(): StdioAcpClient {
 			isPackaged: app.isPackaged,
 			resourcesPath: process.resourcesPath,
 		})
-			stdioClient = new StdioAcpClient({
-				program,
-				networkProxy: getSettings().servers.networkProxy,
-				trafficLogger: getAcpTrafficLogger(),
-			})
+		stdioClient = new StdioAcpClient({
+			program,
+			networkProxy: getSettings().servers.networkProxy,
+			trafficLogger: getAcpTrafficLogger(),
+			env: buildAgentBehaviorEnv(getSettings().performance),
+		})
 		stdioClient.subscribe(handleTransportEvent)
 	}
 	return stdioClient
+}
+
+/**
+ * Builds the env-var overlay forwarded to the spawned Rust server so the
+ * running process picks up the user's performance / agent-behavior knobs.
+ *
+ * Reads from `AppSettings.performance` (which lives in
+ * `apps/desktop/src/shared/app-settings.ts`). The Rust server reads these
+ * env vars in `infinitecode/crates/config/src/app.rs` via
+ * `apply_agent_behavior_env_overrides` and layers them on top of the
+ * user/project TOML + CLI overrides at load time.
+ *
+ * Keys are exported from `acp-stdio-client.ts` as
+ * `INFINITECODE_*_ENV` constants so the names stay in lockstep between
+ * Desktop and Rust.
+ */
+function buildAgentBehaviorEnv(performance: ReturnType<typeof getSettings>["performance"]): NodeJS.ProcessEnv {
+	const env: NodeJS.ProcessEnv = {}
+	if (performance?.selfVerify) {
+		env[INFINITECODE_SELF_VERIFY_ENV] = "1"
+	}
+	if (performance?.compactStrategy && performance.compactStrategy !== "auto") {
+		env[INFINITECODE_COMPACT_STRATEGY_ENV] = performance.compactStrategy
+		// Intentionally omit INFINITECODE_COMPACT_THRESHOLD here — the
+		// threshold is only consulted when compactStrategy === "auto".
+		// Forwarding it for non-auto strategies would mislead readers into
+		// thinking it takes effect for Conservative/Aggressive/Off.
+	} else if (
+		typeof performance?.compactThresholdPercent === "number" &&
+		performance.compactStrategy === "auto"
+	) {
+		env[INFINITECODE_COMPACT_THRESHOLD_ENV] = String(performance.compactThresholdPercent)
+	}
+	return env
 }
 
 function getAcpTrafficLogger(): AcpTrafficLogger {

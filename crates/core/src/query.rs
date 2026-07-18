@@ -887,6 +887,7 @@ pub async fn query_with_options(
             &session.cwd,
             current_agents_snapshot.clone(),
             session.config.available_skills_instructions.clone(),
+            session.config.agent_behavior.clone(),
         ));
     }
     let current_turn_context =
@@ -980,13 +981,32 @@ pub async fn query_with_options(
             }
         }
 
-        // 1.3 + 1.7: Check token budget and compact before building the request
-        if session.last_turn_tokens > 0
-            && session
-                .config
-                .token_budget
-                .should_compact(session.last_turn_tokens)
-        {
+        // 1.3 + 1.7: Check token budget and compact before building the request.
+        // The auto-compaction strategy honors `agent_behavior.compact_strategy`
+        // and `agent_behavior.compact_threshold_percent`. `Off` disables
+        // auto-compaction entirely; `Conservative` waits until 95% of the
+        // input budget; `Aggressive` triggers at 60%; `Auto` uses the
+        // configured percent. Manual `/compact` and `context_too_long`
+        // retries are unaffected.
+        let behavior = &session.config.agent_behavior;
+        let effective_compact_threshold: Option<f64> = match behavior.compact_strategy {
+            infinitecode_config::CompactStrategy::Off => None,
+            infinitecode_config::CompactStrategy::Conservative => Some(0.95),
+            infinitecode_config::CompactStrategy::Aggressive => Some(0.60),
+            infinitecode_config::CompactStrategy::Auto => {
+                let pct = behavior.compact_threshold_percent.clamp(50, 95);
+                Some(pct as f64 / 100.0)
+            }
+        };
+        let should_auto_compact = effective_compact_threshold.is_some()
+            && session.last_turn_tokens > 0
+            && {
+                let mut budget = session.config.token_budget.clone();
+                budget.compact_threshold =
+                    effective_compact_threshold.expect("checked is_some above");
+                budget.should_compact(session.last_turn_tokens)
+            };
+        if should_auto_compact {
             if !budget_steer_injected {
                 if let Some(turn) = session.turn_state.as_mut() {
                     turn.push_pending_input(infinitecode_protocol::PendingInputItem::new(

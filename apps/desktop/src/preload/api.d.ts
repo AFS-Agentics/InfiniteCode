@@ -228,6 +228,14 @@ export interface AppSettings {
 	desktopFolders: DesktopFolderSettings
 	/** Server connection configuration. */
 	servers: ServerSettings
+	/** Voice / STT settings. */
+	voice: VoiceSettings
+	/** Web search settings. */
+	webSearch: WebSearchSettings
+	/** Performance / agent behavior knobs (self-verify, compaction strategy).
+	 * Forwarded to the spawned Rust server as env vars so the running
+	 * process picks them up on next restart. */
+	performance: PerformanceSettings
 }
 
 // ============================================================
@@ -668,6 +676,28 @@ export interface InfiniteCodeAPI {
 		/** Subscribe to memory mutations pushed from the main process. */
 		onChanged: (callback: () => void) => () => void
 	}
+
+	// ============================================================
+	// Web search types
+	// ============================================================
+
+	webSearch: {
+		query: (
+			provider: WebSearchProviderId,
+			query: string,
+			limit?: number,
+		) => Promise<WebSearchResponse>
+		test: (provider: WebSearchProviderId) => Promise<WebSearchResponse>
+	}
+
+	// ============================================================
+	// Voice / STT types
+	// ============================================================
+
+	/** Cheap capability probe for the renderer-side Web Speech API. */
+	voice: {
+		capability: () => Promise<VoiceCapabilityProbe>
+	}
 }
 
 // ============================================================
@@ -755,6 +785,94 @@ export interface ScoredMemory {
 export interface MemoryStats {
 	total: number
 	byCategory: Record<MemoryCategory, number>
+}
+
+// ============================================================
+// Web search schema (shared between main and renderer)
+// ============================================================
+
+export type WebSearchProviderId = "duckduckgo" | "brave" | "tavily"
+
+export interface WebSearchResultRow {
+	provider: WebSearchProviderId
+	title: string
+	url: string
+	snippet: string
+	source: string
+}
+
+export type WebSearchErrorReason =
+	| "invalid_query"
+	| "not_configured"
+	| "invalid_credentials"
+	| "rate_limited"
+	| "network_error"
+	| "timeout"
+	| "provider_error"
+	| "unsupported_provider"
+
+export type WebSearchResponse =
+	| { ok: true; results: WebSearchResultRow[]; cached: boolean }
+	| { ok: false; reason: WebSearchErrorReason; message: string }
+
+// ============================================================
+// Voice / STT schema (shared between main and renderer)
+// ============================================================
+
+export type VoiceInputMode = "off" | "push_to_talk" | "toggle_to_record"
+
+export type VoiceSttProvider = "web_speech" | "whisper_local" | "whisper_api"
+
+export interface VoiceCapabilityProbe {
+	/** Whether `window.SpeechRecognition` (or webkit variant) is present. */
+	available: boolean
+	/** Underlying implementation vendor, when available. */
+	vendor: "standard" | "webkit" | null
+	/** Whether microphone permissions can be requested from the renderer. */
+	microphoneSupported: boolean
+}
+
+export interface VoiceSettings {
+	enabled: boolean
+	inputMode: VoiceInputMode
+	provider: VoiceSttProvider
+	/** BCP-47 language code, e.g. "en-US". */
+	language: string
+	/** OpenAI API key used by the whisper_api provider. Optional. */
+	openaiApiKey: string
+	/** Auto-stop recognition after this many ms (default 30s). */
+	maxDurationMs: number
+}
+
+/**
+ * Performance / agent behavior knobs. Surfaced in the Settings → Performance
+ * page and forwarded to the spawned Rust server as env vars
+ * (`INFINITECODE_SELF_VERIFY`, `INFINITECODE_COMPACT_STRATEGY`,
+ * `INFINITECODE_COMPACT_THRESHOLD`). Changes apply on the next server
+ * restart — the settings update handler triggers one automatically.
+ */
+export type CompactStrategyId = "auto" | "conservative" | "aggressive" | "off"
+
+export interface PerformanceSettings {
+	/** Append the `<verify_solution_protocol>` block to the system prompt and
+	 * encourage the model to call the `verify_solution` tool before
+	 * non-trivial final answers. */
+	selfVerify: boolean
+	/** Auto-compaction strategy. `Off` disables auto-compaction entirely;
+	 * `Conservative` waits until 95% of the input budget; `Aggressive`
+	 * triggers at 60%; `Auto` uses `compactThresholdPercent`. */
+	compactStrategy: CompactStrategyId
+	/** Percent of the input budget at which auto-compaction fires, used only
+	 * when `compactStrategy === "auto"`. Clamped to [50, 95] by the server. */
+	compactThresholdPercent: number
+}
+
+export interface WebSearchSettings {
+	enabled: boolean
+	defaultProvider: WebSearchProviderId
+	braveApiKey: string
+	tavilyApiKey: string
+	maxResults: number
 }
 
 declare global {

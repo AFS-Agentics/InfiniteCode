@@ -552,6 +552,7 @@ fn ensure_session_context_locked(state: &mut SessionActorState, turn_config: &Tu
         &state.core.cwd,
         locked_agents_snapshot,
         state.core.config.available_skills_instructions.clone(),
+        state.core.config.agent_behavior.clone(),
     ));
 }
 

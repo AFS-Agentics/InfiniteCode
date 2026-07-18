@@ -11,7 +11,10 @@ import {
 	BellIcon,
 	BrainIcon,
 	GitForkIcon,
+	GaugeIcon,
 	InfoIcon,
+	MicIcon,
+	SearchIcon,
 	ServerIcon,
 	SettingsIcon,
 	WrenchIcon,
@@ -62,6 +65,9 @@ type SettingsTab =
 	| "providers"
 	| "worktrees"
 	| "memory"
+	| "voice"
+	| "web-search"
+	| "performance"
 	| "setup"
 	| "about"
 
@@ -72,6 +78,9 @@ const tabs: { id: SettingsTab; label: string; icon: typeof SettingsIcon }[] = [
 	// { id: "providers", label: "Providers", icon: PlugIcon },
 	{ id: "worktrees", label: "Worktrees", icon: GitForkIcon },
 	{ id: "memory", label: "Memory", icon: BrainIcon },
+	{ id: "voice", label: "Voice", icon: MicIcon },
+	{ id: "web-search", label: "Web search", icon: SearchIcon },
+	{ id: "performance", label: "Performance", icon: GaugeIcon },
 	{ id: "setup", label: "Setup", icon: WrenchIcon },
 	{ id: "about", label: "About", icon: InfoIcon },
 ]

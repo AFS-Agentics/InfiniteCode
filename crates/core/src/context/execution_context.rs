@@ -11,6 +11,7 @@ use infinitecode_protocol::Message;
 use infinitecode_protocol::Model;
 use infinitecode_protocol::ReasoningEffort;
 use infinitecode_protocol::UserInput;
+use infinitecode_config::AgentBehaviorConfig;
 
 use crate::SessionState;
 use crate::TurnConfig;
@@ -118,6 +119,14 @@ pub struct SessionContext {
     pub reasoning_effort: Option<ReasoningEffort>,
     #[serde(default)]
     pub system_prompt_mode: SystemPromptMode,
+    /// Agent behavior knobs sourced from `SessionConfig.agent_behavior`.
+    /// Used by `build_system_prompt` to decide whether to append the
+    /// `verify_solution_protocol` block. Kept at the END of the static
+    /// prompt block (after collaboration-mode introductions) so that the
+    /// upstream provider's prompt cache prefix stays stable when the flag
+    /// is unchanged across turns.
+    #[serde(default)]
+    pub agent_behavior: AgentBehaviorConfig,
 }
 
 impl SessionContext {
@@ -127,6 +136,7 @@ impl SessionContext {
         cwd: &Path,
         locked_agents_snapshot: Option<AgentsMdSnapshot>,
         available_skills: Option<String>,
+        agent_behavior: AgentBehaviorConfig,
     ) -> Self {
         let normalized_reasoning_effort_selection =
             model.normalize_reasoning_effort_selection(reasoning_effort_selection);
@@ -147,17 +157,34 @@ impl SessionContext {
             reasoning_effort_selection: normalized_reasoning_effort_selection,
             reasoning_effort: resolved.effective_reasoning_effort,
             system_prompt_mode: SystemPromptMode::CodingAgent,
+            agent_behavior,
         }
     }
 
     pub fn build_system_prompt(&self) -> String {
         let base = self.base_instructions.trim();
         let mode_prompt = crate::collaboration_mode_prompts::mode_introductions_prompt();
-        if base.is_empty() {
+        let mut result = if base.is_empty() {
             mode_prompt
         } else {
             format!("{base}\n\n{mode_prompt}")
+        };
+
+        // Append the verify-solution block at the END of the static prefix
+        // so the upstream provider's prompt cache stays stable when the
+        // `self_verify` flag is unchanged across turns. The web-search
+        // prompt (added later by the query loop) goes after this point.
+        let verify_block = crate::agent_behavior_prompts::verify_solution_prompt(
+            self.agent_behavior.self_verify,
+        );
+        if !verify_block.is_empty() {
+            if !result.is_empty() {
+                result.push_str("\n\n");
+            }
+            result.push_str(&verify_block);
         }
+
+        result
     }
 
     pub fn prefix_user_inputs(&self) -> Vec<UserInput> {
@@ -468,6 +495,7 @@ mod tests {
     use std::path::Path;
     use std::path::PathBuf;
 
+    use infinitecode_config::AgentBehaviorConfig;
     use infinitecode_protocol::UserInput;
     use pretty_assertions::assert_eq;
 
@@ -500,6 +528,7 @@ mod tests {
                 rendered_instructions: "workspace".into(),
             }),
             Some("<available_skills>skills</available_skills>".to_string()),
+            AgentBehaviorConfig::default(),
         );
 
         let prefix = context.prefix_user_inputs();
@@ -724,6 +753,7 @@ mod tests {
             Path::new("/tmp/a"),
             None,
             /*available_skills*/ None,
+            AgentBehaviorConfig::default(),
         );
 
         assert_eq!(

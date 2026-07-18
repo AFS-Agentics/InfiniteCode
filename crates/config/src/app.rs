@@ -84,6 +84,80 @@ pub struct AppConfig {
     pub project_root_markers: Vec<String>,
     /// User-level settings remembered per project key.
     pub projects: BTreeMap<String, ProjectConfig>,
+    /// Agent behavior knobs — self-verification prompt + context compaction
+    /// strategy. Surfaced in CLI flags (`--self-verify`,
+    /// `--compact-strategy`, `--compact-threshold`) and the Desktop
+    /// Performance settings page. Override TOML via env vars
+    /// (`INFINITECODE_SELF_VERIFY`, `INFINITECODE_COMPACT_STRATEGY`,
+    /// `INFINITECODE_COMPACT_THRESHOLD`) when spawning the server.
+    #[serde(default)]
+    pub agent_behavior: AgentBehaviorConfig,
+}
+
+/// Controls the agent's behavior knobs that the user can toggle without
+/// touching provider/model settings.
+///
+/// All fields are off / defaults on a fresh install. The user opts in
+/// explicitly via CLI flag, config.toml, or the Desktop Performance page.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentBehaviorConfig {
+    /// When true, the static system prompt gets a `verify_solution_protocol`
+    /// block appended (cached-stable position) and the model is encouraged
+    /// to call the `verify_solution` tool before submitting non-trivial
+    /// final answers. Off by default — opt-in only.
+    #[serde(default)]
+    pub self_verify: bool,
+    /// Strategy for proactive context compaction. `Auto` preserves current
+    /// behavior; `Conservative` only auto-compacts at 95% of context;
+    /// `Aggressive` auto-compacts at 60%; `Off` disables auto-compaction
+    /// entirely (user must run `/compact` or wait for the provider to
+    /// surface `context_too_long`).
+    #[serde(default)]
+    pub compact_strategy: CompactStrategy,
+    /// Percent of the model's input budget at which auto-compaction fires,
+    /// used only when `compact_strategy = Auto`. Clamped to [50, 95].
+    #[serde(default = "default_compact_threshold_percent")]
+    pub compact_threshold_percent: u8,
+}
+
+impl Default for AgentBehaviorConfig {
+    fn default() -> Self {
+        Self {
+            self_verify: false,
+            compact_strategy: CompactStrategy::default(),
+            compact_threshold_percent: default_compact_threshold_percent(),
+        }
+    }
+}
+
+/// Strategy for proactive context compaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompactStrategy {
+    /// Existing behavior — auto-compact when input tokens exceed the model's
+    /// effective input budget by the configured percent (default 80%).
+    Auto,
+    /// Auto-compact at 95% of the input budget. Useful for long sessions
+    /// where you want to preserve as much raw history as possible.
+    Conservative,
+    /// Auto-compact at 60% of the input budget. Useful for deep research /
+    /// long-running tasks where cache-friendliness matters more than raw
+    /// detail.
+    Aggressive,
+    /// Disable auto-compaction entirely. Compaction still runs on
+    /// `context_too_long` retries and explicit `/compact` calls. Use when
+    /// you want full control over when summarization happens.
+    Off,
+}
+
+impl Default for CompactStrategy {
+    fn default() -> Self {
+        CompactStrategy::Auto
+    }
+}
+
+fn default_compact_threshold_percent() -> u8 {
+    80
 }
 
 /// Settings remembered for one project.
@@ -171,6 +245,7 @@ impl Default for AppConfig {
             },
             project_root_markers: vec![".git".into()],
             projects: BTreeMap::new(),
+            agent_behavior: AgentBehaviorConfig::default(),
         }
     }
 }
@@ -653,8 +728,49 @@ impl AppConfigLoader for FileSystemAppConfigLoader {
                     message: source.to_string(),
                 })?;
         config.provider = provider_config;
+        // Env-var overrides apply on top of TOML (user/project) + CLI. The
+        // Desktop app and CI use these to flip behavior without rewriting
+        // config.toml. Layering: TOML → CLI → env.
+        apply_agent_behavior_env_overrides(&mut config.agent_behavior);
         validate_app_config(&config)?;
         Ok(config)
+    }
+}
+
+/// Applies env-var overrides to the `agent_behavior` block. Honors
+/// `INFINITECODE_SELF_VERIFY`, `INFINITECODE_COMPACT_STRATEGY`, and
+/// `INFINITECODE_COMPACT_THRESHOLD`. Invalid values are silently ignored —
+/// the loader must remain tolerant of stale or misspelled env vars.
+fn apply_agent_behavior_env_overrides(behavior: &mut AgentBehaviorConfig) {
+    if let Ok(value) = std::env::var("INFINITECODE_SELF_VERIFY") {
+        behavior.self_verify = parse_env_bool(&value);
+    }
+    if let Ok(value) = std::env::var("INFINITECODE_COMPACT_STRATEGY") {
+        if let Some(strategy) = parse_env_compact_strategy(&value) {
+            behavior.compact_strategy = strategy;
+        }
+    }
+    if let Ok(value) = std::env::var("INFINITECODE_COMPACT_THRESHOLD") {
+        if let Ok(parsed) = value.trim().parse::<u8>() {
+            behavior.compact_threshold_percent = parsed.clamp(50, 95);
+        }
+    }
+}
+
+fn parse_env_bool(value: &str) -> bool {
+    matches!(
+        value.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "on",
+    )
+}
+
+fn parse_env_compact_strategy(value: &str) -> Option<CompactStrategy> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "auto" => Some(CompactStrategy::Auto),
+        "conservative" => Some(CompactStrategy::Conservative),
+        "aggressive" => Some(CompactStrategy::Aggressive),
+        "off" => Some(CompactStrategy::Off),
+        _ => None,
     }
 }
 

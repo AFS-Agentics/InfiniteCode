@@ -6,6 +6,7 @@ use std::time::UNIX_EPOCH;
 use infinitecode_protocol::PermissionPreset;
 use pretty_assertions::assert_eq;
 
+use super::AgentBehaviorConfig;
 use super::AppConfig;
 use super::AppConfigLoader;
 use super::AppConfigStore;
@@ -96,6 +97,7 @@ check_interval_hours = 48
     assert_eq!(
         config,
         AppConfig {
+            agent_behavior: AgentBehaviorConfig::default(),
             summary_model: SummaryModelSelection::UseAxiliaryModel,
             server: super::ServerConfig {
                 listen: vec!["stdio://".into()],

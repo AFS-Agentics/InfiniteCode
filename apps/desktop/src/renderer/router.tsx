@@ -18,10 +18,13 @@ import { AboutSettings } from "./components/settings/about-settings"
 import { GeneralSettings } from "./components/settings/general-settings"
 import { MemorySettings } from "./components/settings/memory-settings-page"
 import { NotificationSettings } from "./components/settings/notification-settings"
+import { PerformanceSettings } from "./components/settings/performance-settings"
 import { ProviderSettings } from "./components/settings/provider-settings"
 import { ServerSettings } from "./components/settings/server-settings"
 import { SettingsPage } from "./components/settings/settings-page"
 import { SetupSettings } from "./components/settings/setup-settings"
+import { VoiceSettings } from "./components/settings/voice-settings-page"
+import { WebSearchSettings } from "./components/settings/web-search-settings-page"
 import { WorktreeSettings } from "./components/settings/worktree-settings"
 import { SidebarLayout } from "./components/sidebar-layout"
 
@@ -120,6 +123,24 @@ const settingsMemoryRoute = createRoute({
 	component: MemorySettings,
 })
 
+const settingsVoiceRoute = createRoute({
+	getParentRoute: () => settingsRoute,
+	path: "voice",
+	component: VoiceSettings,
+})
+
+const settingsWebSearchRoute = createRoute({
+	getParentRoute: () => settingsRoute,
+	path: "web-search",
+	component: WebSearchSettings,
+})
+
+const settingsPerformanceRoute = createRoute({
+	getParentRoute: () => settingsRoute,
+	path: "performance",
+	component: PerformanceSettings,
+})
+
 const settingsAboutRoute = createRoute({
 	getParentRoute: () => settingsRoute,
 	path: "about",
@@ -171,6 +192,9 @@ const routeTree = rootRoute.addChildren([
 			settingsProvidersRoute,
 			settingsWorktreesRoute,
 			settingsMemoryRoute,
+			settingsVoiceRoute,
+			settingsWebSearchRoute,
+			settingsPerformanceRoute,
 			settingsSetupRoute,
 			settingsAboutRoute,
 		]),
