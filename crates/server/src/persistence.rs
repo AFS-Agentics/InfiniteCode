@@ -1893,6 +1893,7 @@ mod tests {
     use super::build_prompt_messages_from_snapshot;
     use crate::execution::PersistedTurnItem;
     use crate::persistence::apply_turn_item;
+    use infinitecode_core::AgentBehaviorConfig;
     use infinitecode_core::CompactionSnapshotLine;
     use infinitecode_core::ContentPart;
     use infinitecode_core::EditId;
@@ -2725,6 +2726,7 @@ mod tests {
             reasoning_effort_selection: None,
             reasoning_effort: None,
             system_prompt_mode: infinitecode_core::SystemPromptMode::CodingAgent,
+            agent_behavior: AgentBehaviorConfig::default(),
         };
         let turn_context = TurnContext {
             environment: EnvironmentContext {
@@ -2837,6 +2839,7 @@ mod tests {
             reasoning_effort_selection: None,
             reasoning_effort: None,
             system_prompt_mode: infinitecode_core::SystemPromptMode::CodingAgent,
+            agent_behavior: AgentBehaviorConfig::default(),
         }
     }
 

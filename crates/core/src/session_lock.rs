@@ -259,12 +259,11 @@ fn write_new_lock_at(
     };
     let mut tmp = path.to_path_buf();
     tmp.set_extension("lock.json.tmp");
-    let bytes = serde_json::to_vec_pretty(&record).map_err(|source| {
-        SessionLockError::WriteFailed {
+    let bytes =
+        serde_json::to_vec_pretty(&record).map_err(|source| SessionLockError::WriteFailed {
             path: path.to_path_buf(),
             source: std::io::Error::other(source),
-        }
-    })?;
+        })?;
     {
         let mut f = fs::OpenOptions::new()
             .create(true)
@@ -275,14 +274,16 @@ fn write_new_lock_at(
                 path: tmp.clone(),
                 source,
             })?;
-        f.write_all(&bytes).map_err(|source| SessionLockError::WriteFailed {
-            path: tmp.clone(),
-            source,
-        })?;
-        f.sync_all().map_err(|source| SessionLockError::WriteFailed {
-            path: tmp.clone(),
-            source,
-        })?;
+        f.write_all(&bytes)
+            .map_err(|source| SessionLockError::WriteFailed {
+                path: tmp.clone(),
+                source,
+            })?;
+        f.sync_all()
+            .map_err(|source| SessionLockError::WriteFailed {
+                path: tmp.clone(),
+                source,
+            })?;
     }
     fs::rename(&tmp, path).map_err(|source| SessionLockError::WriteFailed {
         path: path.to_path_buf(),
@@ -342,16 +343,10 @@ fn is_pid_alive(pid: u32) -> bool {
     // matches our pid exactly when the row exists. Detect the empty-result
     // banner ("INFO: No tasks are running...") explicitly.
     let mut cmd = std::process::Command::new("tasklist");
-    cmd.args([
-        "/FI",
-        &format!("PID eq {}", pid),
-        "/NH",
-        "/FO",
-        "LIST",
-    ])
-    .stdin(std::process::Stdio::null())
-    .stdout(std::process::Stdio::piped())
-    .stderr(std::process::Stdio::null());
+    cmd.args(["/FI", &format!("PID eq {}", pid), "/NH", "/FO", "LIST"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
     match cmd.output() {
         Ok(output) => {
             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -437,7 +432,10 @@ mod tests {
             schema_version: 1,
         };
         fs::write(&path, serde_json::to_vec_pretty(&stale).unwrap()).unwrap();
-        assert!(!is_pid_alive(dead), "test fixture: dead pid is genuinely dead");
+        assert!(
+            !is_pid_alive(dead),
+            "test fixture: dead pid is genuinely dead"
+        );
 
         let guard = acquire_at(&path, Surface::Desktop, Some("fresh".into())).unwrap();
         let after = read_lock_at(&path).unwrap().expect("lock rewritten");

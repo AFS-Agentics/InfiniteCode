@@ -6,12 +6,12 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
+use infinitecode_config::AgentBehaviorConfig;
 use infinitecode_protocol::CollaborationMode;
 use infinitecode_protocol::Message;
 use infinitecode_protocol::Model;
 use infinitecode_protocol::ReasoningEffort;
 use infinitecode_protocol::UserInput;
-use infinitecode_config::AgentBehaviorConfig;
 
 use crate::SessionState;
 use crate::TurnConfig;
@@ -174,9 +174,8 @@ impl SessionContext {
         // so the upstream provider's prompt cache stays stable when the
         // `self_verify` flag is unchanged across turns. The web-search
         // prompt (added later by the query loop) goes after this point.
-        let verify_block = crate::agent_behavior_prompts::verify_solution_prompt(
-            self.agent_behavior.self_verify,
-        );
+        let verify_block =
+            crate::agent_behavior_prompts::verify_solution_prompt(self.agent_behavior.self_verify);
         if !verify_block.is_empty() {
             if !result.is_empty() {
                 result.push_str("\n\n");
@@ -214,9 +213,8 @@ impl SessionContext {
         // Append the audit-changes block: opt-in for multi-perspective
         // change review. Instructs the model to review from quality,
         // security, and performance angles before finalizing.
-        let audit_block = crate::agent_behavior_prompts::audit_changes_prompt(
-            self.agent_behavior.audit_changes,
-        );
+        let audit_block =
+            crate::agent_behavior_prompts::audit_changes_prompt(self.agent_behavior.audit_changes);
         if !audit_block.is_empty() {
             if !result.is_empty() {
                 result.push_str("\n\n");

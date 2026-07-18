@@ -225,21 +225,15 @@ mod tests {
 
     #[test]
     fn render_followup_lines_emits_header_and_chip_rows() {
-        let items = vec![
-            FollowupItem {
-                emoji: "🚀".into(),
-                label: "Ship it".into(),
-                prompt: "commit and push".into(),
-            },
-        ];
+        let items = vec![FollowupItem {
+            emoji: "🚀".into(),
+            label: "Ship it".into(),
+            prompt: "commit and push".into(),
+        }];
         let lines = render_followup_lines(&items, 80);
         // header + chip row + footer hint = 3 lines
         assert_eq!(lines.len(), 3);
-        let header_text: String = lines[0]
-            .spans
-            .iter()
-            .map(|s| s.content.as_ref())
-            .collect();
+        let header_text: String = lines[0].spans.iter().map(|s| s.content.as_ref()).collect();
         assert!(header_text.contains("What's next?"));
     }
 

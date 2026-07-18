@@ -998,9 +998,8 @@ pub async fn query_with_options(
                 Some(pct as f64 / 100.0)
             }
         };
-        let should_auto_compact = effective_compact_threshold.is_some()
-            && session.last_turn_tokens > 0
-            && {
+        let should_auto_compact =
+            effective_compact_threshold.is_some() && session.last_turn_tokens > 0 && {
                 let mut budget = session.config.token_budget.clone();
                 budget.compact_threshold =
                     effective_compact_threshold.expect("checked is_some above");
@@ -4364,8 +4363,7 @@ mod tests {
         let captured = requests.lock().expect("lock requests");
         assert_eq!(captured.len(), 2);
         let mode_prompt = crate::collaboration_mode_prompts::mode_introductions_prompt();
-        let followups_prompt =
-            crate::agent_behavior_prompts::suggest_followups_prompt(true);
+        let followups_prompt = crate::agent_behavior_prompts::suggest_followups_prompt(true);
         let expected_system = format!("base-a\n\n{mode_prompt}\n\n{followups_prompt}");
         assert_eq!(
             captured[0].system.as_deref(),

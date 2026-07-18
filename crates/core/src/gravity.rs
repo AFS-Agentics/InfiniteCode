@@ -67,13 +67,12 @@ pub struct GravityAdData {
 /// render with realistic visual chrome even without a configured API key.
 pub fn demo_gravity_ad() -> GravityAdData {
     GravityAdData {
-        ad_text: "Production-grade object storage with edge caching and zero-egress pricing.".into(),
+        ad_text: "Production-grade object storage with edge caching and zero-egress pricing."
+            .into(),
         brand_name: Some("Cortex Cloud".into()),
         cta: Some("Start free trial".into()),
         url: Some("https://example.com/cortex".into()),
-        click_url: Some(
-            "https://example.com/cortex?utm_source=infinitecode&utm_medium=cli".into(),
-        ),
+        click_url: Some("https://example.com/cortex?utm_source=infinitecode&utm_medium=cli".into()),
         imp_url: None,
         title: None,
         favicon: None,
@@ -255,8 +254,7 @@ mod tests {
             "imp_url": "https://track.example/imp",
             "favicon": "https://acme.example/favicon.ico"
         });
-        let ad: GravityAdData =
-            serde_json::from_value(json).expect("deserialize full object");
+        let ad: GravityAdData = serde_json::from_value(json).expect("deserialize full object");
         assert_eq!(ad.ad_text, "Full ad description");
         assert_eq!(ad.title.as_deref(), Some("Ad Title"));
         assert_eq!(ad.cta.as_deref(), Some("Click here"));
@@ -264,6 +262,9 @@ mod tests {
         assert_eq!(ad.url.as_deref(), Some("https://acme.example"));
         assert_eq!(ad.click_url.as_deref(), Some("https://track.example/click"));
         assert_eq!(ad.imp_url.as_deref(), Some("https://track.example/imp"));
-        assert_eq!(ad.favicon.as_deref(), Some("https://acme.example/favicon.ico"));
+        assert_eq!(
+            ad.favicon.as_deref(),
+            Some("https://acme.example/favicon.ico")
+        );
     }
 }

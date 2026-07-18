@@ -53,7 +53,8 @@ impl Renderable for ChatWidget {
             return;
         }
 
-        let (history_area, subagent_area, bottom_ad_area, bottom_area) = self.chat_layout_areas(area);
+        let (history_area, subagent_area, bottom_ad_area, bottom_area) =
+            self.chat_layout_areas(area);
 
         {
             if tracing::enabled!(tracing::Level::DEBUG)
@@ -134,7 +135,8 @@ impl Renderable for ChatWidget {
         if let Some(onboarding) = &self.onboarding {
             return onboarding.cursor_pos(area);
         }
-        let (_history_area, _subagent_area, _bottom_ad_area, bottom_area) = self.chat_layout_areas(area);
+        let (_history_area, _subagent_area, _bottom_ad_area, bottom_area) =
+            self.chat_layout_areas(area);
         self.bottom_pane.cursor_pos(bottom_area)
     }
 }
@@ -174,10 +176,7 @@ impl ChatWidget {
         let right_dash = border_total - left_dash;
         let top = format!(" ┌{}┤", "─".repeat(left_dash + label_width + right_dash));
         let top_span = Span::styled(top, Style::default().dim());
-        Paragraph::new(Line::from(top_span)).render(
-            Rect::new(area.x, area.y, area.width, 1),
-            buf,
-        );
+        Paragraph::new(Line::from(top_span)).render(Rect::new(area.x, area.y, area.width, 1), buf);
 
         // Body line: brand · description   Ad
         let ad_label = "Ad";
@@ -188,10 +187,11 @@ impl ChatWidget {
         let brand_width = UnicodeWidthStr::width(brand_display.as_str());
         let available = inner_width.saturating_sub(ad_label_width).saturating_sub(2);
         let truncated = if brand_width > available {
-            let max_desc = available.saturating_sub(
-                UnicodeWidthStr::width(brand_text) + 3,
-            );
-            format!("{brand_text} · {}", crate::history_cell::truncate_str(desc_text, max_desc))
+            let max_desc = available.saturating_sub(UnicodeWidthStr::width(brand_text) + 3);
+            format!(
+                "{brand_text} · {}",
+                crate::history_cell::truncate_str(desc_text, max_desc)
+            )
         } else {
             brand_display
         };
@@ -216,7 +216,10 @@ impl ChatWidget {
             let truncated_link = crate::history_cell::truncate_str(link, inner_width);
             Paragraph::new(Line::from(vec![
                 Span::raw("   "),
-                Span::styled(truncated_link, Style::default().fg(ratatui::style::Color::Blue).dim()),
+                Span::styled(
+                    truncated_link,
+                    Style::default().fg(ratatui::style::Color::Blue).dim(),
+                ),
             ]))
             .render(
                 Rect::new(area.x, area.y.saturating_add(2), area.width, 1),
@@ -231,9 +234,11 @@ impl ChatWidget {
             .desired_height(area.width)
             .min(area.height.saturating_sub(1).max(3));
         let bottom_ad_height = self.bottom_ad_height();
-        let subagent_height = self
-            .subagent_live_list_desired_height()
-            .min(area.height.saturating_sub(bottom_height + bottom_ad_height).saturating_sub(1));
+        let subagent_height = self.subagent_live_list_desired_height().min(
+            area.height
+                .saturating_sub(bottom_height + bottom_ad_height)
+                .saturating_sub(1),
+        );
         let [history_area, subagent_area, bottom_ad_area, bottom_area] = Layout::vertical([
             Constraint::Min(1),
             Constraint::Length(subagent_height),
@@ -252,7 +257,8 @@ impl ChatWidget {
             return None;
         }
 
-        let (history_area, _subagent_area, _bottom_ad_area, _bottom_area) = self.chat_layout_areas(area);
+        let (history_area, _subagent_area, _bottom_ad_area, _bottom_area) =
+            self.chat_layout_areas(area);
         let width = history_area.width.max(1);
         let full_viewport_line_count = self.active_viewport_lines(width).len();
         let viewport_scroll_offset =

@@ -30,12 +30,12 @@ use super::ChatWidget;
 use super::DotStatus;
 use super::PendingApprovalRequest;
 
-use crate::app_event::AppEvent;
-use crate::history_cell::HistoryCell;
-use infinitecode_core::gravity::{MessageEntry, fetch_gravity_ad};
 use super::SKILLS_TRANSCRIPT_TITLE;
 use super::session_header::is_web_search_title;
 use super::text_stream::ActiveTextItemId;
+use crate::app_event::AppEvent;
+use crate::history_cell::HistoryCell;
+use infinitecode_core::gravity::{MessageEntry, fetch_gravity_ad};
 
 fn format_retry_status_message(attempt: usize, backoff_ms: u64) -> String {
     let seconds = (backoff_ms as f64 / 1000.0).max(0.1);
@@ -48,17 +48,25 @@ impl ChatWidget {
     /// before the assistant response text. Does NOT skip the last history
     /// entry (no TurnSummaryCell exists yet at TurnStarted).
     fn spawn_above_ad_fetch(&self) {
-        let Some(model) = self.session.model.as_ref() else { return };
+        let Some(model) = self.session.model.as_ref() else {
+            return;
+        };
         let session_id = model.slug.clone();
         let app_event_tx = self.app_event_tx.clone();
         let messages = self.ad_context_messages_skip_last(false);
-        if messages.is_empty() { return; }
-        tokio::spawn(async move {
-            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "above_response", "cli-above", &session_id).await {
-                let json = serde_json::to_string(&ad).unwrap_or_default();
-                app_event_tx.send(AppEvent::GravityAboveAdResult(json));
-            }
-        });
+        if messages.is_empty() {
+            return;
+        }
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                if let Ok(Some(ad)) =
+                    fetch_gravity_ad(&messages, "above_response", "cli-above", &session_id).await
+                {
+                    let json = serde_json::to_string(&ad).unwrap_or_default();
+                    app_event_tx.send(AppEvent::GravityAboveAdResult(json));
+                }
+            });
+        }
     }
 
     /// Fetches a mid-response ad after reasoning completes. Runs in background
@@ -66,13 +74,19 @@ impl ChatWidget {
     /// the reasoning block and the final assistant response. Does NOT skip
     /// the last history entry (no TurnSummaryCell exists yet).
     fn spawn_mid_ad_fetch(&self) {
-        let Some(model) = self.session.model.as_ref() else { return };
+        let Some(model) = self.session.model.as_ref() else {
+            return;
+        };
         let session_id = model.slug.clone();
         let app_event_tx = self.app_event_tx.clone();
         let messages = self.ad_context_messages_skip_last(false);
-        if messages.is_empty() { return; }
+        if messages.is_empty() {
+            return;
+        }
         tokio::spawn(async move {
-            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "inline_response", "cli-mid", &session_id).await {
+            if let Ok(Some(ad)) =
+                fetch_gravity_ad(&messages, "inline_response", "cli-mid", &session_id).await
+            {
                 let json = serde_json::to_string(&ad).unwrap_or_default();
                 app_event_tx.send(AppEvent::GravityMidAdResult(json));
             }
@@ -92,11 +106,20 @@ impl ChatWidget {
     fn ad_context_messages_skip_last(&self, skip_last: bool) -> Vec<MessageEntry> {
         let mut messages = Vec::new();
         for (i, cell) in self.history.iter().rev().enumerate() {
-            if skip_last && i == 0 { continue; }
+            if skip_last && i == 0 {
+                continue;
+            }
             let text = cell_text_for_ad(cell.as_ref());
-            if text.trim().is_empty() { continue; }
-            messages.push(MessageEntry { role: "user".into(), content: text });
-            if messages.len() >= 6 { break; }
+            if text.trim().is_empty() {
+                continue;
+            }
+            messages.push(MessageEntry {
+                role: "user".into(),
+                content: text,
+            });
+            if messages.len() >= 6 {
+                break;
+            }
         }
         messages
     }
@@ -109,30 +132,44 @@ impl ChatWidget {
     /// fire-and-forget — errors or no-fill produce no event so the UI is
     /// never blocked or disrupted.
     fn spawn_gravity_ad_fetch(&self) {
-        let Some(model) = self.session.model.as_ref() else { return };
+        let Some(model) = self.session.model.as_ref() else {
+            return;
+        };
         let session_id = model.slug.clone();
         let app_event_tx = self.app_event_tx.clone();
         let messages = self.ad_context_messages();
-        if messages.is_empty() { return; }
-        tokio::spawn(async move {
-            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "below_response", "cli-main", &session_id).await {
-                let json = serde_json::to_string(&ad).unwrap_or_default();
-                app_event_tx.send(AppEvent::GravityAdResult(json));
-            }
-        });
+        if messages.is_empty() {
+            return;
+        }
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                if let Ok(Some(ad)) =
+                    fetch_gravity_ad(&messages, "below_response", "cli-main", &session_id).await
+                {
+                    let json = serde_json::to_string(&ad).unwrap_or_default();
+                    app_event_tx.send(AppEvent::GravityAdResult(json));
+                }
+            });
+        }
     }
 
     /// Spawns a background fetch for the bottom-page always-visible ad.
     /// Sends result via `GravityBottomAdResult` which gets stored in
     /// `ChatWidget::bottom_ad` for always-visible rendering above the composer.
     pub(crate) fn spawn_bottom_ad_fetch(&self) {
-        let Some(model) = self.session.model.as_ref() else { return };
+        let Some(model) = self.session.model.as_ref() else {
+            return;
+        };
         let session_id = model.slug.clone();
         let app_event_tx = self.app_event_tx.clone();
         let messages = self.ad_context_messages();
-        if messages.is_empty() { return; }
+        if messages.is_empty() {
+            return;
+        }
         tokio::spawn(async move {
-            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "bottom_page", "cli-bottom", &session_id).await {
+            if let Ok(Some(ad)) =
+                fetch_gravity_ad(&messages, "bottom_page", "cli-bottom", &session_id).await
+            {
                 let json = serde_json::to_string(&ad).unwrap_or_default();
                 app_event_tx.send(AppEvent::GravityBottomAdResult(json));
             }
@@ -142,13 +179,19 @@ impl ChatWidget {
     /// Spawns a background fetch for the pinned-above-input ad (like Freebuff's SingleAdBanner).
     /// Rotates every 60 seconds via `maybe_rotate_pinned_ad`. Always visible above the composer.
     pub(crate) fn spawn_pinned_ad_fetch(&self) {
-        let Some(model) = self.session.model.as_ref() else { return };
+        let Some(model) = self.session.model.as_ref() else {
+            return;
+        };
         let session_id = model.slug.clone();
         let app_event_tx = self.app_event_tx.clone();
         let messages = self.ad_context_messages();
-        if messages.is_empty() { return; }
+        if messages.is_empty() {
+            return;
+        }
         tokio::spawn(async move {
-            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "single_ad_unit", "cli-pinned", &session_id).await {
+            if let Ok(Some(ad)) =
+                fetch_gravity_ad(&messages, "single_ad_unit", "cli-pinned", &session_id).await
+            {
                 let json = serde_json::to_string(&ad).unwrap_or_default();
                 app_event_tx.send(AppEvent::GravityPinnedAdResult(json));
             }
@@ -630,15 +673,13 @@ impl ChatWidget {
                     self.pending_tool_calls
                         .retain(|tc| tc.tool_use_id != tool_use_id);
                     self.active_tool_calls.remove(&tool_use_id);
-                    let items =
-                        super::suggest_followups_render::parse_followups(&input);
+                    let items = super::suggest_followups_render::parse_followups(&input);
                     if !items.is_empty() {
                         self.add_to_history(
                             super::suggest_followups_render::SuggestFollowupsCell::new(items),
                         );
                     }
-                    self.active_cell_revision =
-                        self.active_cell_revision.wrapping_add(1);
+                    self.active_cell_revision = self.active_cell_revision.wrapping_add(1);
                     self.frame_requester.schedule_frame();
                     self.set_status_message(if is_error {
                         "Tool returned an error"

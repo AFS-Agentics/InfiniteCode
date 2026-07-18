@@ -171,8 +171,8 @@ mod tests {
     use std::path::PathBuf;
 
     use infinitecode_protocol::CollaborationMode;
-    use infinitecode_tools::contracts::{ToolBudgets, ToolContext};
     use infinitecode_tools::ToolCallId;
+    use infinitecode_tools::contracts::{ToolBudgets, ToolContext};
     use pretty_assertions::assert_eq;
     use tokio_util::sync::CancellationToken;
 

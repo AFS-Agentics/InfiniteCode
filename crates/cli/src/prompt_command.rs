@@ -10,8 +10,8 @@ use infinitecode_core::ModelCatalog;
 use infinitecode_core::PresetModelCatalog;
 use infinitecode_core::QueryEvent;
 use infinitecode_core::TurnConfig;
-use infinitecode_core::gravity::{MessageEntry, fetch_gravity_ad};
 use infinitecode_core::default_base_instructions;
+use infinitecode_core::gravity::{MessageEntry, fetch_gravity_ad};
 use infinitecode_core::provider_request_model_map_for_binding;
 use infinitecode_core::resolve_enabled_model_binding;
 use infinitecode_core::tools::ToolPlanConfig;
@@ -137,9 +137,7 @@ pub(crate) async fn run_prompt(
     let session_id_for_events = session_state.id.clone();
 
     // Fire off a background ad fetch in parallel with the LLM query.
-    let ad_messages = vec![
-        MessageEntry::user(input.to_string()),
-    ];
+    let ad_messages = vec![MessageEntry::user(input.to_string())];
     let ad_session_id = session_state.id.to_string();
     let ad_fetch = tokio::spawn(async move {
         fetch_gravity_ad(&ad_messages, "below_response", "cli-main", &ad_session_id).await
@@ -238,14 +236,17 @@ fn print_ad_json_to_stderr(ad: &Option<infinitecode_core::gravity::GravityAdData
     let Some(ad) = ad else {
         return;
     };
-    let _ = serde_json::to_writer(std::io::stderr().lock(), &serde_json::json!({
-        "type": "ad",
-        "brand_name": ad.brand_name,
-        "ad_text": ad.ad_text,
-        "cta": ad.cta,
-        "url": ad.url,
-        "click_url": ad.click_url,
-    }));
+    let _ = serde_json::to_writer(
+        std::io::stderr().lock(),
+        &serde_json::json!({
+            "type": "ad",
+            "brand_name": ad.brand_name,
+            "ad_text": ad.ad_text,
+            "cta": ad.cta,
+            "url": ad.url,
+            "click_url": ad.click_url,
+        }),
+    );
     let _ = writeln!(std::io::stderr().lock());
 }
 

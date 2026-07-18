@@ -21,9 +21,7 @@ use crate::contracts::{
 };
 use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
-use crate::tool_spec::{
-    ToolExecutionMode, ToolOutputMode, ToolPreparationFeedback, ToolSpec,
-};
+use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolPreparationFeedback, ToolSpec};
 
 /// Hard limits the renderer can rely on without re-parsing input.
 pub const MAX_FOLLOWUPS: usize = 6;
@@ -56,9 +54,7 @@ impl SuggestFollowupsHandler {
                 ),
                 (
                     "label".to_string(),
-                    JsonSchema::string(Some(
-                        "Short chip text shown to the user (≤60 chars).",
-                    )),
+                    JsonSchema::string(Some("Short chip text shown to the user (≤60 chars).")),
                 ),
                 (
                     "prompt".to_string(),
@@ -79,8 +75,7 @@ impl SuggestFollowupsHandler {
 
         let spec = ToolSpec {
             name: "suggest_followups".into(),
-            description:
-                "Offer 1–6 clickable next steps at the end of a non-trivial turn. \
+            description: "Offer 1–6 clickable next steps at the end of a non-trivial turn. \
                  Each chip becomes a button the user can click to send that exact \
                  prompt back as a new user turn. Use this whenever you can foresee \
                  at least one concrete useful follow-up; skip it for trivial \
@@ -92,7 +87,7 @@ impl SuggestFollowupsHandler {
                  chars). 1–6 chips per call; never duplicate intents; do not \
                  include chips whose prompt essentially restates the last user \
                  turn."
-                    .into(),
+                .into(),
             input_schema: JsonSchema::object(
                 BTreeMap::from([(
                     "followups".to_string(),
@@ -133,9 +128,7 @@ impl ToolHandler for SuggestFollowupsHandler {
         let followups = input
             .get("followups")
             .and_then(|v| v.as_array())
-            .ok_or_else(|| {
-                ToolCallError::InvalidInput("missing 'followups' array".to_string())
-            })?;
+            .ok_or_else(|| ToolCallError::InvalidInput("missing 'followups' array".to_string()))?;
 
         if followups.len() < MIN_FOLLOWUPS {
             return Err(ToolCallError::InvalidInput(format!(
@@ -149,30 +142,21 @@ impl ToolHandler for SuggestFollowupsHandler {
         }
 
         for (idx, item) in followups.iter().enumerate() {
-            let label = item
-                .get("label")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| {
-                    ToolCallError::InvalidInput(format!(
-                        "followups[{idx}].label missing or not a string"
-                    ))
-                })?;
-            let prompt = item
-                .get("prompt")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| {
-                    ToolCallError::InvalidInput(format!(
-                        "followups[{idx}].prompt missing or not a string"
-                    ))
-                })?;
-            let emoji = item
-                .get("emoji")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| {
-                    ToolCallError::InvalidInput(format!(
-                        "followups[{idx}].emoji missing or not a string"
-                    ))
-                })?;
+            let label = item.get("label").and_then(|v| v.as_str()).ok_or_else(|| {
+                ToolCallError::InvalidInput(format!(
+                    "followups[{idx}].label missing or not a string"
+                ))
+            })?;
+            let prompt = item.get("prompt").and_then(|v| v.as_str()).ok_or_else(|| {
+                ToolCallError::InvalidInput(format!(
+                    "followups[{idx}].prompt missing or not a string"
+                ))
+            })?;
+            let emoji = item.get("emoji").and_then(|v| v.as_str()).ok_or_else(|| {
+                ToolCallError::InvalidInput(format!(
+                    "followups[{idx}].emoji missing or not a string"
+                ))
+            })?;
 
             if emoji.is_empty() {
                 return Err(ToolCallError::InvalidInput(format!(
@@ -210,8 +194,8 @@ mod tests {
     use std::path::PathBuf;
 
     use infinitecode_protocol::CollaborationMode;
-    use infinitecode_tools::contracts::{ToolBudgets, ToolContext};
     use infinitecode_tools::ToolCallId;
+    use infinitecode_tools::contracts::{ToolBudgets, ToolContext};
     use pretty_assertions::assert_eq;
     use tokio_util::sync::CancellationToken;
 

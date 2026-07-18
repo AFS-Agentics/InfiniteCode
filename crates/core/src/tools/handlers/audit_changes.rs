@@ -25,7 +25,7 @@ use crate::contracts::{
 use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
 use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolPreparationFeedback, ToolSpec};
-use crate::tools::handlers::orchestrator::{run_parallel_children, ChildOutput};
+use crate::tools::handlers::orchestrator::{ChildOutput, run_parallel_children};
 
 pub struct AuditChangesHandler {
     spec: ToolSpec,
@@ -173,11 +173,7 @@ fn build_reviewer_prompt(
 ) -> String {
     let label = crate::tools::handlers::orchestrator::letter_id(index);
     let budget_hint = max_chars
-        .map(|n| {
-            format!(
-                "         - Aim for ~{n} characters total (caller-supplied soft cap).\n"
-            )
-        })
+        .map(|n| format!("         - Aim for ~{n} characters total (caller-supplied soft cap).\n"))
         .unwrap_or_else(|| "         - Stay under 400 words.\n".to_string());
     format!(
         "You are reviewer candidate {label}. Provide a focused, brief, candid review of the \
@@ -393,13 +389,15 @@ fn input_schema() -> JsonSchema {
                 "perspectives".to_string(),
                 JsonSchema::array(
                     JsonSchema::string(Some("Focus lens, e.g. 'security concerns'")),
-                    Some("Optional: 1..=8 perspectives. Defaults to correctness / security / performance+maintainability / simplify-reuse-readability."),
+                    Some(
+                        "Optional: 1..=8 perspectives. Defaults to correctness / security / performance+maintainability / simplify-reuse-readability.",
+                    ),
                 ),
             ),
             (
                 "maxCharsPerReview".to_string(),
                 JsonSchema::integer(Some(
-                    "Soft cap for each reviewer's reply length. Truncated to N chars when exceeded; verdict detection still runs on the un-truncated text."
+                    "Soft cap for each reviewer's reply length. Truncated to N chars when exceeded; verdict detection still runs on the un-truncated text.",
                 )),
             ),
         ]),
@@ -600,10 +598,7 @@ mod tests {
         let children = vec![ChildOutput {
             nickname: "reviewer-A".into(),
             role: "reviewer-correctness".into(),
-            text: (0..60)
-                .map(|i| format!("line {i}\n"))
-                .collect::<String>()
-                + "VERDICT: PASS",
+            text: (0..60).map(|i| format!("line {i}\n")).collect::<String>() + "VERDICT: PASS",
             succeeded: true,
         }];
         let payload = build_review_aggregate(None, &children, "diff", Some(40));
@@ -658,13 +653,19 @@ mod tests {
             .await
             .expect("audit");
 
-        assert!(matches!(result.structured_status, ToolTerminalStatus::Completed));
+        assert!(matches!(
+            result.structured_status,
+            ToolTerminalStatus::Completed
+        ));
         let spawn_log = coordinator.spawn_log.lock().await.clone();
         assert_eq!(spawn_log.len(), 4);
         for spawn in &spawn_log {
             assert_eq!(spawn.ephemeral, true);
             assert_eq!(spawn.max_turns, Some(1));
-            assert_eq!(spawn.tool_policy, infinitecode_protocol::AgentToolPolicy::DenyAll);
+            assert_eq!(
+                spawn.tool_policy,
+                infinitecode_protocol::AgentToolPolicy::DenyAll
+            );
             assert!(spawn.message.contains("Focus lens:"));
         }
         if let ToolResultContent::Mixed { json, .. } = &result.content {
@@ -672,7 +673,13 @@ mod tests {
             assert_eq!(json["schema"], "audit_changes/v1");
             assert_eq!(json["reviews"].as_array().unwrap().len(), 4);
             assert_eq!(json["findings"].as_array().unwrap().len(), 4);
-            assert_eq!(json["summary"].as_str().unwrap().contains("PASS=2 NEEDS_FIX=1 WARN=1"), true);
+            assert_eq!(
+                json["summary"]
+                    .as_str()
+                    .unwrap()
+                    .contains("PASS=2 NEEDS_FIX=1 WARN=1"),
+                true
+            );
         } else {
             panic!("expected Mixed content with json metadata");
         }

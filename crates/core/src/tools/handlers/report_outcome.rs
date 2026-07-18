@@ -145,8 +145,15 @@ mod tests {
             .await
             .expect("handle");
 
-        assert!(matches!(result.structured_status, ToolTerminalStatus::Completed));
-        if let ToolResultContent::Mixed { json: Some(json), text: _ } = &result.content {
+        assert!(matches!(
+            result.structured_status,
+            ToolTerminalStatus::Completed
+        ));
+        if let ToolResultContent::Mixed {
+            json: Some(json),
+            text: _,
+        } = &result.content
+        {
             assert_eq!(json["status"], "reported");
             assert_eq!(json["findings"]["quality"], "good");
         } else {
@@ -170,8 +177,15 @@ mod tests {
             .await
             .expect("handle");
 
-        assert!(matches!(result.structured_status, ToolTerminalStatus::Completed));
-        if let ToolResultContent::Mixed { json: Some(json), text: _ } = &result.content {
+        assert!(matches!(
+            result.structured_status,
+            ToolTerminalStatus::Completed
+        ));
+        if let ToolResultContent::Mixed {
+            json: Some(json),
+            text: _,
+        } = &result.content
+        {
             assert_eq!(json["findings"][0]["proposal"], "use Vec<u8>");
         } else {
             panic!("expected Mixed content with JSON metadata");
@@ -194,9 +208,6 @@ mod tests {
     #[test]
     fn report_outcome_is_readonly() {
         let handler = ReportOutcomeHandler::new();
-        assert_eq!(
-            handler.spec().execution_mode,
-            ToolExecutionMode::ReadOnly
-        );
+        assert_eq!(handler.spec().execution_mode, ToolExecutionMode::ReadOnly);
     }
 }

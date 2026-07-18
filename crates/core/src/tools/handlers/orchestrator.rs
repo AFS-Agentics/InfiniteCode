@@ -98,10 +98,7 @@ where
     I: IntoIterator<Item = (S, String)>,
     S: Into<String>,
 {
-    let briefs: Vec<(String, String)> = briefs
-        .into_iter()
-        .map(|(r, m)| (r.into(), m))
-        .collect();
+    let briefs: Vec<(String, String)> = briefs.into_iter().map(|(r, m)| (r.into(), m)).collect();
     if briefs.is_empty() {
         return Err(ToolCallError::InvalidInput(format!(
             "orchestrator role '{role_prefix}' requires at least one child"
@@ -127,9 +124,8 @@ where
     // the cancel took effect. Without tracking handles, dropping
     // the join_all future on cancel would leak every agent whose
     // registration succeeded mid-cancellation.
-    let mut spawn_handles: Vec<
-        JoinHandle<(String, Result<SpawnAgentResult, ToolCallError>)>,
-    > = Vec::with_capacity(briefs.len());
+    let mut spawn_handles: Vec<JoinHandle<(String, Result<SpawnAgentResult, ToolCallError>)>> =
+        Vec::with_capacity(briefs.len());
     for (role_label, message) in briefs.iter() {
         let coordinator = Arc::clone(&coordinator);
         let session_id = parent_session_id.clone();
@@ -266,9 +262,9 @@ where
                 ));
                 // Inline immediately-ready future so join_all keeps
                 // the slot order identical to the briefs vector.
-                wait_futures.push(Box::pin(async move {
-                    (role_label, String::new(), synthetic)
-                }));
+                wait_futures.push(Box::pin(
+                    async move { (role_label, String::new(), synthetic) },
+                ));
             }
         }
     }
@@ -344,9 +340,15 @@ pub async fn run_selector_child(
     let nickname = spawned.agent_nickname.clone();
     let agent_path = spawned.agent_path.clone();
     let wait_coord = Arc::clone(&coordinator);
-    let text =
-        wait_for_single_child(wait_coord, parent_session_id, &agent_path, &nickname, cancel_token, progress)
-            .await?;
+    let text = wait_for_single_child(
+        wait_coord,
+        parent_session_id,
+        &agent_path,
+        &nickname,
+        cancel_token,
+        progress,
+    )
+    .await?;
     Ok(ChildOutput {
         nickname,
         role: "selector".to_string(),
@@ -543,10 +545,7 @@ mod tests {
 
     #[test]
     fn parse_selected_id_marker_returns_none_when_missing() {
-        assert_eq!(
-            parse_selected_id_marker("I choose B but no marker"),
-            None
-        );
+        assert_eq!(parse_selected_id_marker("I choose B but no marker"), None);
         assert_eq!(parse_selected_id_marker(""), None);
     }
 
@@ -558,8 +557,7 @@ mod tests {
 
     #[test]
     fn parse_selected_id_marker_picks_last_occurrence() {
-        let text =
-            "<selected_id>A</selected_id>\nthinking more...\n<selected_id>B</selected_id>";
+        let text = "<selected_id>A</selected_id>\nthinking more...\n<selected_id>B</selected_id>";
         assert_eq!(parse_selected_id_marker(text).as_deref(), Some("B"));
     }
 

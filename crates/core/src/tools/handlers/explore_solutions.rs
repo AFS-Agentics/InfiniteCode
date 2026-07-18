@@ -37,7 +37,7 @@ use crate::json_schema::JsonSchema;
 use crate::tool_handler::ToolHandler;
 use crate::tool_spec::{ToolExecutionMode, ToolOutputMode, ToolPreparationFeedback, ToolSpec};
 use crate::tools::handlers::orchestrator::{
-    letter_id, parse_selected_id_marker, run_parallel_children, run_selector_child, ChildOutput,
+    ChildOutput, letter_id, parse_selected_id_marker, run_parallel_children, run_selector_child,
 };
 
 pub struct ExploreSolutionsHandler {
@@ -89,8 +89,9 @@ impl ToolHandler for ExploreSolutionsHandler {
         input: serde_json::Value,
         progress: Option<ToolProgressSender>,
     ) -> Result<ToolResult, ToolCallError> {
-        let parsed: ExploreInput = serde_json::from_value(input)
-            .map_err(|error| ToolCallError::InvalidInput(format!("invalid explore_solutions input: {error}")))?;
+        let parsed: ExploreInput = serde_json::from_value(input).map_err(|error| {
+            ToolCallError::InvalidInput(format!("invalid explore_solutions input: {error}"))
+        })?;
 
         // Coordinator check is intentionally first so that runs
         // without child-agent coordination surface a clean
@@ -142,7 +143,11 @@ async fn explore_mode(
             "'perspectives' must have exactly {n} entries to match 'n'"
         )));
     }
-    info!(n, problem_chars = problem.chars().count(), "explore_solutions: explore mode");
+    info!(
+        n,
+        problem_chars = problem.chars().count(),
+        "explore_solutions: explore mode"
+    );
 
     let briefs = (0..n as usize).map(|idx| {
         let role = format!("thinker-{}", letter_id(idx));
@@ -154,8 +159,15 @@ async fn explore_mode(
         (role, prompt)
     });
 
-    let children =
-        run_parallel_children(coordinator.clone(), parent_session_id, "thinker", briefs, ctx.cancel_token.clone(), progress.clone()).await?;
+    let children = run_parallel_children(
+        coordinator.clone(),
+        parent_session_id,
+        "thinker",
+        briefs,
+        ctx.cancel_token.clone(),
+        progress.clone(),
+    )
+    .await?;
 
     let notes = format_explore_thinker_notes(problem, &children);
     let selection = run_selector_child(
@@ -178,7 +190,12 @@ async fn explore_mode(
     Ok(ToolResult::success(
         ToolResultContent::Mixed {
             text: Some(chosen_text_render(&chosen_text, chosen)),
-            json: Some(json_explore_result(parsed.operation.as_deref(), chosen, &children, &selection.text)),
+            json: Some(json_explore_result(
+                parsed.operation.as_deref(),
+                chosen,
+                &children,
+                &selection.text,
+            )),
         },
         format!(
             "explore_solutions: explored {} candidates, selected {}",
@@ -213,7 +230,8 @@ async fn select_mode(
     // Pre-drafted candidates don't need child agent runs — they were
     // produced upstream by `preview_edit` / `preview_write` or by the
     // model itself. We only spawn the selector child.
-    let selector_payload = build_select_selector_prompt(&candidates, parsed.selection_criteria.as_deref());
+    let selector_payload =
+        build_select_selector_prompt(&candidates, parsed.selection_criteria.as_deref());
     let selection = run_selector_child(
         coordinator,
         parent_session_id,
@@ -223,17 +241,22 @@ async fn select_mode(
     )
     .await?;
     let chosen_id = parse_selected_id_marker(&selection.text);
-    let chosen_index: Option<usize> = chosen_id
-        .as_deref()
-        .and_then(|id| letter_to_index(id));
+    let chosen_index: Option<usize> = chosen_id.as_deref().and_then(|id| letter_to_index(id));
     let chosen = chosen_index.and_then(|index| candidates.get(index).cloned());
 
     Ok(ToolResult::success(
         ToolResultContent::Mixed {
-            text: Some(chosen
-                .as_ref()
-                .map(|c| c.content.clone())
-                .unwrap_or_else(|| format!("(selector emitted no marker; raw reply: {})", selection.text.trim()))),
+            text: Some(
+                chosen
+                    .as_ref()
+                    .map(|c| c.content.clone())
+                    .unwrap_or_else(|| {
+                        format!(
+                            "(selector emitted no marker; raw reply: {})",
+                            selection.text.trim()
+                        )
+                    }),
+            ),
             json: Some(json_select_result(chosen, &selection.text, &candidates)),
         },
         format!(
@@ -277,10 +300,7 @@ fn build_explore_selector_prompt(problem: &str, notes: &str, criteria: Option<&s
     )
 }
 
-fn build_select_selector_prompt(
-    candidates: &[CandidateInput],
-    criteria: Option<&str>,
-) -> String {
+fn build_select_selector_prompt(candidates: &[CandidateInput], criteria: Option<&str>) -> String {
     let notes = candidates
         .iter()
         .enumerate()
@@ -290,8 +310,7 @@ fn build_select_selector_prompt(
         })
         .collect::<Vec<_>>()
         .join("\n---\n");
-    let criteria = criteria
-        .unwrap_or("Pick the candidate that best addresses the user's problem.");
+    let criteria = criteria.unwrap_or("Pick the candidate that best addresses the user's problem.");
     format!(
         "You are the selector in a Best-of-N selection workflow. Several pre-drafted \
          candidates (labeled A, B, C, ...) are available. Pick the single best candidate.\n\n\
@@ -332,7 +351,10 @@ fn chosen_text_render(text: &str, child: Option<&ChildOutput>) -> String {
         out.push('\n');
     }
     if let Some(child) = child {
-        out.push_str(&format!("\n[source: {} / {}]\n", child.role, child.nickname));
+        out.push_str(&format!(
+            "\n[source: {} / {}]\n",
+            child.role, child.nickname
+        ));
     }
     out
 }
@@ -428,7 +450,9 @@ fn input_schema() -> JsonSchema {
                 "perspectives".to_string(),
                 JsonSchema::array(
                     JsonSchema::string(Some("Focus lens per thinker")),
-                    Some("Optional: exactly N focus prompts paralleling 'n'. Empty = each thinker uses 'general depth'."),
+                    Some(
+                        "Optional: exactly N focus prompts paralleling 'n'. Empty = each thinker uses 'general depth'.",
+                    ),
                 ),
             ),
             (
@@ -436,8 +460,14 @@ fn input_schema() -> JsonSchema {
                 JsonSchema::array(
                     JsonSchema::object(
                         BTreeMap::from([
-                            ("id".to_string(), JsonSchema::string(Some("Optional caller-assigned id."))),
-                            ("content".to_string(), JsonSchema::string(Some("Candidate text."))),
+                            (
+                                "id".to_string(),
+                                JsonSchema::string(Some("Optional caller-assigned id.")),
+                            ),
+                            (
+                                "content".to_string(),
+                                JsonSchema::string(Some("Candidate text.")),
+                            ),
                         ]),
                         None,
                         Some(true),
@@ -542,7 +572,10 @@ mod tests {
         ) -> Result<SpawnAgentResult, ToolCallError> {
             self.spawn_log.lock().await.push(params.clone());
             Ok(SpawnAgentResult {
-                task_id: infinitecode_protocol::TaskId(format!("fake-{}", self.spawn_log.lock().await.len())),
+                task_id: infinitecode_protocol::TaskId(format!(
+                    "fake-{}",
+                    self.spawn_log.lock().await.len()
+                )),
                 child_session_id: SessionId::new(),
                 agent_path: format!("root/explore/{}", self.spawn_log.lock().await.len()),
                 agent_nickname: format!("thinker-{}", self.spawn_log.lock().await.len()),
@@ -648,6 +681,7 @@ mod tests {
         }
     }
 
+    #[allow(dead_code)]
     fn scripted_coordinator(answers: Vec<String>) -> Arc<FakeCoordinator> {
         let coordinator = FakeCoordinator::default();
         coordinator
@@ -680,9 +714,7 @@ mod tests {
             ));
         }
         // Selector reply picks B.
-        outputs.push(
-            "I considered them all.\n<selected_id>B</selected_id>".to_string(),
-        );
+        outputs.push("I considered them all.\n<selected_id>B</selected_id>".to_string());
         drop(outputs);
 
         let handler = ExploreSolutionsHandler::new();
@@ -699,7 +731,10 @@ mod tests {
             .await
             .expect("explore");
 
-        assert!(matches!(result.structured_status, ToolTerminalStatus::Completed));
+        assert!(matches!(
+            result.structured_status,
+            ToolTerminalStatus::Completed
+        ));
         let spawn_log = coord.spawn_log.lock().await.clone();
         // 3 thinker spawns + 1 selector spawn = 4 spawn_agent calls
         assert_eq!(spawn_log.len(), 4);
@@ -707,13 +742,19 @@ mod tests {
         for (index, spawn) in spawn_log.iter().enumerate().take(3) {
             assert_eq!(spawn.ephemeral, true);
             assert_eq!(spawn.max_turns, Some(1));
-            assert_eq!(spawn.tool_policy, infinitecode_protocol::AgentToolPolicy::DenyAll);
+            assert_eq!(
+                spawn.tool_policy,
+                infinitecode_protocol::AgentToolPolicy::DenyAll
+            );
             assert!(spawn.message.contains("thinker candidate"));
             let _ = index;
         }
         // The fourth spawn is the selector — also ephemeral, single-turn, DenyAll.
         let selector = spawn_log.last().unwrap();
-        assert_eq!(selector.tool_policy, infinitecode_protocol::AgentToolPolicy::DenyAll);
+        assert_eq!(
+            selector.tool_policy,
+            infinitecode_protocol::AgentToolPolicy::DenyAll
+        );
         assert!(selector.message.contains("Best-of-N thinker workflow"));
         assert!(selector.message.contains("<selected_id>"));
         // Result text mentions the chosen thinker's letter.
@@ -847,7 +888,10 @@ mod tests {
             )
             .await
             .expect("tool succeeds even when some children fail");
-        assert!(matches!(result.structured_status, ToolTerminalStatus::Completed));
+        assert!(matches!(
+            result.structured_status,
+            ToolTerminalStatus::Completed
+        ));
     }
 
     #[test]

@@ -1715,10 +1715,7 @@ impl HistoryCell for GravityAdCell {
         let border_total = inner_width.saturating_sub(label_width).saturating_sub(2);
         let left_dash = border_total / 2;
         let right_dash = border_total - left_dash;
-        let top = format!(
-            " ┌{}",
-            "─".repeat(left_dash + label_width + right_dash)
-        );
+        let top = format!(" ┌{}", "─".repeat(left_dash + label_width + right_dash));
         lines.push(Line::from(Span::styled(top, Style::default().dim())));
 
         // Content: brand · description    Ad
@@ -1729,13 +1726,9 @@ impl HistoryCell for GravityAdCell {
         let available = inner_width.saturating_sub(ad_label_width).saturating_sub(2);
         let truncated = if brand_width > available {
             let max_desc = available.saturating_sub(
-                unicode_width::UnicodeWidthStr::width(brand.as_str()) + 3, // " · " + 
+                unicode_width::UnicodeWidthStr::width(brand.as_str()) + 3, // " · " +
             );
-            format!(
-                "{} · {}",
-                brand,
-                truncate_str(&description, max_desc)
-            )
+            format!("{} · {}", brand, truncate_str(&description, max_desc))
         } else {
             brand_display
         };
@@ -1748,10 +1741,7 @@ impl HistoryCell for GravityAdCell {
         lines.push(
             Line::from(vec![
                 Span::raw(" │ ".to_string()),
-                Span::styled(
-                    truncated.clone(),
-                    Style::default(),
-                ),
+                Span::styled(truncated.clone(), Style::default()),
                 Span::raw(" ".repeat(padding)),
                 Span::styled(ad_label, Style::default().dim().bold()),
                 Span::raw(" │".to_string()),
@@ -1760,8 +1750,8 @@ impl HistoryCell for GravityAdCell {
         );
 
         if !cta.is_empty() {
-            let cta_padding = inner_width
-                .saturating_sub(unicode_width::UnicodeWidthStr::width(cta.as_str()));
+            let cta_padding =
+                inner_width.saturating_sub(unicode_width::UnicodeWidthStr::width(cta.as_str()));
             lines.push(
                 Line::from(vec![
                     Span::raw(" │ ".to_string()),
@@ -1779,14 +1769,14 @@ impl HistoryCell for GravityAdCell {
 
         if !link.is_empty() {
             let truncated_link = truncate_str(link, inner_width);
-            let link_padding = inner_width.saturating_sub(unicode_width::UnicodeWidthStr::width(truncated_link.as_str()));
-            lines.push(
-                Line::from(vec![
-                    Span::raw("   ".to_string()),
-                    Span::styled(truncated_link, Style::default().fg(Color::Blue).dim()),
-                    Span::raw(" ".repeat(link_padding)),
-                ])
-            );
+            let link_padding = inner_width.saturating_sub(unicode_width::UnicodeWidthStr::width(
+                truncated_link.as_str(),
+            ));
+            lines.push(Line::from(vec![
+                Span::raw("   ".to_string()),
+                Span::styled(truncated_link, Style::default().fg(Color::Blue).dim()),
+                Span::raw(" ".repeat(link_padding)),
+            ]));
         }
 
         lines

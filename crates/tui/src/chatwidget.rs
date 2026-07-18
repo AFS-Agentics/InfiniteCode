@@ -87,8 +87,6 @@ use self::subagent_monitor::SubagentMonitorState;
 
 use self::text_stream::ActiveTextItem;
 
-pub(crate) use self::suggest_followups_render::SuggestFollowupsCell;
-
 pub(crate) const MCP_SERVERS_TRANSCRIPT_TITLE: &str = "⬡  MCP Servers";
 pub(crate) const SKILLS_TRANSCRIPT_TITLE: &str = "▦  Skills";
 

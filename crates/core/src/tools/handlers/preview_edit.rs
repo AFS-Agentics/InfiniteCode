@@ -140,7 +140,10 @@ impl ToolHandler for PreviewEditHandler {
 
         if is_binary_file(&path).unwrap_or(false) {
             return Ok(ToolResult::error(
-                ToolResultContent::Text(format!("Cannot preview edit on binary file: {}", path.display())),
+                ToolResultContent::Text(format!(
+                    "Cannot preview edit on binary file: {}",
+                    path.display()
+                )),
                 "Binary file",
                 ToolCallError::ExecutionFailed("binary file".into()),
             ));
@@ -274,12 +277,21 @@ mod tests {
             .await
             .expect("handle");
 
-        assert!(matches!(result.structured_status, ToolTerminalStatus::Completed));
+        assert!(matches!(
+            result.structured_status,
+            ToolTerminalStatus::Completed
+        ));
         // File should be unchanged
         let content = std::fs::read_to_string(&path).expect("read");
-        assert_eq!(content, "hello world", "file must not be modified by preview");
+        assert_eq!(
+            content, "hello world",
+            "file must not be modified by preview"
+        );
         // Result should contain diff metadata
-        if let ToolResultContent::Mixed { json: Some(json), .. } = &result.content {
+        if let ToolResultContent::Mixed {
+            json: Some(json), ..
+        } = &result.content
+        {
             assert!(json["diff"].as_str().is_some_and(|d| d.contains("hello")));
             assert_eq!(json["files"][0]["kind"], "update");
         } else {
@@ -335,6 +347,9 @@ mod tests {
             .expect("preview edit");
 
         // File must remain unchanged after preview
-        assert_eq!(std::fs::read_to_string(&path).expect("read"), "one two three");
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("read"),
+            "one two three"
+        );
     }
 }

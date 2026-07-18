@@ -114,9 +114,17 @@ impl ToolHandler for PreviewWriteHandler {
 
         let kind = if previous.is_some() { "update" } else { "add" };
         let summary = if kind == "add" {
-            format!("preview write for new file {} ({} bytes)", path.display(), content.len())
+            format!(
+                "preview write for new file {} ({} bytes)",
+                path.display(),
+                content.len()
+            )
         } else {
-            format!("preview write for {} ({} bytes)", path.display(), content.len())
+            format!(
+                "preview write for {} ({} bytes)",
+                path.display(),
+                content.len()
+            )
         };
 
         Ok(write_tool_result(
@@ -132,8 +140,6 @@ fn resolve_path(cwd: &std::path::Path, path: &str) -> PathBuf {
     let p = PathBuf::from(path);
     if p.is_absolute() { p } else { cwd.join(p) }
 }
-
-
 
 #[cfg(test)]
 mod tests {
@@ -189,7 +195,10 @@ mod tests {
             .await
             .expect("handle");
 
-        assert!(matches!(result.structured_status, ToolTerminalStatus::Completed));
+        assert!(matches!(
+            result.structured_status,
+            ToolTerminalStatus::Completed
+        ));
         // File must not exist — preview_write does not create files
         assert!(!path.exists(), "preview_write must not create files");
     }
@@ -214,11 +223,20 @@ mod tests {
             .await
             .expect("handle");
 
-        assert!(matches!(result.structured_status, ToolTerminalStatus::Completed));
+        assert!(matches!(
+            result.structured_status,
+            ToolTerminalStatus::Completed
+        ));
         // File content must remain unchanged
         let content = std::fs::read_to_string(&path).expect("read");
-        assert_eq!(content, "old content", "preview_write must not modify files");
-        if let crate::contracts::ToolResultContent::Mixed { json: Some(json), .. } = &result.content {
+        assert_eq!(
+            content, "old content",
+            "preview_write must not modify files"
+        );
+        if let crate::contracts::ToolResultContent::Mixed {
+            json: Some(json), ..
+        } = &result.content
+        {
             assert_eq!(json["files"][0]["kind"], "update");
         } else {
             panic!("expected Mixed content with JSON metadata");

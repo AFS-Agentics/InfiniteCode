@@ -13,7 +13,6 @@ use clap::builder::PossibleValuesParser;
 use clap::builder::TypedValueParser as _;
 use infinitecode_core::AppConfig;
 use infinitecode_core::AppConfigLoader;
-use infinitecode_core::CompactStrategy;
 use infinitecode_core::FileSystemAppConfigLoader;
 use infinitecode_core::LoggingBootstrap;
 use infinitecode_core::LoggingRuntime;
@@ -504,16 +503,10 @@ fn cli_agent_behavior_overrides(cli: &Cli) -> toml::Value {
         behavior_table.insert("suggest_followups".to_string(), toml::Value::Boolean(value));
     }
     if cli.explore_solutions {
-        behavior_table.insert(
-            "explore_solutions".to_string(),
-            toml::Value::Boolean(true),
-        );
+        behavior_table.insert("explore_solutions".to_string(), toml::Value::Boolean(true));
     }
     if cli.audit_changes {
-        behavior_table.insert(
-            "audit_changes".to_string(),
-            toml::Value::Boolean(true),
-        );
+        behavior_table.insert("audit_changes".to_string(), toml::Value::Boolean(true));
     }
     if let Some(strategy) = &cli.compact_strategy {
         behavior_table.insert(
@@ -653,10 +646,14 @@ mod tests {
                 model: None,
                 log_level: Some(level),
                 dangerously_skip_permissions: false,
-                            self_verify: None,
+                self_verify: None,
                 no_self_verify: false,
                 compact_strategy: None,
                 compact_threshold: None,
+                suggest_followups: None,
+                no_suggest_followups: false,
+                explore_solutions: false,
+                audit_changes: false,
             };
 
             assert_eq!(
@@ -680,20 +677,28 @@ mod tests {
                 model: None,
                 log_level: None,
                 dangerously_skip_permissions: false,
-                            self_verify: None,
+                self_verify: None,
                 no_self_verify: false,
                 compact_strategy: None,
                 compact_threshold: None,
+                suggest_followups: None,
+                no_suggest_followups: false,
+                explore_solutions: false,
+                audit_changes: false,
             },
             Cli {
                 command: Some(Command::Onboard),
                 model: None,
                 log_level: None,
                 dangerously_skip_permissions: false,
-                            self_verify: None,
+                self_verify: None,
                 no_self_verify: false,
                 compact_strategy: None,
                 compact_threshold: None,
+                suggest_followups: None,
+                no_suggest_followups: false,
+                explore_solutions: false,
+                audit_changes: false,
             },
             Cli {
                 command: Some(Command::Prompt {
@@ -703,10 +708,14 @@ mod tests {
                 model: None,
                 log_level: None,
                 dangerously_skip_permissions: false,
-                            self_verify: None,
+                self_verify: None,
                 no_self_verify: false,
                 compact_strategy: None,
                 compact_threshold: None,
+                suggest_followups: None,
+                no_suggest_followups: false,
+                explore_solutions: false,
+                audit_changes: false,
             },
         ] {
             assert_eq!(
@@ -726,11 +735,15 @@ mod tests {
             model: None,
             log_level: None,
             dangerously_skip_permissions: false,
-                        self_verify: None,
-                no_self_verify: false,
-                compact_strategy: None,
-                compact_threshold: None,
-            };
+            self_verify: None,
+            no_self_verify: false,
+            compact_strategy: None,
+            compact_threshold: None,
+            suggest_followups: None,
+            no_suggest_followups: false,
+            explore_solutions: false,
+            audit_changes: false,
+        };
         let server = Cli {
             command: Some(Command::Server {
                 transport: infinitecode_server::ServerTransportMode::Config,
@@ -740,11 +753,15 @@ mod tests {
             model: None,
             log_level: None,
             dangerously_skip_permissions: false,
-                        self_verify: None,
-                no_self_verify: false,
-                compact_strategy: None,
-                compact_threshold: None,
-            };
+            self_verify: None,
+            no_self_verify: false,
+            compact_strategy: None,
+            compact_threshold: None,
+            suggest_followups: None,
+            no_suggest_followups: false,
+            explore_solutions: false,
+            audit_changes: false,
+        };
 
         assert_eq!(
             matches!(

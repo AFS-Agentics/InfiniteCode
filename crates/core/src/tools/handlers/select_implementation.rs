@@ -84,9 +84,7 @@ impl ToolHandler for SelectImplementationHandler {
         progress: Option<ToolProgressSender>,
     ) -> Result<ToolResult, ToolCallError> {
         let parsed: SelectInput = serde_json::from_value(input).map_err(|error| {
-            ToolCallError::InvalidInput(format!(
-                "invalid select_implementation input: {error}"
-            ))
+            ToolCallError::InvalidInput(format!("invalid select_implementation input: {error}"))
         })?;
 
         // Coordinator check first so missing bridges surface as a
@@ -132,9 +130,7 @@ impl ToolHandler for SelectImplementationHandler {
         .await?;
 
         let chosen_id = parse_selected_id_marker(&selection.text);
-        let chosen_index: Option<usize> = chosen_id
-            .as_deref()
-            .and_then(letter_index);
+        let chosen_index: Option<usize> = chosen_id.as_deref().and_then(letter_index);
         if chosen_index.is_none() {
             return Ok(ToolResult::success(
                 ToolResultContent::Mixed {
@@ -153,7 +149,12 @@ impl ToolHandler for SelectImplementationHandler {
         Ok(ToolResult::success(
             ToolResultContent::Mixed {
                 text: Some(render_chosen_text(chosen.as_ref())),
-                json: Some(json_success(&parsed, chosen, chosen_id.as_deref(), &selection.text)),
+                json: Some(json_success(
+                    &parsed,
+                    chosen,
+                    chosen_id.as_deref(),
+                    &selection.text,
+                )),
             },
             format!(
                 "select_implementation: chose proposal {} ({} candidates)",
@@ -218,9 +219,7 @@ fn build_selector_prompt(problem: &str, parsed: &SelectInput) -> String {
          Problem:\n{problem}\n\n"
     ));
     if let Some(criteria) = parsed.selection_criteria.as_deref() {
-        body.push_str(&format!(
-            "Selection criteria:\n{criteria}\n\n"
-        ));
+        body.push_str(&format!("Selection criteria:\n{criteria}\n\n"));
     } else {
         body.push_str(
             "Selection criteria: pick the candidate that is the cleanest, smallest, and best \
@@ -322,7 +321,9 @@ fn input_schema() -> JsonSchema {
                                             (
                                                 "input".to_string(),
                                                 JsonSchema {
-                                                    description: Some("Call input JSON.".to_string()),
+                                                    description: Some(
+                                                        "Call input JSON.".to_string(),
+                                                    ),
                                                     ..Default::default()
                                                 },
                                             ),
@@ -342,9 +343,7 @@ fn input_schema() -> JsonSchema {
             ),
             (
                 "selectionCriteria".to_string(),
-                JsonSchema::string(Some(
-                    "Optional override of the default selection criteria.",
-                )),
+                JsonSchema::string(Some("Optional override of the default selection criteria.")),
             ),
         ]),
         Some(vec!["proposals".to_string()]),
@@ -413,10 +412,7 @@ mod tests {
         ) -> Result<SpawnAgentResult, ToolCallError> {
             self.spawn_log.lock().await.push(params.clone());
             Ok(SpawnAgentResult {
-                task_id: TaskId(format!(
-                    "select-{}",
-                    self.spawn_log.lock().await.len()
-                )),
+                task_id: TaskId(format!("select-{}", self.spawn_log.lock().await.len())),
                 child_session_id: SessionId::new(),
                 agent_path: format!("root/select/{}", self.spawn_log.lock().await.len()),
                 agent_nickname: format!("selector-{}", self.spawn_log.lock().await.len()),
@@ -553,9 +549,11 @@ mod tests {
     #[tokio::test]
     async fn select_implementation_picks_winner() {
         let coordinator = Arc::new(FakeCoordinator::default());
-        coordinator.outputs.try_lock().unwrap().push(
-            "Candidate B is cleaner. <selected_id>A</selected_id>".to_string(),
-        );
+        coordinator
+            .outputs
+            .try_lock()
+            .unwrap()
+            .push("Candidate B is cleaner. <selected_id>A</selected_id>".to_string());
 
         let handler = SelectImplementationHandler::new();
         let result = handler
@@ -570,11 +568,17 @@ mod tests {
             .await
             .expect("select succeeds");
 
-        assert!(matches!(result.structured_status, ToolTerminalStatus::Completed));
+        assert!(matches!(
+            result.structured_status,
+            ToolTerminalStatus::Completed
+        ));
         let spawn_log = coordinator.spawn_log.lock().await.clone();
         // Exactly one selector child spawned.
         assert_eq!(spawn_log.len(), 1);
-        assert_eq!(spawn_log[0].tool_policy, infinitecode_protocol::AgentToolPolicy::DenyAll);
+        assert_eq!(
+            spawn_log[0].tool_policy,
+            infinitecode_protocol::AgentToolPolicy::DenyAll
+        );
         assert_eq!(spawn_log[0].max_turns, Some(1));
         assert_eq!(spawn_log[0].ephemeral, true);
         assert!(spawn_log[0].message.contains("Best-of-N editing workflow"));
@@ -613,7 +617,10 @@ mod tests {
 
         if let ToolResultContent::Mixed { json, .. } = &result.content {
             let json = json.clone().unwrap();
-            assert_eq!(json["error"], "selector did not emit a <selected_id> marker");
+            assert_eq!(
+                json["error"],
+                "selector did not emit a <selected_id> marker"
+            );
             assert_eq!(json["raw_proposals"].as_array().unwrap().len(), 2);
         } else {
             panic!("expected Mixed content with json metadata");
@@ -659,7 +666,11 @@ mod tests {
         ctx.cancel_token = CancellationToken::new();
         let handler = SelectImplementationHandler::new();
         let error = handler
-            .handle(ctx, serde_json::json!({ "problem": "x", "proposals": proposals() }), None)
+            .handle(
+                ctx,
+                serde_json::json!({ "problem": "x", "proposals": proposals() }),
+                None,
+            )
             .await
             .expect_err("coordinator required");
         assert!(matches!(error, ToolCallError::NeedsConfiguration(_)));
