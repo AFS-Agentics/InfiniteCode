@@ -184,6 +184,19 @@ impl SessionContext {
             result.push_str(&verify_block);
         }
 
+        // Append the suggest_followups block: default-on for every agent so
+        // non-trivial turns end with concrete next-step chips. The handler
+        // is always registered in the plan; this fragment only teaches the
+        // model the schema and the emoji conventions when the prompt is
+        // appended here.
+        let followups_block = crate::agent_behavior_prompts::suggest_followups_prompt();
+        if !followups_block.is_empty() {
+            if !result.is_empty() {
+                result.push_str("\n\n");
+            }
+            result.push_str(&followups_block);
+        }
+
         result
     }
 

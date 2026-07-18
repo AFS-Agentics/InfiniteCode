@@ -24,4 +24,9 @@ pub enum ToolHandlerKind {
     /// (cheap), opt-in via `AgentBehaviorConfig::self_verify` in the system
     /// prompt. See `crates/core/src/tools/handlers/verify_solution.rs`.
     VerifySolution,
+    /// UI-only "what's next?" chip suggestions. Read-only tool; the model
+    /// emits it near the end of non-trivial turns. Renderers read the raw
+    /// input to draw the chips. See
+    /// `crates/core/src/tools/handlers/suggest_followups.rs`.
+    SuggestFollowups,
 }

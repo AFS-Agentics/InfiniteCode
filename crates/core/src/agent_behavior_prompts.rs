@@ -11,6 +11,8 @@
 
 const VERIFY_SOLUTION_PROMPT_TEMPLATE: &str =
     include_str!("../prompts/agent-behavior/verify-solution.md");
+const SUGGEST_FOLLOWUPS_PROMPT_TEMPLATE: &str =
+    include_str!("../prompts/agent-behavior/suggest-followups.md");
 
 /// Returns the `verify_solution` prompt fragment, or an empty string when
 /// `self_verify` is disabled.
@@ -23,6 +25,16 @@ pub(crate) fn verify_solution_prompt(enabled: bool) -> String {
         return String::new();
     }
     VERIFY_SOLUTION_PROMPT_TEMPLATE.trim().to_string()
+}
+
+/// Returns the `suggest_followups` prompt fragment. Default-on for every
+/// agent so non-trivial turns end with concrete next-step suggestions.
+///
+/// The fragment is wrapped in `<suggest_followups_protocol>...</suggest_followups_protocol>`
+/// tags. The handler is always registered; the prompt only mentions it when
+/// this function returns a non-empty string.
+pub(crate) fn suggest_followups_prompt() -> String {
+    SUGGEST_FOLLOWUPS_PROMPT_TEMPLATE.trim().to_string()
 }
 
 #[cfg(test)]
@@ -51,6 +63,26 @@ mod tests {
         assert_eq!(
             prompt,
             include_str!("../prompts/agent-behavior/verify-solution.md")
+                .trim()
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn suggest_followups_prompt_is_non_empty_and_wrapped_in_protocol_tags() {
+        let prompt = suggest_followups_prompt();
+        assert!(prompt.starts_with("<suggest_followups_protocol>"));
+        assert!(prompt.ends_with("</suggest_followups_protocol>"));
+        assert!(prompt.contains("suggest_followups"));
+        assert!(prompt.contains("emoji"));
+    }
+
+    #[test]
+    fn suggest_followups_prompt_matches_markdown_source() {
+        let prompt = suggest_followups_prompt();
+        assert_eq!(
+            prompt,
+            include_str!("../prompts/agent-behavior/suggest-followups.md")
                 .trim()
                 .to_string()
         );

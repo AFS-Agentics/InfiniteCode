@@ -872,6 +872,60 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
 
     plan.push(
         ToolSpec {
+            name: "suggest_followups".to_string(),
+            description: "Offer 1–6 clickable next steps at the end of a non-trivial turn. Each chip becomes a button the user can click to send that exact prompt back as a new user turn. Use this whenever you can foresee at least one concrete useful follow-up; skip it for trivial greetings or terminal states. Each follow-up object requires three fields: emoji, label (≤60 chars), prompt (≤800 chars). 1–6 chips per call; never duplicate intents.".to_string(),
+            input_schema: JsonSchema::object(
+                BTreeMap::from([(
+                    "followups".to_string(),
+                    JsonSchema::array(
+                        JsonSchema::object(
+                            BTreeMap::from([
+                                (
+                                    "emoji".to_string(),
+                                    JsonSchema::string(Some(
+                                        "A single emoji that signals the action category.",
+                                    )),
+                                ),
+                                (
+                                    "label".to_string(),
+                                    JsonSchema::string(Some(
+                                        "Short chip text shown to the user (≤60 chars).",
+                                    )),
+                                ),
+                                (
+                                    "prompt".to_string(),
+                                    JsonSchema::string(Some(
+                                        "Full instruction sent if the user clicks the chip (≤800 chars).",
+                                    )),
+                                ),
+                            ]),
+                            Some(vec![
+                                "emoji".to_string(),
+                                "label".to_string(),
+                                "prompt".to_string(),
+                            ]),
+                            Some(false),
+                        ),
+                        Some("1 to 6 followups, ordered by importance."),
+                    ),
+                )]),
+                Some(vec!["followups".to_string()]),
+                Some(false),
+            ),
+            output_mode: ToolOutputMode::Text,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: true,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: Some("Suggest followups".to_string()),
+            supports_cancellation: None,
+            supports_streaming: None,
+        },
+        ToolHandlerKind::SuggestFollowups,
+    );
+
+    plan.push(
+        ToolSpec {
             name: "update_plan".to_string(),
             description: "Updates the task plan.\nProvide an optional explanation and a list of plan items, each with a step and status.\nAt most one step can be in_progress at a time.".to_string(),
             input_schema: plan_schema(),

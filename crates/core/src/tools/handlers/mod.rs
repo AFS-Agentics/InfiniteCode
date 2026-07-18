@@ -19,6 +19,7 @@ mod read;
 mod ripgrep;
 mod shell_command;
 mod skill;
+mod suggest_followups;
 mod tool_search;
 mod webfetch;
 mod websearch;
@@ -43,6 +44,7 @@ pub use question::QuestionHandler;
 pub use read::ReadHandler;
 pub use shell_command::ShellCommandHandler;
 pub use skill::SkillHandler;
+pub use suggest_followups::SuggestFollowupsHandler;
 pub use tool_search::{ToolSearchHandler, tool_search_spec};
 pub use verify_solution::VerifySolutionHandler;
 pub use webfetch::WebFetchHandler;
@@ -187,6 +189,7 @@ fn build_registry_from_builder(
                 builder.effective_deferred_loading_config(&DeferredLoadingConfig::default()),
             )),
             ToolHandlerKind::VerifySolution => Arc::new(VerifySolutionHandler::new()),
+            ToolHandlerKind::SuggestFollowups => Arc::new(SuggestFollowupsHandler::new()),
         };
         let legacy_alias = match kind {
             ToolHandlerKind::Bash if name == "shell_command" => Some("bash"),
@@ -272,5 +275,18 @@ mod tests {
         let spec = registry.spec("edit").expect("edit spec");
         assert_eq!(spec.execution_mode, ToolExecutionMode::Mutating);
         assert!(!spec.supports_parallel);
+    }
+
+    #[test]
+    fn default_registry_exposes_suggest_followups() {
+        let registry = build_registry_from_plan(&ToolPlanConfig::default());
+
+        assert!(registry.spec("suggest_followups").is_some());
+        assert!(registry.get("suggest_followups").is_some());
+        let spec = registry
+            .spec("suggest_followups")
+            .expect("suggest_followups spec");
+        assert_eq!(spec.execution_mode, ToolExecutionMode::ReadOnly);
+        assert!(spec.supports_parallel);
     }
 }
