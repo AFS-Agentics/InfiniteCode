@@ -348,7 +348,7 @@ function PrivacySection() {
 		{
 			who: "InfiniteCode",
 			good: true,
-			body: "No analytics. No code upload. No session recording. Your conversations and code stay on your machine — only stored in your project's local cache.",
+			body: "No analytics. No code upload. No session recording. Your conversations and code stay on your machine — only stored in your project's local cache. Plus a single opaque lockfile (~/Library/Application Support/infinitecode/session.lock.json on macOS, equivalent on Linux/Windows) that records your process id and start timestamp for the strict single-session guard.",
 		},
 		{
 			who: "Most other tools (incl. Freebuff)",

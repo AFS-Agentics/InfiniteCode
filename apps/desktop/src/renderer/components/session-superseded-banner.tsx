@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import {
 	sessionSupersededAtom,
 	sessionSupersededDismissAtom,
-	type SessionSupersededDetail,
 } from "@/atoms/session-superseded"
 
 /**
@@ -14,23 +13,15 @@ import {
  * the detail block into `sessionSupersededAtom`. Mount this once near the
  * app root — sibling to the banner — so the atom is hot before any
  * `infinitecode:ensure` IPC call can fire.
+ *
+ * The `window.infinitecode` global is typed via the
+ * `apps/desktop/src/preload/api.d.ts` `declare global { interface Window }`
+ * block, so no defensive `as unknown as {...}` cast is necessary.
  */
 export function SessionSupersededBridge() {
 	const setDetail = useSetAtom(sessionSupersededAtom)
 	useEffect(() => {
-		// Safe in SSR-less renderer; the preload bridge is the only thing that
-		// exposes `infinitecode` in this scope.
-		const ipc = (
-			window as unknown as {
-				infinitecode?: {
-					onSessionSuperseded?: (
-						cb: (detail: SessionSupersededDetail) => void,
-					) => () => void
-				}
-			}
-		).infinitecode
-		const subscribe = ipc?.onSessionSuperseded
-		if (!subscribe) return
+		const subscribe = window.infinitecode.onSessionSuperseded
 		const off = subscribe((detail) => {
 			setDetail(detail)
 		})
@@ -50,10 +41,12 @@ export function SessionSupersededBridge() {
  * the other instance, then restart." — see
  * `freebuff/cli-engine/src/hooks/helpers/send-message.ts:600-612`.
  *
- * Dismissing the banner is local-only — the underlying supersede state does
+ * Acknowledge only hides this overlay; the underlying supersede state does
  * NOT clear until the user actually closes other infinitecode instances, so a
  * subsequent `infinitecode:ensure` IPC call re-broadcasts the event and the
- * banner reappears. The only true recovery is to quit this Electron process.
+ * banner reappears. We deliberately do not call the dismiss a "dismiss" —
+ * that wording implied the problem was solved. The only true recovery is to
+ * quit this Electron process.
  */
 export function SessionSupersededBanner() {
 	const [detail] = useAtom(sessionSupersededAtom)
@@ -100,7 +93,7 @@ export function SessionSupersededBanner() {
 						Close window
 					</Button>
 					<Button variant="default" onClick={() => dismiss(null)}>
-						Dismiss
+						Acknowledged
 					</Button>
 				</div>
 			</div>

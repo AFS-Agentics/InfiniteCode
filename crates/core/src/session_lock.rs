@@ -123,13 +123,26 @@ impl Drop for SessionLockGuard {
 /// Canonical path the CLI binary and the Desktop app agree on. Both call this
 /// resolver so they always look at (and write to) the same on-disk file.
 ///
-/// Returns the canonical path or panics with a clear message — failing to
-/// resolve the OS data dir is a fatal misconfiguration (no temp-fallback),
-/// and we'd rather surface that loudly than silently lock in a stale path.
+/// Falls back to `<OS temp dir>/infinitecode/session.lock.json` when the OS
+/// data dir cannot be resolved (sandboxed CI containers, chroots with
+/// restricted `dirs::data_dir()` lookups, etc.). The fallback keeps the
+/// process runnable but weakens cross-process scope to "user on this
+/// machine, OS temp dir" — logged loudly so the user can see why.
 pub fn session_lock_path() -> PathBuf {
-    infinitecode_util_paths::find_infinitecode_home()
-        .expect("could not resolve InfiniteCode data directory")
-        .join("session.lock.json")
+    match infinitecode_util_paths::find_infinitecode_home() {
+        Ok(home) => home.join("session.lock.json"),
+        Err(error) => {
+            tracing::warn!(
+                error = %error,
+                "could not resolve InfiniteCode data directory; falling back to OS temp dir; \
+                 session lock will be process-local for the OS user"
+            );
+            let mut fallback = std::env::temp_dir();
+            fallback.push("infinitecode");
+            fallback.push("session.lock.json");
+            fallback
+        }
+    }
 }
 
 /// Convenience: acquire the lock at the canonical path.

@@ -439,6 +439,22 @@ export interface UpdateAutomationInput {
 	execution?: Partial<ExecutionConfig>
 }
 
+/**
+ * Detail block broadcast to every renderer whenever the main-process
+ * `infinitecode:ensure` IPC handler detects that a separate infinitecode
+ * instance (CLI or desktop) already holds the session lock. See
+ * `infinitecode/apps/desktop/src/main/session-lock.ts::SessionSupersededError.detail`
+ * for the producing side, and
+ * `infinitecode/apps/desktop/src/main/ipc-handlers.ts::infinitecode:ensure`
+ * for the broadcasting IPC handler.
+ */
+export interface SessionSupersededDetail {
+	otherPid: number
+	otherSurface: "cli" | "desktop"
+	/** Absolute path of the lock file that the user can delete if stale. */
+	lockPath: string
+}
+
 export interface InfiniteCodeAPI {
 	/** The host platform: "darwin", "win32", or "linux". */
 	platform: NodeJS.Platform
@@ -456,6 +472,19 @@ export interface InfiniteCodeAPI {
 	getServerUrl: () => Promise<string | null>
 	stopInfiniteCode: () => Promise<boolean>
 	restartInfiniteCode: () => Promise<InfiniteCodeServerInfo>
+
+	/**
+	 * Subscribe to a cross-surface supersede notification. Fires whenever the
+	 * main process detects another infinitecode instance is already active
+	 * during an `infinitecode:ensure`. Returning function detaches the
+	 * listener. The detail shape is `SessionSupersededDetail` (declared
+	 * above). See `crates/core/src/session_lock.rs::SessionLockError::Superseded`
+	 * for the producing side.
+	 */
+	onSessionSuperseded: (
+		callback: (detail: SessionSupersededDetail) => void,
+	) => () => void
+
 	onTerminalToggle: (callback: () => void) => () => void
 	acp: {
 		request: (request: {
@@ -858,6 +887,10 @@ export interface PerformanceSettings {
 	 * encourage the model to call the `verify_solution` tool before
 	 * non-trivial final answers. */
 	selfVerify: boolean
+	/** Append the `<suggest_followups_protocol>` block to the system prompt
+	 * and let the model emit a `suggest_followups` tool call near the end
+	 * of non-trivial turns so the user sees clickable chip suggestions. */
+	suggestFollowups: boolean
 	/** Auto-compaction strategy. `Off` disables auto-compaction entirely;
 	 * `Conservative` waits until 95% of the input budget; `Aggressive`
 	 * triggers at 60%; `Auto` uses `compactThresholdPercent`. */
