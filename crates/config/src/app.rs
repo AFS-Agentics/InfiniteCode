@@ -107,6 +107,13 @@ pub struct AgentBehaviorConfig {
     /// final answers. Off by default — opt-in only.
     #[serde(default)]
     pub self_verify: bool,
+    /// When true, the static system prompt gets a
+    /// `<suggest_followups_protocol>` block appended (cached-stable position)
+    /// and the model is encouraged to call the `suggest_followups` tool near
+    /// the end of non-trivial turns. On by default — the chips are the
+    /// primary way users discover follow-on actions.
+    #[serde(default = "default_suggest_followups")]
+    pub suggest_followups: bool,
     /// Strategy for proactive context compaction. `Auto` preserves current
     /// behavior; `Conservative` only auto-compacts at 95% of context;
     /// `Aggressive` auto-compacts at 60%; `Off` disables auto-compaction
@@ -118,16 +125,33 @@ pub struct AgentBehaviorConfig {
     /// used only when `compact_strategy = Auto`. Clamped to [50, 95].
     #[serde(default = "default_compact_threshold_percent")]
     pub compact_threshold_percent: u8,
+    /// When true, the agent explores multiple solutions in parallel before
+    /// selecting the best one. Uses `preview_edit`/`preview_write` tools
+    /// for read-only exploration, then applies the winning solution.
+    #[serde(default)]
+    pub explore_solutions: bool,
+    /// When true, the agent performs a multi-perspective audit of changes
+    /// before finalizing. Reviews from quality, security, and performance
+    /// angles, then collates results.
+    #[serde(default)]
+    pub audit_changes: bool,
 }
 
 impl Default for AgentBehaviorConfig {
     fn default() -> Self {
         Self {
             self_verify: false,
+            suggest_followups: default_suggest_followups(),
             compact_strategy: CompactStrategy::default(),
             compact_threshold_percent: default_compact_threshold_percent(),
+            explore_solutions: false,
+            audit_changes: false,
         }
     }
+}
+
+fn default_suggest_followups() -> bool {
+    true
 }
 
 /// Strategy for proactive context compaction.
@@ -745,6 +769,9 @@ fn apply_agent_behavior_env_overrides(behavior: &mut AgentBehaviorConfig) {
     if let Ok(value) = std::env::var("INFINITECODE_SELF_VERIFY") {
         behavior.self_verify = parse_env_bool(&value);
     }
+    if let Ok(value) = std::env::var("INFINITECODE_SUGGEST_FOLLOWUPS") {
+        behavior.suggest_followups = parse_env_bool(&value);
+    }
     if let Ok(value) = std::env::var("INFINITECODE_COMPACT_STRATEGY") {
         if let Some(strategy) = parse_env_compact_strategy(&value) {
             behavior.compact_strategy = strategy;
@@ -754,6 +781,12 @@ fn apply_agent_behavior_env_overrides(behavior: &mut AgentBehaviorConfig) {
         if let Ok(parsed) = value.trim().parse::<u8>() {
             behavior.compact_threshold_percent = parsed.clamp(50, 95);
         }
+    }
+    if let Ok(value) = std::env::var("INFINITECODE_EXPLORE_SOLUTIONS") {
+        behavior.explore_solutions = parse_env_bool(&value);
+    }
+    if let Ok(value) = std::env::var("INFINITECODE_AUDIT_CHANGES") {
+        behavior.audit_changes = parse_env_bool(&value);
     }
 }
 

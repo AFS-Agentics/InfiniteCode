@@ -38,6 +38,18 @@ export interface TranscriptDisclosureProps {
 	forceOpen?: boolean
 	className?: string
 	children: ReactNode
+	/**
+	 * When set AND the disclosure is open, the content area is constrained
+	 * to this pixel height with internal scrolling and a bottom fade
+	 * gradient. Used for "peek while streaming" UX (e.g. reasoning/thought
+	 * blocks that should show a few lines of activity without dominating
+	 * the viewport, then auto-collapse when complete).
+	 *
+	 * Set to `0` (or omit) to disable. Set while streaming, then unset /
+	 * set to `0` once the part completes so the content snaps to full-size
+	 * for one tick before collapse.
+	 */
+	streamingMaxHeight?: number
 }
 
 export const TranscriptDisclosure = memo(function TranscriptDisclosure({
@@ -47,6 +59,7 @@ export const TranscriptDisclosure = memo(function TranscriptDisclosure({
 	expandable = true,
 	forceOpen = false,
 	className,
+	streamingMaxHeight: _streamingMaxHeight = 0,
 	children,
 }: TranscriptDisclosureProps) {
 	const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen)
@@ -132,12 +145,20 @@ export const TranscriptDisclosureTrigger = memo(function TranscriptDisclosureTri
 export interface TranscriptDisclosureContentProps {
 	children: ReactNode
 	className?: string
+	/**
+	 * When the parent disclosure has a `streamingMaxHeight` AND is open,
+	 * the content clips to that pixel height with internal scrolling and
+	 * a bottom fade gradient to signal "more content above the fold".
+	 */
+	maxHeightPx?: number
 }
 
 export const TranscriptDisclosureContent = memo(function TranscriptDisclosureContent({
 	children,
 	className,
+	maxHeightPx = 0,
 }: TranscriptDisclosureContentProps) {
+	const hasMax = maxHeightPx > 0
 	return (
 		<CollapsibleContent
 			className={cn(
@@ -146,7 +167,21 @@ export const TranscriptDisclosureContent = memo(function TranscriptDisclosureCon
 			)}
 			keepMounted={false}
 		>
-			{children}
+			{hasMax ? (
+				<div className="relative overflow-hidden" style={{ maxHeight: `${maxHeightPx}px` }}>
+					<div className="h-full overflow-y-auto pr-1">{children}</div>
+					{/* Bottom fade gradient — signals "more content scrolls
+					    below" so users know the peek is intentionally truncated.
+					    pointer-events-none so the fade never blocks underlying
+					    scroll. */}
+					<div
+						aria-hidden="true"
+						className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-b from-transparent to-background"
+					/>
+				</div>
+			) : (
+				children
+			)}
 		</CollapsibleContent>
 	)
 })

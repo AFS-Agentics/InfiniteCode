@@ -764,6 +764,238 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
         ToolHandlerKind::Edit,
     );
 
+    plan.push(
+        ToolSpec {
+            name: "preview_edit".to_string(),
+            description: "Preview an edit without applying it. Returns the unified diff that would result from the replacement, but does NOT modify the file. Use this to check what an edit would look like before committing.".to_string(),
+            input_schema: edit_schema(),
+            output_mode: ToolOutputMode::Mixed,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: true,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: Some("Preview edit".to_string()),
+            supports_cancellation: None,
+            supports_streaming: None,
+        },
+        ToolHandlerKind::PreviewEdit,
+    );
+
+    plan.push(
+        ToolSpec {
+            name: "preview_write".to_string(),
+            description: "Preview a file write without applying it. Returns the unified diff that would result, but does NOT create or modify the file. Use this to check what a write would look like before committing.".to_string(),
+            input_schema: write_schema(),
+            output_mode: ToolOutputMode::Mixed,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: true,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: Some("Preview write".to_string()),
+            supports_cancellation: None,
+            supports_streaming: None,
+        },
+        ToolHandlerKind::PreviewWrite,
+    );
+
+    plan.push(
+        ToolSpec {
+            name: "report_outcome".to_string(),
+            description: "Report structured outcomes from a subagent. Accepts arbitrary JSON findings and returns them so the parent can review.".to_string(),
+            input_schema: {
+                let mut props = std::collections::BTreeMap::new();
+                props.insert("findings".to_string(), JsonSchema::object(
+                    std::collections::BTreeMap::new(),
+                    None,
+                    Some(true),
+                ));
+                JsonSchema::object(props, Some(vec!["findings".to_string()]), Some(false))
+            },
+            output_mode: ToolOutputMode::Mixed,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: true,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: Some("Report outcome".to_string()),
+            supports_cancellation: None,
+            supports_streaming: None,
+        },
+        ToolHandlerKind::ReportOutcome,
+    );
+
+    plan.push(
+        ToolSpec {
+            name: "explore_solutions".to_string(),
+            description: "Best-of-N parallel thinker orchestrator (freebuff-style). Use operation 'explore' (default) to spawn N=1..=6 ephemeral thinker subagents in parallel on a single problem, each with a different focus lens; a final selector child picks the best thought. Use operation 'select' to run only the selector over caller-supplied candidate ideas. Both modes are read-only and inherit the parent's provider/reasoning. Mirrors freebuff's `thinker-best-of-n` pattern.".to_string(),
+            input_schema: JsonSchema::object(
+                BTreeMap::from([
+                    (
+                        "operation".to_string(),
+                        JsonSchema::string(Some("\"explore\" (default) spawns N thinker children; \"select\" runs only the selector over caller-supplied candidates.")),
+                    ),
+                    (
+                        "problem".to_string(),
+                        JsonSchema::string(Some("Required for operation='explore'. The problem each thinker reasons about.")),
+                    ),
+                    (
+                        "n".to_string(),
+                        JsonSchema::integer(Some("Number of parallel thinker children. Default 3, clamped to 1..=6.")),
+                    ),
+                    (
+                        "perspectives".to_string(),
+                        JsonSchema::array(
+                            JsonSchema::string(Some("Focus lens per thinker, e.g. 'correctness edge cases'.")),
+                            Some("Optional: exactly N entries paralleling 'n'. Empty = each thinker uses 'general depth'."),
+                        ),
+                    ),
+                    (
+                        "candidates".to_string(),
+                        JsonSchema::array(
+                            JsonSchema::object(
+                                BTreeMap::from([
+                                    ("id".to_string(), JsonSchema::string(Some("Optional caller-assigned id."))),
+                                    ("content".to_string(), JsonSchema::string(Some("Candidate text."))),
+                                ]),
+                                None,
+                                Some(true),
+                            ),
+                            Some("Required for operation='select': 1..=8 pre-drafted candidates."),
+                        ),
+                    ),
+                    (
+                        "selectionCriteria".to_string(),
+                        JsonSchema::string(Some("Optional override of the selector's default criteria.")),
+                    ),
+                ]),
+                Some(vec![]),
+                Some(false),
+            ),
+            output_mode: ToolOutputMode::Mixed,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: Some("Explore solutions".to_string()),
+            supports_cancellation: Some(true),
+            supports_streaming: None,
+        },
+        ToolHandlerKind::ExploreSolutions,
+    );
+
+    plan.push(
+        ToolSpec {
+            name: "audit_changes".to_string(),
+            description: "Multi-prompt reviewer orchestrator (freebuff-style). Spawns N=1..=8 ephemeral reviewer subagents in parallel, each focused on a different lens (correctness, security, performance + maintainability, simplify / reuse / readability, ...), against the same change summary. Aggregates the reviews into a structured {reviews, verdicts, summary} payload. Read-only. Equivalent to freebuff's `code-reviewer-multi-prompt` invoked with a lens array.".to_string(),
+            input_schema: JsonSchema::object(
+                BTreeMap::from([
+                    (
+                        "changes".to_string(),
+                        JsonSchema::string(Some("Required: unified diff, file summary, or plain description of the changes.")),
+                    ),
+                    (
+                        "perspectives".to_string(),
+                        JsonSchema::array(
+                            JsonSchema::string(Some("Focus lens, e.g. 'security concerns'.")),
+                            Some("Optional: 1..=8 perspectives. Defaults to correctness / security / performance+maintainability / simplify-reuse-readability."),
+                        ),
+                    ),
+                    (
+                        "maxCharsPerReview".to_string(),
+                        JsonSchema::integer(Some("Soft cap for each reviewer's reply length. Advisory only.")),
+                    ),
+                ]),
+                Some(vec!["changes".to_string()]),
+                Some(false),
+            ),
+            output_mode: ToolOutputMode::Mixed,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: Some("Audit changes".to_string()),
+            supports_cancellation: Some(true),
+            supports_streaming: None,
+        },
+        ToolHandlerKind::AuditChanges,
+    );
+
+    plan.push(
+        ToolSpec {
+            name: "select_implementation".to_string(),
+            description: "Best-of-N editing orchestrator (freebuff-style). Caller pre-drafts N=1..=8 candidate implementations of the same change (typically by chaining preview_edit / preview_write), then spawns a single selector child to pick the best. Returns the chosen strategy + diff + structured tool_calls for the parent model to apply via its own edit / write tool calls. Read-only — never touches the workspace. Equivalent to freebuff's `editor-multi-prompt` invoked as a pure selector.".to_string(),
+            input_schema: JsonSchema::object(
+                BTreeMap::from([
+                    (
+                        "problem".to_string(),
+                        JsonSchema::string(Some("Required: brief description of the change the proposals address.")),
+                    ),
+                    (
+                        "proposals".to_string(),
+                        JsonSchema::array(
+                            JsonSchema::object(
+                                BTreeMap::from([
+                                    (
+                                        "id".to_string(),
+                                        JsonSchema::string(Some("Optional caller-assigned id. Falls back to A, B, C… based on order.")),
+                                    ),
+                                    (
+                                        "strategy".to_string(),
+                                        JsonSchema::string(Some("One-sentence strategy summary the selector uses to compare.")),
+                                    ),
+                                    (
+                                        "diff".to_string(),
+                                        JsonSchema::string(Some("Unified diff or free-form summary the selector reviews.")),
+                                    ),
+                                    (
+                                        "tool_calls".to_string(),
+                                        JsonSchema::array(
+                                            JsonSchema::object(
+                                                BTreeMap::from([
+                                                    (
+                                                        "toolName".to_string(),
+                                                        JsonSchema::string(Some("edit, write, preview_edit, preview_write, …")),
+                                                    ),
+                                                    (
+                                                        "input".to_string(),
+                                                        JsonSchema {
+                                                            description: Some("Call input JSON.".to_string()),
+                                                            ..Default::default()
+                                                        },
+                                                    ),
+                                                ]),
+                                                Some(vec!["toolName".to_string(), "input".to_string()]),
+                                                Some(true),
+                                            ),
+                                            Some("Concrete tool calls that realize this proposal."),
+                                        ),
+                                    ),
+                                ]),
+                                Some(vec!["strategy".to_string()]),
+                                Some(true),
+                            ),
+                            Some("1..=8 candidate implementations."),
+                        ),
+                    ),
+                    (
+                        "selectionCriteria".to_string(),
+                        JsonSchema::string(Some("Optional override of the selector's default criteria.")),
+                    ),
+                ]),
+                Some(vec!["proposals".to_string()]),
+                Some(false),
+            ),
+            output_mode: ToolOutputMode::Mixed,
+            execution_mode: ToolExecutionMode::ReadOnly,
+            capability_tags: vec![],
+            supports_parallel: false,
+            preparation_feedback: ToolPreparationFeedback::None,
+            display_name: Some("Select implementation".to_string()),
+            supports_cancellation: Some(true),
+            supports_streaming: None,
+        },
+        ToolHandlerKind::SelectImplementation,
+    );
+
     let find_description = GLOB_DESCRIPTION;
 
     plan.push(

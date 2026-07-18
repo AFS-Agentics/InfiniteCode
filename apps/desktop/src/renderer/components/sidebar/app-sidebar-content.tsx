@@ -1,8 +1,9 @@
 import { SidebarContent, SidebarFooter } from "@infinitecode/ui/components/sidebar"
 import { cn } from "@infinitecode/ui/lib/utils"
 import { useNavigate, useParams } from "@tanstack/react-router"
-import { useAtom, useAtomValue } from "jotai"
+import { useAtom, useAtomValue, useSetAtom } from "jotai"
 import {
+	BookmarkIcon,
 	Clock3Icon,
 	FolderPlusIcon,
 	Loader2Icon,
@@ -14,6 +15,10 @@ import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
 import { activeServerConfigAtom } from "../../atoms/connection"
 import { sandboxMappingsAtom } from "../../atoms/derived/agents"
 import { automationsEnabledAtom } from "../../atoms/feature-flags"
+import {
+	artifactCountAtom,
+	artifactPaneOpenAtom,
+} from "../../atoms/artifacts"
 import { projectPaginationFamily } from "../../atoms/sessions"
 import { appStore } from "../../atoms/store"
 import { sessionScrollTopFamily } from "../../atoms/ui"
@@ -67,15 +72,18 @@ function TopActionRow({
 	children,
 	icon,
 	onClick,
+	"aria-label": ariaLabel,
 }: {
 	children: ReactNode
 	icon: ReactNode
 	onClick: () => void
+	"aria-label"?: string
 }) {
 	return (
 		<button
 			type="button"
 			onClick={onClick}
+			aria-label={ariaLabel}
 			className="flex h-8 w-full items-center gap-2.5 rounded-lg px-1.5 text-left text-sm font-normal text-sidebar-foreground transition-colors hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
 		>
 			<span className="flex size-4 shrink-0 items-center justify-center text-sidebar-foreground/90">
@@ -270,6 +278,15 @@ export function AppSidebarContent({
 	const automationsEnabled = useAtomValue(automationsEnabledAtom)
 	const activeServer = useAtomValue(activeServerConfigAtom)
 	const isLocalServer = activeServer.type === "local"
+	/**
+	 * Artifacts button toggles the same `artifactPaneOpenAtom` that the
+	 * ⌘./Ctrl+. shortcut uses, so opening from the sidebar and from the
+	 * keyboard always lands on the same pane state — and the pane can stay
+	 * overlaid on top of any route (chat, settings, automations) just like
+	 * before.
+	 */
+	const setArtifactPaneOpen = useSetAtom(artifactPaneOpenAtom)
+	const artifactCount = useAtomValue(artifactCountAtom)
 	const canRevealInFinder = typeof window !== "undefined" && "infinitecode" in window
 	const stableProjectOrderRef = useRef<Map<string, number>>(new Map())
 
@@ -412,6 +429,24 @@ export function AppSidebarContent({
 						onClick={onOpenCommandPalette}
 					>
 						Search
+					</TopActionRow>
+					<TopActionRow
+						icon={<BookmarkIcon className={sidebarPrimaryIconClass} />}
+						aria-label={
+							artifactCount > 0
+								? `Open artifacts — ${artifactCount} saved`
+								: "Open artifacts"
+						}
+						onClick={() => setArtifactPaneOpen((open) => !open)}
+					>
+						<span className="flex min-w-0 flex-1 items-center gap-1.5">
+							<span>Artifacts</span>
+							{artifactCount > 0 && (
+								<span className="ml-auto rounded-full bg-muted-foreground/15 px-1.5 text-[10px] font-medium tabular-nums text-muted-foreground/80">
+									{artifactCount}
+								</span>
+							)}
+						</span>
 					</TopActionRow>
 					{automationsEnabled && isLocalServer && (
 						<TopActionRow

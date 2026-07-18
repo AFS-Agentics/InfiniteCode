@@ -62,9 +62,13 @@ export const DEFAULT_PERFORMANCE_SETTINGS: PerformanceSettings = {
 	// Off by default — the user opts in explicitly. Self-verify adds a
 	// `<verify_solution_protocol>` block to the system prompt and exposes
 	// the `verify_solution` tool for structured self-reflection before
-	// submission. Conservative compaction matches the historical
-	// `compact_at_threshold` behavior; auto-compaction threshold is 80%.
+	// submission. Suggest-followups is on by default so non-trivial turns
+	// end with clickable next-step chips (`<suggest_followups_protocol>`
+	// block + the `suggest_followups` tool). Conservative compaction matches
+	// the historical `compact_at_threshold` behavior; auto-compaction
+	// threshold is 80%.
 	selfVerify: false,
+	suggestFollowups: true,
 	compactStrategy: "auto",
 	compactThresholdPercent: 80,
 }

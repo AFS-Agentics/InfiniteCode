@@ -143,8 +143,7 @@ function OpaqueWindowsRow() {
 
 	return (
 		<SettingsRow
-			label="Use opaque background"
-			description="Make windows use a solid background rather than system translucency"
+			label="Use opaque background"				description="Use a solid background — turns off the see-through window effect"
 		>
 			<Switch checked={opaque} onCheckedChange={handleChange} />
 		</SettingsRow>
@@ -185,8 +184,7 @@ function HideThinkingWhileWorkingRow() {
 
 	return (
 		<SettingsRow
-			label="Hide thinking while working"
-			description="Hide model reasoning blocks until the turn completes"
+			label="Hide thinking while working"				description="Hide the assistant's thinking blocks until the response is finished"
 		>
 			<Switch
 				checked={hideThinkingWhileWorking}

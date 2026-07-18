@@ -4364,7 +4364,9 @@ mod tests {
         let captured = requests.lock().expect("lock requests");
         assert_eq!(captured.len(), 2);
         let mode_prompt = crate::collaboration_mode_prompts::mode_introductions_prompt();
-        let expected_system = format!("base-a\n\n{mode_prompt}");
+        let followups_prompt =
+            crate::agent_behavior_prompts::suggest_followups_prompt(true);
+        let expected_system = format!("base-a\n\n{mode_prompt}\n\n{followups_prompt}");
         assert_eq!(
             captured[0].system.as_deref(),
             Some(expected_system.as_str())

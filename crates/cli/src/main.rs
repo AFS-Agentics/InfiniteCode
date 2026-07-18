@@ -116,6 +116,18 @@ struct Cli {
     /// only when `--compact-strategy auto` (or unset). Range 50-95.
     #[arg(long = "compact-threshold", global = true, value_parser = clap::value_parser!(u8).range(50..=95))]
     compact_threshold: Option<u8>,
+
+    /// Opt-in multi-solution exploration: the agent generates N proposals
+    /// using `preview_edit`/`preview_write` tools, then selects the best one
+    /// and applies it. Off by default.
+    #[arg(long = "explore-solutions", global = true)]
+    explore_solutions: bool,
+
+    /// Opt-in change audit: after edits, the agent reviews from quality,
+    /// security, and performance perspectives before finalizing. Off by
+    /// default.
+    #[arg(long = "audit", global = true)]
+    audit_changes: bool,
 }
 
 fn main() -> Result<()> {
@@ -478,6 +490,8 @@ fn cli_agent_behavior_overrides(cli: &Cli) -> toml::Value {
         && suggest_followups.is_none()
         && cli.compact_strategy.is_none()
         && cli.compact_threshold.is_none()
+        && !cli.explore_solutions
+        && !cli.audit_changes
     {
         return toml::Value::Table(Default::default());
     }
@@ -488,6 +502,18 @@ fn cli_agent_behavior_overrides(cli: &Cli) -> toml::Value {
     }
     if let Some(value) = suggest_followups {
         behavior_table.insert("suggest_followups".to_string(), toml::Value::Boolean(value));
+    }
+    if cli.explore_solutions {
+        behavior_table.insert(
+            "explore_solutions".to_string(),
+            toml::Value::Boolean(true),
+        );
+    }
+    if cli.audit_changes {
+        behavior_table.insert(
+            "audit_changes".to_string(),
+            toml::Value::Boolean(true),
+        );
     }
     if let Some(strategy) = &cli.compact_strategy {
         behavior_table.insert(

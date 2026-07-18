@@ -679,81 +679,12 @@ export function GravityBottomPageAd({
 	 *  across InfiniteCode Desktop and Freebuff CLI. */
 	refreshIntervalMs?: number;
 }): JSX.Element | null {
-	const [ad, setAd] = useState<GravityAdData | null>(null);
-	const [state, setState] = useState<"loading" | "empty" | "error" | "ready">(
-		"loading",
-	);
-	const [rotation, setRotation] = useState(0);
-	const latestKeyRef = useRef(0);
-
-	// Auto-refresh: tick the rotation counter on a fixed interval. Each tick
-	// cycles the synthesis key (and therefore the contextKey/messages ref),
-	// which re-triggers the fetch effect downstream.
-	useEffect(() => {
-		const id = setInterval(() => {
-			setRotation((r) => r + 1);
-		}, refreshIntervalMs);
-		return () => clearInterval(id);
-	}, [refreshIntervalMs]);
-
-	// Synthesis key includes the rotation counter so each tick is a fresh
-	// graph node in Gravity's per-session sessionId derivation. The actual
-	// ambient messages stay the same — only the rotation counter deepens.
-	const contextMessages = useMemo<{ role: string; content: string }[]>(
-		() => [
-			...messages.map((m) => ({ role: m.role, content: m.content })),
-			{ role: "system", content: `__rotation__:${rotation}` },
-		],
-		[messages, rotation],
-	);
-
-	const contextKey = useMemo(() => {
-		try {
-			return JSON.stringify(contextMessages);
-		} catch {
-			return "";
-		}
-	}, [contextMessages]);
-
-	// biome-ignore lint/correctness/useExhaustiveDependencies: contextKey is the stable, rotation-derived key. Adding `contextMessages` would re-fire on every upstream reference churn during typing and reintroduce the original thrash.
-	useEffect(() => {
-		if (!window.infinitecode?.gravity?.getAds) {
-			setState("error");
-			return;
-		}
-		const myKey = ++latestKeyRef.current;
-		setState("loading");
-
-		async function load() {
-			try {
-				const ads = await window.infinitecode.gravity.getAds(
-					contextMessages,
-					"bottom_page",
-				);
-				if (myKey !== latestKeyRef.current) return;
-				if (Array.isArray(ads) && ads.length > 0) {
-					setAd(ads[0] as GravityAdData);
-					setState("ready");
-				} else {
-					setState("empty");
-				}
-			} catch (err) {
-				console.error("[gravity] bottom-page fetch failed", err);
-				if (myKey === latestKeyRef.current) {
-					setState("error");
-				}
-			}
-		}
-
-		void load();
-	}, [contextKey]);
-
-	// Same null-on-empty guarantee as the other pills in production. In dev
-	// mode, render the faint dashed placeholder so the always-on bottom slot
-	// is visible even without a live API key.
-	if (state !== "ready" || !ad) {
-		return renderEmptyOrNull("bottom_page");
-	}
+	const ad = useGravityAdRotating({
+		placement: "bottom_page",
+		messages,
+		refreshIntervalMs,
+	});
+	if (!ad) return renderEmptyOrNull("bottom_page");
 	return <ThemedGravityBottomPagePill ad={ad} />;
 }
 

@@ -30,6 +30,7 @@ export const ThoughtRow = memo(function ThoughtRow({
 			defaultOpen={defaultOpen}
 			open={open}
 			onOpenChange={onOpenChange}
+			streamingMaxHeight={isStreaming ? 120 : 0}
 		>
 			<TranscriptDisclosureTrigger
 				aria-label="Reasoning details"
@@ -41,7 +42,10 @@ export const ThoughtRow = memo(function ThoughtRow({
 					)
 				}
 			/>
-			<TranscriptDisclosureContent>
+			<TranscriptDisclosureContent
+				maxHeightPx={isStreaming ? 120 : 0}
+				className="pt-1"
+			>
 				<div aria-label="Reasoning details" className="text-sm text-muted-foreground/80">
 					<ReasoningText animated={isStreaming}>{text}</ReasoningText>
 				</div>

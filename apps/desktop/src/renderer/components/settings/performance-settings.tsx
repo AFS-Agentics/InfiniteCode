@@ -26,38 +26,37 @@ const STRATEGY_OPTIONS: { value: CompactStrategyId; label: string; description: 
 	[
 		{
 			value: "auto",
-			label: "Auto",
-			description:
-				"Use the configured threshold (default 80% of input budget). Matches the historical behavior.",
+			label: "Balanced",
+			description: "Use the percentage setting below. Best for most people.",
 		},
 		{
 			value: "conservative",
-			label: "Conservative",
+			label: "Less often",
 			description:
-				"Wait until 95% of the input budget before auto-compacting. Preserves as much raw history as possible.",
+				"Keep more of your older messages in the conversation. The assistant may run out of room sooner on very long tasks.",
 		},
 		{
 			value: "aggressive",
-			label: "Aggressive",
+			label: "More often",
 			description:
-				"Trigger at 60% of the input budget. Keeps more headroom for long-running tasks and cache-friendly prompts.",
+				"Trim older messages sooner so the assistant has more room. Helpful for long, multi-hour sessions.",
 		},
 		{
 			value: "off",
-			label: "Off",
+			label: "Manual only",
 			description:
-				"Disable auto-compaction entirely. Compaction still runs on /compact and context_too_long retries.",
+				"Don't trim anything automatically. The assistant only cleans up when you run the /compact command or when it runs out of room.",
 		},
 	]
 
 const SELF_VERIFY_DESCRIPTION =
-	"When enabled, the model gets a verify_solution_protocol block in its system prompt and is encouraged to call the verify_solution tool before submitting non-trivial final answers. The tool asks the model to walk through any explicit criteria and factual claims. It does NOT run external tools or APIs."
+	"Turn this on to have the assistant double-check its own answer against the original task before sending it. It only rewrites the answer if it spots a real mistake. No extra tools or APIs are called. Recommended for tasks where accuracy matters."
 
 const COMPACT_STRATEGY_DESCRIPTION =
-	"Controls when auto-compaction triggers. Manual /compact and provider context_too_long retries always run regardless."
+	"How the assistant makes room during long conversations. It usually cleans up older messages automatically so newer ones still fit. The /compact command still works the same way regardless of this setting."
 
 const THRESHOLD_DESCRIPTION =
-	"Percent of the input budget at which auto-compaction fires. Used only when strategy is auto. Range 50-95%."
+	"Auto trims older messages once the chat reaches this percentage of its limit. 80% is a safe default for most conversations."
 
 const DEFAULT_PERFORMANCE: PerformanceSettings = {
 	selfVerify: false,
@@ -78,11 +77,11 @@ export function PerformanceSettings() {
 			try {
 				await updateSettings({ performance: { ...performance, ...patch } })
 				setStatusMessage(
-					"Saved. The InfiniteCode server will restart to apply changes.",
+					"Saved. The assistant will restart in the background to apply your changes.",
 				)
 			} catch (error) {
-				console.error("Failed to save performance settings", error)
-				setStatusMessage("Failed to save. Check the logs.")
+				console.error("Failed to save agent behavior settings", error)
+				setStatusMessage("Couldn't save your changes. Please try again.")
 			} finally {
 				setSaving(false)
 			}
@@ -94,8 +93,8 @@ export function PerformanceSettings() {
 		return (
 			<div className="flex flex-col gap-6">
 				<SettingsSection
-					title="Performance"
-					description="Agent behavior knobs: self-verification and context compaction strategy."
+					title="How the assistant works"
+					description="Whether the assistant double-checks its own answers and how it makes room for long conversations."
 				>
 					<div className="px-4 py-3 text-sm text-muted-foreground">Loading…</div>
 				</SettingsSection>
@@ -106,11 +105,11 @@ export function PerformanceSettings() {
 	return (
 		<div className="flex flex-col gap-6">
 			<SettingsSection
-				title="Performance"
-				description="Agent behavior knobs: self-verification and context compaction strategy."
+				title="Agent behavior"
+				description="Tune how the assistant works — whether it double-checks its own answers and how it makes room for long conversations."
 			>
 				<SettingsRow
-					label="Self-verify before final answers"
+					label="Double-check answers before replying"
 					description={SELF_VERIFY_DESCRIPTION}
 				>
 					<label className="flex items-center gap-2 text-sm">
@@ -122,12 +121,42 @@ export function PerformanceSettings() {
 								updateOne({ selfVerify: event.target.checked })
 							}
 						/>
-						<span>{performance.selfVerify ? "Enabled" : "Disabled"}</span>
+						<span>{performance.selfVerify ? "On" : "Off"}</span>
+					</label>
+				</SettingsRow>
+
+					<label className="flex items-center gap-2 text-sm">
+						<input
+							type="checkbox"
+							checked={performance.suggestFollowups}
+							disabled={saving}
+							onChange={(event) =>
+								updateOne({ suggestFollowups: event.target.checked })
+							}
+						/>
+						<span>{performance.suggestFollowups ? "On" : "Off"}</span>
 					</label>
 				</SettingsRow>
 
 				<SettingsRow
-					label="Context compaction strategy"
+					label="Suggest next steps at the end of each turn"
+					description="Adds a clickable chip row below non-trivial assistant turns. Each chip uses an emoji + short label; clicking submits the chip's prompt as your next message. Off only turns off the system-prompt block — the tool itself stays registered."
+				>
+					<label className="flex items-center gap-2 text-sm">
+						<input
+							type="checkbox"
+							checked={performance.suggestFollowups}
+							disabled={saving}
+							onChange={(event) =>
+								updateOne({ suggestFollowups: event.target.checked })
+							}
+						/>
+						<span>{performance.suggestFollowups ? "On" : "Off"}</span>
+					</label>
+				</SettingsRow>
+
+				<SettingsRow
+					label="When to trim older messages"
 					description={COMPACT_STRATEGY_DESCRIPTION}
 				>
 					<select
@@ -149,7 +178,7 @@ export function PerformanceSettings() {
 				</SettingsRow>
 
 				<SettingsRow
-					label="Auto-compact threshold"
+					label="How full before trimming"
 					description={THRESHOLD_DESCRIPTION}
 				>
 					<div className="flex items-center gap-3">

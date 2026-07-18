@@ -108,6 +108,20 @@ export interface ProcessTimelineViewProps {
 	 * (and IntersectionObserver registration) stable when the cadence
 	 * Math flips between null and JSX across renders.
 	 */
+	/**
+	 * Optional callback that injects a Gravity mid-timeline ad after the
+	 * item at the given 0-based index. Returning null skips insertion.
+	 * Encapsulated here as a closure so callers (chat-turn) own the
+	 * cadence + per-turn cap. Items wrap in a Fragment keyed by `rowId`
+	 * so React doesn't confuse the ad's slot with adjacent item slots,
+	 * and `rowId` is passed through so the closure can stamp a stable
+	 * inner key on the returned ad element — keeping its React identity
+	 * (and IntersectionObserver registration) stable when the cadence
+	 * Math flips between null and JSX across renders.
+	 *
+	 * `itemKind` lets callers run per-kind cadence (e.g. thoughts more
+	 * dense than tools) without re-deriving the kind from the rowId.
+	 */
 	renderMidAd?: (itemIndex: number, rowId: string) => ReactNode;
 }
 
@@ -153,48 +167,57 @@ export const ProcessTimelineView = memo(function ProcessTimelineView({
 					);
 				}
 
-				if (item.kind === "thought") {
-					const isStreaming =
-						working &&
-						isReasoningPartActivelyStreaming(orderedParts, item.part);
-					return (
-						<Fragment key={rowId}>
-							<ThoughtRow
-								// Show the Reasoning block expanded by default; click the
-								// chevron/header to collapse. Tools still respect
-								// defaultExpandAll so verbose-mode toggling is unaffected.
-								defaultOpen={true}
-								isStreaming={isStreaming}
-								onOpenChange={
-									onToggleRow ? (open) => onToggleRow(rowId, open) : undefined
-								}
-								open={expandedRowIds ? expandedRowIds.has(rowId) : undefined}
-								part={item.part}
-							/>
-							{midAdNode}
-						</Fragment>
-					);
-				}
+			if (item.kind === "thought") {
+				const isStreaming =
+					working &&
+					isReasoningPartActivelyStreaming(orderedParts, item.part);
+				return (
+					<Fragment key={rowId}>
+						<ThoughtRow
+							// Default-open the reasoning block permanently so the
+							// user can read the model's thinking without having
+							// to click. While actively streaming, the content
+							// area is constrained to ~120px with a bottom fade so
+							// the peek doesn't dominate the viewport (see
+							// streamingMaxHeight / maxHeightPx below); once
+							// reasoning completes, the constraint drops and the
+							// full content shows. User can still click the
+							// chevron to manually collapse. Verbose-mode
+							// (defaultExpandAll) overrides still apply via
+							// expandedRowIds controlled open.
+							defaultOpen={true}
+							isStreaming={isStreaming}
+							onOpenChange={
+								onToggleRow ? (open) => onToggleRow(rowId, open) : undefined
+							}
+							open={expandedRowIds ? expandedRowIds.has(rowId) : undefined}
+							part={item.part}
+						/>
+						{midAdNode}
+					</Fragment>
+				);
+			}
 
-				if (item.kind === "tool") {
-					return (
-						<Fragment key={rowId}>
-							<ChatToolCall
-								defaultOpen={defaultExpandAll}
-								isActiveTurn={isActiveTurn}
-								onDelete={onDeleteToolPart}
-								open={expandedRowIds ? expandedRowIds.has(rowId) : undefined}
-								onOpenChange={
-									onToggleRow ? (open) => onToggleRow(rowId, open) : undefined
-								}
-								part={item.part}
-								projectRoot={projectRoot}
-								turnHasError={turnHasError}
-							/>
-							{midAdNode}
-						</Fragment>
-					);
-				}
+			if (item.kind === "tool") {
+				return (
+					<Fragment key={rowId}>
+						<ChatToolCall
+							defaultOpen={defaultExpandAll}
+							isActiveTurn={isActiveTurn}
+							onDelete={onDeleteToolPart}
+							open={expandedRowIds ? expandedRowIds.has(rowId) : undefined}
+							onOpenChange={
+								onToggleRow ? (open) => onToggleRow(rowId, open) : undefined
+							}
+							part={item.part}
+							projectRoot={projectRoot}
+							turnHasError={turnHasError}
+						/>
+						{midAdNode}
+					</Fragment>
+				);
+			}
+
 
 				return (
 					<Fragment key={rowId}>

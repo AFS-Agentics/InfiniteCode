@@ -187,14 +187,41 @@ impl SessionContext {
         // Append the suggest_followups block: default-on for every agent so
         // non-trivial turns end with concrete next-step chips. The handler
         // is always registered in the plan; this fragment only teaches the
-        // model the schema and the emoji conventions when the prompt is
-        // appended here.
-        let followups_block = crate::agent_behavior_prompts::suggest_followups_prompt();
+        // model the schema and the emoji conventions when enabled.
+        let followups_block = crate::agent_behavior_prompts::suggest_followups_prompt(
+            self.agent_behavior.suggest_followups,
+        );
         if !followups_block.is_empty() {
             if !result.is_empty() {
                 result.push_str("\n\n");
             }
             result.push_str(&followups_block);
+        }
+
+        // Append the explore-solutions block: opt-in for multi-solution
+        // exploration. Instructs the model to use `preview_edit`/`preview_write`
+        // tools to generate and compare approaches before committing.
+        let explore_block = crate::agent_behavior_prompts::explore_solutions_prompt(
+            self.agent_behavior.explore_solutions,
+        );
+        if !explore_block.is_empty() {
+            if !result.is_empty() {
+                result.push_str("\n\n");
+            }
+            result.push_str(&explore_block);
+        }
+
+        // Append the audit-changes block: opt-in for multi-perspective
+        // change review. Instructs the model to review from quality,
+        // security, and performance angles before finalizing.
+        let audit_block = crate::agent_behavior_prompts::audit_changes_prompt(
+            self.agent_behavior.audit_changes,
+        );
+        if !audit_block.is_empty() {
+            if !result.is_empty() {
+                result.push_str("\n\n");
+            }
+            result.push_str(&audit_block);
         }
 
         result
@@ -772,8 +799,9 @@ mod tests {
         assert_eq!(
             context.build_system_prompt(),
             format!(
-                "base instructions\n\n{}",
-                crate::collaboration_mode_prompts::mode_introductions_prompt()
+                "base instructions\n\n{}\n\n{}",
+                crate::collaboration_mode_prompts::mode_introductions_prompt(),
+                crate::agent_behavior_prompts::suggest_followups_prompt(true),
             )
         );
     }

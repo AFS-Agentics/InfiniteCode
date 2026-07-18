@@ -23,7 +23,14 @@ mod suggest_followups;
 mod tool_search;
 mod webfetch;
 mod websearch;
+mod preview_edit;
+mod preview_write;
+mod report_outcome;
 mod verify_solution;
+mod orchestrator;
+mod explore_solutions;
+mod audit_changes;
+mod select_implementation;
 
 pub(crate) use agent::register_agent_tools;
 pub use apply_patch::ApplyPatchHandler;
@@ -47,8 +54,14 @@ pub use skill::SkillHandler;
 pub use suggest_followups::SuggestFollowupsHandler;
 pub use tool_search::{ToolSearchHandler, tool_search_spec};
 pub use verify_solution::VerifySolutionHandler;
+pub use preview_edit::PreviewEditHandler;
+pub use preview_write::PreviewWriteHandler;
+pub use report_outcome::ReportOutcomeHandler;
 pub use webfetch::WebFetchHandler;
 pub use websearch::WebSearchHandler;
+pub use explore_solutions::ExploreSolutionsHandler;
+pub use audit_changes::AuditChangesHandler;
+pub use select_implementation::SelectImplementationHandler;
 
 use std::sync::Arc;
 
@@ -190,6 +203,12 @@ fn build_registry_from_builder(
             )),
             ToolHandlerKind::VerifySolution => Arc::new(VerifySolutionHandler::new()),
             ToolHandlerKind::SuggestFollowups => Arc::new(SuggestFollowupsHandler::new()),
+            ToolHandlerKind::PreviewEdit => Arc::new(PreviewEditHandler::new()),
+            ToolHandlerKind::PreviewWrite => Arc::new(PreviewWriteHandler::new()),
+            ToolHandlerKind::ReportOutcome => Arc::new(ReportOutcomeHandler::new()),
+            ToolHandlerKind::ExploreSolutions => Arc::new(ExploreSolutionsHandler::new()),
+            ToolHandlerKind::AuditChanges => Arc::new(AuditChangesHandler::new()),
+            ToolHandlerKind::SelectImplementation => Arc::new(SelectImplementationHandler::new()),
         };
         let legacy_alias = match kind {
             ToolHandlerKind::Bash if name == "shell_command" => Some("bash"),
@@ -288,5 +307,35 @@ mod tests {
             .expect("suggest_followups spec");
         assert_eq!(spec.execution_mode, ToolExecutionMode::ReadOnly);
         assert!(spec.supports_parallel);
+    }
+
+    #[test]
+    fn default_registry_exposes_orchestrator_tool_set() {
+        let registry = build_registry_from_plan(&ToolPlanConfig::default());
+
+        for tool in [
+            "explore_solutions",
+            "audit_changes",
+            "select_implementation",
+        ] {
+            assert!(registry.spec(tool).is_some(), "{} spec", tool);
+            assert!(registry.get(tool).is_some(), "{} handler", tool);
+            let spec = registry.spec(tool).expect("spec");
+            assert_eq!(
+                spec.execution_mode,
+                ToolExecutionMode::ReadOnly,
+                "{tool} must be read-only"
+            );
+        }
+        // Orchestrator tools should not be marked supports_parallel —
+        // they are stateful multi-step workflows.
+        for tool in [
+            "explore_solutions",
+            "audit_changes",
+            "select_implementation",
+        ] {
+            let spec = registry.spec(tool).expect("spec");
+            assert!(!spec.supports_parallel, "{tool} should be sequential");
+        }
     }
 }

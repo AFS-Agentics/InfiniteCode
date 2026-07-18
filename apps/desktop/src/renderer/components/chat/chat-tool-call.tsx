@@ -15,6 +15,7 @@ import {
 	TerminalTitle,
 } from "@infinitecode/ui/components/ai-elements/terminal"
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@infinitecode/ui/components/dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@infinitecode/ui/components/tooltip"
 import { cn } from "@infinitecode/ui/lib/utils"
 
 import { useSetAtom } from "jotai"
@@ -39,7 +40,7 @@ import {
 	ZapIcon,
 } from "lucide-react"
 import type { ReactNode } from "react"
-import { memo, useCallback, useMemo } from "react"
+import { memo, useCallback, useEffect, useMemo, useState } from "react"
 import type { BundledLanguage } from "shiki"
 import { viewFileInDiffPanelAtom } from "../../atoms/ui"
 import { detectContentLanguage, detectLanguage, prettyPrintJson } from "../../lib/language"
@@ -177,33 +178,36 @@ export function getToolInfo(tool: string): {
 } {
 	switch (tool) {
 		case "read":
-			return { icon: EyeIcon, title: "Read" }
+			return { icon: EyeIcon, title: "Reading" }
 		case "glob":
-			return { icon: SearchIcon, title: "Glob" }
+			return { icon: SearchIcon, title: "Finding files" }
 		case "grep":
-			return { icon: SearchIcon, title: "Grep" }
+			return { icon: SearchIcon, title: "Searching" }
 		case "list":
-			return { icon: SearchIcon, title: "List" }
+			return { icon: SearchIcon, title: "Listing" }
 		case "webfetch":
-			return { icon: GlobeIcon, title: "Fetch" }
+			return { icon: GlobeIcon, title: "Fetching" }
 		case "bash":
-			return { icon: TerminalIcon, title: "Shell" }
+			return { icon: TerminalIcon, title: "Running" }
 		case "edit":
-			return { icon: EditIcon, title: "Edit" }
+			return { icon: EditIcon, title: "Editing" }
 		case "write":
-			return { icon: FileCodeIcon, title: "Write" }
+			return { icon: FileCodeIcon, title: "Writing" }
 		case "apply_patch":
-			return { icon: CodeIcon, title: "Patch" }
+			return { icon: CodeIcon, title: "Patching" }
 		case "task":
-			return { icon: ZapIcon, title: "Agent" }
+			return { icon: ZapIcon, title: "Spawning" }
 		case "todowrite":
-			return { icon: SquareCheckIcon, title: "Todos" }
+			return { icon: SquareCheckIcon, title: "Updating todos" }
 		case "todoread":
-			return { icon: SquareCheckIcon, title: "Todos" }
+			return { icon: SquareCheckIcon, title: "Reading todos" }
 		case "question":
 		case "request_user_input":
-			return { icon: BookOpenIcon, title: "Question" }
+			return { icon: BookOpenIcon, title: "Asking" }
 		default:
+			// Unknown / MCP: leave the title as the raw tool name so the
+			// monospace pill below the title doesn't duplicate it. The
+			// pill is the canonical identifier for these tools.
 			return { icon: WrenchIcon, title: tool }
 	}
 }
@@ -236,22 +240,31 @@ function extractFromRaw(state: ToolPart["state"], ...fields: string[]): string |
 function getPendingLabel(tool: string): string {
 	switch (tool) {
 		case "write":
-			return "Preparing write..."
+			return "Preparing file write..."
 		case "edit":
-			return "Preparing edit..."
+			return "Preparing file edit..."
 		case "apply_patch":
 			return "Preparing patch..."
 		case "bash":
-			return "Preparing command..."
+			return "Preparing shell command..."
 		case "read":
-			return "Preparing read..."
+			return "Preparing file read..."
+		case "glob":
+			return "Preparing file search..."
+		case "grep":
+			return "Preparing pattern search..."
+		case "list":
+			return "Preparing directory listing..."
 		case "task":
-			return "Preparing agent..."
+			return "Preparing sub-agent..."
 		case "webfetch":
-			return "Preparing fetch..."
+			return "Preparing URL fetch..."
+		case "todowrite":
+		case "todoread":
+			return "Preparing todos..."
 		case "question":
 		case "request_user_input":
-			return "Asking a question..."
+			return "Preparing question..."
 		default:
 			return `Preparing ${tool}...`
 	}
@@ -858,42 +871,49 @@ export function describeToolGroup(
 		if (details.length > 0) {
 			switch (category) {
 				case "explore":
-					return count === 1 ? `Read ${details[0]}` : `Read ${details.join(", ")}`
+					return count === 1 ? `Reading ${details[0]}` : `Reading ${details.join(", ")}`
 				case "edit":
-					return count === 1 ? `Edited ${details[0]}` : `Edited ${details.join(", ")}`
+					return count === 1 ? `Editing ${details[0]}` : `Editing ${details.join(", ")}`
 				case "run":
-					return count === 1 ? `Ran ${details[0]}` : `Ran ${count} commands`
+					return count === 1 ? `Running ${details[0]}` : `Running ${count} commands`
 				case "delegate":
-					return count === 1 ? `Delegated: ${details[0]}` : `Delegated ${count} tasks`
+					return count === 1 ? `Spawning agent: ${details[0]}` : `Spawning ${count} sub-agents`
 				case "fetch":
-					return count === 1 ? `Fetched ${details[0]}` : `Fetched ${count} URLs`
+					return count === 1 ? `Fetching ${details[0]}` : `Fetching ${count} URLs`
 				case "ask":
-					return "Asked a question"
-				case "plan":
-					return "Updated plan"
+					return "Asking a question"
+				case "plan": {
+					// Differentiate todoread-only from todowrite so the
+					// read-only plan refresh reads as "Reading plan"
+					// rather than the misleading "Updating plan".
+					const allReadOnly = tools.every((t) => t.tool === "todoread")
+					return allReadOnly ? "Reading plan" : "Updating plan"
+				}
 				default:
-					return `Ran ${details.join(", ")}`
+					return `Running ${details.join(", ")}`
 			}
 		}
 	}
 
 	switch (category) {
 		case "explore":
-			return `Explored ${count} files`
+			return `Reading ${count} files`
 		case "edit":
-			return `Edited ${count} files`
+			return `Editing ${count} files`
 		case "run":
-			return `Ran ${count} commands`
+			return `Running ${count} commands`
 		case "delegate":
-			return `Delegated ${count} tasks`
+			return `Spawning ${count} sub-agents`
 		case "fetch":
-			return `Fetched ${count} URLs`
+			return `Fetching ${count} URLs`
 		case "ask":
-			return `Asked ${count} questions`
-		case "plan":
-			return "Updated plan"
+			return `Asking ${count} questions`
+		case "plan": {
+			const allReadOnly = tools.every((t) => t.tool === "todoread")
+			return allReadOnly ? `Reading ${count} plans` : `Updating ${count} plans`
+		}
 		default:
-			return `Ran ${count} tools`
+			return `Running ${count} tools`
 	}
 }
 
@@ -906,14 +926,39 @@ export function isGroupError(tools: ToolPart[]): boolean {
 }
 
 // ============================================================
-// Smart defaults: which tools should be open by default
+// Stuck-detection thresholds
 // ============================================================
+
+/** After this many ms in pending/running without a status transition,
+ *  show a static (non-spinning) indicator + elapsed time to signal
+ *  to the user that the tool appears stuck. Mirrors the TUI's
+ *  ~25s warning heuristic. */
+const TOOL_STUCK_AFTER_MS = 25_000
 
 /**
  * Returns whether a tool should default to expanded in the active turn.
+ * Active-turn tools auto-expand so the user can see live output and tool
+ * name instead of just a faint trigger row. When the turn goes idle the
+ * caller passes `defaultOpen=false` (via `defaultOpenProp`), so completed
+ * tools collapse naturally without user interaction.
  */
-export function shouldDefaultOpen(_tool: string, _status: string): boolean {
-	return false
+export function shouldDefaultOpen(_tool: string, status: string): boolean {
+	return status === "running" || status === "pending"
+}
+
+/**
+ * Formats an elapsed ms duration as a compact "12s" / "1m 4s" string.
+ * Mirrors getToolDuration output style for visual consistency.
+ */
+function formatElapsed(ms: number): string {
+	const safe = Math.max(0, ms)
+	if (safe < 1000) return `${safe}ms`
+	const seconds = Math.floor(safe / 1000)
+	if (seconds < 60) return `${seconds}s`
+	const minutes = Math.floor(seconds / 60)
+	const remainingSeconds = seconds % 60
+	if (minutes < 60) return `${minutes}m ${remainingSeconds}s`
+	return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
 }
 /**
  * Returns whether a tool has expandable content.
@@ -1083,7 +1128,9 @@ export const ChatToolCall = memo(
 
 		const status = part.state.status as "running" | "error" | "completed" | "pending"
 
-		// Build trailing element: diff stats + "view diff" button, or a running spinner.
+		// Build trailing element: diff stats (the running spinner / stuck
+		// indicator is rendered separately by `runningTrailing` below so we
+		// don't get duplicate spinners).
 		const trailingElement = useMemo(() => {
 			const parts: ReactNode[] = []
 
@@ -1102,19 +1149,10 @@ export const ChatToolCall = memo(
 				)
 			}
 
-			if (status === "running" || status === "pending") {
-				parts.push(
-					<Loader2Icon
-						key="running"
-						className="size-3 animate-spin text-muted-foreground/40"
-					/>,
-				)
-			}
-
 			if (parts.length === 0) return undefined
 			if (parts.length === 1) return parts[0]
 			return <span className="flex items-center gap-2.5">{parts}</span>
-		}, [diffStats, status])
+		}, [diffStats])
 
 		// Combine trailing element with "View diff" button for edit-category tools
 		const combinedTrailing = useMemo(() => {
@@ -1180,6 +1218,44 @@ export const ChatToolCall = memo(
 			)
 		}, [turnHasError, onDelete, combinedTrailing, handleDelete])
 
+		// Stuck-detection: after TOOL_STUCK_AFTER_MS in pending/running without
+		// a status transition, freeze the spinner and surface elapsed time so
+		// the user can tell the tool has hung. Re-checks every second so the
+		// elapsed counter ticks. Resets to live spinner the moment status
+		// flips to completed/error (the cleanup below fires on status change).
+		const startMs = part.state.time?.start
+		const [stuckMs, setStuckMs] = useState<number | null>(null)
+		useEffect(() => {
+			// Clear stuck state immediately on completion/error — the user
+			// should NOT see "stuck" warnings on a tool that just finished.
+			if (status !== "running" && status !== "pending") {
+				setStuckMs(null)
+				return undefined
+			}
+			if (typeof startMs !== "number") return undefined
+
+			const tick = () => {
+				const elapsed = Date.now() - startMs
+				if (elapsed >= TOOL_STUCK_AFTER_MS) {
+					setStuckMs(elapsed)
+				} else {
+					setStuckMs(null)
+				}
+			}
+			tick()
+			const id = setInterval(tick, 1000)
+			return () => clearInterval(id)
+		}, [status, startMs])
+		const isStuck = stuckMs != null
+
+		// Re-derived during render so the elapsed counter updates without a
+		// full re-flow. Cheap: just one Date.now() + arithmetic.
+		const liveElapsedMs = useMemo(() => {
+			if (typeof startMs !== "number") return null
+			if (status !== "running" && status !== "pending") return null
+			return Date.now() - startMs
+		}, [startMs, status, stuckMs])
+
 		// Skip rendering todoread parts without output
 		if (part.tool === "todoread" && part.state.status !== "completed") return null
 
@@ -1192,6 +1268,21 @@ export const ChatToolCall = memo(
 		const { icon: Icon, title } = getToolInfo(part.tool)
 		const subtitle = getToolSubtitle(part, { projectRoot })
 		const hasContent = hasExpandableContent(part)
+		// Raw SDK tool name surfaced as a small monospace pill so the user
+		// always sees exactly which tool from the SDK is being called
+		// (e.g. "bash" even though the human-friendly title reads
+		// "Running command"). Helps debug "why did the agent call `bash`
+		// and not the MCP server" without opening the JSON.
+		const tooltipTitle = `Tool: ${part.tool}`
+		// DefaultOpen logic:
+		//   - explicit prop wins (controlled by parent)
+		//   - otherwise: auto-expand while running/pending so the user can see
+		//     the tool name, subtitle, and streaming output instead of just
+		//     a faint icon row. When status flips to completed/error AND no
+		//     explicit prop was passed, the parent re-mounts with
+		//     defaultOpenProp=undefined but `shouldDefaultOpen` returns false,
+		//     so the next fresh render collapses. User can still re-expand
+		//     by clicking.
 		const defaultOpen =
 			defaultOpenProp ?? (isActiveTurn ? shouldDefaultOpen(part.tool, status) : false)
 		const isRunning = status === "running" || status === "pending"
@@ -1202,36 +1293,117 @@ export const ChatToolCall = memo(
 				? ((part.state as ToolStateCompleted).attachments ?? [])
 				: []
 
+		// Visible trigger styling: while running/pending, lift the row out of
+		// pure muted-foreground into a clearly-active pill so the user can
+		// tell at a glance that work is happening — fixes the "didn't even
+		// show anything" complaint when the trigger is collapsed.
+		const triggerLeadingClass = isRunning
+			? isStuck
+				? "size-4 shrink-0 text-amber-500"
+				: "size-4 shrink-0 animate-pulse text-blue-400"
+			: "size-4 shrink-0 text-muted-foreground/60"
+		const triggerLabelClass = isRunning
+			? isStuck
+				? "min-w-0 truncate font-medium text-amber-600"
+				: "min-w-0 truncate font-medium text-foreground"
+			: "min-w-0 truncate text-foreground/80"
+		const subtitleClass = isRunning
+			? "min-w-0 truncate text-foreground/70"
+			: "min-w-0 truncate text-muted-foreground/60"
+		const triggerBgClass = isRunning
+			? isStuck
+				? "bg-amber-500/5"
+				: "bg-blue-500/5"
+			: undefined
+
 		const label = subtitle ? (
-			<>
-				<span>{title}</span>
-				<span className="text-muted-foreground/60"> · {subtitle}</span>
-			</>
+			<span className="flex min-w-0 items-center gap-1.5">
+				<span className={triggerLabelClass}>{title}</span>
+				<span className={subtitleClass}>· {subtitle}</span>
+			</span>
 		) : (
-			<span>{title}</span>
+			<span className={triggerLabelClass}>{title}</span>
+		)
+
+		// Tool-name pill — small monospace badge that surfaces the *raw*
+		// SDK tool name. Helps users (especially technical ones) tell at
+		// a glance whether the underlying tool is `bash`, `webfetch`, an
+		// MCP tool, etc. Sized to stay secondary next to the action verb
+		// and rendered as part of the trailing slot so subtitle truncation
+		// never squeezes it out of view.
+		//
+		// Suppress the pill when title already == part.tool (default/MCP
+		// branch where getToolInfo returns the raw tool name as title) to
+		// avoid duplicating the same string twice on one row.
+		const showToolPill = part.tool !== title
+		const toolNamePill = showToolPill ? (
+			<Tooltip>
+				<TooltipTrigger
+					render={
+						<code
+							aria-label={tooltipTitle}
+							className={cn(
+								"shrink-0 cursor-default rounded px-1.5 py-px font-mono text-[10px] leading-tight transition-colors",
+								isRunning
+									? "bg-blue-500/10 text-foreground/80"
+									: "bg-muted/60 text-muted-foreground/70",
+							)}
+						>
+							{part.tool}
+						</code>
+					}
+				/>
+				<TooltipContent side="top" className="max-w-xs">
+					<p className="text-xs">SDK tool name: <code className="font-mono">{part.tool}</code></p>
+				</TooltipContent>
+			</Tooltip>
+		) : null
+
+		// Replace the trailing spinner with a stuck-state indicator when the
+		// tool has been pending/running for a long time without completion.
+		const runningTrailing = isStuck ? (
+			<span
+				key="stuck"
+				className="flex items-center gap-1.5 text-[11px] font-medium tabular-nums text-amber-600"
+			>
+				<AlertTriangleIcon className="size-3" aria-hidden="true" />
+				<span>
+					Stuck {typeof stuckMs === "number" ? formatElapsed(stuckMs) : ""}
+				</span>
+			</span>
+		) : isRunning ? (
+			<span
+				key="running"
+				className="flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground/70"
+			>
+				{liveElapsedMs != null && liveElapsedMs >= 1500 ? (
+					<span>{formatElapsed(liveElapsedMs)}</span>
+				) : null}
+				<Loader2Icon className="size-3 animate-spin text-blue-400/70" />
+			</span>
+		) : undefined
+
+		const finalTrailingForRender = (
+			<span className="flex items-center gap-2">
+				{toolNamePill}
+				{runningTrailing}
+				{finalTrailing}
+			</span>
 		)
 
 		return (
 			<div className="space-y-1.5">
 				<TranscriptDisclosure
-					className="mb-0"
+					className={cn("mb-0", triggerBgClass)}
 					defaultOpen={defaultOpen}
 					expandable={hasContent}
 					open={open}
 					onOpenChange={onOpenChange}
 				>
 					<TranscriptDisclosureTrigger
-						leading={
-							<Icon
-								className={`size-4 shrink-0 ${
-									isRunning
-										? "animate-pulse text-muted-foreground"
-										: "text-muted-foreground/50"
-								}`}
-							/>
-						}
+						leading={<Icon className={triggerLeadingClass} />}
 						label={label}
-						trailing={finalTrailing}
+						trailing={finalTrailingForRender}
 					/>
 					{hasContent && (
 						<TranscriptDisclosureContent className="overflow-hidden rounded-md border border-border/50">

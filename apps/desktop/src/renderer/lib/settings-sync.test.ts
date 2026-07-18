@@ -81,6 +81,7 @@ const defaultSettings: AppSettings = {
 	},
 	performance: {
 		selfVerify: false,
+		suggestFollowups: true,
 		compactStrategy: "auto",
 		compactThresholdPercent: 80,
 	},

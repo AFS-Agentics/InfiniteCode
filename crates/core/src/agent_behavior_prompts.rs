@@ -13,6 +13,10 @@ const VERIFY_SOLUTION_PROMPT_TEMPLATE: &str =
     include_str!("../prompts/agent-behavior/verify-solution.md");
 const SUGGEST_FOLLOWUPS_PROMPT_TEMPLATE: &str =
     include_str!("../prompts/agent-behavior/suggest-followups.md");
+const EXPLORE_SOLUTIONS_PROMPT_TEMPLATE: &str =
+    include_str!("../prompts/agent-behavior/explore-solutions.md");
+const AUDIT_CHANGES_PROMPT_TEMPLATE: &str =
+    include_str!("../prompts/agent-behavior/audit-changes.md");
 
 /// Returns the `verify_solution` prompt fragment, or an empty string when
 /// `self_verify` is disabled.
@@ -27,14 +31,44 @@ pub(crate) fn verify_solution_prompt(enabled: bool) -> String {
     VERIFY_SOLUTION_PROMPT_TEMPLATE.trim().to_string()
 }
 
-/// Returns the `suggest_followups` prompt fragment. Default-on for every
-/// agent so non-trivial turns end with concrete next-step suggestions.
+/// Returns the `suggest_followups` prompt fragment, or an empty string when
+/// the user has opted out via `AgentBehaviorConfig::suggest_followups`.
 ///
 /// The fragment is wrapped in `<suggest_followups_protocol>...</suggest_followups_protocol>`
 /// tags. The handler is always registered; the prompt only mentions it when
-/// this function returns a non-empty string.
-pub(crate) fn suggest_followups_prompt() -> String {
+/// this function returns a non-empty string. Default-on for every agent so
+/// non-trivial turns end with concrete next-step suggestions.
+pub(crate) fn suggest_followups_prompt(enabled: bool) -> String {
+    if !enabled {
+        return String::new();
+    }
     SUGGEST_FOLLOWUPS_PROMPT_TEMPLATE.trim().to_string()
+}
+
+/// Returns the `explore_solutions` prompt fragment, or an empty string when
+/// the `explore_solutions` behavior flag is disabled.
+///
+/// The fragment is wrapped in `<explore_solutions_protocol>...</explore_solutions_protocol>`
+/// tags. It instructs the model to generate multiple proposals using
+/// `preview_edit`/`preview_write` before committing to a single approach.
+pub(crate) fn explore_solutions_prompt(enabled: bool) -> String {
+    if !enabled {
+        return String::new();
+    }
+    EXPLORE_SOLUTIONS_PROMPT_TEMPLATE.trim().to_string()
+}
+
+/// Returns the `audit_changes` prompt fragment, or an empty string when
+/// the `audit_changes` behavior flag is disabled.
+///
+/// The fragment is wrapped in `<audit_changes_protocol>...</audit_changes_protocol>`
+/// tags. It instructs the model to review changes from quality, security,
+/// and performance perspectives before finalizing.
+pub(crate) fn audit_changes_prompt(enabled: bool) -> String {
+    if !enabled {
+        return String::new();
+    }
+    AUDIT_CHANGES_PROMPT_TEMPLATE.trim().to_string()
 }
 
 #[cfg(test)]
@@ -70,7 +104,7 @@ mod tests {
 
     #[test]
     fn suggest_followups_prompt_is_non_empty_and_wrapped_in_protocol_tags() {
-        let prompt = suggest_followups_prompt();
+        let prompt = suggest_followups_prompt(true);
         assert!(prompt.starts_with("<suggest_followups_protocol>"));
         assert!(prompt.ends_with("</suggest_followups_protocol>"));
         assert!(prompt.contains("suggest_followups"));
@@ -78,8 +112,13 @@ mod tests {
     }
 
     #[test]
+    fn suggest_followups_prompt_disabled_is_empty() {
+        assert_eq!(suggest_followups_prompt(false), String::new());
+    }
+
+    #[test]
     fn suggest_followups_prompt_matches_markdown_source() {
-        let prompt = suggest_followups_prompt();
+        let prompt = suggest_followups_prompt(true);
         assert_eq!(
             prompt,
             include_str!("../prompts/agent-behavior/suggest-followups.md")

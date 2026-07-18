@@ -86,6 +86,28 @@ import { getProjectClient } from "../../services/connection-manager"
 
 const log = createLogger("chat-view")
 
+/**
+ * Format web search results as a context block prepended to the user message.
+ * Kept short so we don't blow past the model's context budget.
+ */
+function formatWebSearchContextBlock(
+	query: string,
+	results: ReadonlyArray<{
+		title: string
+		url: string
+		snippet: string
+		source: string
+	}>,
+): string {
+	const lines = results
+		.map(
+			(r, i) =>
+				`[${i + 1}] ${r.title}\n    ${r.snippet}\n    Source: ${r.source} — ${r.url}`,
+		)
+		.join("\n\n")
+	return `<web_search query="${query.replace(/"/g, "&quot;")}">\n${lines}\n</web_search>`
+}
+
 const VIRTUALIZE_TURN_THRESHOLD = 30
 const VIRTUAL_TURN_GAP = 40
 
@@ -1621,6 +1643,9 @@ function ChatInputSection({
 			// Product requirement: Desktop slash commands are limited to first-party
 			// entries. Compact executes immediately; Goal/Plan become footer trigger
 			// chips; Research stays as slash text so ACP can run it after a question.
+			// `/search <query>` fetches web search results, rewrites the composer
+			// text to include them as a `<web_search>` context block, and consumes
+			// the command — the user then hits Enter to send normally.
 			switch (cmdName.toLowerCase()) {
 				case "compact":
 					if (agent.directory && effectiveModel) {
@@ -1646,6 +1671,41 @@ function ChatInputSection({
 					return true
 				case "research":
 					return false
+				case "search": {
+					const query = spaceIndex === -1 ? "" : trimmed.slice(spaceIndex + 1).trim()
+					if (!query) {
+						log.warn("slash /search called without a query")
+						return true
+					}
+					if (typeof window === "undefined" || !window.infinitecode?.webSearch) {
+						log.warn("slash /search — web search IPC unavailable")
+						return true
+					}
+					try {
+						const settings = await window.infinitecode.getSettings()
+						const provider =
+							settings.webSearch?.defaultProvider ?? "duckduckgo"
+						const limit = settings.webSearch?.maxResults ?? 5
+						const result = await window.infinitecode.webSearch.query(
+							provider,
+							query,
+							limit,
+						)
+						if (result.ok) {
+							const block = formatWebSearchContextBlock(query, result.results)
+							const nextText = `${block}\n\n${query}`
+							slashCommandRef.current?.setText(nextText)
+						} else {
+							log.warn("slash /search failed", {
+								reason: result.reason,
+								message: result.message,
+							})
+						}
+					} catch (err) {
+						log.error("slash /search threw", { sessionId: agent.sessionId }, err)
+					}
+					return true
+				}
 				default:
 					return false
 			}

@@ -73,7 +73,11 @@ import {
 	GravityMidResponseAd,
 	GravityMidTimelineAd,
 } from "./gravity-ad";
-import { buildProcessTimeline } from "./process-timeline";
+import {
+	buildProcessTimeline,
+	processTimelineRowId,
+	type ProcessTimelineItem,
+} from "./process-timeline";
 import { ProcessTimelineView } from "./process-timeline-view";
 
 // ============================================================
@@ -939,35 +943,70 @@ export const ChatTurnComponent = memo(
 		const isActiveTurn = working;
 		const showVerboseTools = displayMode === "verbose";
 
-		// Mid-timeline ad cadence:
-		//   - Dev mode: every 2 items to make the placement visibly verifiable
-		//     during UI iteration (without a real GRAVITY_API_KEY).
-		//   - Prod mode: every 3 items so real auction density stays sane.
-		//   - Capped at MAX_MID_TIMELINE_ADS_PER_TURN so a 20-tool turn doesn't
-		//     flood the page. Slots 5+ render without an ad.
-		const MID_TIMELINE_CADENCE = import.meta.env.DEV ? 2 : 3;
-		const MAX_MID_TIMELINE_ADS_PER_TURN = 4;
-
-		// Stable closure so ProcessTimelineView's memo doesn't re-mount on
-		// every render. Index math: `(index + 1) % cadence === 0` fires after
-		// every N items; `(index + 1) / cadence <= MAX` caps the per-turn
-		// total. The `paused={!isActiveTurn}` flag freezes the rotation
-		// interval on off-screen turns — without this, a 10-turn chat would
-		// fire ~40 API calls per minute for ads the user can't see.
+		// Mid-timeline ad cadence — per-kind so thoughts get dense coverage
+		// while tools stay at a saner auction rate. User feedback moved
+		// thoughts from cadence=3 down to cadence=1 (every thought block)
+		// because reasoning-heavy turns were capping at 4 ads across 10+
+		// thoughts. Tools keep cadence=3 (production) / cadence=2 (dev) so
+		// the underlying auction density stays sane when a turn has many
+		// file ops.
 		//
-		// Stamping `key={`ad-${rowId}`}` on the returned element is critical:
-		// it keeps the ad's React identity stable across renders even when
-		// the cadence Math flips between null and JSX. Without it, mid-
-		// streaming churn would tear down + re-register the Intersection-
-		// Observer, inflating impression-tracking noise.
+		// Separate per-kind caps so a 20-thought turn doesn't crowd out
+		// tool-ads entirely (and vice versa). User requirement was
+		// "ad after every thought block" — thoughts get a generous cap
+		// (16) so the user almost never sees a missed thought-ad; tools
+		// and text keep a tighter cap (4) so we don't auction-storm a
+		// run of shell commands.
+		const MAX_THOUGHT_ADS_PER_TURN = 16;
+		const MAX_OTHER_ADS_PER_TURN = 4;
+
+		// The renderMidAd closure needs to count "how many of THIS kind
+		// have already rendered an ad, before this one?" so the per-kind
+		// cap applies independently. We pre-compute per-item slot
+		// numbers via items (in scope above as processTimelineItems),
+		// then expose them via a Map keyed by rowId. The slot map is
+		// O(n) once per render and avoids the closure needing the full
+		// items array every call.
+		const midAdSlotMap = useMemo(() => {
+			const map = new Map<string, { cap: number; cadence: number; slot: number }>()
+			let thoughtSlot = 0
+			let otherSlot = 0
+			processTimelineItems.forEach((item, idx) => {
+				let cadence: number
+				let cap: number
+				if (item.kind === "thought") {
+					cadence = 1
+					cap = MAX_THOUGHT_ADS_PER_TURN
+					thoughtSlot += 1
+				} else if (item.kind === "tool" || item.kind === "tool-group") {
+					cadence = import.meta.env.DEV ? 2 : 3
+					cap = MAX_OTHER_ADS_PER_TURN
+					if ((idx + 1) % cadence === 0) otherSlot += 1
+				} else {
+					cadence = 4
+					cap = MAX_OTHER_ADS_PER_TURN
+					if ((idx + 1) % cadence === 0) otherSlot += 1
+				}
+				const slot =
+					item.kind === "thought"
+						? thoughtSlot
+						: (idx + 1) % cadence === 0
+							? otherSlot
+							: 0
+				const rowId = processTimelineRowId(item, idx)
+				map.set(rowId, { cap, cadence, slot })
+			})
+			return map
+		}, [processTimelineItems])
+
 		const renderMidAd = useCallback(
 			(itemIndex: number, rowId: string) => {
-				if (turnAdMessages.length === 0) return null;
-				const slotNumber = (itemIndex + 1) / MID_TIMELINE_CADENCE;
-				const isCadenceHit = (itemIndex + 1) % MID_TIMELINE_CADENCE === 0;
-				if (!isCadenceHit || slotNumber > MAX_MID_TIMELINE_ADS_PER_TURN) {
-					return null;
-				}
+				if (turnAdMessages.length === 0) return null
+				const meta = midAdSlotMap.get(rowId)
+				if (!meta) return null
+				if (meta.cadence > 1 && (itemIndex + 1) % meta.cadence !== 0) return null
+				if (meta.slot === 0) return null
+				if (meta.slot > meta.cap) return null
 				return (
 					<GravityMidTimelineAd
 						key={`ad-${rowId}`}
@@ -975,10 +1014,10 @@ export const ChatTurnComponent = memo(
 						paused={!isActiveTurn}
 						refreshIntervalMs={60 * 1000}
 					/>
-				);
+				)
 			},
-			[isActiveTurn, turnAdMessages],
-		);
+			[isActiveTurn, turnAdMessages, midAdSlotMap],
+		)
 
 		const textAlreadyInline =
 			processSectionVisible &&
