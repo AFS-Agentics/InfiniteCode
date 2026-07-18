@@ -27,6 +27,13 @@ import {
 	AccordionTrigger,
 } from "@/components/ui/accordion"
 
+// Docs landing page sections (added alongside original content)
+import { ProofSection } from "@/pages/landing/proof-section"
+import { WorkflowSection } from "@/pages/landing/workflow-section"
+import { EnterpriseSection } from "@/pages/landing/enterprise-section"
+import { ClosingSection } from "@/pages/landing/closing-section"
+import { landingCopy } from "@/pages/landing/data"
+
 // ──────────────────────────────────────────────
 // Data
 // ──────────────────────────────────────────────
@@ -76,6 +83,10 @@ const faqItems = [
 	{
 		q: "What's the difference between InfiniteCode and Freebuff?",
 		a: "Both are free and open-source, but Freebuff limits usage to 5 sessions of 1 hour per day (5 hours total) in most countries. InfiniteCode has no daily limits — use it as much as you want, whenever you want. No caps, no sessions, no clock watching.",
+	},
+	{
+		q: "Do you capture my code or session data?",
+		a: "No — InfiniteCode never captures your code, sessions, or telemetry. There's no analytics endpoint, no upload, no recording. Other agentic tools, including Freebuff, do capture session logs and code fragments for analytics and product improvement. That's how they keep the free tier funded. We don't do that.",
 	},
 	{
 		q: "Do I need an API key?",
@@ -194,7 +205,6 @@ function HeroSection() {
 
 function ReplacesSection() {
 	const tools = [
-		{ name: "OpenCode", paid: 120 },
 		{ name: "Codex", paid: 240 },
 		{ name: "Cursor", paid: 720 },
 		{ name: "Claude Code", paid: 1200 },
@@ -328,6 +338,68 @@ function ComparisonSection() {
 						</tbody>
 					</table>
 				</div>
+			</div>
+		</section>
+	)
+}
+
+function PrivacySection() {
+	const rows = [
+		{
+			who: "InfiniteCode",
+			good: true,
+			body: "No analytics. No code upload. No session recording. Your conversations and code stay on your machine — only stored in your project's local cache.",
+		},
+		{
+			who: "Most other tools (incl. Freebuff)",
+			good: false,
+			body: "Capture session logs, code fragments, and usage metrics. Transmitted off-device to vendor servers for analytics, model improvement, and capacity planning.",
+		},
+	]
+	return (
+		<section
+			id="privacy"
+			className="relative overflow-hidden border-y border-border bg-gradient-to-b from-background via-background to-muted/40 py-20"
+		>
+			<div className="pointer-events-none absolute inset-0 -z-10 opacity-60">
+				<div className="absolute -top-24 left-1/2 size-[28rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+			</div>
+			<div className="mx-auto max-w-5xl px-4">
+				<div className="mb-10 text-center">
+					<div className="mb-3 inline-flex w-fit items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs text-muted-foreground">
+						<ShieldIcon className="size-3" />
+						Privacy by default
+					</div>
+					<h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+						We don't capture your data. Most tools do.
+					</h2>
+					<p className="mx-auto mt-3 max-w-2xl text-muted-foreground leading-relaxed">
+						InfiniteCode never sends your code, sessions, or telemetry anywhere.
+						Other agentic tools — including Freebuff — routinely capture session
+						logs and code fragments for analytics and product improvement.
+					</p>
+				</div>
+				<div className="grid gap-4 sm:grid-cols-2">
+					{rows.map((r) => (
+						<Card className={r.good ? "border-emerald-500/30 bg-emerald-500/5" : "border-red-500/25 bg-red-500/5"} key={r.who}>
+							<CardHeader>
+								<div className="mb-2 flex size-10 items-center justify-center rounded-lg bg-background/60 ring-1 ring-border">
+									{r.good ? (
+										<CheckIcon className="size-5 text-emerald-500" />
+									) : (
+										<XIcon className="size-5 text-red-500" />
+									)}
+								</div>
+								<CardTitle className="text-base">{r.who}</CardTitle>
+								<CardDescription className="leading-relaxed">{r.body}</CardDescription>
+							</CardHeader>
+						</Card>
+					))}
+				</div>
+				<p className="mt-8 text-center text-xs text-muted-foreground">
+					Audit it yourself — InfiniteCode is MIT-licensed. The whole runtime is
+					readable, forkable, and replaceable.
+				</p>
 			</div>
 		</section>
 	)
@@ -631,11 +703,17 @@ export function HomePage() {
 				<ReplacesSection />
 				<FeatureGrid />
 				<ComparisonSection />
+				<PrivacySection />
 				<CliSection />
 				<DesktopSection />
 				<WebSection />
 				<StatsSection />
 				<CtaSection />
+				{/* Docs landing page sections added below */}
+				<ProofSection rows={landingCopy.en.proofRows} />
+				<WorkflowSection copy={landingCopy.en.workflow} />
+				<EnterpriseSection copy={landingCopy.en.enterprise} />
+				<ClosingSection copy={landingCopy.en.closing} docsHref="/docs" />
 				<FaqSection />
 			</main>
 			<FooterSection />
