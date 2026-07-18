@@ -444,4 +444,32 @@ contextBridge.exposeInMainWorld("infinitecode", {
 			};
 		},
 	},
+
+	// --- Web search ---
+
+	webSearch: {
+		query: (provider: string, query: string, limit?: number) =>
+			ipcRenderer.invoke("web-search:query", provider, query, limit),
+		test: (provider: string) => ipcRenderer.invoke("web-search:test", provider),
+	},
+
+	// --- Voice / STT ---
+
+	voice: {
+		capability: () => ipcRenderer.invoke("voice:capability"),
+	},
+
+	// --- Session supersede (cross-process single-session enforcement) ---
+	// Forwarded from the main process when an infinitecode:ensure call hits
+	// a live SessionSupersededError. See `infinitecode-manager.ts` for the
+	// lock acquire and `SessionSupersededBanner` for the renderer copy.
+
+	onSessionSuperseded: (callback: (detail: { otherPid: number; otherSurface: "cli" | "desktop"; lockPath: string }) => void) => {
+		const listener = (_event: unknown, detail: { otherPid: number; otherSurface: "cli" | "desktop"; lockPath: string }) =>
+			callback(detail);
+		ipcRenderer.on("session:superseded", listener);
+		return () => {
+			ipcRenderer.removeListener("session:superseded", listener);
+		};
+	},
 });

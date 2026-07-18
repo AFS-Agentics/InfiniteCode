@@ -31,6 +31,10 @@ import { AppBarProvider } from "./app-bar-context"
 import { CommandPalette } from "./command-palette"
 import { OnboardingOverlay } from "./onboarding/onboarding-overlay"
 import { SidebarSlotProvider } from "./sidebar-slot-context"
+import {
+	SessionSupersededBanner,
+	SessionSupersededBridge,
+} from "./session-superseded-banner"
 import { StartupOverlay } from "./startup-overlay"
 
 export function RootLayout() {
@@ -236,22 +240,26 @@ export function RootLayout() {
 
 	return (
 		<TooltipProvider>
-			<AppBarProvider>
-				<SidebarSlotProvider>
+			<AppBarProvider>				<SidebarSlotProvider>
 					<div
 						className={`transition-opacity duration-300 ${contentReady ? "opacity-100" : "opacity-0"}`}
 					>
-					<Outlet />
-					<CommandPalette
-						open={commandPaletteOpen}
-						onOpenChange={setCommandPaletteOpen}
-						agents={agents}
-						onForkSession={activeAgent ? handleForkSession : undefined}
-					/>
-					<ArtifactPane />
-					<Toaster position="bottom-right" />
+						<Outlet />
+						<CommandPalette
+							open={commandPaletteOpen}
+							onOpenChange={setCommandPaletteOpen}
+							agents={agents}
+							onForkSession={activeAgent ? handleForkSession : undefined}
+						/>
+						<ArtifactPane />
+						<Toaster position="bottom-right" />
 					</div>
 					<StartupOverlay />
+					{/* Cross-surface single-session lock: invisible IPC bridge
+						wires `session:superseded` events into the jotai atom; the
+						banner reads the atom and renders when it is non-null. */}
+					<SessionSupersededBridge />
+					<SessionSupersededBanner />
 				</SidebarSlotProvider>
 			</AppBarProvider>
 		</TooltipProvider>

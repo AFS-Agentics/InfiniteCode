@@ -3,6 +3,7 @@ import {
 	INFINITECODE_COMPACT_STRATEGY_ENV,
 	INFINITECODE_COMPACT_THRESHOLD_ENV,
 	INFINITECODE_SELF_VERIFY_ENV,
+	INFINITECODE_SUGGEST_FOLLOWUPS_ENV,
 } from "./acp-stdio-client"
 import { app } from "electron"
 import {
@@ -15,6 +16,10 @@ import {
 } from "./acp-traffic-log"
 import { StdioAcpClient } from "./acp-stdio-client"
 import { resolveProgram } from "./infinitecode-program"
+import {
+	acquire as acquireDesktopSessionLock,
+	release as releaseDesktopSessionLock,
+} from "./session-lock"
 import { createLogger } from "./logger"
 import { startNotificationWatcher, stopNotificationWatcher } from "./notification-watcher"
 import { getSettings } from "./settings-store"
@@ -76,6 +81,14 @@ export function stopServer(): boolean {
 	stdioClient?.stop()
 	stdioClient = null
 	server = null
+	// Release the cross-process session lock last, after the stdio client has
+	// actually torn down. We swallow the "already gone" case inside release()
+	// so a benign raced delete does not wedge app quit on Windows.
+	try {
+		releaseDesktopSessionLock()
+	} catch (error) {
+		log.warn("Failed to release session lock", error)
+	}
 	return hadClient
 }
 
@@ -126,6 +139,13 @@ export function getAcpTrafficLogState(): AcpTrafficLogState {
 
 async function startServer(): Promise<InfiniteCodeServer> {
 	await waitForEnv()
+	// Cross-surface supersede check: takes the cross-process session lock.
+	// If a CLI or another desktop window already holds it, this throws
+	// SessionSupersededError; the IPC `infinitecode:ensure` handler catches
+	// and broadcasts `session:superseded` to the renderer so the supersede
+	// banner copy from Freebuff's `cli-engine/src/hooks/helpers/send-message.ts:600-612`
+	// is visible immediately.
+	acquireDesktopSessionLock("desktop", null)
 	const client = getOrCreateClient()
 	client.start()
 
@@ -183,6 +203,12 @@ function buildAgentBehaviorEnv(performance: ReturnType<typeof getSettings>["perf
 	const env: NodeJS.ProcessEnv = {}
 	if (performance?.selfVerify) {
 		env[INFINITECODE_SELF_VERIFY_ENV] = "1"
+	}
+	if (performance && performance.suggestFollowups === false) {
+		// Default-on: only forward "0" when the user has explicitly turned
+		// the chips off. Leaving this unset lets the Rust side keep its
+		// own default of true.
+		env[INFINITECODE_SUGGEST_FOLLOWUPS_ENV] = "0"
 	}
 	if (performance?.compactStrategy && performance.compactStrategy !== "auto") {
 		env[INFINITECODE_COMPACT_STRATEGY_ENV] = performance.compactStrategy

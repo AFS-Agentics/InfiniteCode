@@ -87,6 +87,24 @@ struct Cli {
     #[arg(long = "no-self-verify", global = true)]
     no_self_verify: bool,
 
+    /// Opt-in / opt-out of clickable "What's next?" chip suggestions at
+    /// the end of non-trivial turns. On by default. Use
+    /// `--no-suggest-followups` to explicitly disable (cuts a small
+    /// `<suggest_followups_protocol>` block from the system prompt).
+    #[arg(
+        long = "suggest-followups",
+        global = true,
+        default_missing_value = "true",
+        num_args = 0..=1,
+        conflicts_with = "no_suggest_followups"
+    )]
+    suggest_followups: Option<bool>,
+
+    /// Explicitly disable suggest-followups, overriding any config.toml or
+    /// env-var setting.
+    #[arg(long = "no-suggest-followups", global = true)]
+    no_suggest_followups: bool,
+
     /// Context-compaction strategy. `auto` preserves existing behavior
     /// (compact at the configured threshold), `conservative` waits until
     /// 95% of the input budget, `aggressive` triggers at 60%, `off`
@@ -101,6 +119,12 @@ struct Cli {
 }
 
 fn main() -> Result<()> {
+    // Strict one-session-per-user enforcement. If another infinitecode
+    // instance is live, this binary exits 75 with a friendly message before
+    // touching stdin / TUI / stdio transport. Mirrors Freebuff's
+    // `cli-engine/src/hooks/helpers/send-message.ts:600-612` UX (a 2nd CLI
+    // running while one is already seated).
+    infinitecode_core::session_lock::ensure_single_cli_session_or_exit(None);
     infinitecode_arg0::run_as_with_early_dispatch(
         |_paths| async {
             let result = run_cli().await;
@@ -445,13 +469,25 @@ fn cli_agent_behavior_overrides(cli: &Cli) -> toml::Value {
     } else {
         cli.self_verify
     };
-    if self_verify.is_none() && cli.compact_strategy.is_none() && cli.compact_threshold.is_none() {
+    let suggest_followups: Option<bool> = if cli.no_suggest_followups {
+        Some(false)
+    } else {
+        cli.suggest_followups
+    };
+    if self_verify.is_none()
+        && suggest_followups.is_none()
+        && cli.compact_strategy.is_none()
+        && cli.compact_threshold.is_none()
+    {
         return toml::Value::Table(Default::default());
     }
 
     let mut behavior_table = toml::map::Map::new();
     if let Some(value) = self_verify {
         behavior_table.insert("self_verify".to_string(), toml::Value::Boolean(value));
+    }
+    if let Some(value) = suggest_followups {
+        behavior_table.insert("suggest_followups".to_string(), toml::Value::Boolean(value));
     }
     if let Some(strategy) = &cli.compact_strategy {
         behavior_table.insert(

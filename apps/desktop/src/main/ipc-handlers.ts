@@ -110,6 +110,13 @@ import {
 	type Memory,
 	type MemoryInput,
 } from "./memory-store";
+import {
+	isProviderId,
+	runWebSearch,
+	normalizeWebSearchLimit,
+	normalizeWebSearchQuery,
+	type WebSearchProviderId,
+} from "./web-search-service";
 
 const log = createLogger("ipc");
 
@@ -328,7 +335,30 @@ export function registerIpcHandlers(): void {
 
 	ipcMain.handle(
 		"infinitecode:ensure",
-		withLogging("infinitecode:ensure", async () => await ensureServer()),
+		withLogging("infinitecode:ensure", async () => {
+			try {
+				return await ensureServer();
+			} catch (error) {
+				// Cross-surface supersede: a separate infinitecode (CLI or
+				// desktop window) already holds the lock. Translate to a
+				// renderer-visible IPC event whose detail matches the copy we
+				// show in `SessionSupersededBanner` — modelled on Freebuff's
+				// "Another freebuff CLI took over this account" message in
+				// `freebuff/cli-engine/src/hooks/helpers/send-message.ts:600-612`.
+				const code = (error as { code?: unknown } | null)?.code;
+				if (code === "SESSION_SUPERSEDED") {
+					const detail = (error as {
+						detail?: { otherPid: number; otherSurface: "cli" | "desktop"; lockPath: string };
+					}).detail;
+					if (detail) {
+						for (const win of BrowserWindow.getAllWindows()) {
+							win.webContents.send("session:superseded", detail);
+						}
+					}
+				}
+				throw error;
+			}
+		}),
 	);
 
 	ipcMain.handle("infinitecode:url", () => getServerUrl());
@@ -647,7 +677,30 @@ export function registerIpcHandlers(): void {
 
 	ipcMain.handle("settings:get", () => getSettings());
 
-	ipcMain.handle("settings:update", (_, partial) => updateSettings(partial));
+	ipcMain.handle(
+		"settings:update",
+		withLogging("settings:update", async (_, partial) => {
+			const result = updateSettings(partial);
+			// Performance / agent-behavior knobs only take effect on the next
+			// server restart (env vars are read at server-process boot). If
+			// the user changed them, ask the server to restart so the running
+			// process picks up the new values. Network-only updates still get
+			// the same restart treatment because `networkProxy` also reads
+			// from env on spawn — consistent behavior across both knobs.
+			if (
+				partial &&
+				typeof partial === "object" &&
+				("performance" in partial || "servers" in partial)
+			) {
+				try {
+					await restartServer();
+				} catch (error) {
+					log.warn("Failed to restart server after settings update", error);
+				}
+			}
+			return result;
+		}),
+	);
 
 	// --- Credential storage (safeStorage-backed) ---
 
@@ -1113,4 +1166,85 @@ export function registerIpcHandlers(): void {
 		"memory:stats",
 		withLogging("memory:stats", () => memoryStats()),
 	);
+
+	// --- Web search ---
+
+	ipcMain.handle(
+		"web-search:query",
+		withLogging(
+			"web-search:query",
+			async (_: unknown, provider: string, query: string, limit?: number) => {
+				if (!isProviderId(provider)) {
+					return {
+						ok: false,
+						reason: "unsupported_provider",
+						message: "Unsupported web search provider.",
+					}
+				}
+				const normalizedQuery = normalizeWebSearchQuery(query)
+				if (normalizedQuery === null) {
+					return {
+						ok: false,
+						reason: "invalid_query",
+						message: "Enter a valid search query.",
+					}
+				}
+				const normalizedLimit = normalizeWebSearchLimit(limit)
+				const settings = getSettings()
+				if (!settings.webSearch?.enabled) {
+					return {
+						ok: false,
+						reason: "not_configured",
+						message:
+							"Web search is disabled. Enable it under Settings → Web Search.",
+					}
+				}
+				return runWebSearch(
+					provider as WebSearchProviderId,
+					normalizedQuery,
+					normalizedLimit,
+					{
+						braveApiKey: settings.webSearch.braveApiKey ?? "",
+						tavilyApiKey: settings.webSearch.tavilyApiKey ?? "",
+					},
+				)
+			},
+		),
+	)
+
+	ipcMain.handle(
+		"web-search:test",
+		withLogging(
+			"web-search:test",
+			async (_: unknown, provider: string) => {
+				if (!isProviderId(provider)) {
+					return {
+						ok: false,
+						reason: "unsupported_provider",
+						message: "Unsupported web search provider.",
+					}
+				}
+				const settings = getSettings()
+				return runWebSearch(
+					provider as WebSearchProviderId,
+					"test query",
+					3,
+					{
+						braveApiKey: settings.webSearch.braveApiKey ?? "",
+						tavilyApiKey: settings.webSearch.tavilyApiKey ?? "",
+					},
+				)
+			},
+		),
+	)
+
+	// --- Voice / STT capability probe ---
+
+	ipcMain.handle("voice:capability", () => {
+		// Renderer-side Web Speech API lives in the renderer process, not the
+		// main process. We return a permissive "no opinion" probe here — the
+		// renderer does the actual feature detection via window.SpeechRecognition
+		// before mounting the mic button.
+		return { available: true, vendor: null, microphoneSupported: true }
+	})
 }

@@ -31,6 +31,7 @@ mod session;
 mod session_store;
 mod skills;
 mod state;
+pub mod session_lock;
 pub mod tools;
 mod update_check;
 
