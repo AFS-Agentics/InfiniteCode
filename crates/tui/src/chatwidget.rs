@@ -77,6 +77,8 @@ mod reasoning_effort;
 
 mod worker_events;
 
+mod suggest_followups_render;
+
 use self::permission_presets::permission_preset_items;
 use self::permission_presets::permission_preset_label;
 use self::resume_browser::ResumeBrowserState;
@@ -84,6 +86,8 @@ use self::session_header::SessionHeaderParams;
 use self::subagent_monitor::SubagentMonitorState;
 
 use self::text_stream::ActiveTextItem;
+
+pub(crate) use self::suggest_followups_render::SuggestFollowupsCell;
 
 pub(crate) const MCP_SERVERS_TRANSCRIPT_TITLE: &str = "⬡  MCP Servers";
 pub(crate) const SKILLS_TRANSCRIPT_TITLE: &str = "▦  Skills";
@@ -310,6 +314,9 @@ pub(crate) struct ChatWidget {
     // Bottom-page always-visible ad (above composer). Auto-rotates on a timer.
     bottom_ad: Option<infinitecode_core::gravity::GravityAdData>,
     bottom_ad_last_fetch_at: Instant,
+    // Pinned-above-input ad (like Freebuff's SingleAdBanner). Always visible above composer.
+    pinned_ad: Option<infinitecode_core::gravity::GravityAdData>,
+    pinned_ad_last_fetch_at: Instant,
 }
 
 impl ChatWidget {
@@ -379,6 +386,13 @@ impl ChatWidget {
         self.frame_requester.schedule_frame();
     }
 
+    /// Sets the pinned-above-input ad data (from a background fetch).
+    pub(crate) fn set_pinned_ad(&mut self, ad: infinitecode_core::gravity::GravityAdData) {
+        self.pinned_ad = Some(ad);
+        self.pinned_ad_last_fetch_at = Instant::now();
+        self.frame_requester.schedule_frame();
+    }
+
     fn format_git_diff_result(result: std::io::Result<(bool, String)>) -> String {
         diff_rules::format_git_diff_result(result)
     }
@@ -393,6 +407,15 @@ impl ChatWidget {
         let elapsed = self.bottom_ad_last_fetch_at.elapsed();
         if elapsed >= std::time::Duration::from_secs(60) {
             self.spawn_bottom_ad_fetch();
+        }
+    }
+
+    /// Checks if the pinned ad needs rotation (every 60 seconds)
+    /// and spawns a fresh fetch if so.
+    fn maybe_rotate_pinned_ad(&mut self) {
+        let elapsed = self.pinned_ad_last_fetch_at.elapsed();
+        if elapsed >= std::time::Duration::from_secs(60) {
+            self.spawn_pinned_ad_fetch();
         }
     }
 
@@ -550,6 +573,8 @@ impl ChatWidget {
             next_seq: 0,
             bottom_ad: None,
             bottom_ad_last_fetch_at: Instant::now() - std::time::Duration::from_secs(120),
+            pinned_ad: None,
+            pinned_ad_last_fetch_at: Instant::now() - std::time::Duration::from_secs(120),
         };
 
         // Model onboarding can inject additional startup UI before the first frame is drawn.

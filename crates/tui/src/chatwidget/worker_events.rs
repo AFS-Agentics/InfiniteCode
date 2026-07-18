@@ -139,6 +139,22 @@ impl ChatWidget {
         });
     }
 
+    /// Spawns a background fetch for the pinned-above-input ad (like Freebuff's SingleAdBanner).
+    /// Rotates every 60 seconds via `maybe_rotate_pinned_ad`. Always visible above the composer.
+    pub(crate) fn spawn_pinned_ad_fetch(&self) {
+        let Some(model) = self.session.model.as_ref() else { return };
+        let session_id = model.slug.clone();
+        let app_event_tx = self.app_event_tx.clone();
+        let messages = self.ad_context_messages();
+        if messages.is_empty() { return; }
+        tokio::spawn(async move {
+            if let Ok(Some(ad)) = fetch_gravity_ad(&messages, "single_ad_unit", "cli-pinned", &session_id).await {
+                let json = serde_json::to_string(&ad).unwrap_or_default();
+                app_event_tx.send(AppEvent::GravityPinnedAdResult(json));
+            }
+        });
+    }
+
     fn start_command_execution_cell(
         &mut self,
         tool_use_id: String,
@@ -248,6 +264,8 @@ impl ChatWidget {
                 self.bottom_pane.set_task_running(true);
                 // Fire an above-response ad fetch in the background.
                 self.spawn_above_ad_fetch();
+                // Fire a pinned-above-input ad fetch in the background.
+                self.spawn_pinned_ad_fetch();
             }
             WorkerEvent::InterruptFailed { message } => {
                 self.interrupt_failed(message);
@@ -606,6 +624,29 @@ impl ChatWidget {
                 is_error,
                 truncated,
             } => {
+                // `suggest_followups` is a UI-only tool: render a chip block under the assistant
+                // message and skip the generic `ToolIoCell` path (no command output, no header).
+                if tool_name == "suggest_followups" {
+                    self.pending_tool_calls
+                        .retain(|tc| tc.tool_use_id != tool_use_id);
+                    self.active_tool_calls.remove(&tool_use_id);
+                    let items =
+                        super::suggest_followups_render::parse_followups(&input);
+                    if !items.is_empty() {
+                        self.add_to_history(
+                            super::suggest_followups_render::SuggestFollowupsCell::new(items),
+                        );
+                    }
+                    self.active_cell_revision =
+                        self.active_cell_revision.wrapping_add(1);
+                    self.frame_requester.schedule_frame();
+                    self.set_status_message(if is_error {
+                        "Tool returned an error"
+                    } else {
+                        "Tool completed"
+                    });
+                    return;
+                }
                 if let Some(pos) = self
                     .pending_tool_calls
                     .iter()

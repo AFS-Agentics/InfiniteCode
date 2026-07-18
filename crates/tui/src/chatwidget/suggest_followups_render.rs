@@ -1,15 +1,19 @@
 //! Render helper for the agent's `suggest_followups` tool calls.
 //!
-//! The InfiniteCode TUI renders tool calls through `history_cell.rs`
-//! (2012 lines; deliberately not edited in this change). This module exposes
-//! pure formatting helpers that callers can plug into the existing
-//! tool-cell rendering without touching the giant file.
+//! `history_cell.rs` is the canonical home for `HistoryCell` implementations but at 2012 lines it
+//! exceeds the AI-edit ceiling. This module exports both the pure `Line`-style formatting helpers
+//! and a small `SuggestFollowupsCell` that implements `HistoryCell` directly — so wiring in
+//! `worker_events.rs` only needs `mod suggest_followups_render;` in `chatwidget.rs` plus a
+//! dispatch arm in the `ToolResultIo` branch.
 //!
-//! Future work: a follow-up change should add a `Cell::SuggestFollowups`
-//! variant + JSON-streaming path so the chips animate in/out live.
+//! Future work: stream the chips in as JSON deltas arrive (rather than waiting for the tool to
+//! complete), so they fade in during the final assistant message.
 
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
+use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::{Paragraph, Wrap};
+
+use crate::history_cell::HistoryCell;
 
 /// Maximum chips we render (anything beyond the handler's cap is dropped).
 const MAX_CHIPS: usize = 6;
@@ -110,8 +114,60 @@ fn abbreviate_prompt(prompt: &str, max_chars: usize) -> String {
     }
 }
 
+/// TUI `HistoryCell` adapter that renders an emoji chip block under the
+/// assistant message when the agent emits a `suggest_followups` tool call.
+///
+/// Pushed into `ChatWidget` history once `WorkerEvent::ToolResultIo` carries
+/// `tool_name == "suggest_followups"`. User copies any chip's prompt into
+/// the composer to send as the next user turn.
+#[derive(Debug)]
+pub(crate) struct SuggestFollowupsCell {
+    items: Vec<FollowupItem>,
+}
+
+impl SuggestFollowupsCell {
+    pub fn new(items: Vec<FollowupItem>) -> Self {
+        Self { items }
+    }
+
+    /// Snapshot of the parsed chip data; useful for tests and jest-style snapshots.
+    pub fn items(&self) -> &[FollowupItem] {
+        &self.items
+    }
+}
+
+impl HistoryCell for SuggestFollowupsCell {
+    fn display_lines(&self, width: u16) -> Vec<Line<'static>> {
+        render_followup_lines(&self.items, width)
+    }
+
+    /// Match the `Paragraph`-measured default — keeps the cell from claiming zero rows when
+    /// the chat viewport is narrower than the longest chip.
+    fn desired_height(&self, width: u16) -> u16 {
+        if self.items.is_empty() {
+            return 0;
+        }
+        let lines = self.display_lines(width);
+        if let [line] = &lines[..]
+            && line
+                .spans
+                .iter()
+                .all(|s| s.content.chars().all(char::is_whitespace))
+        {
+            return 1;
+        }
+        Paragraph::new(Text::from(lines))
+            .wrap(Wrap { trim: false })
+            .line_count(width)
+            .try_into()
+            .unwrap_or(0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
     use super::*;
 
     #[test]
@@ -190,5 +246,41 @@ mod tests {
     #[test]
     fn render_followup_lines_empty_returns_nothing() {
         assert!(render_followup_lines(&[], 80).is_empty());
+    }
+
+    #[test]
+    fn suggest_followups_cell_new_copies_items() {
+        let items = vec![FollowupItem {
+            emoji: "⚡".into(),
+            label: "Fix it".into(),
+            prompt: "fix the failing test".into(),
+        }];
+        let cell = SuggestFollowupsCell::new(items.clone());
+        assert_eq!(cell.items(), items.as_slice());
+    }
+
+    #[test]
+    fn suggest_followups_cell_display_lines_match_helper() {
+        let items = vec![
+            FollowupItem {
+                emoji: "🚀".into(),
+                label: "Ship it".into(),
+                prompt: "commit and push".into(),
+            },
+            FollowupItem {
+                emoji: "🧪".into(),
+                label: "Test it".into(),
+                prompt: "run cargo test".into(),
+            },
+        ];
+        let cell = SuggestFollowupsCell::new(items.clone());
+        assert_eq!(cell.display_lines(80), render_followup_lines(&items, 80));
+    }
+
+    #[test]
+    fn suggest_followups_cell_empty_has_zero_height() {
+        let cell = SuggestFollowupsCell::new(Vec::new());
+        assert!(cell.display_lines(80).is_empty());
+        assert_eq!(cell.desired_height(80), 0);
     }
 }
