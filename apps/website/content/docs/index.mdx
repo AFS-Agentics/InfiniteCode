@@ -1,62 +1,173 @@
 ---
 title: InfiniteCode
-description: Open source, lightweight, model-neutral coding agent documentation.
+description: Open source, lightweight, model-neutral coding agent for developers who want a local, terminal-first workflow.
 icon: BookOpen
 ---
 
-InfiniteCode is an open source, model-neutral coding agent for
-developers who want a local, terminal-first workflow. You can run it
-as a single binary, talk to it from the Desktop app, or wire it into
-the editor of your choice.
+**InfiniteCode** is an open source, lightweight, model-neutral coding
+agent. It runs as a single Rust binary, ships with a Desktop
+companion, and connects to any model provider — local or hosted —
+using explicit configuration instead of vendor lock-in.
 
-This site carries the product documentation. Navigation lives in the
-sidebar.
+This site carries the product documentation. The
+[Quickstart](/docs/get-started/quickstart) is the fastest way to a
+running agent. The rest of the docs assume you have a checkout and a
+provider wired up.
 
 ## What's new in v0.1.31
 
-The v0.1.31 release ships four new capability surfaces:
+The v0.1.31 release ships four new capability surfaces and a
+behavioral harness to tune them.
 
-- **[Self-Review workflow](/docs/features/self-review)** — Best-of-N
-  proposal selection plus multi-perspective audit, before any code
-  reaches your repository.
-- **[Desktop voice input](/docs/features/desktop-voice)** —
-  Push-to-talk dictation in the Desktop composer.
-- **[Native web search](/docs/features/desktop-search)** — Provider-routed
-  web search with inline citation chips.
-- **[Agent behavior config](/docs/features/agent-behavior)** — CLI
-  flags and env vars for `self_verify`, `suggest_followups`,
-  `compact_strategy`, and `explore_solutions`.
+| Surface | What it does | Page |
+| --- | --- | --- |
+| **Self-Review workflow** | Best-of-N proposal selection + multi-perspective audit before any code lands. | [Self-Review](/docs/features/self-review) |
+| **Desktop voice input** | Push-to-talk dictation in the Desktop composer. | [Desktop voice](/docs/features/desktop-voice) |
+| **Native web search** | Provider-routed `web_search` with inline citation chips. | [Desktop search](/docs/features/desktop-search) |
+| **Agent behavior config** | CLI flags + env vars: `self_verify`, `suggest_followups`, `compact_strategy`, `explore_solutions`. | [Agent behavior](/docs/features/agent-behavior) |
+
+Self-Review is the structural change. Everything else in this
+release is a knob on top of it. Turn it on for any change that
+touches cross-cutting code, copy enough context for the audit to
+land, and watch the agent propose two or three candidates instead of
+one. The deep page is
+[Self-Review workflow](/docs/features/self-review).
+
+## How it feels
+
+The first session is short.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.sh | sh
+cd your-repo
+infinitecode onboard
+infinitecode
+```
+
+`onboard` writes `infinitecode.toml` next to your repo. After that,
+the TUI opens straight to the composer. A first prompt can be
+read-only:
+
+```text
+Explain this repository's main runtime path. Do not edit files yet.
+```
+
+The answer shows up inline. From there you can ask for a scoped
+change, attach a file with `@path/to/file.ts`, or pipe shell output
+into the prompt with `!git status`. The
+[CLI usage](/docs/using-infinitecode/cli) page documents the
+shortcut conventions; [Desktop usage](/docs/using-infinitecode/desktop)
+documents the same flow with the Desktop companion.
+
+## Provider routing
+
+InfiniteCode talks to four kinds of providers. Pick whichever one
+fits the job; the runtime doesn't care which.
+
+| Provider kind | Base URL shape | Notes |
+| --- | --- | --- |
+| **Anthropic-compatible** | `https://api.<vendor>/anthropic` | DeepSeek official, Anthropic, Bedrock via the Anthropic shim. |
+| **OpenAI-compatible** | `https://api.<vendor>/v1` | OpenAI, OpenRouter, Together, OpenPipe, most self-hosted gateways. |
+| **Local HTTP** | `http://localhost:<port>/v1` | Ollama, LM Studio, llama.cpp's server, vLLM. |
+| **ACP stdio** | n/a — spawn a subprocess | The Desktop calls InfiniteCode through this bridge. |
+
+Switching providers is a one-line change in `infinitecode.toml`:
+
+```toml
+[provider]
+kind = "anthropic"
+base_url = "https://api.deepseek.com/anthropic"
+api_key = "${DEEPSEEK_API_KEY}"
+model = "deepseek-v4-pro"
+```
+
+Per-machine overrides go in `infinitecode.local.toml` next to it.
+Full reference at
+[Settings reference](/docs/configuration/settings).
+
+## Configuration surface
+
+The same shape is exposed in three places, with this precedence:
+
+1. **CLI flags** — highest precedence.
+2. **Environment variables** — `INFINITECODE_*`.
+3. **`infinitecode.toml`** — repo or `~/.config/infinitecode/`.
+
+A representative `[behavior]` block:
+
+```toml
+[behavior]
+self_verify = true
+suggest_followups = false
+compact_strategy = "summarize"
+explore_solutions = "minimal"
+```
+
+These knobs are the ones shipped in v0.1.31. The full reference —
+including the auto-approval surface, the path-glob rules, and the
+local override file — lives at
+[Agent behavior config](/docs/features/agent-behavior).
+
+## Project shape
+
+This is a small workspace on purpose. Most runtime changes touch two
+crates at most, and most of the moving parts are short.
+
+```
+infinitecode/
+  crates/
+    cli/      CLI binary + onboarding.
+    core/     Agent runtime, orchestrator, prompt templates.
+    server/   ACP stdio bridge (used by the Desktop).
+    tools/    Tool registry + handlers.
+    config/   App config, infinitecode.toml, providers.
+    tui/      Terminal UI.
+  apps/
+    desktop/  Electron + React renderer.
+    website/  This site (Vite + MDX).
+```
+
+For a deeper read — including the orchestrator's tool fan-out, the
+compaction model, and the per-crate invariants — see
+[Architecture overview](/docs/contributors/architecture). Contributors
+adding a new tool will find the recipe in the same place.
 
 ## Reader paths
 
-- **New users** — start with [Quickstart](/docs/get-started/quickstart).
-- **CLI users** — continue with [CLI usage](/docs/using-infinitecode/cli).
-- **Desktop users** — jump to [Desktop usage](/docs/using-infinitecode/desktop).
-- **Provider integrators** — read [Settings reference](/docs/configuration/settings).
-- **Tooling authors** — the [Orchestrator](/docs/tools/orchestrator)
-  page documents how the agent runtime composes tools.
+Pick the path that matches how you're using InfiniteCode today:
 
-## Sections
+- **First-time user** →
+  [Quickstart](/docs/get-started/quickstart).
+- **Already wired up, want to drive** →
+  [CLI usage](/docs/using-infinitecode/cli) or
+  [Desktop usage](/docs/using-infinitecode/desktop).
+- **Self-Review is the headline, learn it first** →
+  [Self-Review workflow](/docs/features/self-review).
+- **Tuning behavior, env vars, flags** →
+  [Agent behavior config](/docs/features/agent-behavior).
+- **Wiring a new provider** →
+  [Settings reference](/docs/configuration/settings).
+- **Working on the runtime itself** →
+  [Architecture overview](/docs/contributors/architecture).
 
-- **[Get Started](/docs/get-started/quickstart)** — install, onboard,
-  connect a provider, run your first prompt.
-- **[Features](/docs/features/self-review)** — the v0.1.31 capability
-  surface and the configuration knobs behind it.
-- **[Tools](/docs/tools/orchestrator)** — the runtime tool surface
-  and the orchestrator that drives it.
-- **[Configuration](/docs/configuration/settings)** — `infinitecode.toml`,
-  environment variables, and the ACP stdio bridge.
-- **[Using InfiniteCode](/docs/using-infinitecode/cli)** — day-to-day
-  CLI and Desktop usage.
-- **[Contributors](/docs/contributors/architecture)** — crate map,
-  runtime flow, and how to add a new tool.
+## What this docs set expects
+
+These pages assume:
+
+- You're working inside a repository, not a sandbox.
+- You can edit one TOML file and re-run onboarding without losing work.
+- You'd rather see the candidate diff than hear about it.
+
+If any of those don't hold, [open an issue on
+GitHub](https://github.com/AFS-Agentics/InfiniteCode/issues) —
+the docs set is small enough to fix in place.
 
 ## About InfiniteCode
 
 InfiniteCode is structured for users who want auditable, low-drama
 agentic workflows. The CLI and the Desktop talk to the same Rust
-runtime, the orchestrator is small, the prompts are versioned, and
-the providers are explicit.
+runtime. The orchestrator is small. The prompts are versioned. The
+providers are explicit.
 
-For partnership or enterprise inquiries, see the contact address on
-the landing page.
+For partnership or enterprise inquiries, see the contact address
+on the [landing page](https://tryinfinitecode.vercel.app/#contact).
