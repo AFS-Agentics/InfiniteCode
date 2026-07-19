@@ -83,14 +83,16 @@ impl ChatWidget {
         if messages.is_empty() {
             return;
         }
-        tokio::spawn(async move {
-            if let Ok(Some(ad)) =
-                fetch_gravity_ad(&messages, "inline_response", "cli-mid", &session_id).await
-            {
-                let json = serde_json::to_string(&ad).unwrap_or_default();
-                app_event_tx.send(AppEvent::GravityMidAdResult(json));
-            }
-        });
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                if let Ok(Some(ad)) =
+                    fetch_gravity_ad(&messages, "inline_response", "cli-mid", &session_id).await
+                {
+                    let json = serde_json::to_string(&ad).unwrap_or_default();
+                    app_event_tx.send(AppEvent::GravityMidAdResult(json));
+                }
+            });
+        }
     }
 
     /// Builds a list of `MessageEntry` from the turn context for ad matching.
@@ -166,14 +168,16 @@ impl ChatWidget {
         if messages.is_empty() {
             return;
         }
-        tokio::spawn(async move {
-            if let Ok(Some(ad)) =
-                fetch_gravity_ad(&messages, "bottom_page", "cli-bottom", &session_id).await
-            {
-                let json = serde_json::to_string(&ad).unwrap_or_default();
-                app_event_tx.send(AppEvent::GravityBottomAdResult(json));
-            }
-        });
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                if let Ok(Some(ad)) =
+                    fetch_gravity_ad(&messages, "bottom_page", "cli-bottom", &session_id).await
+                {
+                    let json = serde_json::to_string(&ad).unwrap_or_default();
+                    app_event_tx.send(AppEvent::GravityBottomAdResult(json));
+                }
+            });
+        }
     }
 
     /// Spawns a background fetch for the pinned-above-input ad (like Freebuff's SingleAdBanner).
@@ -188,14 +192,16 @@ impl ChatWidget {
         if messages.is_empty() {
             return;
         }
-        tokio::spawn(async move {
-            if let Ok(Some(ad)) =
-                fetch_gravity_ad(&messages, "single_ad_unit", "cli-pinned", &session_id).await
-            {
-                let json = serde_json::to_string(&ad).unwrap_or_default();
-                app_event_tx.send(AppEvent::GravityPinnedAdResult(json));
-            }
-        });
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                if let Ok(Some(ad)) =
+                    fetch_gravity_ad(&messages, "single_ad_unit", "cli-pinned", &session_id).await
+                {
+                    let json = serde_json::to_string(&ad).unwrap_or_default();
+                    app_event_tx.send(AppEvent::GravityPinnedAdResult(json));
+                }
+            });
+        }
     }
 
     fn start_command_execution_cell(
