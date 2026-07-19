@@ -1,0 +1,78 @@
+---
+title: ACP stdio
+description: How the Desktop renderer communicates with the InfiniteCode server process.
+icon: Terminal
+---
+
+The InfiniteCode Desktop application runs as two processes:
+
+- The **renderer** — Electron + React.
+- The **server** — a local `infinitecode` subprocess.
+
+They talk over **ACP stdio**, a thin
+[JSON-RPC 2.0 / NDJSON](https://www.jsonrpc.org/specification) bridge
+that wraps live conversation state, tool calls, and edit previews.
+
+This page documents the wire format and the lifecycle. Most users
+won't need it. ACP-aware tools and contributors do.
+
+## Lifecycle
+
+```
+┌───────────────┐                                 ┌────────────────┐
+│  Renderer     │  ── stdin/stdout (NDJSON) ──▶   │  Server        │
+│  (Electron)   │                                 │  (infinitecode)│
+└───────────────┘                                 └────────────────┘
+```
+
+1. The renderer spawns `infinitecode serve --stdio` as a child process.
+2. It opens JSON-RPC framing on the child's stdio.
+3. Both sides keep their own state; the bridge copies messages between
+   them.
+
+The server process is identical to the standalone CLI. The Desktop
+does not fork or patch it.
+
+## Frame format
+
+Each line is a single JSON object terminated by `\n`:
+
+```json
+{"id": 1, "method": "session.start", "params": {"agent": "default"}}
+{"id": 2, "method": "turn.user_message", "params": {"session": 1, "text": "hi"}}
+{"id": 1, "result": {"session": 1}}
+{"id": 2, "result": {"turn": 12}}
+```
+
+Notifications (server pushes) use the same envelope without an `id`:
+
+```json
+{"method": "transcript.delta", "params": {"turn": 12, "text": "Hi! …"}}
+{"method": "tool.call", "params": {"turn": 12, "tool": "read_file", "args": {...}}}
+```
+
+## Method names
+
+| Method | Direction | Purpose |
+| --- | --- | --- |
+| `session.start` | renderer → server | Open a new session. |
+| `session.list` | renderer → server | List active sessions. |
+| `session.close` | renderer → server | Close a session. |
+| `turn.user_message` | renderer → server | Submit a user message. |
+| `turn.compact` | renderer → server | Compact the session's transcripts. |
+| `transcript.*` | server → renderer | Streaming transcript deltas. |
+| `tool.*` | server → renderer | Tool call + tool result lifecycle. |
+| `edit.preview` | server → renderer | Show staged edits in the renderer. |
+| `audio.transcript` | renderer → server | Push a voice transcript into the composer. |
+
+## Where the wire code lives
+
+- `crates/server/src/acp.rs` — server side.
+- `apps/desktop/src/main/acp-stdio-client.ts` — renderer side.
+
+## Why stdio, not WebSocket
+
+Stdio is the simplest IPC contract that still survives reboots,
+upgrade paths, and locked-down firewalls. It also means the server
+process and the renderer can be tested independently: any process
+that can produce NDJSON can act as the renderer.

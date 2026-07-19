@@ -1,0 +1,74 @@
+---
+title: Orchestrator
+description: How InfiniteCode orchestrates multiple agents and candidate solutions.
+icon: Workflow
+---
+
+The **orchestrator** is the runtime layer that decides which tool runs
+next, in what order, and with what inputs. It is exposed in v0.1.31 with
+a documented surface so contributors can reason about flow.
+
+## Pipeline
+
+```
+              ┌──────────────────────┐
+              │   user prompt        │
+              └──────────┬───────────┘
+                         │
+            ┌────────────▼────────────┐
+            │   explore_solutions      │  (optional, agent_behavior)
+            └────────────┬────────────┘
+                         │
+            ┌────────────▼────────────┐
+            │   select_implementation  │  (picks the candidate)
+            └────────────┬────────────┘
+                         │
+            ┌────────────▼────────────┐
+            │   verify_solution        │  (runs the candidate)
+            └────────────┬────────────┘
+                         │
+            ┌────────────▼────────────┐
+            │   audit_changes          │  (risks + policy)
+            └────────────┬────────────┘
+                         │
+            ┌────────────▼────────────┐
+            │   preview_edit / write   │  (committed change)
+            └────────────┬────────────┘
+                         │
+              ┌──────────▼───────────┐
+              │  suggest_followups    │  (optional, queue)
+              └──────────────────────┘
+```
+
+## Tools added in v0.1.31
+
+| Tool | Layer | Purpose |
+| --- | --- | --- |
+| `explore_solutions` | Agent behavior | Generate multiple candidate solutions. |
+| `select_implementation` | Agent behavior | Score and choose the best candidate. |
+| `verify_solution` | Verify | Run the candidate's behavior locally. |
+| `audit_changes` | Verify | Flag risky lines, secrets, and policy hits. |
+| `preview_edit` | Editor | Stage hunks in the in-app preview pane. |
+| `preview_write` | Editor | Stage new files in the in-app preview pane. |
+| `report_outcome` | Telemetry | Emit the run's outcome for the dashboard. |
+| `suggest_followups` | Agent behavior | Queue small follow-up tasks. |
+
+## Sub-agent invocation
+
+The orchestrator can spawn a sub-agent when the agent decides a task
+should be split. Sub-agent invocations appear in the transcript as a
+nested tool call. Sub-agent contexts are scoped; they do not inherit
+the parent session's compaction state.
+
+## Failure handling
+
+A tool failure in the middle of the pipeline surfaces as an explicit
+`tool_error` block in the transcript. The pipeline does not auto-retry
+the entire pipeline; you can reissue the prompt or run the missing
+step manually.
+
+## Configuration
+
+The orchestrator reads `[behavior]` in `infinitecode.toml`. See
+[Agent behavior config](/docs/features/agent-behavior) for the full
+switch list.

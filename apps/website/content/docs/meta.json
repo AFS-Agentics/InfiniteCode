@@ -1,0 +1,14 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "get-started",
+    "core-concepts",
+    "features",
+    "tools",
+    "configuration",
+    "using-infinitecode",
+    "reference",
+    "contributors"
+  ]
+}

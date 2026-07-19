@@ -1,0 +1,208 @@
+---
+title: Config Reference
+description: 在用户向导稳定后查阅 InfiniteCode config fields。
+---
+
+本页列出主要 config files 和 fields。引导式配置请先读[配置基础](../configuration/config-basics)、[提供商配置](../configuration/provider-setup) 和[模型绑定](../configuration/model-bindings)。
+
+## 文件
+
+| File | Purpose |
+| --- | --- |
+| `<INFINITECODE_HOME>/config.toml` | User-level InfiniteCode config。 |
+| `<INFINITECODE_HOME>/auth.json` | User-level secrets 和 credentials。 |
+| `<workspace>/.infinitecode/config.toml` | Workspace-level config overlay。 |
+
+默认 `INFINITECODE_HOME` 路径：
+
+| Platform | Default |
+| --- | --- |
+| macOS/Linux | `~/.infinitecode` |
+| Windows | `C:/Users/your-username/.infinitecode` |
+
+如果设置了 `INFINITECODE_HOME`，它必须指向已经存在的目录。
+
+## 优先级
+
+Effective config 按以下顺序解析，优先级从高到低：
+
+1. command-line startup arguments；
+2. `<workspace>/.infinitecode/config.toml`；
+3. `<INFINITECODE_HOME>/config.toml`；
+4. built-in defaults。
+
+`auth.json` 是 user-scoped，不应提交到仓库。
+
+## Top-Level Fields
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `summary_model` | enum | 选择用于 context summaries 的模型。 |
+| `server` | table | Server runtime defaults。 |
+| `logging` | table | Diagnostic logging behavior。 |
+| `skills` | table | Skill discovery roots 和 behavior。 |
+| `experimental` | table | Experimental feature gates。 |
+| `mcp_oauth_credentials_store` | `auto`, `keyring`, `file` | MCP OAuth credentials 的存储 backend。 |
+| `mcp` | table | MCP server discovery 和 runtime config。 |
+| `tools` | table | Tool-specific runtime config。 |
+| `hooks` | table | External lifecycle hooks。 |
+| `provider_http` | table | Shared provider HTTP transport settings。 |
+| `updates` | table | Startup update-check defaults。 |
+| `project_root_markers` | string array | 用于发现 instruction project root 的 markers。默认 `.git`。 |
+| `projects` | table | 按 project key 记住的 user-level settings。 |
+
+Provider 相关字段被 flatten 到顶层：
+
+| Field | Meaning |
+| --- | --- |
+| `defaults` | Durable default selections，包括 active model binding。 |
+| `providers` | 按 provider id 存储的 provider records。 |
+| `model_bindings` | 按 binding id 存储的 invocable model bindings。 |
+| `model_provider`, `model`, `model_providers` | Legacy provider config compatibility fields。 |
+| `model_reasoning_effort_selection` | 当前模型的用户可见 reasoning effort selection。 |
+| `model_auto_compact_token_limit` | 可选 automatic compaction token threshold。 |
+| `model_context_window` | 可选 context-window override。 |
+| `disable_response_storage` | 可选 response-storage switch。 |
+| `preferred_auth_method` | Preferred provider auth method。目前基于 API key。 |
+
+## `[provider_http]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `proxy_url` | string | Provider requests、local web fetch/search 以及 code search 模型下载使用的可选代理 URL。支持 `http://`、`https://`、`socks5://` 和 `socks5h://`。 |
+| `no_proxy` | string | 可选 comma-separated host bypass list，例如 `localhost,127.0.0.1,::1`。 |
+
+Desktop Server network proxy settings 只在 Desktop-managed runtime process 内
+override 这些值，不会修改 `config.toml`。
+
+## `[server]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `listen` | string array | Server listen endpoints。 |
+| `max_connections` | integer | 最大 concurrent client connections。默认 `32`。 |
+| `event_buffer_size` | integer | 每个 connection 的 event buffer capacity。默认 `1024`。 |
+| `idle_session_timeout_secs` | integer | Idle session timeout 秒数。默认 `1800`。 |
+| `persist_ephemeral_sessions` | bool | 是否持久化 ephemeral sessions。默认 `false`。 |
+
+### `[server.auth]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `enabled` | bool | 非 initialization server methods 是否需要 server authentication。默认 `false`。 |
+| `method_id` | string | Initialization 时 advertised 的 server authentication method id。默认 `agent-login`。 |
+| `name` | string | 用户可读 authentication method name。默认 `Agent login`。 |
+| `description` | string | 可选 authentication method description。 |
+| `logout` | bool | Auth enabled 时是否 advertise 并支持 ACP `logout`。默认 `true`。 |
+
+启用后，auth state 按 connection 隔离，并同时 gate ACP methods 和 legacy
+InfiniteCode server methods。
+
+## `[defaults]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `model_binding` | string | 没有 CLI 或 runtime model override 时使用的 binding id。 |
+
+## `[providers.<id>]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `name` | string | 用户可读的 provider name。 |
+| `enabled` | bool | Provider 是否可用。默认 `true`。 |
+| `base_url` | string | Provider endpoint。 |
+| `credential` | string | `auth.json` 中的 credential id。 |
+| `headers` | JSON object string | Provider requests 的 extra HTTP headers。 |
+| `wire_apis` | string array | 该 provider 支持的 wire APIs。 |
+| `web_search` | table | Provider-level web search override。 |
+| `web_fetch` | table | Provider-level web fetch override。 |
+
+支持的 wire API 值：
+
+- `anthropic_messages`
+- `openai_chat_completions`
+- `openai_responses`
+
+## `[model_bindings.<id>]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `enabled` | bool | Binding 是否出现在 model resolution 和 picker surfaces 中。默认 `true`。 |
+| `model_slug` | string | Local model metadata id。 |
+| `provider` | string | `[providers]` 中的 provider id。 |
+| `request_model` | string | 发送给 provider 的 model name。 |
+| `display_name` | string | UI 中显示的可选 label。 |
+| `invocation_method` | wire API | 该 binding 使用的 wire API。省略时默认 `openai_chat_completions`。 |
+| `default_reasoning_effort` | string | 可选 default reasoning effort。 |
+| `web_search` | table | Binding-level web search override。 |
+| `web_fetch` | table | Binding-level web fetch override。 |
+
+## `[tools.web_search]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `mode` | `disabled`, `provider`, `local` | Effective web search mode。默认 `provider`。 |
+| `local_provider` | string | 选中的 local provider id。当存在多个 local providers 时必需。 |
+| `local_providers` | table | Local search provider definitions。 |
+
+Local provider fields：
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `kind` | `exa`, `tavily` | Search service kind。 |
+| `credential` | string | `auth.json` 中的 credential id。 |
+| `base_url` | string | 可选 service endpoint override。 |
+| `max_results` | integer | 可选 result limit。 |
+
+## `[tools.web_fetch]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `mode` | `disabled`, `provider`, `local` | Effective web fetch mode。默认 `local`。 |
+
+## `[research]`
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `max_researcher_iterations` | integer | 传给 researcher prompt 的 search/fetch iteration guidance。默认 `5`。 |
+| `fetch_summary_threshold_chars` | integer | 本地 `webfetch` 文本超过该长度时，research 会先汇总 fetched page。默认 `24000`。 |
+| `max_summary_chars` | integer | 超大 webpage summaries 的目标上限。默认 `8000`。 |
+
+## `auth.json`
+
+`auth.json` 存储 user-scoped credentials：
+
+```json
+{
+  "version": 1,
+  "credentials": {
+    "deepseek_api_key": {
+      "kind": "api_key",
+      "value": "sk-your-key"
+    }
+  }
+}
+```
+
+Credential fields：
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `version` | integer | Credential file schema version。当前值为 `1`。 |
+| `credentials.<id>.kind` | `api_key` | Credential kind。 |
+| `credentials.<id>.value` | string | Secret value。 |
+
+不要提交 `auth.json`。
+
+## Update Checks
+
+默认 update config 启用 startup checks，最小间隔 24 小时：
+
+```toml
+[updates]
+enabled = true
+check_on_startup = true
+check_interval_hours = 24
+```
+
+需要完全离线运行的环境应禁用 startup checks。

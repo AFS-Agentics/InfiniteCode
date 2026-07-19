@@ -1,0 +1,81 @@
+---
+title: CLI usage
+description: Day-to-day use of the InfiniteCode CLI.
+icon: TerminalSquare
+---
+
+The CLI is what most people use day to day. This page covers the
+shape of the Terminal UI (TUI), the slash commands, and a few
+shortcut conventions the rest of the docs assume you know.
+
+## Boot
+
+```bash
+cd your-repo
+infinitecode
+```
+
+If `infinitecode.toml` is present, the TUI opens straight to the
+composer. If not, the agent walks you through onboarding.
+
+## Composer shortcuts
+
+| Key | Action |
+| --- | --- |
+| `@<path>` | Mention a file. The agent appends it to the prompt. |
+| `!<cmd>` | Run a shell command and pipe the output into the prompt. |
+| `!git status` | For example, attach git status to the prompt. |
+| `Tab` | Cycle through the slash-command menu. |
+| `Ctrl-C` | Cancel the current turn. |
+| `Ctrl-D` | Exit the TUI. |
+
+## Slash commands
+
+| Command | Description |
+| --- | --- |
+| `/help` | Open the inline help sheet. |
+| `/goal` | Set a long-running goal — the agent keeps pushing until it's done. |
+| `/compact` | Force the current session to compact. |
+| `/tools` | List the tools available in the current session. |
+| `/provider` | Show the active model provider and config. |
+| `/theme` | Cycle the TUI theme. |
+| `/quit` | Exit the TUI. |
+
+## Asking questions
+
+```text
+Explain what this repository does.
+```
+
+```text
+Update @src/auth/session.rs to also expire on idle.
+```
+
+```text
+Refactor the SQL expressions without breaking @tests/.
+```
+
+The agent will produce a preview before writing. Press `y` to accept,
+`n` to reject, `e` to expand inline.
+
+## Long-running tasks
+
+```text
+/goal Convert all .js files in @src/ to TypeScript, keeping the public
+      API surface compatible.
+```
+
+When a goal is set, InfiniteCode turns the prompt into a multi-turn
+session. It carries context across turns until the goal completes,
+times out, or you cancel it.
+
+## Tips
+
+- **Be specific about the file.** `@path/to/file.ts` lets the agent
+  skip file discovery.
+- **Use `!` to attach shell output.** `!git status` is far more useful
+  than describing your branch.
+- **Edit the transcript if the agent made a wrong turn.** The
+  composer is the right place to correct course.
+- **Use `/compact` when transcripts get long.** It keeps the model
+  focused.

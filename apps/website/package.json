@@ -10,6 +10,8 @@
     "lint": "biome check ."
   },
   "dependencies": {
+    "@mdx-js/react": "^3.1.0",
+    "@mdx-js/rollup": "^3.1.0",
     "@radix-ui/react-accordion": "^1.2.9",
     "@radix-ui/react-slot": "^1.2.2",
     "class-variance-authority": "^0.7.1",
@@ -17,13 +19,19 @@
     "lucide-react": "^0.564.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.0",
+    "remark-mdx-frontmatter": "^5.0.0",
     "tailwind-merge": "^3.2.0",
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.16",
     "@tailwindcss/vite": "^4.0.0",
+    "@types/mdx": "^2.0.13",
+    "@types/node": "^22",
     "@types/react": "^19.0.0",
-    "@types/node": "^22.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.4.1",
     "tailwindcss": "^4.0.0",

@@ -82,8 +82,8 @@
 	--accent-foreground: oklch(0.985 0 0);
 	--destructive: oklch(0.577 0.245 27.325);
 	--destructive-foreground: oklch(0.577 0.245 27.325);
-	--border: oklch(0.269 0.015 286.375);
-	--input: oklch(0.269 0.015 286.375);
+	--border: oklch(0.269 0.015 286.286);
+	--input: oklch(0.269 0.015 286.286);
 	--ring: oklch(0.439 0.01 286.286);
 	--chart-1: oklch(0.488 0.243 264.376);
 	--chart-2: oklch(0.696 0.17 162.48);
@@ -110,4 +110,120 @@ body {
 	background-color: var(--background);
 	color: var(--foreground);
 	font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Docs prose — minimal typographic reset layered on top of the shadcn tokens. */
+.docs-prose {
+	max-width: 56rem;
+}
+
+.docs-prose-body {
+	color: var(--foreground);
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+	font-size: 0.95rem;
+	line-height: 1.65;
+}
+
+.docs-prose-body p {
+	margin: 0;
+}
+
+.docs-prose-body h2.docs-h2 {
+	margin: 2rem 0 0.6rem;
+	font-size: 1.45rem;
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	color: var(--foreground);
+	border-top: 1px solid var(--border);
+	padding-top: 1.4rem;
+}
+
+.docs-prose-body h3.docs-h3 {
+	margin: 1.4rem 0 0.3rem;
+	font-size: 1.05rem;
+	font-weight: 600;
+	color: var(--foreground);
+}
+
+.docs-prose-body a.docs-link {
+	color: var(--primary);
+	text-decoration: underline;
+	text-underline-offset: 3px;
+	transition: color 120ms ease;
+}
+
+.docs-prose-body a.docs-link:hover {
+	color: var(--primary);
+	opacity: 0.85;
+}
+
+.docs-prose-body code {
+	background: var(--muted);
+	color: var(--foreground);
+	padding: 0.15rem 0.4rem;
+	border-radius: 0.3rem;
+	font-size: 0.85em;
+	font-family: var(--font-mono, ui-monospace, "SFMono-Regular", Menlo, monospace);
+}
+
+.docs-prose-body pre.docs-pre {
+	background: color-mix(in srgb, var(--background) 92%, var(--muted) 8%);
+	border: 1px solid var(--border);
+	padding: 1rem 1.1rem;
+	border-radius: 0.6rem;
+	overflow-x: auto;
+	font-size: 0.85em;
+	line-height: 1.55;
+}
+
+.docs-prose-body pre.docs-pre code {
+	background: transparent;
+	padding: 0;
+	border-radius: 0;
+}
+
+.docs-prose-body ul,
+.docs-prose-body ol {
+	margin: 0.2rem 0 0.6rem 1.1rem;
+	padding: 0;
+	color: var(--foreground);
+}
+
+.docs-prose-body ul li,
+.docs-prose-body ol li {
+	margin: 0.25rem 0;
+}
+
+.docs-prose-body blockquote {
+	border-left: 3px solid var(--border);
+	padding-left: 1rem;
+	color: var(--muted-foreground);
+	margin: 0.4rem 0;
+}
+
+.docs-prose-body table {
+	border-collapse: collapse;
+	width: 100%;
+	font-size: 0.88rem;
+	margin: 0.6rem 0;
+}
+
+.docs-prose-body table th,
+.docs-prose-body table td {
+	border: 1px solid var(--border);
+	padding: 0.5rem 0.7rem;
+	text-align: left;
+}
+
+.docs-prose-body table th {
+	background: var(--muted);
+	font-weight: 600;
+}
+
+.docs-prose-body hr {
+	border: none;
+	border-top: 1px solid var(--border);
+	margin: 1.6rem 0;
 }

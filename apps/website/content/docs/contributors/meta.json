@@ -1,0 +1,13 @@
+{
+  "title": "Contributors",
+  "pages": [
+    "index",
+    "development-setup",
+    "architecture",
+    "architecture-overview",
+    "cli-and-tui-flow",
+    "runtime-flow",
+    "provider-runtime",
+    "testing"
+  ]
+}

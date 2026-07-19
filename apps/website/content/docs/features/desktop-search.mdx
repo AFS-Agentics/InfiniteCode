@@ -1,0 +1,70 @@
+---
+title: Native web search
+description: Provider-routed web search with inline citation chips in v0.1.31.
+icon: Search
+---
+
+InfiniteCode's **native web search** route runs through your configured
+provider. When you ask the agent a question whose freshness matters,
+it can call the provider's `web_search` and `web_fetch` tools and
+attach URL + title + snippet metadata as inline citation chips.
+
+The chips are visible in the transcript, so the reasoning chain stays
+auditable. Search results are not persisted past the current session
+unless you ask the agent to write them down.
+
+## When it fires
+
+The agent decides when `web_search` is needed; you don't have to opt in.
+For deterministic prompts ("write a unit test for this function") the
+agent stays local.
+
+When the prompt does invoke search:
+
+1. The agent invokes `web_search` with the query string and a
+   recency-bias hint.
+2. The provider returns ranked results with title, URL, and snippet.
+3. The agent decides which pages to `web_fetch` next.
+4. Snippets and final citations drop into the transcript as inline
+   chips.
+
+## Citation chips
+
+Each chip shows:
+
+- **Domain** — the search result's host.
+- **Title** — a short, paper-style title.
+- **Snippet** — the matched snippet (truncated to two lines).
+
+You can click a chip to open the source URL in a new tab. The chips
+are visible while the agent is still running, so you can intervene if
+the agent is heading down the wrong path.
+
+## Provider routes
+
+| Provider | Search tool | Notes |
+| --- | --- | --- |
+| Anthropic | `web_search` | Returns up to five ranked results per call. |
+| OpenAI | `web_search` | Surface form depends on the model's tool surface. |
+| Local (no provider) | n/a | Falls back to `local-docs` (no internet). |
+
+The same wire format lands for whichever provider you have configured.
+
+## Caching and retries
+
+Search results cached for the current session. A repeat query with the
+same fingerprint is served from the cache, so you don't pay for the
+provider twice. If the provider returns an HTTP 429 or a transient
+error, InfiniteCode retries once before surfacing the failure to the
+agent.
+
+## Try it
+
+```text
+What's the latest stable version of bun as of this week?
+```
+
+The agent should answer with a citation chip pointing at the bun
+release notes. If you wanted to forbid web access for a
+sensitive prompt, run InfiniteCode with `--no-web` or set
+`web_access = false` in `infinitecode.toml`.

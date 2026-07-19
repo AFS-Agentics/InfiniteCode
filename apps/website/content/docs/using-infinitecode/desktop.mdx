@@ -1,0 +1,78 @@
+---
+title: Desktop usage
+description: Day-to-day use of the InfiniteCode Desktop app.
+icon: AppWindow
+---
+
+The InfiniteCode Desktop is an Electron + React application that talks
+to the local `infinitecode` server process over ACP stdio. For most
+conversations the layout is the same as the CLI's, with three
+additional affordances unique to the desktop:
+
+- A **chat view** with tool call chips and inline preview panes.
+- **Voice input** for hands-free prompts.
+- A **settings panel** for provider wiring, voice language,
+  performance, and behavior.
+
+This page covers those affordances. The composer and slash commands
+work exactly like the CLI; see
+[CLI usage](/docs/using-infinitecode/cli) if you need a refresher.
+
+## Chat view
+
+The chat view stacks turns vertically. Each assistant turn contains:
+
+- A **transcript** block — the model's prose.
+- A list of **tool-call chips** — one per tool invocation, with the
+  tool name, a one-line summary, and an inline expand affordance.
+- An **edit preview** — for `preview_edit` / `preview_write` calls,
+  the staged hunks render as a code diff with accept / reject buttons.
+
+You can also toggle the **transcript disclosure** pane on the right,
+which surfaces the raw transcript without the tool/UI scaffolding.
+
+## Voice input
+
+Press the mic button in the composer rail to start dictation. The
+transcript appears in the disclosure pane; press the mic again to
+stop. See [Desktop voice input](/docs/features/desktop-voice).
+
+## Web search
+
+When the agent invokes `web_search` or `web_fetch`, the chip list
+shows the URL, title, and snippet. Click a chip to open the source
+URL. See [Native web search](/docs/features/desktop-search).
+
+## Settings panel
+
+Open the settings panel from the rail at the bottom-right. Sections:
+
+- **Provider** — wired the same way as `infinitecode.toml`.
+- **Behavior** — toggles for `self_verify`, `suggest_followups`,
+  `compact_strategy`, `explore_solutions`.
+- **Voice** — language, mic device, and disclosure behavior.
+- **Appearance** — theme, font, and density.
+- **Performance** — transcript cap, tool concurrency, cache TTL.
+- **Privacy** — web access, telemetry opt-in, transcript retention.
+
+Each setting round-trips into the ACP wire. Changing a setting is
+visible to the running server within a few hundred milliseconds.
+
+## Multi-session
+
+The desktop can keep multiple sessions open in parallel. Switch
+between them from the left rail. Each session has its own transcript,
+goals, and tool history. The desktop does not auto-merge sessions.
+
+## Telemetry
+
+The desktop dashboard surfaces the same metrics the Enterprise
+dashboard reports: tool calls, model mix, goal completions, last
+audit health.
+
+## Tips
+
+- Click a tool chip's expand arrow to see inputs and outputs.
+- Use the keyboard shortcut `⌘K` (macOS) / `Ctrl-K` (Windows/Linux)
+  to open the command palette.
+- Use `⌘.` / `Ctrl-.` to cancel a long tool call.

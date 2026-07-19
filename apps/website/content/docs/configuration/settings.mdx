@@ -1,0 +1,91 @@
+---
+title: Settings reference
+description: Where InfiniteCode reads its settings from.
+icon: Settings
+---
+
+InfiniteCode merges its settings from four sources, in this order of
+precedence:
+
+1. **CLI flags** — highest precedence.
+2. **Environment variables** — `INFINITECODE_*`.
+3. **`infinitecode.toml`** — repository-level config (or
+   `~/.config/infinitecode/config.toml` for global).
+4. **Built-in defaults** — the runtime's zero-config values.
+
+This page is a reference for the third source. Documentation for the
+first two lives at [Agent behavior config](/docs/features/agent-behavior).
+
+## `infinitecode.toml`
+
+```toml
+# Provider wiring
+[provider]
+kind = "anthropic"
+base_url = "https://api.deepseek.com/anthropic"
+api_key = "${DEEPSEEK_API_KEY}"
+model = "deepseek-v4-pro"
+
+# Agent behavior (v0.1.31)
+[behavior]
+self_verify = true
+suggest_followups = false
+compact_strategy = "summarize"
+explore_solutions = "minimal"
+
+# Auto-approve edits that touch only docs
+[approval]
+auto_approve_paths = ["**/*.md", "**/*.mdx", "**/docs/**"]
+```
+
+## Section reference
+
+### `[provider]`
+
+| Key | Required | Default | Notes |
+| --- | --- | --- | --- |
+| `kind` | yes | — | `anthropic`, `openai`, `local`, custom name. |
+| `base_url` | yes | — | Provider's base URL. |
+| `api_key` | yes | — | Plain string or `${VAR}` substitution. |
+| `model` | yes | — | A valid model name for the provider. |
+
+### `[behavior]`
+
+The same shape as the CLI flags. See
+[Agent behavior config](/docs/features/agent-behavior) for the full
+list of switches and their defaults.
+
+### `[approval]`
+
+| Key | Default | Purpose |
+| --- | --- | --- |
+| `auto_approve_paths` | empty | Glob list of paths that don't need a manual approval. |
+| `auto_approve_tools` | empty | Tool list that doesn't need a manual approval. |
+| `require_review_for` | empty | Tools/paths that always require a human review. |
+
+## Discovery
+
+InfiniteCode searches up the directory tree from the working directory
+for `infinitecode.toml`. The closest config wins; deeper configs are
+not merged with higher ones.
+
+If no `infinitecode.toml` is found, the runtime looks at
+`~/.config/infinitecode/config.toml`. If neither exists, the built-in
+defaults apply.
+
+## Local overrides
+
+For per-machine or per-project overrides that should not be committed,
+drop a `infinitecode.local.toml` next to `infinitecode.toml`. Local
+files override the committed config and are git-ignored by default.
+
+## Precedence rules
+
+1. CLI flag wins over everything else.
+2. Environment variables are read after CLI flags. Both can override
+   `infinitecode.toml`.
+3. Built-in defaults apply only when no other source sets the value.
+
+Conflicts between sources never produce a hard error — the lower-priority
+source is silently overridden. To see which value won, run
+`infinitecode --print-config`.

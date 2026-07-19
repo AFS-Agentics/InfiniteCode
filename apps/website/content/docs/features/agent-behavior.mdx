@@ -1,0 +1,75 @@
+---
+title: Agent behavior config
+description: CLI flags and environment variables for v0.1.31 agent behavior switches.
+icon: SlidersHorizontal
+---
+
+InfiniteCode exposes a deeper agent-behavior surface in **v0.1.31**. Most of
+these switches were previously hidden inside the runtime; they are now
+CLI flags, environment variables, and `infinitecode.toml` keys.
+
+The defaults are zero-config. You only need to read this page if you
+want to change a default for a session, a project, or a CI job.
+
+## Switches
+
+| Switch | Default | Purpose |
+| --- | --- | --- |
+| `self_verify` | `false` | Run the Self-Review pipeline before accepting edits. |
+| `suggest_followups` | `false` | Queue follow-up suggestions after a turn. |
+| `compact_strategy` | `auto` | Pick the compactness algorithm for long sessions. |
+| `explore_solutions` | `false` | Produce multiple candidate solutions before the audit pass. |
+
+## CLI flags
+
+```bash
+# Turn on the Self-Review pipeline
+infinitecode --self-verify
+
+# Turn on alternate candidate exploration
+infinitecode --explore-solutions
+
+# Pick a specific compactness strategy for this session
+infinitecode --compact-strategy truncate
+```
+
+## Environment variables
+
+```bash
+# Equivalent to passing --self-verify on every CLI invocation
+export INFINITECODE_SELF_VERIFY=1
+
+# Equivalent to --compact-strategy summarize
+export INFINITECODE_COMPACT_STRATEGY=summarize
+
+# Disable follow-up suggestions even when the agent offers them
+export INFINITECODE_SUGGEST_FOLLOWUPS=0
+```
+
+Variables are read in the order `INFINITECODE_<KEY>` (uppercase,
+`SCREAMING_SNAKE_CASE`). A CLI flag always overrides the environment
+variable.
+
+## `infinitecode.toml`
+
+```toml
+[behavior]
+self_verify = true
+suggest_followups = true
+compact_strategy = "summarize"
+explore_solutions = "minimal"
+```
+
+`explore_solutions` accepts `"off"`, `"minimal"` (default when turned on),
+or `"full"` (run every candidate through the audit pass).
+
+## Why these four switches
+
+- **`self_verify`** is the headline: it's the most visible reliability
+  improvement in v0.1.31.
+- **`suggest_followups`** is the one most likely to be turned on by
+  long-running task users.
+- **`compact_strategy`** matters for any session that exceeds a few
+  hundred turns.
+- **`explore_solutions`** is the runtime cost knob — turning it on adds
+  latency; turning it off falls back to the single-solution path.

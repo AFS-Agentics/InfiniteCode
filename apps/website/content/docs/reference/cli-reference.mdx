@@ -1,0 +1,91 @@
+---
+title: CLI Reference
+description: Common InfiniteCode command examples.
+---
+
+This page lists the common command forms. For option details, see
+[Command Line Options](./command-line-options).
+
+## Interactive Session
+
+Start InfiniteCode in the current repository:
+
+```bash
+infinitecode
+```
+
+Force onboarding:
+
+```bash
+infinitecode onboard
+```
+
+Start with a specific configured model binding or model name:
+
+```bash
+infinitecode --model deepseek-v4-pro
+```
+
+Set process logging level:
+
+```bash
+infinitecode --log-level debug
+```
+
+## Resume
+
+When InfiniteCode exits, it prints a command for continuing the session:
+
+```bash
+infinitecode resume <session-id>
+```
+
+You can also browse saved sessions from inside the TUI:
+
+```text
+/resume
+```
+
+## Non-Interactive Prompt
+
+Send one prompt and print the final answer:
+
+```bash
+infinitecode prompt "Explain this repository's main runtime path."
+```
+
+Emit a JSON object:
+
+```bash
+infinitecode prompt --format json "Summarize the last commit."
+```
+
+Emit streaming JSONL events:
+
+```bash
+infinitecode prompt --format jsonl "List the main config files."
+```
+
+`infinitecode prompt` runs with an always-allow permission checker. Use it for trusted
+automation where the prompt and working tree are controlled.
+
+## Health Check
+
+Diagnose config, provider connectivity, and system health:
+
+```bash
+infinitecode doctor
+```
+
+Run this after changing provider config, credentials, or local tool setup.
+
+## Upgrade
+
+Upgrade InfiniteCode to the latest released version:
+
+```bash
+infinitecode upgrade
+```
+
+Offline installations should upgrade from a copied release artifact instead.
+See [Install](../get-started/install).

@@ -1,0 +1,121 @@
+---
+title: Command Line Options
+description: Reference top-level InfiniteCode CLI flags and commands.
+---
+
+The `infinitecode` binary starts the interactive TUI when no subcommand is provided.
+Global flags can be used with interactive mode and subcommands.
+
+## Global Flags
+
+| Flag | Value | Meaning |
+| --- | --- | --- |
+| `--model` | string | Override the model used for this process. |
+| `--log-level` | `trace`, `debug`, `info`, `warn`, `error` | Override process logging level. |
+| `--dangerously-skip-permissions`, `--yolo` | none | Start the interactive TUI with full-access permissions, skipping approval prompts. |
+| `--help` | none | Print command help. |
+| `--version` | none | Print InfiniteCode version. |
+
+Example:
+
+```bash
+infinitecode --model deepseek-v4-pro --log-level debug
+infinitecode --yolo
+```
+
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `infinitecode` | Start the interactive TUI. |
+| `infinitecode onboard` | Launch onboarding and configure a model provider. |
+| `infinitecode resume <session-id>` | Resume a saved interactive session by id. |
+| `infinitecode prompt [--format <format>] <input>` | Send one prompt and print the response. |
+| `infinitecode doctor` | Diagnose configuration, provider connectivity, and system health. |
+| `infinitecode upgrade` | Upgrade InfiniteCode to the latest released version. |
+
+There is also a hidden `server` command used by the runtime. It is not part of
+the user-facing CLI contract.
+
+## `infinitecode`
+
+Starts an interactive session in the current working directory:
+
+```bash
+infinitecode
+```
+
+Use this for normal coding-agent work.
+
+## `infinitecode onboard`
+
+Forces the onboarding flow:
+
+```bash
+infinitecode onboard
+```
+
+Use this when setting up a provider for the first time or replacing the current
+provider setup.
+
+## `infinitecode resume`
+
+Resumes a saved interactive session:
+
+```bash
+infinitecode resume <session-id>
+```
+
+The session id is printed when an interactive session exits. Inside the TUI,
+`/resume` opens the session browser.
+
+## `infinitecode prompt`
+
+Runs one non-interactive prompt:
+
+```bash
+infinitecode prompt "Explain this repository."
+```
+
+Output formats:
+
+| Format | Meaning |
+| --- | --- |
+| `text` | Print final assistant text. This is the default. |
+| `json` | Print one JSON result object with message and usage. |
+| `jsonl` | Print JSONL lifecycle, delta, tool, result, and error events. |
+
+Examples:
+
+```bash
+infinitecode prompt --format text "List the main crates."
+infinitecode prompt --format json "Summarize current config."
+infinitecode prompt --format jsonl "Inspect project structure."
+```
+
+`--model` also applies to `infinitecode prompt`:
+
+```bash
+infinitecode --model deepseek-v4-flash prompt "Summarize this file tree."
+```
+
+## `infinitecode doctor`
+
+Runs local diagnostics:
+
+```bash
+infinitecode doctor
+```
+
+Run this after editing config files, credentials, or provider endpoints.
+
+## `infinitecode upgrade`
+
+Runs the built-in upgrade command:
+
+```bash
+infinitecode upgrade
+```
+
+For offline machines, use the offline install or upgrade process instead of
+expecting this command to fetch artifacts from the network.

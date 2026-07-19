@@ -3,5 +3,8 @@
 		"silent": true,
 		"autoJobCancelation": true
 	},
-	"ignoreCommand": "git diff --quiet HEAD~1 HEAD -- apps/website/"
+	"ignoreCommand": "git diff --quiet HEAD~1 HEAD -- apps/website/",
+	"rewrites": [
+		{ "source": "/(.*)", "destination": "/index.html" }
+	]
 }
