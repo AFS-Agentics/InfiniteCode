@@ -709,6 +709,8 @@ export function HomePage() {
 				<WebSection />
 				<StatsSection />
 				<CtaSection />
+				{/* Adsterra fallback ad */}
+				<div id="container-ba7ceb35501edf7bae9f9a9e268cb6ca" className="mx-auto my-8" />
 				{/* Docs landing page sections added below */}
 				<ProofSection rows={landingCopy.en.proofRows} />
 				<WorkflowSection copy={landingCopy.en.workflow} />
