@@ -7,7 +7,9 @@
 	"rewrites": [
 		{ "source": "/_next/:path*", "destination": "https://infinitecode-docs.vercel.app/_next/:path*" },
 		{ "source": "/api/:path*", "destination": "https://infinitecode-docs.vercel.app/api/:path*" },
+		{ "source": "/zh/docs", "destination": "https://infinitecode-docs.vercel.app/zh/docs" },
 		{ "source": "/zh/docs/:path*", "destination": "https://infinitecode-docs.vercel.app/zh/docs/:path*" },
+		{ "source": "/docs", "destination": "https://infinitecode-docs.vercel.app/docs" },
 		{ "source": "/docs/:path*", "destination": "https://infinitecode-docs.vercel.app/docs/:path*" },
 		{ "source": "/(.*)", "destination": "/index.html" }
 	]
