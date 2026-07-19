@@ -115,7 +115,6 @@ function DocsRouteRenderer() {
 export function DocsRoutes() {
 	return (
 		<Routes>
-			<Route index element={<DocsIndex />} />
 			<Route path="*" element={<DocsRouteRenderer />} />
 		</Routes>
 	);
