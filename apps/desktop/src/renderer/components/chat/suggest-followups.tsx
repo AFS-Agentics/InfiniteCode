@@ -55,10 +55,14 @@ function extractFollowups(part: ToolPart): FollowupItem[] {
 
 /** The most recent suggest_followups tool call in the turn (or undefined). */
 function findLatestFollowupCall(turn: ChatTurnType): ToolPart | undefined {
-	const parts = turn.parts
-	for (let i = parts.length - 1; i >= 0; i--) {
-		const part = parts[i]
-		if (part.type === "tool" && part.tool === "suggest_followups") return part
+	// Scan all assistant messages' parts (ChatTurn has assistantMessages[], each with its own parts[])
+	for (let i = turn.assistantMessages.length - 1; i >= 0; i--) {
+		const parts = turn.assistantMessages[i].parts
+		if (!parts) continue
+		for (let j = parts.length - 1; j >= 0; j--) {
+			const part = parts[j]
+			if (typeof part === "object" && "tool" in part && (part as ToolPart).tool === "suggest_followups") return part as ToolPart
+		}
 	}
 	return undefined
 }

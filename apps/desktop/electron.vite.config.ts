@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig, externalizeDepsPlugin } from "electron-vite"
 import type { Plugin } from "vite"
+import { viteStaticCopy } from "vite-plugin-static-copy"
 import { protocolTypesPlugin } from "./scripts/protocol-types"
 
 const sdkClientAlias = path.resolve(__dirname, "packages/infinitecode-ai-sdk/src/v2/client.ts")
@@ -66,7 +67,25 @@ export default defineConfig({
 	},
 	renderer: {
 		root: path.resolve(__dirname, "src/renderer"),
-		plugins: [protocolTypesPlugin({ desktopDir: __dirname }), react(), tailwindcss()],
+		plugins: [
+			protocolTypesPlugin({ desktopDir: __dirname }),
+			// Derive the renderer's /logo.png from the canonical brand lockup at
+			// build time. public/logo.png is the dev canonical (kept in sync at
+			// PR review); viteStaticCopy's writeBundle hook rewrites
+			// out/renderer/logo.png from brand/lockup.png so the packaged asar
+			// ships the canonical regardless of what public/ contains.
+			viteStaticCopy({
+				targets: [
+					{
+						src: path.resolve(__dirname, "resources/brand/lockup.png"),
+						dest: "",
+						rename: "logo.png",
+					},
+				],
+			}),
+			react(),
+			tailwindcss(),
+		],
 		resolve: {
 			alias: {
 				"@": path.resolve(__dirname, "src/renderer"),

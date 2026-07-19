@@ -125,19 +125,6 @@ export function PerformanceSettings() {
 					</label>
 				</SettingsRow>
 
-					<label className="flex items-center gap-2 text-sm">
-						<input
-							type="checkbox"
-							checked={performance.suggestFollowups}
-							disabled={saving}
-							onChange={(event) =>
-								updateOne({ suggestFollowups: event.target.checked })
-							}
-						/>
-						<span>{performance.suggestFollowups ? "On" : "Off"}</span>
-					</label>
-				</SettingsRow>
-
 				<SettingsRow
 					label="Suggest next steps at the end of each turn"
 					description="Adds a clickable chip row below non-trivial assistant turns. Each chip uses an emoji + short label; clicking submits the chip's prompt as your next message. Off only turns off the system-prompt block — the tool itself stays registered."

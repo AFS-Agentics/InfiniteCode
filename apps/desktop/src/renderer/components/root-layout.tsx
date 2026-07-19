@@ -242,16 +242,18 @@ export function RootLayout() {
 		<TooltipProvider>
 			<AppBarProvider>				<SidebarSlotProvider>
 					<div
-						className={`transition-opacity duration-300 ${contentReady ? "opacity-100" : "opacity-0"}`}
+						className={`flex h-screen overflow-hidden transition-opacity duration-300 ${contentReady ? "opacity-100" : "opacity-0"}`}
 					>
-						<Outlet />
+						<div className="flex min-w-0 flex-1 flex-col">
+							<Outlet />
+						</div>
+						<ArtifactPane />
 						<CommandPalette
 							open={commandPaletteOpen}
 							onOpenChange={setCommandPaletteOpen}
 							agents={agents}
 							onForkSession={activeAgent ? handleForkSession : undefined}
 						/>
-						<ArtifactPane />
 						<Toaster position="bottom-right" />
 					</div>
 					<StartupOverlay />

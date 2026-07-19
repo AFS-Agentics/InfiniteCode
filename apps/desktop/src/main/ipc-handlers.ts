@@ -129,7 +129,7 @@ export { getOpaqueWindows as getOpaqueWindowsPref } from "./settings-store";
 // future re-registration of IPC handlers.
 const gravityClient = new Gravity({
 	apiKey: process.env.GRAVITY_API_KEY,
-	production: false,
+	production: true,
 	timeoutMs: 5000,
 });
 
@@ -138,7 +138,7 @@ const gravityClient = new Gravity({
 // the slot string; this map resolves it to the dashboard's `placement_id`.
 const PLACEMENT_ID_BY_SLOT: Record<string, string> = {
 	above_response: "Chat-Response-Ad-Above",
-	below_response: "main",
+	below_response: "Chat-Response-Ad-Below",
 	inline_response: "Chat-Response-Ad-Inline",
 	search_result: "Search-Result-Ad",
 	bottom_page: "Bottom-MessageField-Ad",
@@ -150,11 +150,13 @@ const PLACEMENT_ID_BY_SLOT: Record<string, string> = {
 
 // Map InfiniteCode renderer-facing slot names onto the upstream
 // `@gravity-ai/api` Placement enum. The renderer sends the
-// InfiniteCode-specific strings ("sidebar", etc.); the SDK only
-// accepts its canonical 8 placements, so we route our non-canonical
-// slot ("sidebar") through `bottom_page` for the upstream auction
-// while keeping the InfiniteCode-specific `placement_id` so the
-// dashboard still reports per-slot metrics under "Sidebar-Ad".
+// InfiniteCode-specific strings ("sidebar", etc.); the SDK accepts
+// 11 canonical placements (above_response, below_response,
+// inline_response, left_response, right_response, search_result,
+// center_page, top_page, bottom_page, left_page, right_page),
+// so we route our slots through the matching upstream placement
+// while keeping the InfiniteCode-specific
+// `placement_id` so the dashboard reports per-slot metrics correctly.
 const SLOT_TO_UPSTREAM_PLACEMENT: Record<
 	string,
 	import("@gravity-ai/api").Placement
@@ -164,7 +166,7 @@ const SLOT_TO_UPSTREAM_PLACEMENT: Record<
 	inline_response: "inline_response",
 	search_result: "search_result",
 	bottom_page: "bottom_page",
-	sidebar: "bottom_page",
+	sidebar: "left_page",
 	// mid_response routes upstream via inline_response since the canonical
 	// enum doesn't have a mid-response slot; the InfiniteCode-specific
 	// placement_id keeps dashboard reporting separate from inline_response.
@@ -186,11 +188,9 @@ const SLOT_TO_UPSTREAM_PLACEMENT: Record<
 	mid_timeline: "inline_response",
 	// startup_overlay (full-screen loading splash shown above the "By AFS
 	// Agentics" attribution line during cold boot) routes upstream through
-	// inline_response as well — same canonical-enum gap. Kept distinct on
-	// the dashboard so startup-overaly impressions are reported separately
-	// from chat-context impressions even though they share the same fill
-	// pool upstream.
-	startup_overlay: "inline_response",
+	// center_page. Kept distinct on the dashboard so startup-overlay
+	// impressions are reported separately from chat-context impressions.
+	startup_overlay: "center_page",
 };
 
 // Gravity API requires `sessionId` in the request body and recommends a stable

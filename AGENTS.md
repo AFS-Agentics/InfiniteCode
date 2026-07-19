@@ -1,40 +1,73 @@
-# AGENTS.md
+# AGENTS.md — Top-level entry point for AI agents and tooling
 
-## Rust
+> **If you're an AI assistant about to do structural work, refactor, or answer a
+> "where does X live" question in this repo, read
+> [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md) first.** That file lists every
+> surface (CLI, Desktop, TUI, Docs, Website) and where each one lives. Past
+> incidents have happened where an AI assumed the project had only Electron
+> surfaces because the AI only grepped `infinitecode/apps/`. Don't repeat that.
+>
+> Specifically: this project has a Rust **CLI** surface that lives at
+> `infinitecode/crates/cli/` (NOT under `infinitecode/apps/`). It compiles to a
+> standalone `infinitecode` binary, ships via `install.sh` / `install.ps1`, and
+> is used by terminal / CI / SSH users without Electron. It is a first-class
+> surface, not an internal implementation detail.
 
-This repository is a Rust-based coding agent, currently called `infinitecode`.
-- All crate names use the `infinitecode-` prefix. For instance, the crate in the `core` directory is named `infinitecode-core`.
-- When using `format!`, inline variables directly inside `{}` whenever possible.
-- Always collapse nested `if` statements according to https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if
-- Inline `format!` arguments whenever possible, following https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
-- Prefer method references instead of closures where applicable, per https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
-- Avoid using `bool` or unclear `Option` parameters that lead to ambiguous calls like `foo(false)` or `bar(None)`. Instead, use enums, clearly named methods, newtypes, or other idiomatic Rust patterns that improve readability at the callsite.
-- If such API changes are not feasible and positional literals must still be used, follow the `argument_comment_lint` rule:
-  - Add an exact `/*param_name*/` comment before unclear positional literals (e.g., `None`, booleans, numeric values).
-  - Do not include these comments for string or character literals unless they genuinely improve clarity, as these are exempt.
-  - The comment must exactly match the parameter name in the function signature.
-- Make `match` expressions exhaustive whenever possible, avoiding wildcard arms.
-- Any newly introduced traits must include documentation explaining their purpose and how implementations should behave.
-- In tests, favor comparing full objects rather than asserting on individual fields.
-- If an API is added or modified, update the relevant documentation in the `docs/` directory when necessary.
-- Avoid introducing small helper functions that are only used once.
-- Keep modules reasonably sized:
-  - Prefer creating new modules instead of expanding existing ones.
-  - Aim to keep modules under 500 lines of code, excluding tests.
-  - If a file grows beyond ~800 lines, place new functionality in a separate module unless there is a strong, documented justification not to.
-- When running Rust-related commands (e.g., `just fix` or `cargo test`), allow them to complete without interruption, do not try to kill them using the PID. Slow execution due to Rust’s locking behavior is expected.
-- Agent can not apply patch to a file more than 800 lines, cause windows patch length limit, agent would failed to apply patch.
-- Do not introduce trivial wrapper functions — call the underlying function directly unless reuse or abstraction is clearly justified.
-- Exclude the target folder when using glob or grep, since it contains a large number of Rust build artifacts.
+---
 
-## Tests
+## Quick orientation
 
-### Test assertions
+This repo contains **two coupled workspaces**:
 
-- Use `pretty_assertions::assert_eq` in tests to produce clearer diffs. Import it at the top of the test module if it’s not already present.
-- Prefer deep equality checks by asserting entire objects instead of comparing fields individually.
-- Do not mutate process environment variables in tests; instead, pass environment-dependent values or flags explicitly from higher levels.
-- Tests that involve filesystem paths or other platform-dependent behavior MUST be platform-aware:
-  - Use `#[cfg(windows)]` and `#[cfg(unix)]` to define platform-specific test cases when behavior differs.
-  - Never rely on Windows-style paths being interpreted correctly on Unix, or Unix-style paths on Windows.
-  - Always use platform-native path formats in tests so they align with `std::path::Path` semantics.
+1. **Rust workspace** (`infinitecode/crates/*`, `infinitecode/Cargo.toml`) — 19
+   `infinitecode-*` crates that build into the `infinitecode` binary. The CLI,
+   TUI, and shared agent backend all live here.
+2. **Bun workspace** (`infinitecode/apps/*`, root `package.json`) — Electron
+   desktop, docs site, public website. The Desktop surface lives here.
+
+For the full surface table and how to add a new feature, see
+[`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md).
+
+## Per-surface convention docs (read these before editing)
+
+| Surface                                  | Read this first                                      |
+| ---                                      | ---                                                  |
+| Rust in general (clippy, formatting)     | `infinitecode/AGENTS.md`                             |
+| Rust TUI (terminal UI)                   | `infinitecode/crates/tui/AGENTS.md`                  |
+| Rust server backend                      | `infinitecode/crates/server/AGENTS.md`               |
+| Desktop (Electron + React + Bun)         | `infinitecode/apps/desktop/AGENTS.md`                |
+| Specs subsystem                          | `infinitecode/specs/AGENTS.md`                       |
+| **Anything structural across surfaces**  | [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md)     |
+
+## Working rules
+
+- **Don't confine yourself to `infinitecode/apps/`.** If the user's question is
+  about CLI features, terminal output, or the `infinitecode` binary, look at
+  `infinitecode/crates/cli/src/` and `infinitecode/crates/tui/src/` first.
+- **Don't claim a feature is missing without grepping all surfaces.** Run
+  text searches across **both** `infinitecode/crates/` and `infinitecode/apps/`
+  before asserting "the CLI doesn't have X" or "Electron doesn't have Y".
+- **The Rust binary is the source of truth for terminal behavior.** The
+  Desktop UI is a Bun/Electron client on top of it. Don't reverse that
+  relationship.
+- **Follow `infinitecode/AGENTS.md` Rust coding standards.** Every shipment
+  there is enforceable in code review (`just fix`, `cargo test`).
+- **AI agents may not apply patches to files > 800 lines.** See
+  `infinitecode/AGENTS.md` for the Windows-line-length workaround.
+- **For step-by-step feature-development procedure** (cross-surface checklist,
+  crate map, "How to add a new feature"), see
+  [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md) — don't duplicate the
+  procedure here.
+
+## Output style for agent responses
+
+When asked "does the CLI have X?" your first action must be a structured search
+across both `infinitecode/crates/` and `infinitecode/apps/`. If the answer is
+"no, only the Desktop has it" that is a known limitation, not a project
+structure surprise — surface it explicitly with the file paths showing where it
+exists.
+
+---
+
+_See [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md) for the full inventory,
+the CLI's path and command list, and the cross-surface change checklist._

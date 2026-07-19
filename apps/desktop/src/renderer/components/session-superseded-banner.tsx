@@ -1,7 +1,7 @@
 import { AlertTriangleIcon, XIcon } from "lucide-react"
 import { useAtom, useSetAtom } from "jotai"
 import { useEffect } from "react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@infinitecode/ui/components/button"
 import {
 	sessionSupersededAtom,
 	sessionSupersededDismissAtom,
