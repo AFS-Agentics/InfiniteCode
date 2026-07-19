@@ -1,0 +1,107 @@
+---
+title: Architecture overview
+description: The crate map and runtime flow of InfiniteCode.
+icon: Boxes
+---
+
+This page is the contributor's path. New contributors should read it
+top to bottom before touching the runtime.
+
+## Workspace layout
+
+```
+infinitecode/
+  crates/
+    cli/         CLI binary + onboarding.
+    core/        Agent runtime, orchestrator, prompt templates.
+    server/      ACP stdio server (used by the Desktop).
+    tools/       Tool registry + handlers.
+    config/      App config, infinitecode.toml, providers.
+    tui/         Terminal UI.
+  apps/
+    desktop/     Electron + React renderer.
+    docs/        This site.
+```
+
+## Request flow
+
+```
+                 ┌────────────────────────────┐
+                 │  user (CLI / Desktop / lib) │
+                 └──────────────┬─────────────┘
+                                │ prompt
+                ┌───────────────▼───────────────┐
+                │  infinitecode-core::orchestrator │
+                └───────────────┬───────────────┘
+                                │ tool calls
+        ┌─────────────┬─────────┼─────────┬──────────────┐
+        ▼             ▼         ▼         ▼              ▼
+   tools/registry  config.rs  prompts/  providers/     audit/
+   (read_file,   (infinitecocode-tool-*  (anthropic,    (risky
+   grep, …)      ome.toml   prompts/    openai, local)  lines,
+                                       schema)         secrets)
+```
+
+## Crate responsibilities
+
+### `core`
+
+Owns the agent runtime. Hosts the orchestrator, the prompt templates
+in `crates/core/prompts/agent-behavior/`, and the tool call wiring.
+It is the only crate that owns session state.
+
+### `server`
+
+Implements the ACP stdio surface used by the Desktop. The same
+`infinitecode` binary can boot either as a CLI, a server, or both.
+
+### `tools`
+
+The tool registry. Each tool is a `ToolHandler` implementing
+`tools/src/protocol.rs::ToolHandler`. Tools are loaded into the
+runtime by `core`.
+
+### `config`
+
+`infinitecode.toml` parsing, provider schema, and the
+`AppConfigLoader` trait. Holds no session state of its own — it is
+called once per session boot.
+
+### `tui`
+
+The terminal UI. Reuses `core` for sessions; brings its own
+composer, transcript view, and slash-command parser.
+
+## Adding a new tool
+
+1. Add a `ToolHandler` in `crates/core/src/tools/handlers/<name>.rs`.
+2. Register it in `crates/core/src/tools/handlers/mod.rs`.
+3. Add an entry point under `crates/core/src/tools/registry_plan.rs`.
+4. Write a unit test in the same file.
+5. Add a docs page in `apps/docs/content/docs/tools/`.
+
+The new tool will be visible to the orchestrator the next time the
+session boots.
+
+## Runtime invariants
+
+- The orchestrator is single-threaded per session. Tool calls fan out
+  through a worker pool with a configured cap.
+- Compaction is opt-in. Sessions that grow past the configured cap
+  invite compaction, but the runtime never compacts silently.
+- Provider state is read-only per turn. The runtime never mutates a
+  provider mid-session.
+
+## Tests
+
+```bash
+cargo test --workspace
+```
+
+`cargo test -p infinitecode-core` is what most contributors keep in
+their inner loop. The full workspace run is reserved for CI.
+
+## Where things live
+
+The crate list is short on purpose. Most runtime changes touch two
+crates at most.

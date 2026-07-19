@@ -1,0 +1,76 @@
+---
+title: Desktop voice input
+description: Push-to-talk dictation in the InfiniteCode Desktop composer.
+icon: Mic
+---
+
+The InfiniteCode Desktop composer ships with a **voice-input** affordance.
+Hold the mic button, speak naturally, and watch the transcript appear in
+the disclosure pane. When the transcript reads correctly, push it to the
+composer. Nothing is sent to the model until you do.
+
+The voice feature is **client-side**: the renderer talks to the
+browser's [`SpeechRecognition`](https://developer.mozilla.org/docs/Web/API/SpeechRecognition)
+API, so the audio does not leave the device. InfiniteCode's
+provider-side quota is unaffected by using voice input.
+
+## How it works
+
+1. Press the mic button in the composer rail.
+2. The renderer creates a `SpeechRecognition` session and starts a
+   continuous transcript.
+3. Press the button again to stop. The transcript is stored next to the
+   composer until you commit it.
+4. Edit the transcript, or press **Send** to push it to the agent.
+
+## Browser support
+
+Voice input requires the Web Speech API. It is currently wired for:
+
+- **macOS / Windows** — Chrome and Edge.
+- **Linux** — Chromium-based browsers.
+
+Firefox does not currently expose the [required API](https://caniuse.com/speech-recognition),
+so the mic button is hidden on Firefox rather than broken.
+
+## Locale switching
+
+```bash
+# Locale follows the Desktop settings panel
+infinitecode-desktop settings → voice → language
+```
+
+The default language matches the Desktop locale. Twelve languages are
+supported out of the box; if you need a different one, the Desktop
+build can be configured with additional BCP-47 tags.
+
+## Audit and consent
+
+The transcript disclosure pane shows exactly what will be sent. If the
+transcript contains anything sensitive (an API key, a hostname, an
+email address), you can edit it before sending. The renderer keeps the
+audio buffer only long enough to compute the transcript and then drops
+it — it does not persist audio.
+
+## Trial flow
+
+```text
+1. Open the Desktop composer.
+2. Press the mic once → "Listening…"
+3. Say: "Refactor the user record updater without breaking the
+   auth middleware."
+4. Press the mic again → the transcript appears in the disclosure.
+5. Press Send.
+```
+
+The transcript is editable, so you can clean up filler words or
+attribution quirks before they reach the model.
+
+## What is not yet wired
+
+- **Speaker diarization** — long multi-speaker transcripts come back as
+  one stream.
+- **Translation** — the engine returns the language it heard.
+- **Offline ASR** — the renderer relies on a browser engine. Truly
+  offline ASR (whisper.cpp, vosk) is on the contributors' path, not
+  the runtime path.

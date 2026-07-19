@@ -1,13 +1,14 @@
 {
-  "title": "InfiniteCode",
-  "icon": "Bot",
+  "title": "Documentation",
   "pages": [
     "index",
     "get-started",
-    "using-infinitecode",
     "core-concepts",
+    "features",
+    "tools",
     "configuration",
-    "contributors",
-    "reference"
+    "using-infinitecode",
+    "reference",
+    "contributors"
   ]
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { AgenticsSection } from "./agentics-section";
 import { ClosingSection } from "./closing-section";
 import { ComparisonSection } from "./comparison-section";
 import { EnterpriseSection } from "./enterprise-section";
@@ -39,6 +40,7 @@ export function LandingPage({ initialLocale }: LandingPageProps) {
       />
       <ComparisonSection copy={copy.comparison} />
       <ProofSection rows={copy.proofRows} />
+      <AgenticsSection copy={copy.agentics} locale={locale} />
       <WorkflowSection copy={copy.workflow} />
       <EnterpriseSection copy={copy.enterprise} />
       <ClosingSection copy={copy.closing} docsHref={docsHref} />

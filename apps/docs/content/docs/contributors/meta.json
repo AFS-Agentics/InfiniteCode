@@ -1,14 +1,13 @@
 {
   "title": "Contributors",
-  "icon": "GitBranch",
   "pages": [
     "index",
-    "architecture-overview",
-    "runtime-flow",
-    "cli-and-tui-flow",
-    "provider-runtime",
     "development-setup",
+    "architecture",
+    "architecture-overview",
+    "cli-and-tui-flow",
+    "runtime-flow",
+    "provider-runtime",
     "testing"
-  ],
-  "defaultOpen": true
+  ]
 }

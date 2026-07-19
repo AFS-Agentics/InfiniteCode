@@ -1,15 +1,15 @@
 {
-  "title": "Configuration And Providers",
-  "icon": "Settings2",
+  "title": "Configuration",
   "pages": [
     "index",
     "config-basics",
     "provider-setup",
+    "model-resolution",
     "model-bindings",
+    "provider-wire-apis",
     "deepseek-official-api",
     "other-providers",
-    "provider-wire-apis",
-    "model-resolution"
-  ],
-  "defaultOpen": true
+    "settings",
+    "acp-stdio"
+  ]
 }

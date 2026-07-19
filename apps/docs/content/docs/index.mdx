@@ -1,36 +1,62 @@
 ---
 title: InfiniteCode
 description: Open source, lightweight, model-neutral coding agent documentation.
+icon: BookOpen
 ---
 
-InfiniteCode is an open source coding agent for developers who want a local,
-terminal-first workflow and the ability to connect to their own model provider.
+InfiniteCode is an open source, model-neutral coding agent for
+developers who want a local, terminal-first workflow. You can run it
+as a single binary, talk to it from the Desktop app, or wire it into
+the editor of your choice.
 
-The docs are organized for new users, Codex CLI and Claude Code users,
-provider integrators, and contributors who need to understand the runtime before
-changing it.
+This site carries the product documentation. Navigation lives in the
+sidebar.
 
-## Documentation Areas
+## What's new in v0.1.31
 
-- Product docs: Get Started and Core Concepts explain what InfiniteCode is, how to
-  install it, how models/providers work, and which features exist.
-- User guide: Using InfiniteCode explains the TUI workflows you use day to day.
-- Developer reference: Configuration, Reference, and Contributors document
-  provider wiring, commands, config fields, runtime flow, and contribution
-  paths.
+The v0.1.31 release ships four new capability surfaces:
 
-## Start Here
+- **[Self-Review workflow](/docs/features/self-review)** — Best-of-N
+  proposal selection plus multi-perspective audit, before any code
+  reaches your repository.
+- **[Desktop voice input](/docs/features/desktop-voice)** —
+  Push-to-talk dictation in the Desktop composer.
+- **[Native web search](/docs/features/desktop-search)** — Provider-routed
+  web search with inline citation chips.
+- **[Agent behavior config](/docs/features/agent-behavior)** — CLI
+  flags and env vars for `self_verify`, `suggest_followups`,
+  `compact_strategy`, and `explore_solutions`.
 
-- [Quickstart](/docs/get-started/quickstart)
-- [Install InfiniteCode](/docs/get-started/install)
-- [Connect DeepSeek](/docs/get-started/connect-deepseek)
-- [TUI overview](/docs/using-infinitecode/tui-overview)
-- [Architecture overview](/docs/contributors/architecture-overview)
+## Reader paths
 
-## Reader Paths
+- **New users** — start with [Quickstart](/docs/get-started/quickstart).
+- **CLI users** — continue with [CLI usage](/docs/using-infinitecode/cli).
+- **Desktop users** — jump to [Desktop usage](/docs/using-infinitecode/desktop).
+- **Provider integrators** — read [Settings reference](/docs/configuration/settings).
+- **Tooling authors** — the [Orchestrator](/docs/tools/orchestrator)
+  page documents how the agent runtime composes tools.
 
-- New users should start with Get Started.
-- Codex CLI and Claude Code users should read the migration pages after the
-  quickstart.
-- Provider integrators should start with Configuration and Providers.
-- Contributors should start with the architecture and runtime flow pages.
+## Sections
+
+- **[Get Started](/docs/get-started/quickstart)** — install, onboard,
+  connect a provider, run your first prompt.
+- **[Features](/docs/features/self-review)** — the v0.1.31 capability
+  surface and the configuration knobs behind it.
+- **[Tools](/docs/tools/orchestrator)** — the runtime tool surface
+  and the orchestrator that drives it.
+- **[Configuration](/docs/configuration/settings)** — `infinitecode.toml`,
+  environment variables, and the ACP stdio bridge.
+- **[Using InfiniteCode](/docs/using-infinitecode/cli)** — day-to-day
+  CLI and Desktop usage.
+- **[Contributors](/docs/contributors/architecture)** — crate map,
+  runtime flow, and how to add a new tool.
+
+## About InfiniteCode
+
+InfiniteCode is structured for users who want auditable, low-drama
+agentic workflows. The CLI and the Desktop talk to the same Rust
+runtime, the orchestrator is small, the prompts are versioned, and
+the providers are explicit.
+
+For partnership or enterprise inquiries, see the contact address on
+the landing page.

@@ -1,31 +1,9 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { NextResponse } from "next/server";
-
-type D1Statement = {
-  bind: (...values: string[]) => {
-    run: () => Promise<unknown>;
-  };
-};
-
-type WaitlistDatabase = {
-  exec: (query: string) => Promise<unknown>;
-  prepare: (query: string) => D1Statement;
-};
-
-type WaitlistEnv = CloudflareEnv & {
-  DB?: WaitlistDatabase;
-};
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function jsonResponse(body: unknown, status = 200) {
   return NextResponse.json(body, { status });
-}
-
-async function getWaitlistDatabase() {
-  const { env } = await getCloudflareContext({ async: true });
-
-  return (env as WaitlistEnv).DB;
 }
 
 export async function POST(request: Request) {
@@ -44,38 +22,13 @@ export async function POST(request: Request) {
     return jsonResponse({ error: "Invalid email address." }, 400);
   }
 
-  const db = await getWaitlistDatabase();
-
-  if (!db) {
-    return jsonResponse({ error: "Missing DB D1 binding." }, 500);
-  }
-
-  try {
-    await db.exec(
-      "CREATE TABLE IF NOT EXISTS waitlist (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, source TEXT NOT NULL DEFAULT 'infinitecode-site', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);",
-    );
-
-    await db.exec(
-      "CREATE INDEX IF NOT EXISTS idx_waitlist_created_at ON waitlist (created_at);",
-    );
-
-    await db
-      .prepare(
-        "INSERT INTO waitlist (email, source) VALUES (?, ?) ON CONFLICT(email) DO NOTHING",
-      )
-      .bind(email, "infinitecode-site")
-      .run();
-  } catch (error) {
-    console.error("Failed to write waitlist email", error);
-
-    return jsonResponse(
-      {
-        error: "Failed to write waitlist email.",
-        hint: "Make sure the D1 migration has been applied to the remote database.",
-      },
-      500,
-    );
-  }
+  // Deployment target: Vercel (no D1 binding available).
+  // The waitlist form on the docs site logs the email server-side for triage;
+  // we acknowledge success without persisting to a database.
+  //
+  // To re-enable persistence later, wire a Vercel KV / Postgres binding
+  // (or any other store) and replace this stub.
+  console.info("[waitlist] received", { email });
 
   return jsonResponse({ ok: true });
 }

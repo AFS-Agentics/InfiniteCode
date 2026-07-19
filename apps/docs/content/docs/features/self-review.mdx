@@ -1,0 +1,61 @@
+---
+title: Self-Review workflow
+description: Best-of-N proposal selection and multi-perspective audit land in v0.1.31.
+icon: CheckCircle
+---
+
+The **Self-Review workflow** turns a single agent prompt into a small
+proposal pipeline. Instead of asking the model to write and commit one
+solution, InfiniteCode asks for several solutions, asks the agent to
+self-score them, and asks a separate audit pass to flag risky edits.
+
+The point of Self-Review is to keep you in the loop while reducing the
+amount of code that reaches your repository unreviewed.
+
+## What runs
+
+When you turn on Self-Review, the agent runtime executes a small set of
+focused tools in sequence:
+
+1. **`explore_solutions`** — produce two or three candidate solutions for
+   the same prompt, written as plain diffs.
+2. **`select_implementation`** — score the candidates against a rubric
+   that you can override through `infinitecode.toml` (correctness,
+   minimality, alignment with the request).
+3. **`verify_solution`** — run the chosen solution's logic against a
+   local check or replay the test that the change is supposed to satisfy.
+4. **`audit_changes`** — surface risky lines, secret-looking strings,
+   unexpected file touches, and policy violations before commit.
+5. **`suggest_followups`** *(optional)* — queue small follow-ups the
+   agent noticed while running.
+
+The whole sequence is observable: each step is a tool call in the
+transcript with its inputs and outputs visible.
+
+## When to turn it on
+
+- Cross-cutting refactors where "the simplest change" is non-obvious.
+- Anytime you want a second opinion without paying for a full review by
+  a human.
+- For risk-averse repositories where Self-Review is the default
+  behavior.
+
+## What it does not do
+
+- It does not change your code without your consent. Each candidate is
+  presented as a preview first.
+- It does not replace CI. Verify-step outputs are a recommendation, not
+  a guarantee.
+- It does not require a different model provider. You can keep your
+  current provider.
+
+## Try it
+
+```bash
+infinitecode --self-verify "Refactor the user record updater"
+```
+
+If the run produces more than one candidate and you want to skip the
+multi-candidate stage, set `self_verify = "minimal"` in
+`infinitecode.toml`. See [Agent behavior config](/docs/features/agent-behavior)
+for the full switch list.

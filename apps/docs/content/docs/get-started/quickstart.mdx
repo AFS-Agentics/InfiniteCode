@@ -1,14 +1,16 @@
 ---
 title: Quickstart
 description: The fastest path to a working InfiniteCode session.
+icon: Rocket
 ---
 
-This page gets InfiniteCode running in an existing repository with a model provider
-connected.
+This page gets InfiniteCode running in an existing repository with a
+model provider connected.
 
-For a first setup, use DeepSeek official API through InfiniteCode's
-Anthropic-compatible provider path. That path is the simplest default when you
-want provider-hosted tools such as `web_search` and `web_fetch`.
+If this is your first time with InfiniteCode, use the **DeepSeek
+official API** through InfiniteCode's Anthropic-compatible provider
+path. That path is the simplest default when you want provider-hosted
+tools such as `web_search` and `web_fetch`.
 
 ## 1. Install InfiniteCode
 
@@ -24,109 +26,103 @@ Windows PowerShell:
 irm 'https://raw.githubusercontent.com/AFS-Agentics/InfiniteCode/main/install.ps1' | iex
 ```
 
-For source builds and offline machines, see [Install](/docs/get-started/install).
-
-Check that the binary is available:
+Verify the install:
 
 ```bash
 infinitecode --version
 ```
 
-## 2. Create A DeepSeek API Key
+You should see the version reported (for example, `infinitecode 0.1.31`).
 
-Create an API key in the
-[DeepSeek Platform](https://platform.deepseek.com/api_keys).
+## 2. Get a provider API key
 
-Last checked against DeepSeek official docs: 2026-06-14.
+Pick whichever provider you want. DeepSeek is a good first choice
+because its Anthropic-compatible endpoint is well documented and
+works on day one. Create an API key in your provider's dashboard.
 
-Use a current DeepSeek model name from the official docs. As of the check above,
-the main choices were:
+The current provider that ships in onboarding defaults is **DeepSeek
+Anthropic-compatible**:
 
-| Model name | Use when |
+| Field | Value |
 | --- | --- |
-| `deepseek-v4-pro` | You want the stronger model for coding and agent workflows. |
-| `deepseek-v4-flash` | You want the lower-cost model for routine work. |
+| Invocation method | `Anthropic Messages` |
+| Base URL | `https://api.deepseek.com/anthropic` |
+| Model name | `deepseek-v4-pro` (or `deepseek-v4-flash` for lower cost) |
 
-DeepSeek lists current base URLs and model names in its official docs:
+For OpenAI-compatible paths and self-hosted endpoints, see
+`infinitecode.toml` in [Settings reference](/docs/configuration/settings).
 
-- [Your First API Call](https://api-docs.deepseek.com/)
-- [Anthropic API](https://api-docs.deepseek.com/guides/anthropic_api)
-- [Models & Pricing](https://api-docs.deepseek.com/quick_start/pricing)
-
-## 3. Run Onboarding
-
-Open the repository you want InfiniteCode to work in:
+## 3. Onboard
 
 ```bash
 cd /path/to/your/repo
 infinitecode onboard
 ```
 
-When onboarding asks for provider details, choose:
-
-| Prompt | Value |
-| --- | --- |
-| Invocation method | `Anthropic Messages` |
-| Base URL | `https://api.deepseek.com/anthropic` |
-| API key | Your DeepSeek API key |
-| Model name | `deepseek-v4-pro` or `deepseek-v4-flash` |
-
-For manual config and the OpenAI-compatible DeepSeek path, see
-[Connect DeepSeek](/docs/get-started/connect-deepseek).
+If you already have an `infinitecode.toml`, onboarding will skip the
+provider step. Otherwise, fill in the prompts.
 
 ## 4. Start InfiniteCode
-
-Run InfiniteCode from the repository root:
 
 ```bash
 infinitecode
 ```
 
-If onboarding has already configured a provider, InfiniteCode opens the TUI directly. If
-no provider is configured, InfiniteCode starts onboarding.
+If onboarding configured a provider, the TUI opens straight to the
+composer. If not, onboarding re-prompts for the missing fields.
 
-The first screen should give you a composer at the bottom and a transcript area
-above it.
-
-## 5. Ask A Read-Only First Prompt
-
-Start with a prompt that proves InfiniteCode can read the repository before asking it to
-edit files:
+## 5. Ask a read-only first prompt
 
 ```text
 Explain this repository's main runtime path. Do not edit files yet.
 ```
 
-If the answer looks wrong, stop and fix the setup before asking for changes.
-Typical causes are the wrong working directory, wrong model name, wrong base
-URL, or a missing API key.
+If the answer looks wrong, fix the setup before asking for changes.
+The most common causes are wrong working directory, wrong model name,
+wrong base URL, or a missing API key.
 
-## 6. Run A Scoped Change
-
-Ask for one concrete change:
+## 6. Run a scoped change
 
 ```text
-Update the install docs to mention offline installation. Keep the change scoped to docs only.
+Update the install docs to mention offline installation.
+Keep the change scoped to docs only.
 ```
 
 When you already know the file, attach it with `@`:
 
 ```text
-Update @apps/web/content/docs/get-started/install.mdx to mention offline installation.
+Update @apps/docs/content/docs/quickstart.mdx to add a v0.1.31 callout.
 ```
 
-When you know the exact command, use `!` shell mode:
+When you know the exact shell command, use `!` shell mode:
 
 ```text
-!npm run lint
+!git status --short
 ```
 
-See [@ Fuzzy File Search](/docs/using-infinitecode/fuzzy-file-search) and
-[! Shell Mode](/docs/using-infinitecode/shell-mode) for the exact composer behavior.
+## 7. Try the v0.1.31 capabilities
 
-## 7. Verify The Change
+If you want to test the Self-Review pipeline, run any scoped change
+with `--self-verify`:
 
-Ask InfiniteCode to run the relevant checks:
+```bash
+infinitecode --self-verify "Refactor the user record updater"
+```
+
+If you're using the **Desktop** app, try voice input from the
+composer rail — see
+[Desktop voice input](/docs/features/desktop-voice) for the trial
+flow.
+
+For web search, ask any freshness-sensitive question:
+
+```text
+What's the latest stable version of bun as of this week?
+```
+
+The answer should arrive with inline citation chips.
+
+## 8. Verify the change
 
 ```text
 Run the checks for this docs change and tell me what passed or failed.
@@ -138,5 +134,17 @@ Then inspect the working tree:
 !git status --short
 ```
 
-Review the diff before committing or continuing. InfiniteCode can help explain the diff,
-but the repository state is still yours to accept.
+Review the diff before committing or continuing. InfiniteCode can
+help explain the diff, but the repository state is still yours to
+accept.
+
+## Where to go next
+
+- [Desktop usage](/docs/using-infinitecode/desktop) — if you want the
+  voice + web-search desktop flow.
+- [CLI usage](/docs/using-infinitecode/cli) — TUI composer, slash
+  commands, and long-running goals.
+- [Self-Review workflow](/docs/features/self-review) — the new
+  multi-candidate proposal pipeline.
+- [Settings reference](/docs/configuration/settings) — every knob
+  `infinitecode.toml` exposes.
