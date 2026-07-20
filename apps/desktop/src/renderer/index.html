@@ -13,6 +13,324 @@
       }(window,document,'script','https://code.trygravity.ai/gr-pix.js','gravity');
       gravity('init', '47f43d70-7338-44da-b13c-74165ad4b1fb');
     </script>
+    <!-- Adsterra fallback ads — containers + scripts are created dynamically by
+         AdsterraFallbackAd component. This inline script discovers all
+         [id^="container-"] elements and handles pill styling, regex/ML
+         moderation, and retry for each one. -->
+    <style>
+      /* Adsterra containers render freely — no opacity blocking.
+         The IIFE below handles pill styling and optional ML moderation,
+         but does NOT prevent the ad from being visible. */
+      [id^="container-"] { all: unset; display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+    </style>
+    <script>
+      // ─── GRAVITY KILL SWITCH (renderer-side, synchronous) ───
+      // Disabled per user request — every GravityAd component short-
+      // circuits to its `fallback` prop (so Adsterra still shows) when
+      // this is true. To re-enable Gravity: flip to `false` (one char,
+      // then Cmd+R or hard-restart).
+      //
+      // Synchronous on purpose: written inside <head> BEFORE main.tsx's
+      // module evaluation, so the flag is present at the very first
+      // React render. No polling window, no preload-bridge race.
+      window.__gravity_off__ = true
+    </script>
+    <script>
+      (function () {
+        // ─── MODERATION KILL SWITCH (renderer-side only) ───
+        // Disabled per user request for ad-inspection pass.
+        //
+        // Restoring: flip `MODERATION_DISABLED` to `false` (one char).
+        //
+        // When disabled: the renderer still applies the full custom
+        // styling (rounded cards, hover, "Ad" label, image sizing,
+        // separator dot) but skips the zero-shot ML check + retry
+        // pipeline, so all ads render immediately as their creative
+        // dictates.
+        //
+        // ⚠  The main-process `preloadClassifier()` in
+        //    apps/desktop/src/main/index.ts still warms
+        //    `Xenova/nli-deberta-v3-small` (~30 MB) on cold start —
+        //    stub that out separately if zero footprint is desired.
+        const MODERATION_DISABLED = true
+        // ───────────────────────────────────────────────────
+
+        // ── No regex patterns ──
+        // All moderation is done by the ML zero-shot classifier via IPC.
+        // Ads stay hidden until ML clears them (deferred-visibility).
+
+        // ── Per-container retry state ──
+        var MOD_RETRY = {}
+        var MOD_RETRY_MAX = 3
+        var MOD_RETRY_DELAY = 45000
+
+        function getContainerScriptSrc(container) {
+          return container.getAttribute("data-adsterra-src") || ""
+        }
+
+        function queueAdRefresh(containerId) {
+          MOD_RETRY[containerId] = MOD_RETRY[containerId] || { count: 0, time: 0 }
+          if (MOD_RETRY[containerId].count >= MOD_RETRY_MAX) return
+          MOD_RETRY[containerId].time = Date.now() + MOD_RETRY_DELAY
+        }
+
+        function processAdRefresh() {
+          var containers = document.querySelectorAll('[id^="container-"]')
+          for (var c = 0; c < containers.length; c++) {
+            var cid = containers[c].id
+            var entry = MOD_RETRY[cid]
+            if (!entry || entry.count >= MOD_RETRY_MAX || Date.now() < entry.time) continue
+
+            entry.count++
+            entry.time = Date.now() + MOD_RETRY_DELAY
+
+            var src = getContainerScriptSrc(containers[c])
+            containers[c].innerHTML = ""
+            containers[c].classList.remove("ad-styled")
+            containers[c].style.setProperty("opacity", "0", "important")
+
+            if (src) {
+              var old = document.querySelector('script[src="' + src + '"]')
+              if (old) old.remove()
+              var s = document.createElement("script")
+              s.src = src
+              s.setAttribute("data-cfasync", "false")
+              s.async = true
+              document.head.appendChild(s)
+            }
+          }
+        }
+
+        // ── ML check state per ad text ──
+        // mlChecked[adText]  = true when ML check has been fired at least once
+        // mlCleared[adText]  = true when ML returned "not flagged" (or error)
+        // mlFlagged[adText]  = true when ML returned "flagged"
+        // mlInFlight[adText] = true while IPC request is pending
+        var mlChecked = {}
+        var mlCleared = {}
+        var mlFlagged = {}
+        var mlInFlight = {}
+
+        function hideAdAndRetry(bn, adText, containerId) {
+          bn.style.setProperty("display", "none", "important")
+          mlChecked[adText] = true
+          mlFlagged[adText] = true
+          delete mlCleared[adText]
+          queueAdRefresh(containerId)
+        }
+
+        function checkAdTextML(bn, adText, containerId) {
+          // Kill switch: when disabled, treat every ad as already cleared
+          // so styling applies immediately without any IPC or model work.
+          if (MODERATION_DISABLED) {
+            mlChecked[adText] = true
+            mlCleared[adText] = true
+            return
+          }
+          if (!window.infinitecode || !window.infinitecode.moderation) return
+          if (mlChecked[adText] || mlInFlight[adText]) return
+          mlInFlight[adText] = true
+          mlChecked[adText] = true
+          window.infinitecode.moderation.checkAdText(adText).then(function (result) {
+            delete mlInFlight[adText]
+            if (result.flagged) {
+              hideAdAndRetry(bn, adText, containerId)
+            } else {
+              mlCleared[adText] = true
+              // Re-run styling to show the now-cleared ad
+              setTimeout(styleAllAds, 0)
+            }
+          }).catch(function () {
+            // IPC error — conservative: clear the ad so it shows anyway
+            delete mlInFlight[adText]
+            mlCleared[adText] = true
+            setTimeout(styleAllAds, 0)
+          })
+        }
+
+        function styleContainer(container) {
+          var containerId = container.id
+          container.querySelectorAll('[class*="__stand-name"],[class*="__cancel-btn"],[class*="__report-container"],[class*="__report-final"]').forEach(function (el) {
+            el.style.setProperty("display", "none", "important")
+          })
+          container.querySelectorAll('[class*="__bn-container"]').forEach(function (bnc) {
+            bnc.style.setProperty("display", "flex", "important")
+            bnc.style.setProperty("justify-content", "center", "important")
+            bnc.style.setProperty("width", "100%", "important")
+            bnc.style.setProperty("background", "transparent", "important")
+            bnc.style.setProperty("border", "none", "important")
+            bnc.style.setProperty("padding", "0", "important")
+          })
+          var bns = container.querySelectorAll('[class*="__bn"]')
+          var anyAdShown = false
+          for (var i = 0; i < bns.length; i++) {
+            var bn = bns[i]
+            if (bn.className.indexOf("__bn-container") !== -1) continue
+
+            // Extract ad text from ALL text-bearing elements in the banner.
+            // Adsterra doesn't always use __title-classed elements, so we
+            // collect from any element that contains non-empty text.
+            var adText = ""
+            var textEls = bn.querySelectorAll('[class*="__title"],[class*="__description"],[class*="__text"],[class*="__name"],[class*="__headline"],[class*="__snippet"]')
+            for (var ti = 0; ti < textEls.length; ti++) {
+              var t = (textEls[ti].textContent || "").trim()
+              if (t.length > adText.length) adText = t
+            }
+            // Fallback: grab the first non-empty textContent in the banner
+            if (!adText) {
+              adText = (bn.textContent || "").trim().substring(0, 200)
+            }
+
+            // 1) Fire ML check if not yet checked
+            if (!mlChecked[adText]) {
+              checkAdTextML(bn, adText, containerId)
+            }
+
+            // 3) If ML flagged this text on a previous run, hide it
+            if (mlFlagged[adText]) {
+              bn.style.setProperty("display", "none", "important")
+              continue
+            }
+
+            // 4) Only count as "shown" if ML has cleared this text
+            //    (or errored). While ML is in flight, the ad stays hidden.
+            if (!mlCleared[adText]) {
+              // ML still pending — keep this specific ad hidden
+              bn.style.setProperty("display", "none", "important")
+              continue
+            }
+
+            anyAdShown = true
+
+            bn.style.setProperty("display", "flex", "important")
+            bn.style.setProperty("flex-direction", "row", "important")
+            bn.style.setProperty("align-items", "center", "important")
+            bn.style.setProperty("gap", "12px", "important")
+            bn.style.setProperty("max-width", "520px", "important")
+            bn.style.setProperty("width", "100%", "important")
+            bn.style.setProperty("padding", "8px 12px", "important")
+            bn.style.setProperty("background-color", "var(--card)", "important")
+            bn.style.setProperty("border", "1px solid var(--border)", "important")
+            bn.style.setProperty("border-radius", "8px", "important")
+            bn.style.setProperty("min-height", "56px", "important")
+            bn.style.setProperty("transition", "background-color 0.15s", "important")
+            bn.style.setProperty("cursor", "pointer", "important")
+            bn.style.setProperty("text-decoration", "none", "important")
+            bn.onmouseenter = function () { this.style.setProperty("background-color", "var(--accent)", "important") }
+            bn.onmouseleave = function () { this.style.setProperty("background-color", "var(--card)", "important") }
+            bn.querySelectorAll('[class*="__img-container"]').forEach(function (imgc) {
+              imgc.style.setProperty("width", "40px", "important")
+              imgc.style.setProperty("height", "40px", "important")
+              imgc.style.setProperty("min-width", "40px", "important")
+              imgc.style.setProperty("max-width", "40px", "important")
+              imgc.style.setProperty("max-height", "40px", "important")
+              imgc.style.setProperty("overflow", "hidden", "important")
+              imgc.style.setProperty("border-radius", "2px", "important")
+              imgc.style.setProperty("flex-shrink", "0", "important")
+              imgc.style.setProperty("background", "var(--muted)", "important")
+            })
+            bn.querySelectorAll('[class*="__img"]').forEach(function (img) {
+              img.style.setProperty("width", "100%", "important")
+              img.style.setProperty("height", "100%", "important")
+              img.style.setProperty("background-size", "cover", "important")
+              img.style.setProperty("background-position", "center", "important")
+            })
+            if (bn.querySelector('[class*="__img-container"]') && !bn.querySelector("[data-separator]")) {
+              var sep = document.createElement("span")
+              sep.setAttribute("data-separator", "1")
+              sep.textContent = "\u00B7"
+              sep.style.cssText = "font-size:14px;line-height:1;opacity:0.5;color:var(--muted-foreground);flex-shrink:0;align-self:center;"
+              var imgc = bn.querySelector('[class*="__img-container"]')
+              if (imgc && imgc.nextSibling) bn.insertBefore(sep, imgc.nextSibling)
+              else bn.appendChild(sep)
+            }
+            bn.querySelectorAll('[class*="__title"]').forEach(function (title) {
+              title.style.setProperty("display", "flex", "important")
+              title.style.setProperty("align-items", "center", "important")
+              title.style.setProperty("font-size", "13px", "important")
+              title.style.setProperty("font-weight", "400", "important")
+              title.style.setProperty("line-height", "normal", "important")
+              title.style.setProperty("text-align", "left", "important")
+              title.style.setProperty("white-space", "nowrap", "important")
+              title.style.setProperty("overflow", "hidden", "important")
+              title.style.setProperty("text-overflow", "ellipsis", "important")
+              title.style.setProperty("color", "var(--muted-foreground)", "important")
+              title.style.setProperty("flex", "1", "important")
+              title.style.setProperty("min-width", "0", "important")
+              title.style.setProperty("align-self", "center", "important")
+            })
+            bn.querySelectorAll('[class*="__link"]').forEach(function (link) {
+              link.style.setProperty("flex", "0 0 0", "important")
+              link.style.setProperty("min-width", "0", "important")
+              link.style.setProperty("overflow", "hidden", "important")
+            })
+            if (!bn.querySelector("[data-ad-label]")) {
+              var adLabel = document.createElement("span")
+              adLabel.setAttribute("data-ad-label", "1")
+              adLabel.textContent = "Ad"
+              adLabel.style.cssText = "font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;opacity:0.7;color:var(--muted-foreground);flex-shrink:0;line-height:1;white-space:nowrap;align-self:center;"
+              bn.appendChild(adLabel)
+            }
+          }
+          // Manage container visibility via !important so Adsterra's
+          // invoke.js can't override it with inline styles.
+          // When MODERATION_DISABLED, every ad shows freely — no opacity
+          // blocking (the container renders at whatever opacity Adsterra
+          // sets or the default CSS provides).
+          if (!MODERATION_DISABLED) {
+            if (anyAdShown) {
+              container.classList.add("ad-styled")
+              container.style.setProperty("opacity", "1", "important")
+            } else {
+              container.classList.remove("ad-styled")
+              container.style.setProperty("opacity", "0", "important")
+            }
+          }
+        }
+
+        function styleAllAds() {
+          var containers = document.querySelectorAll('[id^="container-"]')
+          for (var c = 0; c < containers.length; c++) {
+            styleContainer(containers[c])
+          }
+        }
+
+        // ── Bootstrap ──
+        // Defer one tick so the preload bridge's `window.infinitecode`
+        // object is fully wired before the IIFE first polls for
+        // moderation. Without this, `checkAdTextML` early-returns silently
+        // when `window.infinitecode.moderation` is undefined and the very
+        // first batch of containers added during cold-boot would skip ML
+        // classification. The MutationObserver re-poll eventually catches
+        // up, but deferring the bootstrap removes the startup race.
+        setTimeout(styleAllAds, 0)
+        var aggroCount = 0
+        var aggroTimer = setInterval(function () { styleAllAds(); aggroCount++; if (aggroCount >= 150) clearInterval(aggroTimer) }, 100)
+        setInterval(styleAllAds, 2000)
+        setInterval(processAdRefresh, 10000)
+
+        // Watch body for new containers or ad content.
+        // Defer one tick via DOMContentLoaded so `document.body` is parsed
+        // (this IIFE runs in <head> before <body>, so `document.body` is
+        // null at execution time and `MutationObserver.observe()` throws
+        // "parameter 1 is not of type 'Node'". Safe because no Adsterra
+        // container exists yet on first paint — we'll start watching as
+        // soon as the body node exists.)
+        function watchBody() {
+          if (!document.body) {
+            if (document.readyState === "loading") {
+              document.addEventListener("DOMContentLoaded", watchBody, { once: true })
+            } else {
+              setTimeout(watchBody, 0)
+            }
+            return
+          }
+          var bodyMo = new MutationObserver(function () { styleAllAds() })
+          bodyMo.observe(document.body, { childList: true, subtree: true })
+        }
+        watchBody()
+      })()
+    </script>
     <style>
       /* Splash screen styles -- inlined so they render before any JS loads. */
       html {

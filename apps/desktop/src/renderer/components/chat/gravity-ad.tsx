@@ -13,79 +13,6 @@ interface GravityAdData {
 }
 
 /**
- * Dev-only escape hatch for the absent-placement invariant. In production
- * (`import.meta.env.DEV === false` in the bundled build) this collapses to
- * `return null` — Vite replaces `import.meta.env.DEV` with the literal
- * boolean at build time, so the placeholder branch tree-shakes away. In
- * dev mode the call renders a faint dashed-border placeholder so each
- * placement's surface stays visible during UI iteration even without a real
- * GRAVITY_API_KEY. Kept as a tiny inline-only helper to avoid prop drilling.
- */
-function renderEmptyOrNull(placement: string): JSX.Element | null {
-	return import.meta.env.DEV ? (
-		<ThemedGravityEmptySlot placement={placement} />
-	) : null;
-}
-
-/**
- * Hardcoded demo Gravity ad used for the dev-mode placeholder. Mirrors the
- * shape of a real Gravity response so the placement surfaces render with
- * realistic visual chrome (brand + description + Ad label, full opacity,
- * solid border) even when no real GRAVITY_API_KEY is configured. Tree-shaken
- * in production builds via `import.meta.env.DEV` (see `renderEmptyOrNull`).
- */
-const GRAVITY_DEMO_AD: GravityAdData = {
-	adText: "Production-grade object storage with edge caching and zero-egress egress pricing.",
-	brandName: "Cortex Cloud",
-	cta: "Start free trial",
-	url: "https://example.com/cortex",
-	clickUrl: "https://example.com/cortex?utm_source=infinitecode&utm_medium=desktop",
-	// No impUrl — demo placeholder does not fire impression pixels.
-};
-
-/**
- * Dev-only placeholder rendered when the Gravity auction returns no fill.
- * Renders the existing themed pill variants with `GRAVITY_DEMO_AD` so the
- * placement surfaces look identical to a real ad fill — same chrome, same
- * height, same Inter Observer wiring (firedRef is short-circuited because
- * `impUrl` is undefined). `import.meta.env.DEV` is Vite-baked to `false`
- * in production, so this branch tree-shakes away entirely.
- */
-function ThemedGravityEmptySlot({
-	placement,
-}: {
-	placement: string;
-}): JSX.Element | null {
-	if (!import.meta.env.DEV) return null;
-	switch (placement) {
-		case "above_response":
-		case "below_response":
-			return <ThemedGravityCard ad={GRAVITY_DEMO_AD} placement={placement} />;
-		case "inline_response":
-			return <ThemedGravityInlineFootnote ad={GRAVITY_DEMO_AD} />;
-		case "search_result":
-			return <ThemedGravitySearchResultRow ad={GRAVITY_DEMO_AD} />;
-		case "bottom_page":
-			return <ThemedGravityBottomPagePill ad={GRAVITY_DEMO_AD} />;
-		case "sidebar":
-			return (
-				<ThemedGravityCornerPill
-					ad={GRAVITY_DEMO_AD}
-					placement={placement}
-				/>
-			);
-		case "mid_response":
-			return <ThemedGravityInlineFootnote ad={GRAVITY_DEMO_AD} slot="mid_response" />;
-		case "mid_timeline":
-			return <ThemedGravityMidTimelineCard ad={GRAVITY_DEMO_AD} />;
-		case "startup_overlay":
-			return <ThemedGravityOverlayCard ad={GRAVITY_DEMO_AD} />;
-		default:
-			return null;
-	}
-}
-
-/**
  * Fetches a contextual ad from Gravity via IPC and renders it inline with the
  * InfiniteCode theme tokens.
  *
@@ -104,6 +31,7 @@ function ThemedGravityEmptySlot({
 export function GravityAd({
 	messages,
 	placement = "below_response",
+	fallback,
 }: {
 	/** Last 2–4 conversation turns for contextual ad matching. */
 	messages: { role: string; content: string }[];
@@ -113,7 +41,12 @@ export function GravityAd({
 	 * above an AI response, `below_response` for below.
 	 */
 	placement?: "above_response" | "below_response";
+	/** Fallback content when Gravity returns no ad (null/403/empty). */
+	fallback?: React.ReactNode;
 }): JSX.Element | null {
+	if (window.__gravity_off__ === true) {
+		return <>{fallback ?? null}</>;
+	}
 	const [ad, setAd] = useState<GravityAdData | null>(null);
 	const [state, setState] = useState<"loading" | "empty" | "error" | "ready">(
 		"loading",
@@ -169,10 +102,12 @@ export function GravityAd({
 	// placeholder so the placement surface is visible to the developer even
 	// without a real GRAVITY_API_KEY. `import.meta.env.DEV` is Vite-baked to
 	// `false` in production builds, so this branch tree-shakes away.
-	if (state !== "ready" || !ad) {
-		return renderEmptyOrNull(placement);
-	}
-	return <ThemedGravityCard ad={ad} placement={placement} />;
+  return (
+    <>
+      {fallback}
+      {state === "ready" && ad ? <ThemedGravityCard ad={ad} placement={placement} /> : null}
+    </>
+  );
 }
 
 /**
@@ -306,10 +241,16 @@ function ThemedGravityCard({
  */
 export function GravityInlineAd({
 	messages,
+	fallback,
 }: {
 	/** Capture of THIS turn's user prompt + assistant response. */
 	messages: { role: string; content: string }[];
+	/** Fallback content when Gravity returns no ad. */
+	fallback?: React.ReactNode;
 }): JSX.Element | null {
+	if (window.__gravity_off__ === true) {
+		return <>{fallback ?? null}</>;
+	}
 	const [ad, setAd] = useState<GravityAdData | null>(null);
 	const [state, setState] = useState<"loading" | "empty" | "error" | "ready">(
 		"loading",
@@ -359,14 +300,12 @@ export function GravityInlineAd({
 		void load();
 	}, [contextKey]);
 
-	if (state === "ready" && ad) {
-		return <ThemedGravityInlineFootnote ad={ad} slot="inline_response" />;
-	}
-
-	// Empty/loading/error in production collapses to null (absent-placement
-	// invariant). In dev mode, the woven-in slot gets a faint dashed-placeholder
-	// so the location is visible to the developer without a live API key.
-	return renderEmptyOrNull("inline_response");
+	return (
+		<>
+			{fallback}
+			{state === "ready" && ad ? <ThemedGravityInlineFootnote ad={ad} slot="inline_response" /> : null}
+		</>
+	);
 }
 
 /**
@@ -489,10 +428,16 @@ function ThemedGravityInlineFootnote({
  */
 export function GravitySearchResultAd({
 	messages,
+	fallback,
 }: {
 	/** Search query context — typically `[{role:"user", content:"@"+query}]`. */
 	messages: { role: string; content: string }[];
+	/** Fallback content when Gravity returns no ad. */
+	fallback?: React.ReactNode;
 }): JSX.Element | null {
+	if (window.__gravity_off__ === true) {
+		return <>{fallback ?? null}</>;
+	}
 	const [ad, setAd] = useState<GravityAdData | null>(null);
 	const [state, setState] = useState<"loading" | "empty" | "error" | "ready">(
 		"loading",
@@ -543,13 +488,14 @@ export function GravitySearchResultAd({
 		void load();
 	}, [contextKey]);
 
-	// Same as GravityAd — absent placement = absent render in prod; in dev
-	// render a faint dashed placeholder so the slot is visible to the
-	// developer without a live API key.
-	if (state !== "ready" || !ad) {
-		return renderEmptyOrNull("search_result");
-	}
-	return <ThemedGravitySearchResultRow ad={ad} />;
+	// Same as GravityAd — always render the fallback; only show Gravity on top
+	// when an ad is available.
+	return (
+		<>
+			{fallback}
+			{state === "ready" && ad ? <ThemedGravitySearchResultRow ad={ad} /> : null}
+		</>
+	);
 }
 
 /**
@@ -671,6 +617,7 @@ function ThemedGravitySearchResultRow({
 export function GravityBottomPageAd({
 	messages,
 	refreshIntervalMs = 60 * 1000,
+	fallback,
 }: {
 	/** Ambient context for the auction — typically the most recent user prompt. */
 	messages: { role: string; content: string }[];
@@ -678,14 +625,24 @@ export function GravityBottomPageAd({
 	 *  the freebuff always-on banner cadence so ad rotations feel uniform
 	 *  across InfiniteCode Desktop and Freebuff CLI. */
 	refreshIntervalMs?: number;
+	/** Fallback content to render when Gravity returns no ad (null/403/empty).
+	 *  Defaults to nothing (null) in production, dev placeholder in dev mode. */
+	fallback?: React.ReactNode;
 }): JSX.Element | null {
+	if (window.__gravity_off__ === true) {
+		return <>{fallback ?? null}</>;
+	}
 	const ad = useGravityAdRotating({
 		placement: "bottom_page",
 		messages,
 		refreshIntervalMs,
 	});
-	if (!ad) return renderEmptyOrNull("bottom_page");
-	return <ThemedGravityBottomPagePill ad={ad} />;
+	return (
+		<>
+			{fallback}
+			{ad ? <ThemedGravityBottomPagePill ad={ad} /> : null}
+		</>
+	);
 }
 
 /**
@@ -855,7 +812,7 @@ export type GravityPlacement =
  * all the existing pills already honor — a half-filled slot is worse UX
  * than an empty one because the user reads it as a mistake.
  */
-function useGravityAdRotating({
+export function useGravityAdRotating({
 	placement,
 	messages,
 	refreshIntervalMs = 60_000,
@@ -969,17 +926,27 @@ function useGravityAdRotating({
 export function GravityMidResponseAd({
 	messages,
 	refreshIntervalMs = 60 * 1000,
+	fallback,
 }: {
 	messages: { role: string; content: string }[];
 	refreshIntervalMs?: number;
+	/** Fallback content when Gravity returns no ad. */
+	fallback?: React.ReactNode;
 }): JSX.Element | null {
+	if (window.__gravity_off__ === true) {
+		return <>{fallback ?? null}</>;
+	}
 	const ad = useGravityAdRotating({
 		placement: "mid_response",
 		messages,
 		refreshIntervalMs,
 	});
-	if (!ad) return renderEmptyOrNull("mid_response");
-	return <ThemedGravityInlineFootnote ad={ad} slot="mid_response" />;
+	return (
+		<>
+			{fallback}
+			{ad ? <ThemedGravityInlineFootnote ad={ad} slot="mid_response" /> : null}
+		</>
+	);
 }
 
 /**
@@ -1006,6 +973,7 @@ export function GravityMidTimelineAd({
 	messages,
 	refreshIntervalMs = 60 * 1000,
 	paused = false,
+	fallback,
 }: {
 	/** Ambient context — typically this turn's captured prompt + assistant. */
 	messages: { role: string; content: string }[];
@@ -1013,15 +981,24 @@ export function GravityMidTimelineAd({
 	refreshIntervalMs?: number;
 	/** Suppresses the rotation interval when true (used for non-active turns). */
 	paused?: boolean;
+	/** Fallback content when Gravity returns no ad. */
+	fallback?: React.ReactNode;
 }): JSX.Element | null {
+	if (window.__gravity_off__ === true) {
+		return <>{fallback ?? null}</>;
+	}
 	const ad = useGravityAdRotating({
 		placement: "mid_timeline",
 		messages,
 		refreshIntervalMs,
 		paused,
 	});
-	if (!ad) return renderEmptyOrNull("mid_timeline");
-	return <ThemedGravityMidTimelineCard ad={ad} />;
+	return (
+		<>
+			{fallback}
+			{ad ? <ThemedGravityMidTimelineCard ad={ad} /> : null}
+		</>
+	);
 }
 
 /**
@@ -1152,21 +1129,31 @@ function ThemedGravityMidTimelineCard({
 export function GravitySidebarBanner({
 	messages,
 	refreshIntervalMs = 60 * 1000,
+	fallback,
 }: {
 	messages: { role: string; content: string }[];
 	refreshIntervalMs?: number;
+	/** Fallback content when Gravity returns no ad. */
+	fallback?: React.ReactNode;
 }): JSX.Element | null {
+	if (window.__gravity_off__ === true) {
+		return <>{fallback ?? null}</>;
+	}
 	const ad = useGravityAdRotating({
 		placement: "sidebar",
 		messages,
 		refreshIntervalMs,
 	});
-	if (!ad) return renderEmptyOrNull("sidebar");
 	return (
-		<ThemedGravityCornerPill
-			ad={ad}
-			placement="sidebar"
-		/>
+		<>
+			{fallback}
+			{ad ? (
+				<ThemedGravityCornerPill
+					ad={ad}
+					placement="sidebar"
+				/>
+			) : null}
+		</>
 	);
 }
 
@@ -1416,17 +1403,27 @@ const STARTUP_OVERLAY_CONTEXT_MESSAGES: { role: string; content: string }[] =
  */
 export function GravityStartupOverlayAd({
 	refreshIntervalMs = 60 * 1000,
+	fallback,
 }: {
 	/** 60s default; matches the always-on Tier-1 rotation cadence. */
 	refreshIntervalMs?: number;
+	/** Fallback content when Gravity returns no ad. */
+	fallback?: React.ReactNode;
 }): JSX.Element | null {
+	if (window.__gravity_off__ === true) {
+		return <>{fallback ?? null}</>;
+	}
 	const ad = useGravityAdRotating({
 		placement: "startup_overlay",
 		messages: STARTUP_OVERLAY_CONTEXT_MESSAGES,
 		refreshIntervalMs,
 	});
-	if (!ad) return renderEmptyOrNull("startup_overlay");
-	return <ThemedGravityOverlayCard ad={ad} />;
+	return (
+		<>
+			{fallback}
+			{ad ? <ThemedGravityOverlayCard ad={ad} /> : null}
+		</>
+	);
 }
 
 /**

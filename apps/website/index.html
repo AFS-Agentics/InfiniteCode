@@ -7,6 +7,196 @@
 		<title>InfiniteCode</title>
 		<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2935929946447260" crossorigin="anonymous"></script>
 		<script async="async" data-cfasync="false" src="https://pl30395772.effectivecpmnetwork.com/ba7ceb35501edf7bae9f9a9e268cb6ca/invoke.js"></script>
+		<style>
+			#container-ba7ceb35501edf7bae9f9a9e268cb6ca { opacity: 0; transition: opacity 0.15s ease-out; }
+			#container-ba7ceb35501edf7bae9f9a9e268cb6ca.ad-styled { opacity: 1; }
+		</style>
+		<script>
+			// Exact Gravity desktop pill styling + content moderation for Adsterra ads
+			;(function () {
+				var CONTAINER_ID = "container-ba7ceb35501edf7bae9f9a9e268cb6ca"
+
+				// Solicitation / dating-spam regex patterns
+				var SOLICITATION_PATTERNS = [
+					/(ukrainian|russian|asian|foreign|local|hot|single)\s+(girls?|women|wives|ladies)/i,
+					/(girls?|women|wives|ladies)\s+for\s+men/i,
+					/(looking|searching|seeking|needed)\s+for\s+someone\s+tonight/i,
+					/meet\s+(singles?|women|girls?|people)\s+in/i,
+					/lonely\s+(women|girls?|wives|housewives)/i,
+					/(hot|sexy|beautiful)\s+(singles?|women|girls?)/i,
+					/(find|meet|chat)\s+(with\s+)?(women|girls?|singles?)\s+(near|in|today)/i,
+					/adult\s+(dating|chat|fun|entertainment)/i,
+					/sex(y|ual)?\s+(dating|chat|fun|live)/i,
+				]
+
+				function checkAdText(text) {
+					for (var j = 0; j < SOLICITATION_PATTERNS.length; j++) {
+						if (SOLICITATION_PATTERNS[j].test(text)) {
+							return { flagged: true, reason: "Solicitation/Dating Spam" }
+						}
+					}
+					return { flagged: false }
+				}
+
+				function styleAds() {
+					var container = document.getElementById(CONTAINER_ID)
+					if (!container) return
+
+					// Hide UI elements
+					container.querySelectorAll('[class*="__stand-name"],[class*="__cancel-btn"],[class*="__report-container"],[class*="__report-final"]').forEach(function (el) {
+						el.style.setProperty("display", "none", "important")
+					})
+
+					// Style __bn-container — transparent wrapper only
+					container.querySelectorAll('[class*="__bn-container"]').forEach(function (bnc) {
+						bnc.style.setProperty("display", "flex", "important")
+						bnc.style.setProperty("justify-content", "center", "important")
+						bnc.style.setProperty("width", "100%", "important")
+						bnc.style.setProperty("background", "transparent", "important")
+						bnc.style.setProperty("border", "none", "important")
+						bnc.style.setProperty("padding", "0", "important")
+					})
+
+					// Style __bn ONLY (not __bn-container)
+					var bns = container.querySelectorAll('[class*="__bn"]')
+					var anyAdShown = false
+					for (var i = 0; i < bns.length; i++) {
+						var bn = bns[i]
+						// Skip __bn-container elements
+						if (bn.className.indexOf("__bn-container") !== -1) continue
+
+						// Content moderation: check ad title against solicitation patterns
+						var titleEl = bn.querySelector('[class*="__title"]')
+						var adText = titleEl ? (titleEl.textContent || "") : ""
+						if (checkAdText(adText).flagged) {
+							bn.style.setProperty("display", "none", "important")
+							continue
+						}
+						anyAdShown = true
+
+						bn.style.setProperty("display", "flex", "important")
+						bn.style.setProperty("flex-direction", "row", "important")
+						bn.style.setProperty("align-items", "center", "important")
+						bn.style.setProperty("gap", "12px", "important")
+						bn.style.setProperty("max-width", "520px", "important")
+						bn.style.setProperty("width", "100%", "important")
+						bn.style.setProperty("padding", "8px 12px", "important")
+						bn.style.setProperty("background-color", "var(--card)", "important")
+						bn.style.setProperty("border", "1px solid var(--border)", "important")
+						bn.style.setProperty("border-radius", "8px", "important")
+						bn.style.setProperty("min-height", "56px", "important")
+						bn.style.setProperty("transition", "background-color 0.15s", "important")
+						bn.style.setProperty("cursor", "pointer", "important")
+						bn.style.setProperty("text-decoration", "none", "important")
+
+						// Hover
+						bn.onmouseenter = function () { this.style.setProperty("background-color", "var(--accent)", "important") }
+						bn.onmouseleave = function () { this.style.setProperty("background-color", "var(--card)", "important") }
+
+						// Image container — 40x40
+						bn.querySelectorAll('[class*="__img-container"]').forEach(function (imgc) {
+							imgc.style.setProperty("width", "40px", "important")
+							imgc.style.setProperty("height", "40px", "important")
+							imgc.style.setProperty("min-width", "40px", "important")
+							imgc.style.setProperty("max-width", "40px", "important")
+							imgc.style.setProperty("max-height", "40px", "important")
+							imgc.style.setProperty("overflow", "hidden", "important")
+							imgc.style.setProperty("border-radius", "2px", "important")
+							imgc.style.setProperty("flex-shrink", "0", "important")
+							imgc.style.setProperty("background", "var(--muted)", "important")
+						})
+
+						// Image — cover
+						bn.querySelectorAll('[class*="__img"]').forEach(function (img) {
+							img.style.setProperty("width", "100%", "important")
+							img.style.setProperty("height", "100%", "important")
+							img.style.setProperty("background-size", "cover", "important")
+							img.style.setProperty("background-position", "center", "important")
+						})
+
+						// Dot separator between image and title (only if image container present and dot not yet added)
+						if (bn.querySelector('[class*="__img-container"]') && !bn.querySelector("[data-separator]")) {
+							var sep = document.createElement("span")
+							sep.setAttribute("data-separator", "1")
+							sep.textContent = "\u00B7"
+							sep.style.cssText = "font-size:14px;line-height:1;opacity:0.5;color:var(--muted-foreground);flex-shrink:0;align-self:center;"
+							var imgc = bn.querySelector('[class*="__img-container"]')
+							if (imgc && imgc.nextSibling) {
+								bn.insertBefore(sep, imgc.nextSibling)
+							} else {
+								bn.appendChild(sep)
+							}
+						}
+
+						// Title — greyish, not bold, 13px, vertically centered
+						bn.querySelectorAll('[class*="__title"]').forEach(function (title) {
+							title.style.setProperty("display", "flex", "important")
+							title.style.setProperty("align-items", "center", "important")
+							title.style.setProperty("font-size", "13px", "important")
+							title.style.setProperty("font-weight", "400", "important")
+							title.style.setProperty("line-height", "normal", "important")
+							title.style.setProperty("text-align", "left", "important")
+							title.style.setProperty("white-space", "nowrap", "important")
+							title.style.setProperty("overflow", "hidden", "important")
+							title.style.setProperty("text-overflow", "ellipsis", "important")
+							title.style.setProperty("color", "var(--muted-foreground)", "important")
+							title.style.setProperty("flex", "1", "important")
+							title.style.setProperty("min-width", "0", "important")
+							title.style.setProperty("align-self", "center", "important")
+						})
+
+						// __link — zero-width
+						bn.querySelectorAll('[class*="__link"]').forEach(function (link) {
+							link.style.setProperty("flex", "0 0 0", "important")
+							link.style.setProperty("min-width", "0", "important")
+							link.style.setProperty("overflow", "hidden", "important")
+						})
+
+						// Add "Ad" label once per __bn
+						if (!bn.querySelector("[data-ad-label]")) {
+							var adLabel = document.createElement("span")
+							adLabel.setAttribute("data-ad-label", "1")
+							adLabel.textContent = "Ad"
+							adLabel.style.cssText = "font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;opacity:0.7;color:var(--muted-foreground);flex-shrink:0;line-height:1;white-space:nowrap;align-self:center;"
+							bn.appendChild(adLabel)
+						}
+					}
+
+					// Style __stand
+					var stand = container.querySelector('[class*="__stand"]')
+					if (stand) {
+						stand.style.setProperty("display", "flex", "important")
+						stand.style.setProperty("flex-direction", "column", "important")
+						stand.style.setProperty("align-items", "center", "important")
+						stand.style.setProperty("gap", "8px", "important")
+						stand.style.setProperty("width", "100%", "important")
+					}
+					// Reveal container only if a clean ad was shown
+					if (anyAdShown) container.classList.add("ad-styled")
+				}
+
+				// Run immediately
+				styleAds()
+
+				// Phase 1: Aggressive override every 100ms for first 15 seconds
+				// (beats Adsterra's async JS no matter when it fires)
+				var aggroCount = 0
+				var aggroTimer = setInterval(function () {
+					styleAds()
+					aggroCount++
+					if (aggroCount >= 150) clearInterval(aggroTimer)
+				}, 100)
+
+				// Phase 2: Steady re-apply every 2 seconds indefinitely
+				// (catches late-loading ads, lazy-loaded content, page navigation)
+				setInterval(styleAds, 2000)
+
+				// Phase 3: MutationObserver for instant DOM/attribute changes
+				var observer = new MutationObserver(function () { styleAds() })
+				var target = document.getElementById(CONTAINER_ID) || document.body
+				observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] })
+			})()
+		</script>
 	</head>
 	<body class="dark">
 		<div id="root"></div>

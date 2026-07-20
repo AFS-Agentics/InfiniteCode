@@ -51,6 +51,27 @@ export interface AppMenuPosition {
 }
 
 // ============================================================
+// Moderation types
+// ============================================================
+
+export interface ModerationResult {
+	flagged: boolean
+	reason: string
+	/** Peak single bad-label confidence. 0 means "no bad label present". */
+	score: number
+	/**
+	 * Cumulative bad-label probability mass across all bad categories.
+	 * Only set when the aggregate rule fires — i.e. when the peak
+	 * single-label rule didn't fire, but the cumulative sum of bad-label
+	 * scores still exceeded `SUM_BAD_THRESHOLD`. Always `flagged: true`
+	 * when present. Lets callers distinguish an aggregate flag from a
+	 * high-confidence single-label flag at-a-glance without re-running
+	 * the model.
+	 */
+	cumulativeScore?: number
+}
+
+// ============================================================
 // Git types
 // ============================================================
 
@@ -485,6 +506,14 @@ export interface InfiniteCodeAPI {
 		callback: (detail: SessionSupersededDetail) => void,
 	) => () => void
 
+	// Ad content moderation (ML pipeline)
+	// Renamed from `adsterra`. The IPC channel is the general
+	// `moderation:check`; the type surface should match so future ad
+	// networks (Gravity, …) don't force a separate namespace.
+	moderation: {
+		checkAdText: (text: string) => Promise<ModerationResult>
+	}
+
 	onTerminalToggle: (callback: () => void) => () => void
 	acp: {
 		request: (request: {
@@ -911,5 +940,18 @@ export interface WebSearchSettings {
 declare global {
 	interface Window {
 		infinitecode: InfiniteCodeAPI
+		/**
+		 * Synchronous kill switch for all Gravity ad components. Set in
+		 * `<head>` BEFORE main.tsx loads so the flag is present at the
+		 * very first React render — no preload-bridge race window like
+		 * the previous `__disabled__` polling IIFE had. When `true`,
+		 * every `<Gravity*Ad />` short-circuits to its `fallback` prop
+		 * (typically `<AdsterraFallbackAd />`) so no Gravity network
+		 * traffic fires and no Gravity pill renders. Flipping `false`
+		 * requires a full Cmd+R / hard-restart because the flag is set
+		 * before any module evaluation. Stable across the renderer
+		 * lifetime; never written or read by the preload bridge.
+		 */
+		__gravity_off__?: boolean
 	}
 }

@@ -67,6 +67,7 @@ import {
 	CompactionStatusDivider,
 	isCompactionStatusText,
 } from "./compaction-status-divider";
+import { AdsterraFallbackAd } from "./adsterra-fallback"
 import {
 	GravityAd,
 	GravityInlineAd,
@@ -76,7 +77,6 @@ import {
 import {
 	buildProcessTimeline,
 	processTimelineRowId,
-	type ProcessTimelineItem,
 } from "./process-timeline";
 import { ProcessTimelineView } from "./process-timeline-view";
 
@@ -767,6 +767,23 @@ export const ChatTurnComponent = memo(
 		const toolPathRoot =
 			agent?.worktreePath ?? agent?.directory ?? agent?.projectDirectory;
 		const turnRef = useRef<HTMLDivElement>(null);
+	// Once-per-turn flag for the mid_timeline Adsterra fallback. Both the
+	// `thoughtSlot` counter (every thought) and `otherSlot` counter (every
+	// cadence-matching tool/text) independently reach 1 in a long turn, so a
+	// pure `meta.slot === 1` gate would re-create the duplicate
+	// containerId collision this flag guards against. Reset on `turn.id`
+	// change via the effect above.
+	const adsterraMidTimelineMountedRef = useRef(false);
+		// Synchronous reset on `turn.id` change so the FIRST renderMidAd
+		// call of a new turn sees a clean slot. The `useEffect([turn.id])`
+		// runs post-commit, too late — the first slot=1 would already have
+		// been evaluated against the leftover ref value. So we reset
+		// inline during render, before any JSX is composed.
+		const prevTurnIdRef = useRef(turn.id);
+		if (prevTurnIdRef.current !== turn.id) {
+			prevTurnIdRef.current = turn.id;
+			adsterraMidTimelineMountedRef.current = false;
+		}
 		useEffect(() => {
 			// Smart default per fresh turn: short turns expand (ads visible);
 			// long turns stay collapsed (density UX preserved). User can
@@ -1001,22 +1018,43 @@ export const ChatTurnComponent = memo(
 
 		const renderMidAd = useCallback(
 			(itemIndex: number, rowId: string) => {
-				if (turnAdMessages.length === 0) return null
+				if (!isLast) return null
 				const meta = midAdSlotMap.get(rowId)
 				if (!meta) return null
 				if (meta.cadence > 1 && (itemIndex + 1) % meta.cadence !== 0) return null
 				if (meta.slot === 0) return null
 				if (meta.slot > meta.cap) return null
-				return (
-					<GravityMidTimelineAd
-						key={`ad-${rowId}`}
-						messages={turnAdMessages}
-						paused={!isActiveTurn}
-						refreshIntervalMs={60 * 1000}
-					/>
-				)
+				// Mount the Adsterra fallback AT MOST ONCE per turn. Both the
+				// `thoughtSlot` (every thought) and `otherSlot` (every
+				// cadence-matching tool/text) counters independently reach 1 in
+				// a long turn, so a pure `meta.slot === 1` gate would re-create
+				// Adsterra's hardcoded containerId collision. Reset on `turn.id`
+				// change via the effect above.
+				const mountAdsterra =
+					meta.slot === 1 && !adsterraMidTimelineMountedRef.current
+				if (mountAdsterra) {
+					adsterraMidTimelineMountedRef.current = true
+				}
+			const gravityDisabled = !!window.__gravity_off__
+			return gravityDisabled ? (
+				mountAdsterra ? (
+					<AdsterraFallbackAd key={`ad-${rowId}`} placement="mid_timeline" />
+				) : null
+			) : (
+				<GravityMidTimelineAd
+					key={`ad-${rowId}`}
+					messages={turnAdMessages}
+					paused={!isActiveTurn}
+					refreshIntervalMs={60 * 1000}
+					fallback={
+						mountAdsterra ? (
+							<AdsterraFallbackAd placement="mid_timeline" />
+						) : undefined
+					}
+				/>
+			)
 			},
-			[isActiveTurn, turnAdMessages, midAdSlotMap],
+			[isLast, isActiveTurn, turnAdMessages, midAdSlotMap],
 		)
 
 		const textAlreadyInline =
@@ -1168,23 +1206,47 @@ export const ChatTurnComponent = memo(
 							? `${errorText.slice(0, 300)}...`
 							: errorText}
 					</div>
-				)}			{/* Mid-response Gravity section divider — mounted between the
+				)}{/* Above-response Adsterra primary — sits above the main response area
+			but below the user message. Adsterra mounts independently of
+			Gravity; Gravity is conditionally enabled only when its kill switch
+			in `index.html` (`DISABLE_GRAVITY`) is flipped to `false`. Same
+			ready-gate as below_response. */}
+			{!working && isLast &&
+				finalResponsePart &&
+				responseText &&
+				turnAdMessages.length > 0 && (
+				<>
+					<AdsterraFallbackAd placement="above_response" />
+					{!window.__gravity_off__ && (
+						<GravityAd
+							placement="above_response"
+							messages={turnAdMessages}
+						/>
+					)}
+				</>
+			)}			{/* Mid-response Adsterra primary — mounted between the
 		    active process timeline and the final response Message bubble.
 		    Same ready-gate as inline_response / below_response (only after
 		    `!working && finalResponsePart && responseText`) plus the extra
 		    `processTimelineItems.length > 0` requirement so a thought-only
-		    response without tool activity doesn't get the divider.
+		    response without tool activity doesn't get the divider. Adsterra
+		    mounts independently of Gravity; Gravity is conditionally enabled
+		    only when `DISABLE_GRAVITY` in `index.html` is `false`.
 		    60-s rotation offset vs the bottom-page 60-s timer. */}
-			{!working &&
+			{!working && isLast &&
 				finalResponsePart &&
 				responseText &&
 				turnAdMessages.length > 0 &&
 				processTimelineItems.length > 0 && (
+				<>
+					<AdsterraFallbackAd placement="mid_response" />			{!window.__gravity_off__ && (
 					<GravityMidResponseAd
 						messages={turnAdMessages}
 						refreshIntervalMs={60 * 1000}
 					/>
 				)}
+			</>
+			)}
 
 			{/* Completed final response — only mounts after the response has
 		    settled so the IO observer counts a stable impression (no
@@ -1223,30 +1285,42 @@ export const ChatTurnComponent = memo(
 
 		    Note: the chat carries 2 ads per turn total — Inline footer note
 		    + Below-Response pill — matching freebuff's "Chat Response (Inline)"
-		    + "Chat Response (Below)" pair exactly. */
-
-		    /* Below-response Gravity pill — sibling of the inline float-note.
+		    + "Chat Response (Below)" pair exactly. */		    /* Below-response Adsterra primary — sibling of the inline float-note.
+		    Adsterra mounts independently of Gravity; Gravity is conditionally
+		    enabled only when `DISABLE_GRAVITY` in `index.html` is `false`.
 		    Per-turn context keeps prior turns' pills stable across the user's
 		    next message. Ready-gate prevents mid-stream refetches. */}
-			{!working &&
+			{!working && isLast &&
 				finalResponsePart &&
 				responseText &&
 				turnAdMessages.length > 0 && (
-					<GravityInlineAd messages={turnAdMessages} />
-				)}
+				<>
+					<AdsterraFallbackAd placement="inline_response" />
+					{!window.__gravity_off__ && (
+						<GravityInlineAd messages={turnAdMessages} />
+					)}
+				</>
+			)}
 
-			{/* Below-response Gravity pill — sibling of the inline float-note.
+			{/* Below-response Adsterra primary — sibling of the inline float-note.
+		    Same architecture: Adsterra is top-level JSX, Gravity fires only
+		    when its kill switch in `index.html` is flipped off.
 		    Per-turn context keeps prior turns' pills stable across the user's
 		    next message. Ready-gate prevents mid-stream refetches. */}
-			{!working &&
+			{!working && isLast &&
 				finalResponsePart &&
 				responseText &&
 				turnAdMessages.length > 0 && (
-					<GravityAd
-						placement="below_response"
-						messages={turnAdMessages}
-					/>
-				)}
+				<>
+					<AdsterraFallbackAd placement="below_response" />
+					{!window.__gravity_off__ && (
+						<GravityAd
+							placement="below_response"
+							messages={turnAdMessages}
+						/>
+					)}
+				</>
+			)}
 
 				{/* Streaming response — visible while working, when text isn't already inline */}
 				{working && responseText && !textAlreadyInline && (

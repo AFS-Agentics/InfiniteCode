@@ -20,7 +20,7 @@ export default defineConfig({
 			],
 			providerImportSource: "@mdx-js/react",
 		}),
-		react({ include: /\.(jsx|js|mdx|md|tsx|ts)$/ }),
+		react({ include: /\.(jsx|js|tsx|ts)$/ }),
 		tailwindcss(),
 	],
 	resolve: {

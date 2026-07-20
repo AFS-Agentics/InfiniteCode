@@ -118,15 +118,18 @@ import {
 	type WebSearchProviderId,
 } from "./web-search-service";
 
+import { checkAdText, preloadClassifier } from "./moderation";
+
 const log = createLogger("ipc");
 
 /** Read the opaque windows preference for use at window creation time. */
 export { getOpaqueWindows as getOpaqueWindowsPref } from "./settings-store";
 
 // Gravity singleton — reads `process.env.GRAVITY_API_KEY` via dotenv (loaded at the
-// top of main/index.ts). `production: false` requests test ads by default until
-// the dashboard is verified end-to-end. Module-scope so it's stable across any
-// future re-registration of IPC handlers.
+// top of main/index.ts). `production: true` (so the dashboard reports live
+// impressions, not test mode) — flip to `false` here temporarily when
+// validating a new placement-id end-to-end without polluting real metrics.
+// Module-scope so it's stable across any future re-registration of IPC handlers.
 const gravityClient = new Gravity({
 	apiKey: process.env.GRAVITY_API_KEY,
 	production: true,
@@ -1247,4 +1250,13 @@ export function registerIpcHandlers(): void {
 		// before mounting the mic button.
 		return { available: true, vendor: null, microphoneSupported: true }
 	})
+
+	// --- Ad content moderation (ML) ---
+
+	ipcMain.handle(
+		"moderation:check",
+		withLogging("moderation:check", async (_event, text: string) => {
+			return await checkAdText(text);
+		}),
+	)
 }

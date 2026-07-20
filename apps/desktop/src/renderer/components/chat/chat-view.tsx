@@ -125,6 +125,7 @@ import {
 	type ComposerGoalStatus,
 } from "./composer-status-stack"
 import { ContextItems } from "./context-items"
+import { AdsterraFallbackAd } from "./adsterra-fallback"
 import {
 	GravityBottomPageAd,
 
@@ -1221,7 +1222,15 @@ export function ChatView({
 				    the margin here. The pill's `w-full` then fills this wrapper
 				    edge-to-edge. */}
 				<div className={contentWidthClass}>
-					<GravityBottomPageAd messages={bottomAdMessages} />
+					{/* Adsterra primary — top-level JSX, NOT nested as Gravity's
+					fallback. Adsterra mounts regardless of Gravity's kill switch.
+					Gravity fires only when its `DISABLE_GRAVITY` flag in
+					`index.html` is flipped to `false`. Mirrors the per-turn
+					slots in chat-turn.tsx. */}
+					<AdsterraFallbackAd placement="bottom_page" />
+					{!window.__gravity_off__ && (
+						<GravityBottomPageAd messages={bottomAdMessages} />
+					)}
 				</div>
 				<ChatInputSection
 							agent={agent}

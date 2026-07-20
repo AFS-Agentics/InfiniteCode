@@ -37,6 +37,7 @@ import {
 import { AddProjectMenu, SidebarMainMenu } from "./sidebar-menus"
 import { sidebarPreferencesAtom } from "./sidebar-preferences"
 import { ProjectRow, SessionRow } from "./sidebar-rows"
+import { AdsterraFallbackAd } from "../chat/adsterra-fallback"
 import { GravitySidebarBanner } from "../chat/gravity-ad"
 
 interface AppSidebarContentProps {
@@ -544,6 +545,7 @@ export function AppSidebarContent({
 				<GravitySidebarBanner
 					messages={sidebarBannerMessages}
 					refreshIntervalMs={180 * 1000}
+					fallback={<AdsterraFallbackAd placement="sidebar" />}
 				/>
 			</div>
 

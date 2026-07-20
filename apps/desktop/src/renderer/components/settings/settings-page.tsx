@@ -22,6 +22,7 @@ import {
 import { useEffect } from "react"
 import { lastAppRouteAtom } from "../../atoms/ui"
 import { resolveSettingsBackTarget } from "../../lib/app-navigation"
+import { AdsterraFallbackAd } from "../chat/adsterra-fallback"
 import { GravityBottomPageAd, GravitySidebarBanner } from "../chat/gravity-ad"
 import { useSetSidebarSlot } from "../sidebar-slot-context"
 
@@ -130,6 +131,7 @@ export function SettingsPage() {
 				<GravityBottomPageAd
 					messages={SETTINGS_FOOTER_MESSAGES}
 					refreshIntervalMs={73 * 1000}
+					fallback={<AdsterraFallbackAd placement="bottom_page" />}
 				/>
 			</div>
 		</div>
@@ -208,6 +210,7 @@ function SettingsSidebarContent() {
 				<GravitySidebarBanner
 					messages={SETTINGS_SIDEBAR_MESSAGES}
 					refreshIntervalMs={167 * 1000}
+					fallback={<AdsterraFallbackAd placement="sidebar" />}
 				/>
 			</div>
 		</SidebarContent>

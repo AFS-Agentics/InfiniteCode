@@ -16,6 +16,7 @@
 import { useAtomValue } from "jotai"
 import { useEffect, useRef, useState } from "react"
 import { discoveryPhaseAtom } from "../atoms/discovery"
+import { AdsterraFallbackAd } from "./chat/adsterra-fallback"
 import { GravityStartupOverlayAd } from "./chat/gravity-ad"
 
 // ============================================================
@@ -112,7 +113,7 @@ export function StartupOverlay() {
 			 * centerline.
 			 */}
 			<div className="mb-3 w-full px-6">
-				<GravityStartupOverlayAd />
+				<GravityStartupOverlayAd fallback={<AdsterraFallbackAd placement="startup_overlay" />} />
 			</div>
 			<p className="pb-4 text-center text-xs text-muted-foreground">By AFS Agentics</p>
 		</div>

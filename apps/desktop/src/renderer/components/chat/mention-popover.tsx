@@ -28,6 +28,7 @@ import {
 } from "react"
 import { useReferenceSearch } from "../../hooks/use-reference-search"
 import type { SdkAgent } from "../../hooks/use-infinitecode-data"
+import { AdsterraFallbackAd } from "./adsterra-fallback"
 import { GravitySearchResultAd } from "./gravity-ad"
 
 // ============================================================
@@ -297,7 +298,7 @@ export const MentionPopover = memo(
 						    reads as a confused fallback and forces a wasted
 						    auction on every failed search. */}
 						{hasResults && searchAdMessages.length > 0 && (
-							<GravitySearchResultAd messages={searchAdMessages} />
+							<GravitySearchResultAd messages={searchAdMessages} fallback={<AdsterraFallbackAd placement="search_result" />} />
 						)}
 
 						{/* Agent group */}

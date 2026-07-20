@@ -459,6 +459,12 @@ contextBridge.exposeInMainWorld("infinitecode", {
 		capability: () => ipcRenderer.invoke("voice:capability"),
 	},
 
+	// --- Ad content moderation (ML) ---
+
+	moderation: {
+		checkAdText: (text: string) => ipcRenderer.invoke("moderation:check", text),
+	},
+
 	// --- Session supersede (cross-process single-session enforcement) ---
 	// Forwarded from the main process when an infinitecode:ensure call hits
 	// a live SessionSupersededError. See `infinitecode-manager.ts` for the
