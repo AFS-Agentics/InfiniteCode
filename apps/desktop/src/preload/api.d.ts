@@ -684,23 +684,6 @@ export interface InfiniteCodeAPI {
 			removed: string[]
 			errors: string[]
 		}>
-	}	// Gravity Ads
-	gravity: {
-		getAds: (
-			messages: { role: string; content: string }[],
-			placement?:
-				| "above_response"
-				| "below_response"
-				| "inline_response"
-				| "search_result"
-				| "bottom_page"
-				| "sidebar"
-				| "mid_response"
-				| "mid_timeline"
-				| "startup_overlay",
-		) => Promise<Record<string, unknown>[]>
-	}
-
 	// ============================================================
 	// Artifact store types
 	// ============================================================
@@ -940,18 +923,5 @@ export interface WebSearchSettings {
 declare global {
 	interface Window {
 		infinitecode: InfiniteCodeAPI
-		/**
-		 * Synchronous kill switch for all Gravity ad components. Set in
-		 * `<head>` BEFORE main.tsx loads so the flag is present at the
-		 * very first React render — no preload-bridge race window like
-		 * the previous `__disabled__` polling IIFE had. When `true`,
-		 * every `<Gravity*Ad />` short-circuits to its `fallback` prop
-		 * (typically `<AdsterraFallbackAd />`) so no Gravity network
-		 * traffic fires and no Gravity pill renders. Flipping `false`
-		 * requires a full Cmd+R / hard-restart because the flag is set
-		 * before any module evaluation. Stable across the renderer
-		 * lifetime; never written or read by the preload bridge.
-		 */
-		__gravity_off__?: boolean
 	}
 }

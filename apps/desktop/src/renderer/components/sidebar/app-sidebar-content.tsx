@@ -37,8 +37,8 @@ import {
 import { AddProjectMenu, SidebarMainMenu } from "./sidebar-menus"
 import { sidebarPreferencesAtom } from "./sidebar-preferences"
 import { ProjectRow, SessionRow } from "./sidebar-rows"
-import { AdsterraFallbackAd } from "../chat/adsterra-fallback"
-import { GravitySidebarBanner } from "../chat/gravity-ad"
+import { AdsterraAd } from "../chat/adsterra-ad"
+
 
 interface AppSidebarContentProps {
 	agents: Agent[]
@@ -542,11 +542,7 @@ export function AppSidebarContent({
 			    footprint flows into the footer chrome with a cleaner
 			    8 px baseline instead of the prior 12 px gap. */}
 			<div className="px-3 pb-2">
-				<GravitySidebarBanner
-					messages={sidebarBannerMessages}
-					refreshIntervalMs={180 * 1000}
-					fallback={<AdsterraFallbackAd placement="sidebar" />}
-				/>
+				<AdsterraAd placement="sidebar" />
 			</div>
 
 			<SidebarFooter className="gap-1 px-3 pt-0 pb-3">

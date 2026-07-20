@@ -382,30 +382,6 @@ contextBridge.exposeInMainWorld("infinitecode", {
 		restoreBackup: () => ipcRenderer.invoke("onboarding:restore-backup"),
 	},
 
-	// --- Gravity Ads ---
-
-	gravity: {
-		/**
-		 * Fetch contextual ads from Gravity. Each placement string is a
-		 * separate ad slot on the publisher dashboard (separate auction,
-		 * separate impression counter). Caller should reuse the same slot
-		 * string across every render so per-turn ads accumulate impressions.
-		 */
-		getAds: (
-			messages: { role: string; content: string }[],
-			placement:
-				| "above_response"
-				| "below_response"
-				| "inline_response"
-				| "search_result"
-				| "bottom_page"
-				| "sidebar"
-				| "mid_response"
-				| "mid_timeline"
-				| "startup_overlay" = "below_response",
-		) => ipcRenderer.invoke("gravity:get-ads", messages, placement),
-	},
-
 	// --- Artifact store ---
 
 	artifact: {

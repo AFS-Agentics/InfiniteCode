@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import { Gravity } from "@gravity-ai/api";
+// Gravity removed — Adsterra is primary ad provider.
 import {
 	app,
 	BrowserWindow,
@@ -125,96 +124,7 @@ const log = createLogger("ipc");
 /** Read the opaque windows preference for use at window creation time. */
 export { getOpaqueWindows as getOpaqueWindowsPref } from "./settings-store";
 
-// Gravity singleton — reads `process.env.GRAVITY_API_KEY` via dotenv (loaded at the
-// top of main/index.ts). `production: true` (so the dashboard reports live
-// impressions, not test mode) — flip to `false` here temporarily when
-// validating a new placement-id end-to-end without polluting real metrics.
-// Module-scope so it's stable across any future re-registration of IPC handlers.
-const gravityClient = new Gravity({
-	apiKey: process.env.GRAVITY_API_KEY,
-	production: true,
-	timeoutMs: 5000,
-});
-
-// Gravity placement-id lookup. Each slot is a separate ad unit on the publisher
-// dashboard (separate auction, separate impression counter). The renderer sends
-// the slot string; this map resolves it to the dashboard's `placement_id`.
-const PLACEMENT_ID_BY_SLOT: Record<string, string> = {
-	above_response: "Chat-Response-Ad-Above",
-	below_response: "Chat-Response-Ad-Below",
-	inline_response: "Chat-Response-Ad-Inline",
-	search_result: "Search-Result-Ad",
-	bottom_page: "Bottom-MessageField-Ad",
-	sidebar: "Sidebar-Ad",
-	mid_response: "Chat-Response-Mid",
-	mid_timeline: "Chat-Response-Mid-Timeline",
-	startup_overlay: "Startup-Overlay-Ad",
-};
-
-// Map InfiniteCode renderer-facing slot names onto the upstream
-// `@gravity-ai/api` Placement enum. The renderer sends the
-// InfiniteCode-specific strings ("sidebar", etc.); the SDK accepts
-// 11 canonical placements (above_response, below_response,
-// inline_response, left_response, right_response, search_result,
-// center_page, top_page, bottom_page, left_page, right_page),
-// so we route our slots through the matching upstream placement
-// while keeping the InfiniteCode-specific
-// `placement_id` so the dashboard reports per-slot metrics correctly.
-const SLOT_TO_UPSTREAM_PLACEMENT: Record<
-	string,
-	import("@gravity-ai/api").Placement
-> = {
-	above_response: "above_response",
-	below_response: "below_response",
-	inline_response: "inline_response",
-	search_result: "search_result",
-	bottom_page: "bottom_page",
-	sidebar: "left_page",
-	// mid_response routes upstream via inline_response since the canonical
-	// enum doesn't have a mid-response slot; the InfiniteCode-specific
-	// placement_id keeps dashboard reporting separate from inline_response.
-	mid_response: "inline_response",
-	// mid_timeline (ads between individual Timeline items) also routes
-	// upstream via inline_response — same canonical-enum gap. The
-	// InfiniteCode-specific `placement_id` keeps dashboard per-slot metrics
-	// separate from inline_response + mid_response.
-	//
-	// Known limitation: four InfiniteCode-distinct slots (inline_response,
-	// mid_response, mid_timeline, startup_overlay) all funnel upstream into
-	// a single Gravity fill pool. Per-slot creative targeting isn't possible
-	// today — they all share the same auction and creative rotation. The
-	// `placement_id` keeps the dashboard reporting distinct (separate
-	// impression counters, separate CTRs), but the actual creative served
-	// is shared. Worth negotiating a dedicated enum entry with Gravity
-	// support if/when per-slot creative separation becomes a publisher
-	// priority.
-	mid_timeline: "inline_response",
-	// startup_overlay (full-screen loading splash shown above the "By AFS
-	// Agentics" attribution line during cold boot) routes upstream through
-	// center_page. Kept distinct on the dashboard so startup-overlay
-	// impressions are reported separately from chat-context impressions.
-	startup_overlay: "center_page",
-};
-
-// Gravity API requires `sessionId` in the request body and recommends a stable
-// `user.userId` for matching/attribution. The renderer doesn't yet forward
-// these from the chat session, so we synthesize them on the main side:
-//   - sessionId: a sha256 prefix of the conversation's captured turns. Stable
-//     across re-fetches of the same content, rotates when the conversation
-//     evolves. Good enough as a per-thread correlator.
-//   - userId: a single shared identifier for the desktop install until we wire
-//     a real user/account layer.
-const DESKTOP_USER_ID = "infinitecode-desktop-user";
-
-function deriveSessionId(
-	messages: { role: string; content: string }[],
-): string {
-	const preview = messages
-		.slice(-4)
-		.map((m) => `${m.role}:${m.content.slice(0, 80)}`)
-		.join("|");
-	return createHash("sha256").update(preview).digest("hex").slice(0, 32);
-}
+// Gravity Ads removed — Adsterra is the primary ad provider.
 
 function updateTitleBarOverlay(): void {
 	if (process.platform !== "win32" && process.platform !== "linux") return;
@@ -924,95 +834,7 @@ export function registerIpcHandlers(): void {
 		),
 	);
 
-	// --- Gravity Ads --
-	// Each ad slot is a separate auction on the Gravity dashboard. The slots
-	// we use:
-	//   - "above_response" (id: "Chat-Response-Ad-Above") — pill above each AI
-	//     response, earns an impression per scroll-in per turn.
-	//   - "below_response" (id: "main") — pill below each AI response, earns
-	//     an impression per scroll-in per turn.
-	//   - "inline_response" (id: "Chat-Response-Ad-Inline") — woven between
-	//     work section and final response.
-	//   - "search_result" (id: "Search-Result-Ad") — appears inline among
-	//     `@`-reference search results in the mention popover, styled like
-	//     a result entry.
-	//   - "bottom_page" (id: "Bottom-MessageField-Ad") — sticky pill rendered
-	//     above the message input, always visible, auto-rotates on a timer
-	//     so consecutive fresh ads keep firing impressions.
-	// Per Gravity's docs, reusing the same placement string across every
-	// <GravityAd /> render is correct: each new render = new ad + fresh IO
-	// observer = fresh impression. Height/layout do not affect counting.
-
-	ipcMain.handle(
-		"gravity:get-ads",
-		withLogging(
-			"gravity:get-ads",
-			async (
-				_,
-				messages: { role: string; content: string }[],
-				placement:
-					| "above_response"
-					| "below_response"
-					| "inline_response"
-					| "search_result"
-					| "bottom_page"
-					| "sidebar"
-					| "mid_response"
-				| "mid_timeline" = "below_response",
-			) => {
-				if (!Array.isArray(messages) || messages.length === 0) {
-					return [];
-				}
-				const placement_id =
-					PLACEMENT_ID_BY_SLOT[placement] ??
-					PLACEMENT_ID_BY_SLOT.below_response;
-				// Synthesize the IncomingAdRequest shape the SDK expects. sessionId
-				// and user.userId are required by the upstream Gravity API; we
-				// derive them here until the renderer forwards real ones.
-				const req = {
-					body: {
-						messages,
-						gravity_context: {
-							sessionId: deriveSessionId(messages),
-							user: { id: DESKTOP_USER_ID, userId: DESKTOP_USER_ID },
-							device: {},
-						},
-					},
-					headers: {},
-				};
-			const upstreamPlacement =
-				SLOT_TO_UPSTREAM_PLACEMENT[placement] ??
-				SLOT_TO_UPSTREAM_PLACEMENT.below_response;
-			const placements: import("@gravity-ai/api").PlacementObject[] = [
-				{ placement: upstreamPlacement, placement_id },
-			];
-				const result = await gravityClient.getAds(
-					req,
-					messages as import("@gravity-ai/api").MessageObject[],
-					placements,
-				);
-				// Log every dimension of the response so silent failures are visible.
-				log.info("[gravity] response", {
-					placement,
-					placement_id,
-					adsCount: result.ads.length,
-					status: result.status,
-					elapsed: result.elapsed,
-					error: result.error ?? null,
-					firstBrand: result.ads[0]?.brandName ?? null,
-				});
-				if (result.error) {
-					log.warn("[gravity] upstream error field", {
-						placement,
-						placement_id,
-						error: result.error,
-						status: result.status,
-					});
-				}
-				return result.ads;
-			},
-		),
-	);
+	// Gravity Ads removed — Adsterra is the primary ad provider.
 
 	// --- Settings push channel (main -> renderer) ---
 	// Notify all renderer windows when settings change so they can update reactively.

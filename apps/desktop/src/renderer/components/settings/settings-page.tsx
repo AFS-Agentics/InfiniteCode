@@ -22,8 +22,7 @@ import {
 import { useEffect } from "react"
 import { lastAppRouteAtom } from "../../atoms/ui"
 import { resolveSettingsBackTarget } from "../../lib/app-navigation"
-import { AdsterraFallbackAd } from "../chat/adsterra-fallback"
-import { GravityBottomPageAd, GravitySidebarBanner } from "../chat/gravity-ad"
+import { AdsterraAd } from "../chat/adsterra-ad"
 import { useSetSidebarSlot } from "../sidebar-slot-context"
 
 // ============================================================
@@ -128,11 +127,7 @@ export function SettingsPage() {
 			    provides panel chrome around it that we deliberately omit here
 			    because settings has no ChatInputSection below to fill it. */}
 			<div className="mx-auto w-full max-w-2xl shrink-0 px-8 pb-6 pt-2">
-				<GravityBottomPageAd
-					messages={SETTINGS_FOOTER_MESSAGES}
-					refreshIntervalMs={73 * 1000}
-					fallback={<AdsterraFallbackAd placement="bottom_page" />}
-				/>
+				<AdsterraAd placement="bottom_page" />
 			</div>
 		</div>
 	)
@@ -207,11 +202,7 @@ function SettingsSidebarContent() {
 			    + preload side is the easy part; the renderer-side split needs
 			    a 5-line component refactor. */}
 			<div className="mt-auto shrink-0 px-3 pb-2">
-				<GravitySidebarBanner
-					messages={SETTINGS_SIDEBAR_MESSAGES}
-					refreshIntervalMs={167 * 1000}
-					fallback={<AdsterraFallbackAd placement="sidebar" />}
-				/>
+				<AdsterraAd placement="sidebar" />
 			</div>
 		</SidebarContent>
 	)

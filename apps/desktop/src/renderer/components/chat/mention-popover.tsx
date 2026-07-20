@@ -28,8 +28,8 @@ import {
 } from "react"
 import { useReferenceSearch } from "../../hooks/use-reference-search"
 import type { SdkAgent } from "../../hooks/use-infinitecode-data"
-import { AdsterraFallbackAd } from "./adsterra-fallback"
-import { GravitySearchResultAd } from "./gravity-ad"
+import { AdsterraAd } from "./adsterra-ad"
+
 
 // ============================================================
 // Types
@@ -150,23 +150,7 @@ export const MentionPopover = memo(
 	const { results, isLoading, error } = useReferenceSearch(directory, query, open)
 	const referenceOptions = useMemo(() => mapReferenceSearchResults(results), [results])
 
-	// --- Search Result Gravity ad context ---
-	// We feed Gravity `@<query>` as the only message so the contextual match
-	// aligns with whatever the user is currently searching for. The
-	// `results.length` dep is an implicit "server responded" signal — it
-	// cycles the contextKey each time the server returns a fresh snapshot
-	// (so we re-bid in tandem with the actual search result list), but stays
-	// stable across keystroke noise that hasn't yet triggered a server
-	// response. This keeps a per-keystroke character from burning an
-	// auction while still updating the ad when the user's intent visibly
-	// shifts.
-	const searchAdMessages = useMemo<
-		{ role: string; content: string }[]
-	>(() => {
-		const q = query.trim()
-		if (!q) return []
-		return [{ role: "user", content: `@${q}` }]
-	}, [query, results.length])
+	const hasSearchQuery = query.trim().length > 0
 
 		// --- Merge and filter ---
 		const allOptions = useMemo<MentionOption[]>(() => {
@@ -297,8 +281,8 @@ export const MentionPopover = memo(
 						    appear next to a literal "No results found" — that pair
 						    reads as a confused fallback and forces a wasted
 						    auction on every failed search. */}
-						{hasResults && searchAdMessages.length > 0 && (
-							<GravitySearchResultAd messages={searchAdMessages} fallback={<AdsterraFallbackAd placement="search_result" />} />
+						{hasResults && hasSearchQuery && (
+							<AdsterraAd placement="search_result" />
 						)}
 
 						{/* Agent group */}

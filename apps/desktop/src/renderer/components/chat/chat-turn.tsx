@@ -67,13 +67,7 @@ import {
 	CompactionStatusDivider,
 	isCompactionStatusText,
 } from "./compaction-status-divider";
-import { AdsterraFallbackAd } from "./adsterra-fallback"
-import {
-	GravityAd,
-	GravityInlineAd,
-	GravityMidResponseAd,
-	GravityMidTimelineAd,
-} from "./gravity-ad";
+import { AdsterraAd } from "./adsterra-ad"
 import {
 	buildProcessTimeline,
 	processTimelineRowId,
@@ -1035,24 +1029,9 @@ export const ChatTurnComponent = memo(
 				if (mountAdsterra) {
 					adsterraMidTimelineMountedRef.current = true
 				}
-			const gravityDisabled = !!window.__gravity_off__
-			return gravityDisabled ? (
-				mountAdsterra ? (
-					<AdsterraFallbackAd key={`ad-${rowId}`} placement="mid_timeline" />
-				) : null
-			) : (
-				<GravityMidTimelineAd
-					key={`ad-${rowId}`}
-					messages={turnAdMessages}
-					paused={!isActiveTurn}
-					refreshIntervalMs={60 * 1000}
-					fallback={
-						mountAdsterra ? (
-							<AdsterraFallbackAd placement="mid_timeline" />
-						) : undefined
-					}
-				/>
-			)
+			return mountAdsterra ? (
+				<AdsterraAd key={`ad-${rowId}`} placement="mid_timeline" />
+			) : null
 			},
 			[isLast, isActiveTurn, turnAdMessages, midAdSlotMap],
 		)
@@ -1207,22 +1186,13 @@ export const ChatTurnComponent = memo(
 							: errorText}
 					</div>
 				)}{/* Above-response Adsterra primary — sits above the main response area
-			but below the user message. Adsterra mounts independently of
-			Gravity; Gravity is conditionally enabled only when its kill switch
-			in `index.html` (`DISABLE_GRAVITY`) is flipped to `false`. Same
-			ready-gate as below_response. */}
+			but below the user message. */}
 			{!working && isLast &&
 				finalResponsePart &&
 				responseText &&
 				turnAdMessages.length > 0 && (
 				<>
-					<AdsterraFallbackAd placement="above_response" />
-					{!window.__gravity_off__ && (
-						<GravityAd
-							placement="above_response"
-							messages={turnAdMessages}
-						/>
-					)}
+					<AdsterraAd placement="above_response" />
 				</>
 			)}			{/* Mid-response Adsterra primary — mounted between the
 		    active process timeline and the final response Message bubble.
@@ -1231,7 +1201,6 @@ export const ChatTurnComponent = memo(
 		    `processTimelineItems.length > 0` requirement so a thought-only
 		    response without tool activity doesn't get the divider. Adsterra
 		    mounts independently of Gravity; Gravity is conditionally enabled
-		    only when `DISABLE_GRAVITY` in `index.html` is `false`.
 		    60-s rotation offset vs the bottom-page 60-s timer. */}
 			{!working && isLast &&
 				finalResponsePart &&
@@ -1239,13 +1208,8 @@ export const ChatTurnComponent = memo(
 				turnAdMessages.length > 0 &&
 				processTimelineItems.length > 0 && (
 				<>
-					<AdsterraFallbackAd placement="mid_response" />			{!window.__gravity_off__ && (
-					<GravityMidResponseAd
-						messages={turnAdMessages}
-						refreshIntervalMs={60 * 1000}
-					/>
-				)}
-			</>
+					<AdsterraAd placement="mid_response" />
+				</>
 			)}
 
 			{/* Completed final response — only mounts after the response has
@@ -1285,40 +1249,14 @@ export const ChatTurnComponent = memo(
 
 		    Note: the chat carries 2 ads per turn total — Inline footer note
 		    + Below-Response pill — matching freebuff's "Chat Response (Inline)"
-		    + "Chat Response (Below)" pair exactly. */		    /* Below-response Adsterra primary — sibling of the inline float-note.
-		    Adsterra mounts independently of Gravity; Gravity is conditionally
-		    enabled only when `DISABLE_GRAVITY` in `index.html` is `false`.
-		    Per-turn context keeps prior turns' pills stable across the user's
-		    next message. Ready-gate prevents mid-stream refetches. */}
+		    + "Chat Response (Below)" pair exactly. */}
 			{!working && isLast &&
 				finalResponsePart &&
 				responseText &&
 				turnAdMessages.length > 0 && (
 				<>
-					<AdsterraFallbackAd placement="inline_response" />
-					{!window.__gravity_off__ && (
-						<GravityInlineAd messages={turnAdMessages} />
-					)}
-				</>
-			)}
-
-			{/* Below-response Adsterra primary — sibling of the inline float-note.
-		    Same architecture: Adsterra is top-level JSX, Gravity fires only
-		    when its kill switch in `index.html` is flipped off.
-		    Per-turn context keeps prior turns' pills stable across the user's
-		    next message. Ready-gate prevents mid-stream refetches. */}
-			{!working && isLast &&
-				finalResponsePart &&
-				responseText &&
-				turnAdMessages.length > 0 && (
-				<>
-					<AdsterraFallbackAd placement="below_response" />
-					{!window.__gravity_off__ && (
-						<GravityAd
-							placement="below_response"
-							messages={turnAdMessages}
-						/>
-					)}
+					<AdsterraAd placement="inline_response" />
+					<AdsterraAd placement="below_response" />
 				</>
 			)}
 

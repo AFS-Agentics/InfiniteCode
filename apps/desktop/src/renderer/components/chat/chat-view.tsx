@@ -125,11 +125,7 @@ import {
 	type ComposerGoalStatus,
 } from "./composer-status-stack"
 import { ContextItems } from "./context-items"
-import { AdsterraFallbackAd } from "./adsterra-fallback"
-import {
-	GravityBottomPageAd,
-
-} from "./gravity-ad"
+import { AdsterraAd } from "./adsterra-ad"
 import type { MentionOption } from "./mention-popover"
 import { MentionPopover, type MentionPopoverHandle } from "./mention-popover"
 import { PromptAttachmentPreview } from "./prompt-attachments"
@@ -1216,21 +1212,9 @@ export function ChatView({
 				{/* Width constraint mirrors `contentWidthClass` (defined above) so
 				    this pill is always the same width as the message field below
 				    it, including dynamic parity when the review panel opens and
-				    strips the max-w. Pill's own className (gravity-ad.tsx
-				    ThemedGravityBottomPagePill) carries the default `mb-2`
-				    spacing so this wrapper is content-only — no need to repeat
-				    the margin here. The pill's `w-full` then fills this wrapper
-				    edge-to-edge. */}
-				<div className={contentWidthClass}>
-					{/* Adsterra primary — top-level JSX, NOT nested as Gravity's
-					fallback. Adsterra mounts regardless of Gravity's kill switch.
-					Gravity fires only when its `DISABLE_GRAVITY` flag in
-					`index.html` is flipped to `false`. Mirrors the per-turn
-					slots in chat-turn.tsx. */}
-					<AdsterraFallbackAd placement="bottom_page" />
-					{!window.__gravity_off__ && (
-						<GravityBottomPageAd messages={bottomAdMessages} />
-					)}
+				    strips the max-w. */}
+				<div className={`${contentWidthClass} pb-3`}>
+					<AdsterraAd placement="bottom_page" />
 				</div>
 				<ChatInputSection
 							agent={agent}
