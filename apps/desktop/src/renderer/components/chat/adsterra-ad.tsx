@@ -18,40 +18,40 @@ interface AdsterraSlot {
 
 const ADSTERRA_SLOTS: Record<AdPlacement, AdsterraSlot> = {
 	above_response: {
-		containerId: "container-dbffd4bb6aab1ead6bb05117a7263848",
-		scriptSrc: "https://pl30440053.effectivecpmnetwork.com/dbffd4bb6aab1ead6bb05117a7263848/invoke.js",
-	},
-	below_response: {
-		containerId: "container-cca3b61cc8aaf5f2a02e0023bc5e7592",
-		scriptSrc: "https://pl30440081.effectivecpmnetwork.com/cca3b61cc8aaf5f2a02e0023bc5e7592/invoke.js",
-	},
-	inline_response: {
-		containerId: "container-bebbea40bd5b18c3eba3c47039f730cd",
-		scriptSrc: "https://pl30440084.effectivecpmnetwork.com/bebbea40bd5b18c3eba3c47039f730cd/invoke.js",
-	},
-	search_result: {
-		containerId: "container-8f42a126aafc27189f56130789147df4",
-		scriptSrc: "https://pl30440089.effectivecpmnetwork.com/8f42a126aafc27189f56130789147df4/invoke.js",
-	},
-	bottom_page: {
-		containerId: "container-2094b8945c4daf9561b4e7286ec34a3d",
-		scriptSrc: "https://pl30440097.effectivecpmnetwork.com/2094b8945c4daf9561b4e7286ec34a3d/invoke.js",
-	},
-	sidebar: {
-		containerId: "container-08de200ac6dd6880f5ec296310440f44",
-		scriptSrc: "https://pl30440099.effectivecpmnetwork.com/08de200ac6dd6880f5ec296310440f44/invoke.js",
-	},
-	mid_response: {
-		containerId: "container-af6c03f7f08ea5d178bcbc658eb02b06",
-		scriptSrc: "https://pl30440151.effectivecpmnetwork.com/af6c03f7f08ea5d178bcbc658eb02b06/invoke.js",
-	},
-	mid_timeline: {
-		containerId: "container-705d823e476483950dc21fafa431abf3",
-		scriptSrc: "https://pl30440154.effectivecpmnetwork.com/705d823e476483950dc21fafa431abf3/invoke.js",
-	},
-	startup_overlay: {
 		containerId: "container-ba7ceb35501edf7bae9f9a9e268cb6ca",
 		scriptSrc: "https://pl30395772.effectivecpmnetwork.com/ba7ceb35501edf7bae9f9a9e268cb6ca/invoke.js",
+	},
+	below_response: {
+		containerId: "container-ddfcad99fa622b592770145f4f07372b",
+		scriptSrc: "https://pl30464614.effectivecpmnetwork.com/ddfcad99fa622b592770145f4f07372b/invoke.js",
+	},
+	inline_response: {
+		containerId: "container-b18e70626e0dddad4ba21c397b4e98d1",
+		scriptSrc: "https://pl30464615.effectivecpmnetwork.com/b18e70626e0dddad4ba21c397b4e98d1/invoke.js",
+	},
+	search_result: {
+		containerId: "container-688c0e329e8d56d353b559e234154e24",
+		scriptSrc: "https://pl30464616.effectivecpmnetwork.com/688c0e329e8d56d353b559e234154e24/invoke.js",
+	},
+	bottom_page: {
+		containerId: "container-cb0fe8418e1b8563f7d6778b507469a3",
+		scriptSrc: "https://pl30464617.effectivecpmnetwork.com/cb0fe8418e1b8563f7d6778b507469a3/invoke.js",
+	},
+	sidebar: {
+		containerId: "container-546b6a720522220dfee4699d836c0597",
+		scriptSrc: "https://pl30464618.effectivecpmnetwork.com/546b6a720522220dfee4699d836c0597/invoke.js",
+	},
+	mid_response: {
+		containerId: "container-253e5a8e418e38feff541b854f1447aa",
+		scriptSrc: "https://pl30464619.effectivecpmnetwork.com/253e5a8e418e38feff541b854f1447aa/invoke.js",
+	},
+	mid_timeline: {
+		containerId: "container-1e2d39134cbb1561b9f6c4fff905be83",
+		scriptSrc: "https://pl30464620.effectivecpmnetwork.com/1e2d39134cbb1561b9f6c4fff905be83/invoke.js",
+	},
+	startup_overlay: {
+		containerId: "container-89aca5050629a20ab44f23ede699e636",
+		scriptSrc: "https://pl30464621.effectivecpmnetwork.com/89aca5050629a20ab44f23ede699e636/invoke.js",
 	},
 }
 
