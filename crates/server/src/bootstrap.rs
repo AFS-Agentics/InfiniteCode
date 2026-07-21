@@ -17,6 +17,7 @@ use infinitecode_util_paths::FileSystemConfigPathResolver;
 use crate::ListenTarget;
 use crate::ServerRuntime;
 use crate::db::Database;
+use crate::transport_http;
 use crate::execution::ServerRuntimeDependencies;
 use crate::load_server_provider;
 use crate::resolve_listen_targets;
@@ -242,7 +243,7 @@ pub async fn run_server_process(
                 project_root_markers: config.project_root_markers.clone(),
                 ..AgentsMdConfig::default()
             },
-            db,
+            Arc::clone(&db),
             config_store,
         ),
     );
@@ -259,6 +260,31 @@ pub async fn run_server_process(
     let shutdown_signal = tokio_util::sync::CancellationToken::new();
     let internal_proxy_control = InternalProxyControl::new(shutdown_signal.clone());
     let external_shutdown = options.external_shutdown.clone();
+
+    // Freebuff-shape HTTP bridge: opt-in by setting
+    // `[freebuff_bridge].enabled = true` (and provisioning
+    // `[freebuff_bridge].password` or the env override) AND adding at least
+    // one entry to `server.http_listen`. The bridge shares the SQLite
+    // connection pool with the canonical runtime and shuts down on the
+    // same cancellation token.
+    if config.server.freebuff_bridge.is_operational(&config.server.http_listen) {
+        let bridge = config.server.freebuff_bridge.clone();
+        let http_listen = config.server.http_listen.clone();
+        let db_for_bridge = Arc::clone(&db);
+        let http_shutdown = shutdown_signal.clone();
+        tokio::spawn(async move {
+            if let Err(error) = transport_http::run_http_bridge(
+                bridge,
+                http_listen,
+                db_for_bridge,
+                http_shutdown,
+            )
+            .await
+            {
+                tracing::error!(error = %error, "freebuff HTTP bridge exited with error");
+            }
+        });
+    }
 
     // Concurrent listeners: configured stdio/ws targets + internal proxy task.
     // Returns when any listener exits; shutdown also via Ctrl+C, external token,

@@ -18,6 +18,7 @@ use infinitecode_util_paths::FileSystemConfigPathResolver;
 use crate::AUTH_CONFIG_FILE_NAME;
 use crate::AppConfigError;
 use crate::ExperimentalConfig;
+use crate::FreebuffBridgeConfig;
 use crate::HooksConfig;
 use crate::LogRotation;
 use crate::LoggingConfig;
@@ -237,11 +238,13 @@ impl Default for AppConfig {
             summary_model: SummaryModelSelection::UseTurnModel,
             server: ServerConfig {
                 listen: Vec::new(),
+                http_listen: Vec::new(),
                 max_connections: 32,
                 event_buffer_size: 1024,
                 idle_session_timeout_secs: 1800,
                 persist_ephemeral_sessions: false,
                 auth: Default::default(),
+                freebuff_bridge: FreebuffBridgeConfig::default(),
             },
             logging: LoggingConfig {
                 level: "info".into(),

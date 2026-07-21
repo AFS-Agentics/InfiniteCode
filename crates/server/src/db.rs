@@ -77,6 +77,17 @@ impl Database {
         Ok(db)
     }
 
+    /// Hands out a clone of the underlying SQLite connection handle.
+    ///
+    /// `db_freebuff::migrate` and the freebuff session / quota helpers in
+    /// `db_freebuff` open / read / write tables that exist alongside the
+    /// canonical `infinitecode-server` schema. They take this connector so
+    /// they share the same connection pool and lock ordering instead of
+    /// contending with `self.conn.lock()` sites elsewhere in the file.
+    pub(crate) fn shared_conn(&self) -> Arc<Mutex<Connection>> {
+        Arc::clone(&self.conn)
+    }
+
     /// Runs schema migrations.
     fn migrate(&self) -> Result<()> {
         let conn = self.conn.lock().expect("database mutex poisoned");
