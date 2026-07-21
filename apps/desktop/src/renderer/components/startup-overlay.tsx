@@ -16,7 +16,7 @@
 import { useAtomValue } from "jotai"
 import { useEffect, useRef, useState } from "react"
 import { discoveryPhaseAtom } from "../atoms/discovery"
-import { AdsterraAd } from "./chat/adsterra-ad"
+import { StartupAdGrid } from "./startup-ad-grid"
 
 // ============================================================
 // Constants
@@ -103,16 +103,14 @@ export function StartupOverlay() {
 				</div>
 			</div>
 			{/*
-			 * Ad startup-overlay ad: rendered above the "By AFS Agentics"
-			 * attribution line so the cold-boot wait time earns impressions on
-			 * a placement that would otherwise be a dead pixel. Full-width with
-			 * px-6 horizontal padding so the pill spans the splash chrome edge-
-			 * to-edge minus a 24 px gutter — keeps consistent L/R breathing
-			 * room so the pill content visually anchors to the splash chrome
-			 * centerline.
+			 * Startup ad grid: 2×2 grid of AdsterraAd slots above the
+			 * attribution line. Each cell independently loads Adsterra first,
+			 * falls back to A-Ads after 35s of nofill. Freebuff-inspired:
+			 * the cold-boot wait time earns impressions on multiple creatives
+			 * instead of a single banner.
 			 */}
 			<div className="mb-3 w-full px-6">
-				<AdsterraAd placement="startup_overlay" />
+				<StartupAdGrid />
 			</div>
 			<p className="pb-4 text-center text-xs text-muted-foreground">By AFS Agentics</p>
 		</div>

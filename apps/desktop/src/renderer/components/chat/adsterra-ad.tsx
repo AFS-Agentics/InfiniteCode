@@ -11,6 +11,10 @@ type AdPlacement =
 	| "mid_response"
 	| "mid_timeline"
 	| "startup_overlay"
+	| "startup_grid_0"
+	| "startup_grid_1"
+	| "startup_grid_2"
+	| "startup_grid_3"
 
 interface AdsterraSlot {
 	containerId: string
@@ -54,6 +58,24 @@ const ADSTERRA_SLOTS: Record<AdPlacement, AdsterraSlot> = {
 		containerId: "container-89aca5050629a20ab44f23ede699e636",
 		scriptSrc: "https://pl30464621.effectivecpmnetwork.com/89aca5050629a20ab44f23ede699e636/invoke.js",
 	},
+	// 4 grid cells on the startup/landing screen.
+	// Each iframe is independent — same invoke.js URL works in separate iframes.
+	startup_grid_0: {
+		containerId: "container-89aca5050629a20ab44f23ede699e636",
+		scriptSrc: "https://pl30464621.effectivecpmnetwork.com/89aca5050629a20ab44f23ede699e636/invoke.js",
+	},
+	startup_grid_1: {
+		containerId: "container-89aca5050629a20ab44f23ede699e636",
+		scriptSrc: "https://pl30464621.effectivecpmnetwork.com/89aca5050629a20ab44f23ede699e636/invoke.js",
+	},
+	startup_grid_2: {
+		containerId: "container-89aca5050629a20ab44f23ede699e636",
+		scriptSrc: "https://pl30464621.effectivecpmnetwork.com/89aca5050629a20ab44f23ede699e636/invoke.js",
+	},
+	startup_grid_3: {
+		containerId: "container-89aca5050629a20ab44f23ede699e636",
+		scriptSrc: "https://pl30464621.effectivecpmnetwork.com/89aca5050629a20ab44f23ede699e636/invoke.js",
+	},
 }
 
 // Placement index used for staggering refresh timers so not all 9 fire at once
@@ -67,6 +89,10 @@ const PLACEMENT_ORDER: AdPlacement[] = [
 	"sidebar",
 	"search_result",
 	"startup_overlay",
+	"startup_grid_0",
+	"startup_grid_1",
+	"startup_grid_2",
+	"startup_grid_3",
 ]
 
 // A-Ads fallback unit IDs per placement.
@@ -82,6 +108,11 @@ const FALLBACK_AADS_UNIT: Record<AdPlacement, number> = {
 	sidebar:        2448651,
 	search_result:  2448652,
 	startup_overlay: 2448653,
+	// Grid cells share the default unit. If Adsterra fills, fallback never fires.
+	startup_grid_0: 2448648,
+	startup_grid_1: 2448648,
+	startup_grid_2: 2448648,
+	startup_grid_3: 2448648,
 }
 
 function buildSrcdoc(containerId: string, scriptSrc: string): string {
