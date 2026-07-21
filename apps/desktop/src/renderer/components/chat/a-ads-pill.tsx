@@ -1,13 +1,9 @@
 import { type JSX, useEffect, useRef, useState } from "react"
 
-const AADS_BASE =
-	"//acceptable.a-ads.com"
-const AADS_PARAMS =
-	"/?size=Adaptive&background_color=18181b&title_color=a1a1aa&title_hover_color=818181&text_color=71717a&link_color=a1a1aa&link_hover_color=818181"
+const AADS_URL =
+	"//acceptable.a-ads.com/2448648/?size=Adaptive&background_color=18181b&title_color=a1a1aa&title_hover_color=818181&text_color=71717a&link_color=a1a1aa&link_hover_color=818181"
 
-const DEFAULT_UNIT_ID = 2448648
-
-function buildSrcdoc(unitId: number): string {
+function buildSrcdoc(): string {
 	return `<!DOCTYPE html>
 <html>
 <head>
@@ -26,19 +22,14 @@ function buildSrcdoc(unitId: number): string {
 <div class="ad-wrap">
   <span class="ad-label">Ad</span>
   <div class="pill">
-    <iframe src="${AADS_BASE}/${unitId}${AADS_PARAMS}" style="border:0;padding:0;width:100%;max-width:468px;height:60px;overflow:hidden;display:block" scrolling="no" title="A-Ads"></iframe>
+    <iframe src="${AADS_URL}" style="border:0;padding:0;width:100%;max-width:468px;height:60px;overflow:hidden;display:block" scrolling="no" title="A-Ads"></iframe>
   </div>
 </div>
 </body>
 </html>`
 }
 
-interface AAdsPillProps {
-	/** A-Ads unit ID. Default: 2448648 */
-	unitId?: number
-}
-
-export function AAdsPill({ unitId = DEFAULT_UNIT_ID }: AAdsPillProps): JSX.Element {
+export function AAdsPill(): JSX.Element {
 	const iframeRef = useRef<HTMLIFrameElement>(null)
 	const [height, setHeight] = useState(70)
 
@@ -67,7 +58,7 @@ export function AAdsPill({ unitId = DEFAULT_UNIT_ID }: AAdsPillProps): JSX.Eleme
 	return (
 		<iframe
 			ref={iframeRef}
-			srcDoc={buildSrcdoc(unitId)}
+			srcDoc={buildSrcdoc()}
 			title="A-Ads"
 			scrolling="no"
 			style={{

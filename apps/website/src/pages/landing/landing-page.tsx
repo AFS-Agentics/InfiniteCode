@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { AAdsPill } from "@/components/a-ads-pill";
 import { AgenticsSection } from "./agentics-section";
 import { ClosingSection } from "./closing-section";
 import { ComparisonSection } from "./comparison-section";
@@ -24,23 +23,13 @@ export function LandingPage({ initialLocale = "en" }: LandingPageProps) {
 
 	return (
 		<main className="min-h-screen overflow-hidden bg-[#070a0f] font-sans text-white" lang={locale === "zh" ? "zh-CN" : "en"}>
-			<AAdsPill unitId={2448649} />
 			<HeroSection copy={copy} locale={locale} onLocaleChange={setLocale} />
-			<AAdsPill unitId={2448654} />
 			<ComparisonSection copy={copy.comparison} />
-			<AAdsPill unitId={2448656} />
 			<ProofSection rows={copy.proofRows} />
-			<AAdsPill unitId={2448655} />
 			<AgenticsSection copy={copy.agentics} locale={locale} />
-			<AAdsPill unitId={2448657} />
 			<WorkflowSection copy={copy.workflow} />
-			<AAdsPill unitId={2448653} />
 			<EnterpriseSection copy={copy.enterprise} />
-			<AAdsPill unitId={2448652} />
 			<ClosingSection copy={copy.closing} docsHref={docsHref} />
-			<AAdsPill unitId={2448650} />
-			<AAdsPill unitId={2448651} />
-			<AAdsPill unitId={2448648} />
 		</main>
 	);
 }

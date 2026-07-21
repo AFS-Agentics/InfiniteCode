@@ -1,7 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType, ReactNode } from "react";
 
-import { AAdsPill } from "@/components/a-ads-pill";
 import {
 	DocsContent,
 	DocsSidebar,
@@ -131,17 +130,11 @@ export function DocsPage({ sidebar, Page, title, description }: DocsPageProps) {
 		<div className="mx-auto flex w-full max-w-7xl gap-10 px-4 py-12 sm:px-6 lg:px-8">
 			<aside className="sticky top-24 hidden h-[calc(100vh-7rem)] w-64 shrink-0 overflow-y-auto lg:block">
 				<DocsSidebar sidebar={sidebar} />
-				<div className="mt-4">
-					<AAdsPill unitId={2448650} />
-				</div>
 			</aside>
 			<div className="flex w-full min-w-0 flex-1 flex-col">
 				<DocsContent title={title} description={description} toc={toc}>
 					<div ref={articleRef}>{compiled}</div>
 				</DocsContent>
-				<div className="mt-8">
-					<AAdsPill unitId={2448649} />
-				</div>
 			</div>
 		</div>
 	);

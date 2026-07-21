@@ -281,7 +281,7 @@ export const MentionPopover = memo(
 						    appear next to a literal "No results found" — that pair
 						    reads as a confused fallback and forces a wasted
 						    auction on every failed search. */}
-						<AAdsPill unitId={2448652} />
+						<AAdsPill />
 
 						{/* Agent group */}
 						{agentItems.length > 0 && (

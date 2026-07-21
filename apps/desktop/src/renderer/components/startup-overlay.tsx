@@ -112,7 +112,7 @@ export function StartupOverlay() {
 			 * centerline.
 			 */}
 			<div className="mb-3 w-full px-6">
-				<AAdsPill unitId={2448649} />
+				<AAdsPill />
 			</div>
 			<p className="pb-4 text-center text-xs text-muted-foreground">By AFS Agentics</p>
 		</div>

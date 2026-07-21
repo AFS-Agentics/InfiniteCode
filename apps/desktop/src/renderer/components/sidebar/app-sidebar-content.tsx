@@ -542,7 +542,7 @@ export function AppSidebarContent({
 			    footprint flows into the footer chrome with a cleaner
 			    8 px baseline instead of the prior 12 px gap. */}
 			<div className="px-3 pb-2">
-				<AAdsPill unitId={2448650} />
+				<AAdsPill />
 			</div>
 
 			<SidebarFooter className="gap-1 px-3 pt-0 pb-3">

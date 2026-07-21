@@ -26,7 +26,6 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 } from "@/components/ui/accordion"
-import { AAdsPill } from "@/components/a-ads-pill"
 
 // Docs landing page sections (added alongside original content)
 import { ProofSection } from "@/pages/landing/proof-section"
@@ -700,26 +699,28 @@ export function HomePage() {
 		<div className="min-h-screen bg-background text-foreground">
 			<Nav />
 			<main>
-				<AAdsPill unitId={2448649} />
 				<HeroSection />
-				<AAdsPill unitId={2448654} />
 				<ReplacesSection />
-				<AAdsPill unitId={2448656} />
 				<FeatureGrid />
-				<AAdsPill unitId={2448655} />
 				<ComparisonSection />
-				<AAdsPill unitId={2448657} />
 				<PrivacySection />
-				<AAdsPill unitId={2448653} />
 				<CliSection />
-				<AAdsPill unitId={2448652} />
 				<DesktopSection />
-				<AAdsPill unitId={2448650} />
 				<WebSection />
-				<AAdsPill unitId={2448651} />
 				<StatsSection />
-				<AAdsPill unitId={2448648} />
 				<CtaSection />
+				{/* Adsterra fallback ad */}
+				<div id="container-ba7ceb35501edf7bae9f9a9e268cb6ca" className="mx-auto my-8" />
+				{/* A-Ads unit (anonymous ads) */}
+				<div id="frame" className="mx-auto my-8" style={{ width: "100%", position: "relative", zIndex: 99998 }}>
+					<iframe
+						data-aa="2448645"
+						src="//acceptable.a-ads.com/2448645/?size=Adaptive"
+						style={{ border: 0, padding: 0, width: "70%", height: "auto", overflow: "hidden", display: "block", margin: "auto" }}
+						title="A-Ads"
+					/>
+				</div>
+				{/* Docs landing page sections added below */}
 				<ProofSection rows={landingCopy.en.proofRows} />
 				<WorkflowSection copy={landingCopy.en.workflow} />
 				<EnterpriseSection copy={landingCopy.en.enterprise} />

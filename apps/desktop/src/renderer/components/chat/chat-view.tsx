@@ -1209,11 +1209,10 @@ export function ChatView({
 				ref={composerRef}
 				className="absolute bottom-0 left-0 right-0 z-30 overflow-visible border-t border-border bg-background/95 px-3.5 pt-3 pb-2 backdrop-blur"
 			>
-				{/* Above MessageField Ad — sits above the chat input box at the
-				    bottom of the conversation. Width constraint mirrors
-				    `contentWidthClass` (defined above) so this pill is always the
-				    same width as the message field below it, including dynamic
-				    parity when the review panel opens and strips the max-w. */}
+				{/* Width constraint mirrors `contentWidthClass` (defined above) so
+				    this pill is always the same width as the message field below
+				    it, including dynamic parity when the review panel opens and
+				    strips the max-w. */}
 				<div className={`${contentWidthClass} pb-3`}>
 					<AAdsPill />
 				</div>
