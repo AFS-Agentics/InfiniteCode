@@ -88,7 +88,7 @@
             }
 
             // ── Detect nofill: container has been loaded but is still empty ──
-            var hasContent = containers[c].querySelector('[class*="__bn"]')
+            var hasContent = containers[c].querySelector('[class*="__bn"]:not([class*="__bn-container"])')
             if (!hasContent) {
               var src = getContainerScriptSrc(containers[c])
               if (!src) continue
@@ -170,11 +170,10 @@
             bnc.style.setProperty("border", "none", "important")
             bnc.style.setProperty("padding", "0", "important")
           })
-          var bns = container.querySelectorAll('[class*="__bn"]')
+          var bns = container.querySelectorAll('[class*="__bn"]:not([class*="__bn-container"])')
           var anyAdShown = false
           for (var i = 0; i < bns.length; i++) {
             var bn = bns[i]
-            if (bn.className.indexOf("__bn-container") !== -1) continue
 
             // Extract ad text from ALL text-bearing elements in the banner.
             // Adsterra doesn't always use __title-classed elements, so we
