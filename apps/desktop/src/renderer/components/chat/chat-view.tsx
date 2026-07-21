@@ -126,6 +126,7 @@ import {
 } from "./composer-status-stack"
 import { ContextItems } from "./context-items"
 import { AdsterraAd } from "./adsterra-ad"
+import { enableAdsForSession } from "./chat-turn"
 import type { MentionOption } from "./mention-popover"
 import { MentionPopover, type MentionPopoverHandle } from "./mention-popover"
 import { PromptAttachmentPreview } from "./prompt-attachments"
@@ -1292,6 +1293,9 @@ function ChatInputSection({
 	scrollRef,
 	reviewPanelOpen,
 }: ChatInputSectionProps) {
+	const turnsRef = useRef(turns)
+	turnsRef.current = turns
+
 	const [sending, setSending] = useState(false)
 	const [activeTrigger, setActiveTrigger] = useState<ComposerTrigger | null>(null)
 	const [activeGoal, setActiveGoal] = useState<ComposerGoal | null>(null)
@@ -1748,6 +1752,9 @@ function ChatInputSection({
 				sending,
 				sessionId: agent.sessionId,
 			})
+			// Enable ads for this session on first user message.
+			// Snapshot all current turn IDs so restored history stays ad-free.
+			enableAdsForSession(turnsRef.current.map((t) => t.id))
 			if (!text.trim() || (!onSendMessage && !activeTrigger) || sending) {
 				log.warn("handleSend bailed", {
 					emptyText: !text.trim(),

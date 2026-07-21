@@ -63,6 +63,25 @@ import { useAgentActions } from "../../hooks/use-server";
 import { createLogger } from "../../lib/logger";
 
 const log = createLogger("chat-turn");
+
+/**
+ * Module-level — resets on every app restart / HMR reload.
+ * Snapshots all existing turn IDs when the user sends their first
+ * message. Turns with those IDs are "history" and never get ads.
+ * Only turns created AFTER the snapshot get ads.
+ */
+let historyTurnIds = new Set<string>()
+let adsEnabled = false
+
+export function enableAdsForSession(allTurnIds: string[]) {
+	historyTurnIds = new Set(allTurnIds)
+	adsEnabled = true
+}
+
+function isAdsDisabled(turnId: string): boolean {
+	return !adsEnabled || historyTurnIds.has(turnId)
+}
+
 import {
 	CompactionStatusDivider,
 	isCompactionStatusText,
@@ -761,23 +780,7 @@ export const ChatTurnComponent = memo(
 		const toolPathRoot =
 			agent?.worktreePath ?? agent?.directory ?? agent?.projectDirectory;
 		const turnRef = useRef<HTMLDivElement>(null);
-	// Once-per-turn flag for the mid_timeline Adsterra fallback. Both the
-	// `thoughtSlot` counter (every thought) and `otherSlot` counter (every
-	// cadence-matching tool/text) independently reach 1 in a long turn, so a
-	// pure `meta.slot === 1` gate would re-create the duplicate
-	// containerId collision this flag guards against. Reset on `turn.id`
-	// change via the effect above.
-	const adsterraMidTimelineMountedRef = useRef(false);
-		// Synchronous reset on `turn.id` change so the FIRST renderMidAd
-		// call of a new turn sees a clean slot. The `useEffect([turn.id])`
-		// runs post-commit, too late — the first slot=1 would already have
-		// been evaluated against the leftover ref value. So we reset
-		// inline during render, before any JSX is composed.
-		const prevTurnIdRef = useRef(turn.id);
-		if (prevTurnIdRef.current !== turn.id) {
-			prevTurnIdRef.current = turn.id;
-			adsterraMidTimelineMountedRef.current = false;
-		}
+
 		useEffect(() => {
 			// Smart default per fresh turn: short turns expand (ads visible);
 			// long turns stay collapsed (density UX preserved). User can
@@ -1012,26 +1015,13 @@ export const ChatTurnComponent = memo(
 
 		const renderMidAd = useCallback(
 			(itemIndex: number, rowId: string) => {
-				if (!isLast) return null
+				if (!isLast || isAdsDisabled(turn.id)) return null
 				const meta = midAdSlotMap.get(rowId)
 				if (!meta) return null
 				if (meta.cadence > 1 && (itemIndex + 1) % meta.cadence !== 0) return null
 				if (meta.slot === 0) return null
 				if (meta.slot > meta.cap) return null
-				// Mount the Adsterra fallback AT MOST ONCE per turn. Both the
-				// `thoughtSlot` (every thought) and `otherSlot` (every
-				// cadence-matching tool/text) counters independently reach 1 in
-				// a long turn, so a pure `meta.slot === 1` gate would re-create
-				// Adsterra's hardcoded containerId collision. Reset on `turn.id`
-				// change via the effect above.
-				const mountAdsterra =
-					meta.slot === 1 && !adsterraMidTimelineMountedRef.current
-				if (mountAdsterra) {
-					adsterraMidTimelineMountedRef.current = true
-				}
-			return mountAdsterra ? (
-				<AdsterraAd key={`ad-${rowId}`} placement="mid_timeline" />
-			) : null
+			return <AdsterraAd key={`ad-${rowId}`} placement="mid_timeline" />
 			},
 			[isLast, isActiveTurn, turnAdMessages, midAdSlotMap],
 		)
@@ -1186,8 +1176,8 @@ export const ChatTurnComponent = memo(
 							: errorText}
 					</div>
 				)}{/* Above-response Adsterra primary — sits above the main response area
-			but below the user message. */}
-			{!working && isLast &&
+			but below the user message. Only on fresh messages this session. */}
+			{!isAdsDisabled(turn.id) && !working && isLast &&
 				finalResponsePart &&
 				responseText &&
 				turnAdMessages.length > 0 && (
@@ -1202,7 +1192,7 @@ export const ChatTurnComponent = memo(
 		    response without tool activity doesn't get the divider. Adsterra
 		    mounts independently of Gravity; Ad is conditionally enabled
 		    60-s rotation offset vs the bottom-page 60-s timer. */}
-			{!working && isLast &&
+			{!isAdsDisabled(turn.id) && !working && isLast &&
 				finalResponsePart &&
 				responseText &&
 				turnAdMessages.length > 0 &&
@@ -1250,7 +1240,7 @@ export const ChatTurnComponent = memo(
 		    Note: the chat carries 2 ads per turn total — Inline footer note
 		    + Below-Response pill — matching freebuff's "Chat Response (Inline)"
 		    + "Chat Response (Below)" pair exactly. */}
-			{!working && isLast &&
+			{!isAdsDisabled(turn.id) && !working && isLast &&
 				finalResponsePart &&
 				responseText &&
 				turnAdMessages.length > 0 && (
