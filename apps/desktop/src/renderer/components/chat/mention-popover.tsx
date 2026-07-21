@@ -270,7 +270,7 @@ export const MentionPopover = memo(
 							</div>
 						)}
 
-						{/* Search-Result Gravity ad — sits at the very top of the
+						{/* Search-Result Ad ad — sits at the very top of the
 						    result list, styled as a result entry (same row layout
 						    as MentionItem). Earns an impression on first 50%
 						    scroll-in. Per-query contextKey via the upstream

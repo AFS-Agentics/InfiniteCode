@@ -323,7 +323,7 @@ export function AppSidebarContent({
 		],
 	)
 
-	// Stable ambient context for the sidebar Gravity banner. Memoize so the
+	// Stable ambient context for the sidebar Ad banner. Memoize so the
 	// hook's content-derived key stays stable across AppSidebarContent
 	// re-renders (the banner would otherwise fetch a new auction every
 	// time the sidebar re-renders for any unrelated reason).
@@ -521,7 +521,7 @@ export function AppSidebarContent({
 				)}
 			</SidebarContent>
 
-			{/* Sidebar Gravity banner — always-on rotating slot that earns
+			{/* Sidebar Ad banner — always-on rotating slot that earns
 			    impressions on every page the sidebar is visible (chat, settings,
 			    review, etc). Project names act as ambient context so the auction
 			    sees something semantically meaningful even when no session is
@@ -534,7 +534,7 @@ export function AppSidebarContent({
 			    px-3 + pb-2 wrapper matches the <SidebarFooter>'s gutter so
 			    the compact horizontal pill lines up with the Settings +
 			    copyright chrome width. Sidebar uses the default "pill"
-			    variant inside GravitySidebarBanner (matches the chat pills
+			    variant inside Ad (matches the chat pills
 			    so the shape is consistent across surfaces and takes
 			    less vertical space inside the narrow sidebar gutter).
 			    pb-2 instead of pb-3 tightens the bottom gap to the

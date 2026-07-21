@@ -408,7 +408,7 @@ function splitCompletedTurnParts(orderedParts: RenderablePart[]): {
  * Threshold below which a turn is considered "short" and defaults the
  * "Worked for Xs" expandable summary to OPEN. Tuned for ad-visibility UX:
  *   - ≤ SHORT_TURN_ITEM_LIMIT items: default OPEN so mid_timeline +
- *     mid_response Gravity ads are visible without a manual click.
+ *     mid_response Ad ads are visible without a manual click.
  *   -  > SHORT_TURN_ITEM_LIMIT items: default CLOSED to keep density
  *     UX manageable on long agentic turns (no first-paint flood of
  *     shell/think/edit blocks when no ad is involved).
@@ -841,7 +841,7 @@ export const ChatTurnComponent = memo(
 		);
 		const responseText = useDeferredValue(rawResponseText);
 
-		// Per-turn Gravity ad context (above_response, inline_response, and
+		// Per-turn Ad ad context (above_response, inline_response, and
 		// below_response all read this). Captures THIS turn's user prompt +
 		// final assistant response so the contextual match aligns with the
 		// response that each ad sits next to. Derived per-turn rather than a
@@ -1200,7 +1200,7 @@ export const ChatTurnComponent = memo(
 		    `!working && finalResponsePart && responseText`) plus the extra
 		    `processTimelineItems.length > 0` requirement so a thought-only
 		    response without tool activity doesn't get the divider. Adsterra
-		    mounts independently of Gravity; Gravity is conditionally enabled
+		    mounts independently of Gravity; Ad is conditionally enabled
 		    60-s rotation offset vs the bottom-page 60-s timer. */}
 			{!working && isLast &&
 				finalResponsePart &&
@@ -1241,7 +1241,7 @@ export const ChatTurnComponent = memo(
 				/>
 			)}
 
-			{/* Inline Gravity float-note attached at the very bottom of the
+			{/* Inline Ad float-note attached at the very bottom of the
 		    response bubble (sibling of the bubble, NOT inside it). Per-turn
 		    context keeps prior turns' pills stable across the user's next
 		    message, and the ready-gate prevents mid-stream impression

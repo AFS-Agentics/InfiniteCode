@@ -1,6 +1,6 @@
 import { type JSX, useEffect, useRef, useState, useCallback } from "react"
 
-type GravityPlacement =
+type AdPlacement =
 	| "above_response"
 	| "below_response"
 	| "inline_response"
@@ -16,7 +16,7 @@ interface AdsterraSlot {
 	scriptSrc: string
 }
 
-const ADSTERRA_SLOTS: Record<GravityPlacement, AdsterraSlot> = {
+const ADSTERRA_SLOTS: Record<AdPlacement, AdsterraSlot> = {
 	above_response: {
 		containerId: "container-dbffd4bb6aab1ead6bb05117a7263848",
 		scriptSrc: "https://pl30440053.effectivecpmnetwork.com/dbffd4bb6aab1ead6bb05117a7263848/invoke.js",
@@ -93,7 +93,7 @@ styleAds();var mo=new MutationObserver(styleAds);mo.observe(C,{childList:true,su
 export function AdsterraAd({
 	placement,
 }: {
-	placement: GravityPlacement;
+	placement: AdPlacement;
 }): JSX.Element {
 	const slot = ADSTERRA_SLOTS[placement]
 	const iframeRef = useRef<HTMLIFrameElement>(null)

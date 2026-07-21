@@ -30,14 +30,14 @@ import { useSetSidebarSlot } from "../sidebar-slot-context"
 // ============================================================
 //
 // Hoisted to module scope so the array reference is absolutely stable across
-// the lifetime of the route. `useGravityAdRotating` derives its fetch key
+// the lifetime of the route. `useAdRotating` derives its fetch key
 // from the messages content (not the reference), so a stable identity here
 // keeps the auction cache warm instead of refetching on every SettingsPage
 // render. Module-level hoisting is also cheaper than `useMemo([], [])`
 // because no hook call is needed for static data.
 //
 // Refresh-cadence offsets vs the existing always-on slots are chosen to
-// avoid synchronized fetches across surfaces. Gravity charges per request,
+// avoid synchronized fetches across surfaces. Ad charges per request,
 // not per distinct slot, so two slots firing on the same beat counts as
 // ONE distinct request — we want their beats permuted:
 //   - chat composer bottom_page ........... 60 s default (existing)
@@ -90,7 +90,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof SettingsIcon }[] = [
 // ============================================================
 //
 // Refresh-cadence offsets vs the existing always-on slots are chosen to
-// avoid synchronized fetches across surfaces. Gravity charges per request,
+// avoid synchronized fetches across surfaces. Ad charges per request,
 // not per distinct slot, so two slots firing on the same beat counts as
 // ONE distinct request — we want their beats permuted:
 //   - chat composer bottom_page ........... 60 s default (existing)
@@ -118,11 +118,11 @@ export function SettingsPage() {
 			<div className="mx-auto w-full max-w-2xl flex-1 px-8 py-6">
 				<Outlet />
 			</div>
-			{/* Settings footer Gravity ad — reuses the existing `bottom_page`
+			{/* Settings footer Ad ad — reuses the existing `bottom_page`
 			    placement_id (same `Bottom-MessageField-Ad` slot as the chat
 			    composer) rather than introducing a new IPC slot. Mounted with
 			    73 s rotation; LCM(60, 73) = 73 min so it stays off-beat from
-			    the chat composer's 60 s cadence. `GravityBottomPageAd` itself
+			    the chat composer's 60 s cadence. `Ad` itself
 			    returns just the inner pill card; the chat-view wrapper
 			    provides panel chrome around it that we deliberately omit here
 			    because settings has no ChatInputSection below to fill it. */}
@@ -178,7 +178,7 @@ function SettingsSidebarContent() {
 					})}
 				</SidebarMenu>
 			</div>
-			{/* Settings sidebar Gravity ad — reuses the `sidebar` placement_id
+			{/* Settings sidebar Ad ad — reuses the `sidebar` placement_id
 			    ("Sidebar-Ad") that the main AppSidebarContent also uses, with
 			    the upstream canonical `bottom_page` auction route. Sidebar
 			    impressions across both surfaces accumulate under a single
@@ -194,7 +194,7 @@ function SettingsSidebarContent() {
 			    'bottom_page'` to `SLOT_TO_UPSTREAM_PLACEMENT` in
 			    `infinitecode/apps/desktop/src/main/ipc-handlers.ts`, extend
 			    the `placement_id` union in `preload/api.d.ts` + `index.ts`,
-			    and (since `GravitySidebarBanner` currently hardcodes
+			    and (since `Ad` currently hardcodes
 			    `placement: "sidebar"`) refactor it to accept a `placement`
 			    prop or create a thin `GravitySettingsSidebarBanner` wrapper
 			    that passes `"settings_sidebar"`. Total budget: ~10 lines —

@@ -1058,7 +1058,7 @@ export function ChatView({
 		],
 	)
 
-	// Gravity ad pills (above_response + below_response + inline_response) are
+	// Ad ad pills (above_response + below_response + inline_response) are
 	// rendered inside ChatTurnComponent so they share a per-turn context slice
 	// (THIS turn's user prompt + assistant response) and stay stable when the
 	// user sends a new message. Rendering them here with a global last-4-turns
@@ -1069,8 +1069,8 @@ export function ChatView({
 
 	// Ambient context for the always-on bottom-page ad. We use the most recent
 	// user turn's text (or a fallback ambient identifier when there are no
-	// turns yet) so Gravity has something concrete to match on while still
-	// letting the rotation counter inside GravityBottomPageAd drive fresh
+	// turns yet) so Ad has something concrete to match on while still
+	// letting the rotation counter inside Ad drive fresh
 	// auctions on its timer. Keeping this stable across token churn — we
 	// intentionally sample user text content rather than reference the live
 	// turns atom — means a new turn's response stream never refires the
@@ -1092,7 +1092,7 @@ export function ChatView({
 			if (userText) {
 				return [{ role: "user", content: userText }]
 			}
-			// No turns yet — fall back to ambient identifiers so Gravity has
+			// No turns yet — fall back to ambient identifiers so Ad has
 			// a stable, non-empty context to anchor the auction on. The
 			// directory is the most project-shaped signal we have pre-conversation.
 			const fallback = agent.directory ?? agent.sessionId ?? "infinitecode"
@@ -1182,7 +1182,7 @@ export function ChatView({
 		   setup since the stub session cannot accept prompts yet. Extracted
 		   into its own component so toolbar, popover, mention, and
 		   model-selection state changes don't re-render the conversation
-		   turn list above. The bottom-page Gravity ad is rendered ABOVE
+		   turn list above. The bottom-page Ad ad is rendered ABOVE
 		   ChatInputSection inside the same compositor container.
 
 		   Composer panel chrome (not the ad itself):

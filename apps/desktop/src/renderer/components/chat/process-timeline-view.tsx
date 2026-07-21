@@ -98,7 +98,7 @@ export interface ProcessTimelineViewProps {
 	turnHasError?: boolean;
 	onDeleteToolPart?: (part: ToolPart) => Promise<void>;
 	/**
-	 * Optional callback that injects a Gravity mid-timeline ad after the
+	 * Optional callback that injects a Ad mid-timeline ad after the
 	 * item at the given 0-based index. Returning null skips insertion.
 	 * Encapsulated here as a closure so callers (chat-turn) own the
 	 * cadence + per-turn cap. Items wrap in a Fragment keyed by `rowId`
@@ -109,7 +109,7 @@ export interface ProcessTimelineViewProps {
 	 * Math flips between null and JSX across renders.
 	 */
 	/**
-	 * Optional callback that injects a Gravity mid-timeline ad after the
+	 * Optional callback that injects a Ad mid-timeline ad after the
 	 * item at the given 0-based index. Returning null skips insertion.
 	 * Encapsulated here as a closure so callers (chat-turn) own the
 	 * cadence + per-turn cap. Items wrap in a Fragment keyed by `rowId`

@@ -103,7 +103,7 @@ export function StartupOverlay() {
 				</div>
 			</div>
 			{/*
-			 * Gravity startup-overlay ad: rendered above the "By AFS Agentics"
+			 * Ad startup-overlay ad: rendered above the "By AFS Agentics"
 			 * attribution line so the cold-boot wait time earns impressions on
 			 * a placement that would otherwise be a dead pixel. Full-width with
 			 * px-6 horizontal padding so the pill spans the splash chrome edge-
