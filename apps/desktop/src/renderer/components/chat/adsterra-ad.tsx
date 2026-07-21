@@ -1,4 +1,5 @@
-import { type JSX, useEffect, useRef, useState, useCallback } from "react"
+import { type JSX, useEffect, useRef, useState, useCallback, useMemo } from "react"
+import { AAdsPill } from "./a-ads-pill"
 
 type AdPlacement =
 	| "above_response"
@@ -55,6 +56,34 @@ const ADSTERRA_SLOTS: Record<AdPlacement, AdsterraSlot> = {
 	},
 }
 
+// Placement index used for staggering refresh timers so not all 9 fire at once
+const PLACEMENT_ORDER: AdPlacement[] = [
+	"above_response",
+	"mid_response",
+	"inline_response",
+	"below_response",
+	"mid_timeline",
+	"bottom_page",
+	"sidebar",
+	"search_result",
+	"startup_overlay",
+]
+
+// A-Ads fallback unit IDs per placement.
+// When Adsterra fails to fill a slot after retries, we switch to A-Ads
+// using the user's registered unit IDs (2448648-2448657).
+const FALLBACK_AADS_UNIT: Record<AdPlacement, number> = {
+	above_response: 2448655,
+	mid_response:   2448656,
+	inline_response: 2448649,
+	below_response: 2448654,
+	mid_timeline:   2448650,
+	bottom_page:    2448657,
+	sidebar:        2448651,
+	search_result:  2448652,
+	startup_overlay: 2448653,
+}
+
 function buildSrcdoc(containerId: string, scriptSrc: string): string {
 	return `<!DOCTYPE html>
 <html>
@@ -92,13 +121,56 @@ styleAds();var mo=new MutationObserver(styleAds);mo.observe(C,{childList:true,su
 
 export function AdsterraAd({
 	placement,
+	refreshIntervalMs = 60_000,
 }: {
 	placement: AdPlacement;
+	/** How often to reload the iframe for a fresh ad creative (ms).
+	 *  Default 60_000 (1 min), matching Freebuff's AD_ROTATION_INTERVAL_MS.
+	 *  Timer is staggered per placement so slots don't all reload at once. */
+	refreshIntervalMs?: number;
 }): JSX.Element {
 	const slot = ADSTERRA_SLOTS[placement]
+	const fallbackUnitId = FALLBACK_AADS_UNIT[placement]
 	const iframeRef = useRef<HTMLIFrameElement>(null)
 	const [height, setHeight] = useState(0)
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+	const [fallbackActive, setFallbackActive] = useState(false)
+
+	// Rotation: increment key periodically to force remount (fresh ad creative)
+	const [refreshKey, setRefreshKey] = useState(0)
+	const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+	// Staggered offset so not all 9 slots refresh simultaneously
+	const staggerOffset = useMemo(() => {
+		const idx = PLACEMENT_ORDER.indexOf(placement)
+		return idx >= 0 ? idx * 10000 : 0 // 10s apart
+	}, [placement])
+
+	// Reset fallback when rotation remounts the slot
+	useEffect(() => {
+		setFallbackActive(false)
+	}, [refreshKey])
+
+	useEffect(() => {
+		if (refreshIntervalMs <= 0) return
+
+		// First refresh at stagger offset, then every interval
+		const scheduleNext = () => {
+			refreshTimerRef.current = setTimeout(() => {
+				setRefreshKey((k) => k + 1)
+				scheduleNext()
+			}, refreshIntervalMs)
+		}
+
+		const initial = setTimeout(() => {
+			scheduleNext()
+		}, staggerOffset)
+
+		return () => {
+			clearTimeout(initial)
+			if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+		}
+	}, [refreshIntervalMs, staggerOffset])
 
 	// Poll the iframe content height until it stabilises — postMessage
 	// doesn't reliably work from srcdoc iframes in Electron.
@@ -121,6 +193,7 @@ export function AdsterraAd({
 	useEffect(() => {
 		if (!slot) return
 		setHeight(0)
+		setFallbackActive(false)
 
 		// Start polling after a short delay so the iframe has time to render
 		const t1 = setTimeout(() => {
@@ -136,15 +209,43 @@ export function AdsterraAd({
 			}
 		}, 30000)
 
+		// After 35s, detect if Adsterra actually rendered any ad content.
+		// If the srcdoc body has no [class*="__bn"] elements, Adsterra
+		// returned no fill → fallback to A-Ads.
+		const t3 = setTimeout(() => {
+			try {
+				const doc = iframeRef.current?.contentDocument
+				if (doc) {
+					const hasAdContent = doc.querySelector(
+						'[class*="__bn"]:not([class*="__bn-container"])',
+					)
+					if (!hasAdContent) {
+						setFallbackActive(true)
+					}
+				} else {
+					setFallbackActive(true)
+				}
+			} catch {
+				setFallbackActive(true)
+			}
+		}, 35000)
+
 		return () => {
 			clearTimeout(t1)
 			clearTimeout(t2)
+			clearTimeout(t3)
 			if (pollRef.current) {
 				clearInterval(pollRef.current)
 				pollRef.current = null
 			}
 		}
-	}, [slot, measureHeight])
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [slot, measureHeight, refreshKey])
+
+	// ── Fallback: A-Ads rendered in place of the Adsterra iframe ──
+	if (fallbackActive) {
+		return <AAdsPill unitId={fallbackUnitId} />
+	}
 
 	if (!slot) return <></>
 
