@@ -125,8 +125,7 @@ import {
 	type ComposerGoalStatus,
 } from "./composer-status-stack"
 import { ContextItems } from "./context-items"
-import { AAdsPill } from "./a-ads-pill"
-import { enableAdsForSession } from "./chat-turn"
+import { AdsterraAd } from "./adsterra-ad"
 import type { MentionOption } from "./mention-popover"
 import { MentionPopover, type MentionPopoverHandle } from "./mention-popover"
 import { PromptAttachmentPreview } from "./prompt-attachments"
@@ -374,6 +373,7 @@ function ScrollBridge({ scrollRef }: { scrollRef: React.RefObject<ScrollHandle |
 		}),
 		[ctx],
 	)
+	return null
 }
 
 /** Prefetch older messages when the user scrolls toward the top of the thread. */
@@ -1214,7 +1214,7 @@ export function ChatView({
 				    it, including dynamic parity when the review panel opens and
 				    strips the max-w. */}
 				<div className={`${contentWidthClass} pb-3`}>
-					<AAdsPill />
+					<AdsterraAd placement="bottom_page" />
 				</div>
 				<ChatInputSection
 							agent={agent}
@@ -1297,9 +1297,6 @@ function ChatInputSection({
 	const [activeGoal, setActiveGoal] = useState<ComposerGoal | null>(null)
 	const [goalAction, setGoalAction] = useState<ComposerGoalAction | null>(null)
 	const [collaborationMode, setCollaborationMode] = useState<"build" | "plan">("build")
-
-	const turnsRef = useRef(turns)
-	turnsRef.current = turns
 
 	// Reset collaboration mode when session changes
 	useEffect(() => {
@@ -1751,10 +1748,6 @@ function ChatInputSection({
 				sending,
 				sessionId: agent.sessionId,
 			})
-			// Enable ads for this session on first user message.
-			// Snapshot all current turn IDs so restored history stays ad-free.
-			enableAdsForSession(turnsRef.current.map((t) => t.id))
-
 			if (!text.trim() || (!onSendMessage && !activeTrigger) || sending) {
 				log.warn("handleSend bailed", {
 					emptyText: !text.trim(),

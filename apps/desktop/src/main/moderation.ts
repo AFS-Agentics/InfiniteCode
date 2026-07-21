@@ -1,45 +1,71 @@
-import OpenAI from "openai"
-import { getSettings } from "./settings-store"
+import { pipeline } from "@xenova/transformers"
 import { createLogger } from "./logger"
 
 const log = createLogger("moderation")
 
-// ── Categories we consider "inappropriate for an ad" ──
-// OpenAI returns scores for 13 categories; we only flag the ones
-// that an ad-network context should never show.
-const AD_POLICY_CATEGORIES = new Set([
-	"sexual",
-	"harassment",
-	"harassment/threatening",
-	"hate",
-	"hate/threatening",
-	"illicit",
-	"illicit/violent",
-	"self-harm",
-	"self-harm/intent",
-	"self-harm/instructions",
-	"violence/graphic",
-] as const)
+// All moderation is ML-only via zero-shot classification.
+// No regex patterns — they're brittle and miss edge cases.
 
-// Re-export the same interface the rest of the codebase expects.
+const BAD_LABELS = [
+	"dating ad",
+	"pharmacy ad",
+	"scam",
+	"gambling ad",
+	"weight loss scheme",
+]
+
+const ALL_LABELS = [...BAD_LABELS, "legitimate business", "software product"]
+
+const SINGLE_LABEL_THRESHOLD = 0.25
+
+// Aggregate rule (see `checkAdText`): flag if the cumulative bad-label
+// score exceeds this threshold even when no single bad label crosses
+// SINGLE_LABEL_THRESHOLD. Catches blended policy concerns that the
+// single-label rule misses (e.g. 4 distinct bad categories each scoring
+// ~15% = ~60% combined spirit). 0.5 means at least half of the model's
+// allocated probability mass falls on one of the bad categories.
+const SUM_BAD_THRESHOLD = 0.5
+
+let classifier: Awaited<ReturnType<typeof pipeline>> | null = null
+let classifierLoading: Promise<void> | null = null
+
+async function ensureClassifier(): Promise<void> {
+	if (classifier) return
+	if (classifierLoading) return classifierLoading
+
+	classifierLoading = (async () => {
+		try {
+			log.info("Loading zero-shot classifier...")
+			classifier = await pipeline(
+				"zero-shot-classification",
+				"Xenova/nli-deberta-v3-small",
+			) as any
+			log.info("Zero-shot classifier loaded")
+		} catch (err) {
+			log.error("Failed to load classifier", err)
+			classifierLoading = null
+			throw err
+		}
+	})()
+
+	return classifierLoading
+}
+
 export interface ModerationResult {
 	flagged: boolean
 	reason: string
+	/** Peak single bad-label confidence. 0 means "no bad label present". */
 	score: number
+	/**
+	 * Cumulative bad-label probability mass across all bad categories.
+	 * Only set when the aggregate rule fires — i.e. when the peak
+	 * single-label rule didn't fire, but the cumulative sum of bad-label
+	 * scores still exceeded `SUM_BAD_THRESHOLD`. Always `flagged: true`
+	 * when present. Lets callers distinguish an aggregate flag from a
+	 * high-confidence single-label flag at-a-glance without re-running
+	 * the model.
+	 */
 	cumulativeScore?: number
-}
-
-let client: OpenAI | null = null
-
-function getClient(): OpenAI | null {
-	if (client) return client
-	const apiKey = getSettings().voice.openaiApiKey
-	if (!apiKey) {
-		log.warn("openaiApiKey not set — moderation unavailable")
-		return null
-	}
-	client = new OpenAI({ apiKey })
-	return client
 }
 
 export async function checkAdText(text: string): Promise<ModerationResult> {
@@ -47,44 +73,65 @@ export async function checkAdText(text: string): Promise<ModerationResult> {
 		return { flagged: false, reason: "Empty", score: 0 }
 	}
 
-	const c = getClient()
-	if (!c) {
-		return { flagged: false, reason: "API key not configured", score: 0 }
-	}
-
+	// Stage 1: Zero-shot classification (ML only, no regex)
 	try {
-		const response = await c.moderations.create({
-			model: "omni-moderation-latest",
-			input: text,
-		})
+		await ensureClassifier()
+		if (!classifier) {
+			return { flagged: false, reason: "Model unavailable", score: 0 }
+		}
 
-		const r = response.results[0]
+		const result = await classifier(text, ALL_LABELS) as {
+			labels: string[]
+			scores: number[]
+		}
 
-		// Collect per-category details for the reason string
-		const triggered: string[] = []
-		let maxScore = 0
-
-		for (const [cat, flagged] of Object.entries(r.categories)) {
-			if (flagged && AD_POLICY_CATEGORIES.has(cat)) {
-				triggered.push(cat)
-				const score =
-					r.category_scores[cat as keyof typeof r.category_scores] ?? 0
-				if (score > maxScore) maxScore = score
+		let topBad = { label: "", score: 0 }
+		let sumBad = 0
+		for (let i = 0; i < result.labels.length; i++) {
+			if (BAD_LABELS.includes(result.labels[i])) {
+				if (result.scores[i] > topBad.score) {
+					topBad = { label: result.labels[i], score: result.scores[i] }
+				}
+				sumBad += result.scores[i]
 			}
 		}
 
-		if (triggered.length > 0) {
+		// Lifted once so every return path reads from a single source of
+		// truth; `score` is uniformly the peak single bad-label confidence
+		// across all three verdict paths.
+		const peak = topBad.score
+
+		// Single-label rule: high-confidence flag on the top bad label.
+		if (peak >= SINGLE_LABEL_THRESHOLD) {
 			return {
 				flagged: true,
-				reason: `Policy violation (${triggered.join(", ")})`,
-				score: maxScore,
-				cumulativeScore: undefined,
+				reason: `Policy violation (${topBad.label}: ${(peak * 100).toFixed(0)}%)`,
+				score: peak,
 			}
 		}
 
-		return { flagged: false, reason: "Safe", score: 0 }
+		// Aggregate rule: catch blended cases where multiple bad labels
+		// each score weakly individually but collectively indicate policy
+		// concern. Threshold of 0.5 means at least half the model's
+		// allocated probability mass falls on bad categories.
+		if (sumBad >= SUM_BAD_THRESHOLD) {
+			return {
+				flagged: true,
+				reason: `Aggregate policy concern (sum of bad labels ${(sumBad * 100).toFixed(0)}%, top label ${topBad.label} ${(peak * 100).toFixed(0)}%)`,
+				score: peak,
+				cumulativeScore: sumBad,
+			}
+		}
+
+		return { flagged: false, reason: "Safe", score: peak }
 	} catch (err) {
-		log.error("OpenAI moderation call failed", err)
-		return { flagged: false, reason: "Moderation error", score: 0 }
+		log.error("ML classification failed", err)
+		return { flagged: false, reason: "Classification error", score: 0 }
 	}
+}
+
+export function preloadClassifier(): void {
+	ensureClassifier().catch((err) => {
+		log.warn("Background classifier preload failed", err)
+	})
 }

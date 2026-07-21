@@ -390,6 +390,8 @@ if (!gotLock) {
 		initSettingsStore()
 		initCredentialStore()
 		registerIpcHandlers()
+		// Preload ML model for ad moderation (fire-and-forget).
+		import("./moderation").then((m) => m.preloadClassifier())
 		initAutomations().catch(console.error)
 		setMacDockIcon()
 		createWindow()

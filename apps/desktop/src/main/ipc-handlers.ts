@@ -117,7 +117,7 @@ import {
 	type WebSearchProviderId,
 } from "./web-search-service";
 
-import { checkAdText } from "./moderation";
+import { checkAdText, preloadClassifier } from "./moderation";
 
 const log = createLogger("ipc");
 

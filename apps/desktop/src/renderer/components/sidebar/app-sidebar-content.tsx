@@ -37,7 +37,7 @@ import {
 import { AddProjectMenu, SidebarMainMenu } from "./sidebar-menus"
 import { sidebarPreferencesAtom } from "./sidebar-preferences"
 import { ProjectRow, SessionRow } from "./sidebar-rows"
-import { AAdsPill } from "../chat/a-ads-pill"
+import { AdsterraAd } from "../chat/adsterra-ad"
 
 
 interface AppSidebarContentProps {
@@ -542,7 +542,7 @@ export function AppSidebarContent({
 			    footprint flows into the footer chrome with a cleaner
 			    8 px baseline instead of the prior 12 px gap. */}
 			<div className="px-3 pb-2">
-				<AAdsPill />
+				<AdsterraAd placement="sidebar" />
 			</div>
 
 			<SidebarFooter className="gap-1 px-3 pt-0 pb-3">

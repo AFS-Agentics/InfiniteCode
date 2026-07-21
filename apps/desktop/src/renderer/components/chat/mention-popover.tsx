@@ -28,7 +28,7 @@ import {
 } from "react"
 import { useReferenceSearch } from "../../hooks/use-reference-search"
 import type { SdkAgent } from "../../hooks/use-infinitecode-data"
-import { AAdsPill } from "./a-ads-pill"
+import { AdsterraAd } from "./adsterra-ad"
 
 
 // ============================================================
@@ -281,7 +281,9 @@ export const MentionPopover = memo(
 						    appear next to a literal "No results found" — that pair
 						    reads as a confused fallback and forces a wasted
 						    auction on every failed search. */}
-						<AAdsPill />
+						{hasResults && hasSearchQuery && (
+							<AdsterraAd placement="search_result" />
+						)}
 
 						{/* Agent group */}
 						{agentItems.length > 0 && (

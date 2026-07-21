@@ -1,20 +1,5 @@
 import { type JSX, useEffect, useRef, useState, useCallback } from "react"
 
-// ── Moderation kill switch ──
-// Flip to `false` to enable zero-shot ML moderation + retry.
-const MODERATION_DISABLED = true
-
-const MOD_RETRY_MAX = 3
-const MOD_RETRY_DELAY = 45000 // 45 seconds
-
-// Module-level ML state keyed by ad text (survives retry remounts)
-interface MlEntry {
-	checked: boolean
-	cleared: boolean
-	flagged: boolean
-}
-const mlCache = new Map<string, MlEntry>()
-
 type GravityPlacement =
 	| "above_response"
 	| "below_response"
@@ -112,93 +97,11 @@ export function AdsterraAd({
 }): JSX.Element {
 	const slot = ADSTERRA_SLOTS[placement]
 	const iframeRef = useRef<HTMLIFrameElement>(null)
-	const [height, setHeight] = useState(80)
+	const [height, setHeight] = useState(0)
 	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-	const retryCountRef = useRef(0)
-	const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-	const [retryKey, setRetryKey] = useState(0)
 
-	// ── Ad content moderation ──
-	// Because srcdoc iframes are same-origin, we can read+write the iframe's
-	// DOM directly from the parent.  No postMessage dance needed.
-	const checkAdContent = useCallback(() => {
-		if (MODERATION_DISABLED) return
-		try {
-			const doc = iframeRef.current?.contentDocument
-			if (!doc) return
-			const bns = doc.querySelectorAll<HTMLElement>('[class*="__bn"]')
-			for (let i = 0; i < bns.length; i++) {
-				const bn = bns[i]
-				if (bn.className.indexOf("__bn-container") !== -1) continue
-
-				// Extract ad text
-				let adText = ""
-				const textEls = bn.querySelectorAll(
-					'[class*="__title"],[class*="__description"],[class*="__text"],[class*="__name"],[class*="__headline"],[class*="__snippet"]',
-				)
-				for (let ti = 0; ti < textEls.length; ti++) {
-					const t = (textEls[ti].textContent || "").trim()
-					if (t.length > adText.length) adText = t
-				}
-				if (!adText) {
-					adText = (bn.textContent || "").trim().substring(0, 200)
-				}
-				if (!adText) continue
-
-				let entry = mlCache.get(adText)
-				if (!entry) {
-					entry = { checked: false, cleared: false, flagged: false }
-					mlCache.set(adText, entry)
-				}
-
-				// Already flagged → hide
-				if (entry.flagged) {
-					bn.style.setProperty("display", "none", "important")
-					continue
-				}
-
-				// Fire ML check (once per unique ad text)
-				if (!entry.checked) {
-					entry.checked = true
-					window.infinitecode?.moderation
-						.checkAdText(adText)
-						.then((result: { flagged: boolean }) => {
-							const e = mlCache.get(adText)
-							if (!e) return
-							if (result.flagged) {
-								e.flagged = true
-								e.cleared = false
-								scheduleRetry()
-							} else {
-								e.cleared = true
-							}
-						})
-						.catch(() => {
-							const e = mlCache.get(adText)
-							if (e) e.cleared = true
-						})
-				}
-
-				// Hide while ML is pending or ad was flagged
-				if (!entry.cleared) {
-					bn.style.setProperty("display", "none", "important")
-				}
-			}
-		} catch {
-			// cross-origin or no iframe yet
-		}
-	}, [])
-
-	const scheduleRetry = useCallback(() => {
-		if (retryCountRef.current >= MOD_RETRY_MAX) return
-		retryCountRef.current++
-		if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
-		retryTimerRef.current = setTimeout(() => {
-			setRetryKey((k) => k + 1)
-		}, MOD_RETRY_DELAY)
-	}, [])
-
-	// ── Height polling ──
+	// Poll the iframe content height until it stabilises — postMessage
+	// doesn't reliably work from srcdoc iframes in Electron.
 	const measureHeight = useCallback(() => {
 		try {
 			const doc = iframeRef.current?.contentDocument
@@ -215,20 +118,17 @@ export function AdsterraAd({
 		}
 	}, [height])
 
-	// ── Polling loop ──
 	useEffect(() => {
 		if (!slot) return
-		setHeight(80)
+		setHeight(0)
 
+		// Start polling after a short delay so the iframe has time to render
 		const t1 = setTimeout(() => {
 			measureHeight()
-			checkAdContent()
-			pollRef.current = setInterval(() => {
-				measureHeight()
-				checkAdContent()
-			}, 500)
+			pollRef.current = setInterval(measureHeight, 500)
 		}, 2000)
 
+		// Cleanup after 30 seconds (ads should have loaded by then)
 		const t2 = setTimeout(() => {
 			if (pollRef.current) {
 				clearInterval(pollRef.current)
@@ -244,20 +144,12 @@ export function AdsterraAd({
 				pollRef.current = null
 			}
 		}
-	}, [slot, measureHeight, checkAdContent])
-
-	// Cleanup retry timer on unmount
-	useEffect(() => {
-		return () => {
-			if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
-		}
-	}, [])
+	}, [slot, measureHeight])
 
 	if (!slot) return <></>
 
 	return (
 		<iframe
-			key={retryKey}
 			ref={iframeRef}
 			srcDoc={buildSrcdoc(slot.containerId, slot.scriptSrc)}
 			title={`ad-${placement}`}
