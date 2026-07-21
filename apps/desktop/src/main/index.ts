@@ -387,6 +387,28 @@ if (!gotLock) {
 		)
 		log.info("Registered PNA header injection for 127.0.0.1 requests")
 
+		// Override User-Agent for Adsterra ad requests so the ad network sees a
+		// standard Chrome UA instead of Electron/Chrome (which some networks flag
+		// or don't recognise). Matches Freebuff's getAdUserAgent() pattern.
+		const ADSTERRA_UA =
+			process.platform === "darwin"
+				? "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+				: process.platform === "win32"
+					? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+					: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+		session.defaultSession.webRequest.onBeforeSendHeaders(
+			{ urls: ["*://*.effectivecpmnetwork.com/*", "*://*.adsterra.com/*"] },
+			(details, callback) => {
+				callback({
+					requestHeaders: {
+						...details.requestHeaders,
+						"User-Agent": ADSTERRA_UA,
+					},
+				})
+			},
+		)
+		log.info("Registered Adsterra User-Agent override")
+
 		initSettingsStore()
 		initCredentialStore()
 		registerIpcHandlers()
