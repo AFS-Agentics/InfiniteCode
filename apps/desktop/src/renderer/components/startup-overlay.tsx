@@ -109,7 +109,7 @@ export function StartupOverlay() {
 			 * the cold-boot wait time earns impressions on multiple creatives
 			 * instead of a single banner.
 			 */}
-			<div className="mb-3 w-full px-6">
+			<div className="mb-1 w-full px-1">
 				<StartupAdGrid />
 			</div>
 			<p className="pb-4 text-center text-xs text-muted-foreground">By AFS Agentics</p>

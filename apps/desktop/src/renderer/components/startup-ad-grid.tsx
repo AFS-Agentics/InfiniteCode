@@ -20,7 +20,7 @@ const GRID_PLACEMENTS = [
 
 export function StartupAdGrid(): JSX.Element {
 	return (
-		<div className="grid grid-cols-2 gap-2 w-full">
+		<div className="grid grid-cols-2 w-full" style={{ gap: 0 }}>
 			{GRID_PLACEMENTS.map((placement) => (
 				<AdsterraAd
 					key={placement}
