@@ -63,11 +63,29 @@ import { useAgentActions } from "../../hooks/use-server";
 import { createLogger } from "../../lib/logger";
 
 const log = createLogger("chat-turn");
+
+/**
+ * Module-level — resets on every app restart / HMR reload.
+ * Snapshots all existing turn IDs when the user sends their first
+ * message. Turns with those IDs are "history" and never get ads.
+ * Only turns created AFTER the snapshot get ads.
+ */
+let historyTurnIds = new Set<string>()
+let adsEnabled = false
+
+export function enableAdsForSession(allTurnIds: string[]) {
+	historyTurnIds = new Set(allTurnIds)
+	adsEnabled = true
+}
+function isAdsDisabled(turnId: string): boolean {
+	return !adsEnabled || historyTurnIds.has(turnId)
+}
+
 import {
 	CompactionStatusDivider,
 	isCompactionStatusText,
 } from "./compaction-status-divider";
-import { AdsterraAd } from "./adsterra-ad"
+import { AAdsPill } from "./a-ads-pill"
 import {
 	buildProcessTimeline,
 	processTimelineRowId,
@@ -761,23 +779,7 @@ export const ChatTurnComponent = memo(
 		const toolPathRoot =
 			agent?.worktreePath ?? agent?.directory ?? agent?.projectDirectory;
 		const turnRef = useRef<HTMLDivElement>(null);
-	// Once-per-turn flag for the mid_timeline Adsterra fallback. Both the
-	// `thoughtSlot` counter (every thought) and `otherSlot` counter (every
-	// cadence-matching tool/text) independently reach 1 in a long turn, so a
-	// pure `meta.slot === 1` gate would re-create the duplicate
-	// containerId collision this flag guards against. Reset on `turn.id`
-	// change via the effect above.
-	const adsterraMidTimelineMountedRef = useRef(false);
-		// Synchronous reset on `turn.id` change so the FIRST renderMidAd
-		// call of a new turn sees a clean slot. The `useEffect([turn.id])`
-		// runs post-commit, too late — the first slot=1 would already have
-		// been evaluated against the leftover ref value. So we reset
-		// inline during render, before any JSX is composed.
-		const prevTurnIdRef = useRef(turn.id);
-		if (prevTurnIdRef.current !== turn.id) {
-			prevTurnIdRef.current = turn.id;
-			adsterraMidTimelineMountedRef.current = false;
-		}
+
 		useEffect(() => {
 			// Smart default per fresh turn: short turns expand (ads visible);
 			// long turns stay collapsed (density UX preserved). User can
@@ -963,77 +965,12 @@ export const ChatTurnComponent = memo(
 		// file ops.
 		//
 		// Separate per-kind caps so a 20-thought turn doesn't crowd out
-		// tool-ads entirely (and vice versa). User requirement was
-		// "ad after every thought block" — thoughts get a generous cap
-		// (16) so the user almost never sees a missed thought-ad; tools
-		// and text keep a tighter cap (4) so we don't auction-storm a
-		// run of shell commands.
-		const MAX_THOUGHT_ADS_PER_TURN = 16;
-		const MAX_OTHER_ADS_PER_TURN = 4;
-
-		// The renderMidAd closure needs to count "how many of THIS kind
-		// have already rendered an ad, before this one?" so the per-kind
-		// cap applies independently. We pre-compute per-item slot
-		// numbers via items (in scope above as processTimelineItems),
-		// then expose them via a Map keyed by rowId. The slot map is
-		// O(n) once per render and avoids the closure needing the full
-		// items array every call.
-		const midAdSlotMap = useMemo(() => {
-			const map = new Map<string, { cap: number; cadence: number; slot: number }>()
-			let thoughtSlot = 0
-			let otherSlot = 0
-			processTimelineItems.forEach((item, idx) => {
-				let cadence: number
-				let cap: number
-				if (item.kind === "thought") {
-					cadence = 1
-					cap = MAX_THOUGHT_ADS_PER_TURN
-					thoughtSlot += 1
-				} else if (item.kind === "tool" || item.kind === "tool-group") {
-					cadence = import.meta.env.DEV ? 2 : 3
-					cap = MAX_OTHER_ADS_PER_TURN
-					if ((idx + 1) % cadence === 0) otherSlot += 1
-				} else {
-					cadence = 4
-					cap = MAX_OTHER_ADS_PER_TURN
-					if ((idx + 1) % cadence === 0) otherSlot += 1
-				}
-				const slot =
-					item.kind === "thought"
-						? thoughtSlot
-						: (idx + 1) % cadence === 0
-							? otherSlot
-							: 0
-				const rowId = processTimelineRowId(item, idx)
-				map.set(rowId, { cap, cadence, slot })
-			})
-			return map
-		}, [processTimelineItems])
-
 		const renderMidAd = useCallback(
-			(itemIndex: number, rowId: string) => {
-				if (!isLast) return null
-				const meta = midAdSlotMap.get(rowId)
-				if (!meta) return null
-				if (meta.cadence > 1 && (itemIndex + 1) % meta.cadence !== 0) return null
-				if (meta.slot === 0) return null
-				if (meta.slot > meta.cap) return null
-				// Mount the Adsterra fallback AT MOST ONCE per turn. Both the
-				// `thoughtSlot` (every thought) and `otherSlot` (every
-				// cadence-matching tool/text) counters independently reach 1 in
-				// a long turn, so a pure `meta.slot === 1` gate would re-create
-				// Adsterra's hardcoded containerId collision. Reset on `turn.id`
-				// change via the effect above.
-				const mountAdsterra =
-					meta.slot === 1 && !adsterraMidTimelineMountedRef.current
-				if (mountAdsterra) {
-					adsterraMidTimelineMountedRef.current = true
-				}
-			return mountAdsterra ? (
-				<AdsterraAd key={`ad-${rowId}`} placement="mid_timeline" />
-			) : null
+			() => {
+				if (isAdsDisabled(turn.id)) return null
+				return <AAdsPill />
 			},
-			[isLast, isActiveTurn, turnAdMessages, midAdSlotMap],
+			[turn.id],
 		)
 
 		const textAlreadyInline =
@@ -1185,31 +1122,13 @@ export const ChatTurnComponent = memo(
 							? `${errorText.slice(0, 300)}...`
 							: errorText}
 					</div>
-				)}{/* Above-response Adsterra primary — sits above the main response area
-			but below the user message. */}
-			{!working && isLast &&
-				finalResponsePart &&
-				responseText &&
-				turnAdMessages.length > 0 && (
-				<>
-					<AdsterraAd placement="above_response" />
-				</>
-			)}			{/* Mid-response Adsterra primary — mounted between the
-		    active process timeline and the final response Message bubble.
-		    Same ready-gate as inline_response / below_response (only after
-		    `!working && finalResponsePart && responseText`) plus the extra
-		    `processTimelineItems.length > 0` requirement so a thought-only
-		    response without tool activity doesn't get the divider. Adsterra
-		    mounts independently of Gravity; Gravity is conditionally enabled
-		    60-s rotation offset vs the bottom-page 60-s timer. */}
-			{!working && isLast &&
-				finalResponsePart &&
-				responseText &&
-				turnAdMessages.length > 0 &&
-				processTimelineItems.length > 0 && (
-				<>
-					<AdsterraAd placement="mid_response" />
-				</>
+				)}{/* Above-response A-Ads — sits above the main response area
+			but below the user message. Only on fresh messages this session. */}
+			{!isAdsDisabled(turn.id) && finalResponsePart && responseText && (
+				<AAdsPill />
+			)}			{/* Mid-response A-Ads — between process timeline and response. */}
+			{!isAdsDisabled(turn.id) && finalResponsePart && responseText && processTimelineItems.length > 0 && (
+				<AAdsPill />
 			)}
 
 			{/* Completed final response — only mounts after the response has
@@ -1250,13 +1169,10 @@ export const ChatTurnComponent = memo(
 		    Note: the chat carries 2 ads per turn total — Inline footer note
 		    + Below-Response pill — matching freebuff's "Chat Response (Inline)"
 		    + "Chat Response (Below)" pair exactly. */}
-			{!working && isLast &&
-				finalResponsePart &&
-				responseText &&
-				turnAdMessages.length > 0 && (
+			{!isAdsDisabled(turn.id) && finalResponsePart && responseText && (
 				<>
-					<AdsterraAd placement="inline_response" />
-					<AdsterraAd placement="below_response" />
+				<AAdsPill />
+				<AAdsPill />
 				</>
 			)}
 

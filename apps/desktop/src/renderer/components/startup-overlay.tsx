@@ -16,7 +16,7 @@
 import { useAtomValue } from "jotai"
 import { useEffect, useRef, useState } from "react"
 import { discoveryPhaseAtom } from "../atoms/discovery"
-import { AdsterraAd } from "./chat/adsterra-ad"
+import { AAdsPill } from "./chat/a-ads-pill"
 
 // ============================================================
 // Constants
@@ -112,7 +112,7 @@ export function StartupOverlay() {
 			 * centerline.
 			 */}
 			<div className="mb-3 w-full px-6">
-				<AdsterraAd placement="startup_overlay" />
+				<AAdsPill />
 			</div>
 			<p className="pb-4 text-center text-xs text-muted-foreground">By AFS Agentics</p>
 		</div>

@@ -22,7 +22,7 @@ import {
 import { useEffect } from "react"
 import { lastAppRouteAtom } from "../../atoms/ui"
 import { resolveSettingsBackTarget } from "../../lib/app-navigation"
-import { AdsterraAd } from "../chat/adsterra-ad"
+import { AAdsPill } from "../chat/a-ads-pill"
 import { useSetSidebarSlot } from "../sidebar-slot-context"
 
 // ============================================================
@@ -127,7 +127,7 @@ export function SettingsPage() {
 			    provides panel chrome around it that we deliberately omit here
 			    because settings has no ChatInputSection below to fill it. */}
 			<div className="mx-auto w-full max-w-2xl shrink-0 px-8 pb-6 pt-2">
-				<AdsterraAd placement="bottom_page" />
+				<AAdsPill />
 			</div>
 		</div>
 	)
@@ -202,7 +202,7 @@ function SettingsSidebarContent() {
 			    + preload side is the easy part; the renderer-side split needs
 			    a 5-line component refactor. */}
 			<div className="mt-auto shrink-0 px-3 pb-2">
-				<AdsterraAd placement="sidebar" />
+				<AAdsPill />
 			</div>
 		</SidebarContent>
 	)
