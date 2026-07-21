@@ -1,11 +1,13 @@
-import { type JSX, useEffect, useRef, useState } from "react"
+import { type JSX } from "react"
 
-const AADS_BASE =
-	"//acceptable.a-ads.com"
+const AADS_BASE = "//acceptable.a-ads.com"
 const AADS_PARAMS =
 	"/?size=Adaptive&background_color=18181b&title_color=a1a1aa&title_hover_color=818181&text_color=71717a&link_color=a1a1aa&link_hover_color=818181"
-
 const DEFAULT_UNIT_ID = 2448648
+
+interface AAdsPillProps {
+	unitId?: number
+}
 
 function buildSrcdoc(unitId: number): string {
 	return `<!DOCTYPE html>
@@ -33,50 +35,21 @@ function buildSrcdoc(unitId: number): string {
 </html>`
 }
 
-interface AAdsPillProps {
-	/** A-Ads unit ID. Default: 2448648 */
-	unitId?: number
-}
-
 export function AAdsPill({ unitId = DEFAULT_UNIT_ID }: AAdsPillProps): JSX.Element {
-	const iframeRef = useRef<HTMLIFrameElement>(null)
-	const [height, setHeight] = useState(70)
-
-	useEffect(() => {
-		const iframe = iframeRef.current
-		if (!iframe) return
-		const measure = () => {
-			try {
-				const doc = iframe.contentDocument
-				if (!doc) return
-				const h = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0)
-				if (h > 10 && h !== height) setHeight(h)
-			} catch {
-				/* same-origin, safe */
-			}
-		}
-		const poll = setInterval(measure, 500)
-		const stop = setTimeout(() => clearInterval(poll), 30000)
-		setTimeout(measure, 500)
-		return () => {
-			clearInterval(poll)
-			clearTimeout(stop)
-		}
-	}, [height])
-
 	return (
-		<iframe
-			ref={iframeRef}
-			srcDoc={buildSrcdoc(unitId)}
-			title="A-Ads"
-			scrolling="no"
-			style={{
-				width: "100%",
-				border: "none",
-				overflow: "hidden",
-				height: height > 0 ? `${height}px` : "70px",
-				display: "block",
-			}}
-		/>
+		<div className="mx-auto my-8 w-full px-4" style={{ maxWidth: 560 }}>
+			<iframe
+				srcDoc={buildSrcdoc(unitId)}
+				title="A-Ads"
+				scrolling="no"
+				style={{
+					width: "100%",
+					border: "none",
+					overflow: "hidden",
+					height: 80,
+					display: "block",
+				}}
+			/>
+		</div>
 	)
 }

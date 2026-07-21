@@ -127,7 +127,7 @@ export function SettingsPage() {
 			    provides panel chrome around it that we deliberately omit here
 			    because settings has no ChatInputSection below to fill it. */}
 			<div className="mx-auto w-full max-w-2xl shrink-0 px-8 pb-6 pt-2">
-				<AAdsPill />
+				<AAdsPill unitId={2448651} />
 			</div>
 		</div>
 	)
@@ -202,7 +202,7 @@ function SettingsSidebarContent() {
 			    + preload side is the easy part; the renderer-side split needs
 			    a 5-line component refactor. */}
 			<div className="mt-auto shrink-0 px-3 pb-2">
-				<AAdsPill />
+				<AAdsPill unitId={2448651} />
 			</div>
 		</SidebarContent>
 	)

@@ -968,7 +968,7 @@ export const ChatTurnComponent = memo(
 		const renderMidAd = useCallback(
 			() => {
 				if (isAdsDisabled(turn.id)) return null
-				return <AAdsPill />
+				return <AAdsPill unitId={2448655} />
 			},
 			[turn.id],
 		)
@@ -1125,10 +1125,10 @@ export const ChatTurnComponent = memo(
 				)}{/* Above-response A-Ads — sits above the main response area
 			but below the user message. Only on fresh messages this session. */}
 			{!isAdsDisabled(turn.id) && finalResponsePart && responseText && (
-				<AAdsPill />
+				<AAdsPill unitId={2448654} />
 			)}			{/* Mid-response A-Ads — between process timeline and response. */}
 			{!isAdsDisabled(turn.id) && finalResponsePart && responseText && processTimelineItems.length > 0 && (
-				<AAdsPill />
+				<AAdsPill unitId={2448656} />
 			)}
 
 			{/* Completed final response — only mounts after the response has
@@ -1171,8 +1171,8 @@ export const ChatTurnComponent = memo(
 		    + "Chat Response (Below)" pair exactly. */}
 			{!isAdsDisabled(turn.id) && finalResponsePart && responseText && (
 				<>
-				<AAdsPill />
-				<AAdsPill />
+				<AAdsPill unitId={2448657} />
+				<AAdsPill unitId={2448653} />
 				</>
 			)}
 
