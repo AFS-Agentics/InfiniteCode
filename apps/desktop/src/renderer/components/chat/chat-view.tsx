@@ -1214,7 +1214,7 @@ export function ChatView({
 				    this pill is always the same width as the message field below
 				    it, including dynamic parity when the review panel opens and
 				    strips the max-w. */}
-				<div className={`${contentWidthClass} pb-3`}>
+				<div className={contentWidthClass}>
 					<AdsterraAd placement="bottom_page" />
 				</div>
 				<ChatInputSection
