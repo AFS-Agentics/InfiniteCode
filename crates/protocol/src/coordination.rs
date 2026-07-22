@@ -10,6 +10,23 @@
 //! `/api/v1/gravity-index`, `/api/v1/token-count`, `/api/v1/ads/*`, and the
 //! auth / healthz shim. They are deliberately a small, self-contained subset;
 //! see `crate::http` for the handler wiring.
+//!
+//! # Quota invariant — DO NOT BYPASS
+//!
+//! Every quota math, rate-limit, or daily-cap query against
+//! `infinitecode_sessions` MUST join on `acting_user_id` alone. NEVER
+//! include `device_fingerprint`, `instance_id`, or `app_version` as a join
+//! key. The risk is fingerprint-rotation laundering: an attacker rotating
+//! `device_fingerprint` between admits would otherwise evade any
+//! per-device cap, claim fresh premium bucket slots, and burn unlimited
+//! LLM cost against no ad revenue (since headless impressions lack
+//! viewability for ad networks).
+//!
+//! The reference implementation lives in
+//! `crates/server/src/db_infinitecode.rs::premium_count_for_user` and is
+//! tested by `premium_count_for_user_only_counts_per_user`. Both
+//! annotations must be updated together if the invariant is ever
+//! intentionally loosened.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -29,9 +46,20 @@ pub enum CoordinationSessionStatus {
     /// its grace period has elapsed. The model may still be finishing work on
     /// the agent side; this is informational only and not an error.
     Ended,
-    /// Another client POSTed a new session for the same acting user id. The
-    /// previous session is replaced; subsequent GETs on the old instance id
-    /// should transition to "Superseded" UI state.
+    /// A different user signed in on this device while this session was
+    /// active. The prior session's row is flipped to Superseded with
+    /// reason `different_account_on_device` and the new user becomes
+    /// Active. Subsequent GETs on the old instance id should transition
+    /// to a "different account" UI state.
+    ///
+    /// NOTE: under the per-(user, device) active-session rule, opening a
+    /// SECOND session for the SAME user on a DIFFERENT device does NOT
+    /// trigger Superseded — both sessions are independently Active. Only
+    /// fingerprint collisions with a DIFFERENT `acting_user_id` trigger
+    /// this state. See `crates/server/src/db_infinitecode.rs::
+    /// supersede_and_admit` for the exact SQL shape and
+    /// `crates/server/src/http/error.rs::session_superseded` for the
+    /// outbound 409 message.
     Superseded,
     /// The requesting IP / country is outside the supported free-tier region.
     /// Terminal for the session — clients show the geofence screen.

@@ -1,7 +1,7 @@
-import { AlertTriangleIcon, XIcon } from "lucide-react"
+import { useEffect, useRef } from "react"
 import { useAtom, useSetAtom } from "jotai"
-import { useEffect } from "react"
-import { Button } from "@infinitecode/ui/components/button"
+import { toast } from "sonner"
+
 import {
 	sessionSupersededAtom,
 	sessionSupersededDismissAtom,
@@ -11,7 +11,7 @@ import {
  * Invisible IPC bridge: subscribes to `window.infinitecode.onSessionSuperseded`
  * (forwarded from the main-process session-lock acquire failure) and writes
  * the detail block into `sessionSupersededAtom`. Mount this once near the
- * app root — sibling to the banner — so the atom is hot before any
+ * app root — sibling to the toast banner — so the atom is hot before any
  * `infinitecode:ensure` IPC call can fire.
  *
  * The `window.infinitecode` global is typed via the
@@ -33,70 +33,52 @@ export function SessionSupersededBridge() {
 }
 
 /**
- * Full-screen banner shown when the desktop window catches a
- * `session:superseded` IPC event — meaning a second instance of infinitecode
- * is already active.
+ * Toast-only notification shown when the desktop window catches a
+ * `session:superseded` IPC event.
  *
- * UX mirrors InfiniteCode's "Another infinitecode CLI took over this account. Close
- * the other instance, then restart." — see
- * `infinitecode/cli-engine/src/hooks/helpers/send-message.ts:600-612`.
+ * Under the per-(user, device) active-session rule, this only fires when a
+ * DIFFERENT user signed in on this device while the current session was
+ * alive. Same user opening a second device does NOT trigger supersede;
+ * both remain Active in the coordination layer.
  *
- * Acknowledge only hides this overlay; the underlying supersede state does
- * NOT clear until the user actually closes other infinitecode instances, so a
- * subsequent `infinitecode:ensure` IPC call re-broadcasts the event and the
- * banner reappears. We deliberately do not call the dismiss a "dismiss" —
- * that wording implied the problem was solved. The only true recovery is to
- * quit this Electron process.
+ * Replacing the prior full-screen overlay with a sonner toast matches the
+ * universal SaaS behavior (GitHub, Linear, Discord all use a fleeting
+ * notification rather than a modal — the user is still able to keep
+ * working while the PRIOR session ends). The toast auto-dismisses after
+ * 6 seconds and the atom is cleared on either auto-dismiss or explicit
+ * user click so we don't re-fire on subsequent re-renders.
  */
 export function SessionSupersededBanner() {
 	const [detail] = useAtom(sessionSupersededAtom)
 	const [, dismiss] = useAtom(sessionSupersededDismissAtom)
-	if (!detail) return null
+	const lastFiredFor = useRef<string | null>(null)
 
-	return (
-		<div className="pointer-events-auto fixed inset-0 z-[2147483647] flex items-center justify-center bg-background/85 backdrop-blur-sm">
-			<div className="flex max-w-lg flex-col gap-4 rounded-lg border border-warning/40 bg-card p-6 shadow-lg">
-				<div className="flex items-start gap-3">
-					<AlertTriangleIcon
-						className="mt-0.5 size-5 shrink-0 text-warning"
-						strokeWidth={1.5}
-					/>
-					<div className="flex flex-col gap-2">
-						<h2 className="text-base font-semibold">
-							Another InfiniteCode instance took over this session.
-						</h2>
-						<p className="text-sm text-muted-foreground">
-							A separate{" "}
-							<code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-								infinitecode
-							</code>{" "}
-							process — pid {detail.otherPid} running as the{" "}
-							<code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-								{detail.otherSurface}
-							</code>{" "}
-							— holds the session lock. InfiniteCode enforces one session per
-							user.
-						</p>
-						<p className="text-sm text-muted-foreground">
-							Close the other instance, quit this window, and reopen
-							InfiniteCode to take the seat. If the lock is stale, delete{" "}
-							<code className="break-all rounded bg-muted px-1.5 py-0.5 text-xs">
-								{detail.lockPath}
-							</code>
-							.
-						</p>
-					</div>
-				</div>
-				<div className="flex justify-end gap-2">
-					<Button variant="outline" onClick={() => window.close()}>
-						<XIcon className="mr-1.5 size-3.5" strokeWidth={1.5} />
-						Close window
-					</Button>
-					<Button variant="default" onClick={() => dismiss(null)}>
-						Acknowledged
-					</Button>
-				</div>
-			</div>
-		</div>
-	)
+	useEffect(() => {
+		if (!detail) return
+		// Suppress duplicate firings for the exact same event payload.
+		const fingerprint = `${detail.otherPid}:${detail.otherSurface}:${detail.lockPath}`
+		if (lastFiredFor.current === fingerprint) return
+		lastFiredFor.current = fingerprint
+
+		toast.error("Different account signed in here", {
+			description:
+				`A different account is now active on this device. Your previous session has ended. ` +
+				`Active process: ${detail.otherSurface} pid ${detail.otherPid}.`,
+			duration: 6_000,
+			action: {
+				label: "Dismiss",
+				onClick: () => dismiss(),
+			},
+			onDismiss: () => {
+				dismiss()
+				lastFiredFor.current = null
+			},
+			onAutoClose: () => {
+				dismiss()
+				lastFiredFor.current = null
+			},
+		})
+	}, [detail, dismiss])
+
+	return null
 }

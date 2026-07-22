@@ -72,9 +72,16 @@ impl BridgeError {
     }
 
     pub fn session_superseded(instance_id: impl Into<SmolStr>) -> Self {
+        // Per-(user, device) active-session rule: Superseded now means a
+        // DIFFERENT user signed in on this device. The message reflects
+        // that explicitly so the bridge client renders an accurate banner
+        // instead of the older "another session has been admitted" copy
+        // (which was true under the strict per-user rule we relaxed).
         let body = CoordinationErrorBody {
             code: CoordinationErrorBody::SESSION_SUPERSEDED,
-            message: SmolStr::new("Another session has been admitted for this acting user."),
+            message: SmolStr::new(
+                "A different account has signed in on this device; your session has ended.",
+            ),
             status: Some(coordination_status_str(CoordinationSessionStatus::Superseded)),
             reason: Some(instance_id.into()),
         };

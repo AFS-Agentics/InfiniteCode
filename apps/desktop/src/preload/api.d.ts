@@ -714,6 +714,8 @@ export interface InfiniteCodeAPI {
 			removed: string[]
 			errors: string[]
 		}>
+	}
+
 	// ============================================================
 	// Artifact store types
 	// ============================================================

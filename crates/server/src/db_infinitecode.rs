@@ -7,19 +7,40 @@
 //! existing `~/.infinitecode/infinitecode.db` path resolution and acquires
 //! locks against the same connection.
 //!
+//! Active-session rule: PER-(USER, DEVICE), not strict per-user.
+//!   - Same `acting_user_id` opening on a SECOND device: BOTH active.
+//!   - Different `acting_user_id` opening on the SAME device: prior user's
+//!     row is flipped to `superseded` with reason `different_account_on_device`.
+//!   - Under the strict rule (rejected), same user across devices would
+//!     have caused a takeover prompt on the older device. The relaxed rule
+//!     matches the universal SaaS pattern (GitHub, Slack, Discord, Linear).
+//!
+//! CRITICAL QUOTA INVARIANT — DO NOT BYPASS.
+//! Every query in this module that touches quota math, rate limiting, or
+//! daily-cap enforcement MUST join on `acting_user_id` alone. NEVER include
+//! `device_fingerprint`, `instance_id`, or `app_version` as a join key.
+//! The risk is fingerprint-rotation laundering: an attacker rotating
+//! `device_fingerprint` between admits would otherwise evade any per-device
+//! cap. See `premium_count_for_user` and the regression test in this file's
+//! `tests` module. The top-level invariant is also documented in
+//! `crates/protocol/src/coordination.rs`.
+//!
 //! Public surface:
 //!   - `migrate(conn)` — runs the schema migration. Idempotent. Called once
 //!     during server bootstrap after the canonical migration has run.
-//!   - `upsert_session` — admit or re-admit a session row keyed by
-//!     `instance_id`.
-//!   - `get_session` — poll by instance id (for `GET
-//!     /api/v1/infinitecode/session/:instance_id`).
-//!   - `release_session` — mark a session ended (for `DELETE
-//!     /api/v1/infinitecode/session/:instance_id`).
-//!   - `supersede_existing_sessions_for_user` — atomic rotation that flips
-//!     every active session for an acting-user to `superseded` and returns
-//!     the instance ids that were superseded (for the 409 race we mirror
-//!     from InfiniteCode).
+//!   - `supersede_and_admit` — atomic admit under the per-(user, device)
+//!     rule; returns the instance ids of any rows that just got flipped to
+//!     `superseded` (always a strict subset of the per-device-collision
+//!     case, never the strict per-user case).
+//!   - `touch_time_remaining` — refresh `time_remaining_ms` during polls
+//!     without flipping status.
+//!   - `get_session` — poll by instance id (for
+//!     `GET /api/v1/infinitecode/session/:instance_id`).
+//!   - `release_session` — mark a session ended (for
+//!     `DELETE /api/v1/infinitecode/session/:instance_id`).
+//!   - `premium_count_for_user` — quota signal. KEYED ON `acting_user_id`
+//!     ONLY. Use this to gate a new premium admit when the user already has
+//!     too many active premium sessions in the time window.
 //!   - bearer-token CRUD (`insert_bearer_token`, `find_bearer_token`,
 //!     `prune_expired_bearer_tokens`).
 //!
@@ -185,17 +206,33 @@ fn parse_utc(secs: i64) -> rusqlite::Result<DateTime<Utc>> {
     })
 }
 
-/// All-or-nothing admit that runs the rotation in a single transaction.
+/// All-or-nothing admit under the per-(user, device) rule.
 ///
 /// Steps inside the transaction:
-///   1. For every active row in `infinitecode_sessions` with the supplied
-///      `acting_user_id`, set `status = 'superseded'`, `reason = 'rotated'`.
+///   1. For every active row in `infinitecode_sessions` whose
+///      `device_fingerprint` matches the new admit's fingerprint AND whose
+///      `acting_user_id` is a DIFFERENT user, set
+///      `status = 'superseded', reason = 'different_account_on_device'`.
+///      This is the per-device collision rule. The strict per-user
+///      supersede is intentionally NOT applied here — same-user on a
+///      second device gets a fresh active row, NOT a takeover.
 ///   2. Insert the new row keyed by `instance_id` with the supplied model
 ///      and bucket.
 ///
+/// Notes:
+///   - When `device_fingerprint` is `None` on the new admit, step 1 cannot
+///     fire (no fingerprint to match against). The caller is responsible
+///     for ensuring that the local session-lock has already gated per-process
+///     concurrency on the same machine before this admit is reached.
+///   - When `device_fingerprint` is `Some`, the WHERE clause below
+///     deliberately uses `device_fingerprint = ?1 AND acting_user_id != ?2`
+///     — the inverted condition would re-introduce the strict per-user rule
+///     that this function is explicitly relaxing.
+///
 /// Returns the superseded `instance_id`s so the HTTP handler can attach a
 /// `superseded` reason to the old poll responses (and a 409 next time
-/// someone GETs them).
+/// someone GETs them). Same-user re-admits across devices return an empty
+/// vec.
 pub fn supersede_and_admit(
     conn: &mut Connection,
     new_instance_id: &str,
@@ -213,23 +250,30 @@ pub fn supersede_and_admit(
         .transaction()
         .context("failed to begin infinitecode session transaction")?;
 
-    let superseded: Vec<String> = {
-        let mut stmt = tx
-            .prepare(
-                "UPDATE infinitecode_sessions
-                 SET status = 'superseded', reason = 'rotated'
-                 WHERE acting_user_id = ?1 AND status = 'active'
-                 RETURNING instance_id",
-            )
-            .context("failed to prepare supersede statement")?;
-        let rows = stmt
-            .query_map(params![acting_user_id], |row| row.get::<_, String>(0))
-            .context("failed to run supersede statement")?;
-        let mut out = Vec::new();
-        for row in rows {
-            out.push(row?);
+    let superseded: Vec<String> = match device_fingerprint {
+        Some(fingerprint) => {
+            let mut stmt = tx
+                .prepare(
+                    "UPDATE infinitecode_sessions
+                     SET status = 'superseded', reason = 'different_account_on_device'
+                     WHERE device_fingerprint = ?1
+                       AND acting_user_id != ?2
+                       AND status = 'active'
+                     RETURNING instance_id",
+                )
+                .context("failed to prepare per-device supersede statement")?;
+            let rows = stmt
+                .query_map(params![fingerprint, acting_user_id], |row| {
+                    row.get::<_, String>(0)
+                })
+                .context("failed to run per-device supersede statement")?;
+            let mut out = Vec::new();
+            for row in rows {
+                out.push(row?);
+            }
+            out
         }
-        out
+        None => Vec::new(),
     };
 
     tx.execute(
@@ -254,6 +298,42 @@ pub fn supersede_and_admit(
 
     tx.commit().context("failed to commit infinitecode session transaction")?;
     Ok(superseded)
+}
+
+/// Premium-bucket session count for an acting user in a time window.
+///
+/// CRITICAL INVARIANT: this query joins on `acting_user_id` ONLY. NEVER
+/// add `device_fingerprint`, `instance_id`, or `app_version` to the WHERE
+/// here — fingerprint rotation would otherwise evade the cap. The
+/// regression test `premium_count_for_user_only_counts_per_user` in this
+/// file's `tests` module will fail loudly if anyone introduces a
+/// fingerprint join here.
+///
+/// Use this in `crate::http::session::admit` AFTER inserting the new row
+/// to gate it down to a small budget (e.g. "1 premium per user in the last
+/// hour"), and use it across all devices, not per-device — that's the
+/// quarantine against catastrophic quota-laundering via device-fingerprint
+/// rotation. If premium_count_for_user was naively keyed on
+/// `(acting_user_id, device_fingerprint)`, an attacker could rotate the
+/// fingerprint every minute to claim a fresh premium slot and burn
+/// unlimited LLM cost against no ad revenue (since headless impressions
+/// have no viewability).
+pub fn premium_count_for_user(
+    conn: &Connection,
+    acting_user_id: &str,
+    since_unix_secs: i64,
+) -> Result<u64> {
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM infinitecode_sessions
+             WHERE acting_user_id = ?1
+               AND bucket = 'premium'
+               AND started_at >= ?2",
+            params![acting_user_id, since_unix_secs],
+            |row| row.get(0),
+        )
+        .context("failed to count premium sessions for user")?;
+    Ok(count.max(0) as u64)
 }
 
 /// Updates a session without touching `status` (used by the holding GET
@@ -390,7 +470,11 @@ mod tests {
     }
 
     #[test]
-    fn supersede_and_admit_rotates_previous_active_sessions() {
+    fn supersede_and_admit_allows_two_devices_per_user_to_coexist() {
+        // Per-(user, device) rule: same `acting_user_id` opening a second
+        // instance on a SECOND device should NOT touch the first row. Both
+        // sessions remain Active. (Strict per-user rule would have rotated
+        // the first row to `superseded`; we deliberately do not do that.)
         let (_db, _dir) = test_db();
         let conn = _db.shared_conn();
         let mut conn = conn.lock().expect("conn");
@@ -405,11 +489,14 @@ mod tests {
             Some(ts(4_600).timestamp()),
             Some(3_600_000),
             None,
-            None,
+            Some("device-1"),
             None,
         )
-        .expect("first admit");
-        assert!(superseded_a.is_empty(), "first admit supersedes nothing");
+        .expect("first admit on device-1");
+        assert!(
+            superseded_a.is_empty(),
+            "first admit supersedes nothing (prior rows are nonexistent)"
+        );
 
         let superseded_b = supersede_and_admit(
             &mut conn,
@@ -421,20 +508,189 @@ mod tests {
             Some(ts(6_200).timestamp()),
             Some(4_200_000),
             None,
-            None,
+            Some("device-2"), // <-- different device_fingerprint
             None,
         )
-        .expect("second admit");
+        .expect("second admit on device-2");
 
-        assert_eq!(superseded_b, vec!["instance-A".to_string()]);
+        // SAME user, DIFFERENT device: BOTH stay active.
+        assert!(
+            superseded_b.is_empty(),
+            "per-(user, device) relaxation: same user across devices does not rotate. \
+             Got {:?} which means we accidentally re-introduced the strict per-user rule.",
+            superseded_b
+        );
 
         let a = get_session(&conn, "instance-A").expect("get A").expect("A exists");
-        assert_eq!(a.status, CoordinationSessionStatus::Superseded);
-        assert_eq!(a.reason.as_deref(), Some("rotated"));
+        assert_eq!(
+            a.status,
+            CoordinationSessionStatus::Active,
+            "first row stays active under per-(user, device)"
+        );
 
         let b = get_session(&conn, "instance-B").expect("get B").expect("B exists");
         assert_eq!(b.status, CoordinationSessionStatus::Active);
         assert_eq!(b.acting_user_id, "user-1");
+        assert_eq!(b.device_fingerprint.as_deref(), Some("device-2"));
+    }
+
+    #[test]
+    fn different_account_on_same_device_ends_old_users_session() {
+        // Per-device collision rule: when user-2 signs in on the SAME
+        // device that user-1 was using, user-1's row gets flipped to
+        // `superseded` with reason "different_account_on_device", and
+        // user-2's row lands as `active`.
+        let (_db, _dir) = test_db();
+        let conn = _db.shared_conn();
+        let mut conn = conn.lock().expect("conn");
+
+        supersede_and_admit(
+            &mut conn,
+            "instance-A",
+            "user-1",
+            "deepseek/deepseek-v4-pro",
+            CoordinationSessionBucket::Premium,
+            ts(1_000).timestamp(),
+            Some(ts(4_600).timestamp()),
+            Some(3_600_000),
+            None,
+            Some("shared-device"),
+            None,
+        )
+        .expect("user-1 admit on shared-device");
+
+        let superseded = supersede_and_admit(
+            &mut conn,
+            "instance-B",
+            "user-2", // <-- different user
+            "minimax/minimax-m3",
+            CoordinationSessionBucket::Premium,
+            ts(2_000).timestamp(),
+            Some(ts(6_200).timestamp()),
+            Some(4_200_000),
+            None,
+            Some("shared-device"), // <-- SAME device fingerprint
+            None,
+        )
+        .expect("user-2 admit on shared-device");
+
+        assert_eq!(
+            superseded,
+            vec!["instance-A".to_string()],
+            "user-1's row should have been superseded as the per-device collision"
+        );
+
+        let a = get_session(&conn, "instance-A").expect("get A").expect("A exists");
+        assert_eq!(a.status, CoordinationSessionStatus::Superseded);
+        assert_eq!(a.reason.as_deref(), Some("different_account_on_device"));
+
+        let b = get_session(&conn, "instance-B").expect("get B").expect("B exists");
+        assert_eq!(b.status, CoordinationSessionStatus::Active);
+        assert_eq!(b.acting_user_id, "user-2");
+    }
+
+    #[test]
+    fn same_user_second_admit_with_no_fingerprint_does_not_supersede_prior() {
+        // Defensive: device_fingerprint is `None` (e.g. unauthenticated
+        // admit during a misconfigured boot). The per-device collision
+        // branch cannot fire, so we MUST NOT touch prior rows. This
+        // prevents a regression where someone refactors "skip when
+        // fingerprint is None" and accidentally introduces a fallback to
+        // the strict per-user rule.
+        let (_db, _dir) = test_db();
+        let conn = _db.shared_conn();
+        let mut conn = conn.lock().expect("conn");
+
+        supersede_and_admit(
+            &mut conn,
+            "instance-A",
+            "user-1",
+            "deepseek/deepseek-v4-pro",
+            CoordinationSessionBucket::Premium,
+            ts(1_000).timestamp(),
+            Some(ts(4_600).timestamp()),
+            Some(3_600_000),
+            None,
+            None, // <-- no fingerprint, admit A
+            None,
+        )
+        .expect("first admit no fingerprint");
+
+        let superseded = supersede_and_admit(
+            &mut conn,
+            "instance-B",
+            "user-1", // <-- same user
+            "minimax/minimax-m3",
+            CoordinationSessionBucket::Unlimited,
+            ts(2_000).timestamp(),
+            Some(ts(6_200).timestamp()),
+            Some(4_200_000),
+            None,
+            None, // <-- no fingerprint, admit B
+            None,
+        )
+        .expect("second admit no fingerprint");
+
+        assert!(
+            superseded.is_empty(),
+            "with device_fingerprint=None we cannot check per-device collision \
+             and MUST NOT fall back to per-user supersede. Got {:?}.",
+            superseded
+        );
+
+        let a = get_session(&conn, "instance-A").expect("get A").expect("A exists");
+        assert_eq!(
+            a.status,
+            CoordinationSessionStatus::Active,
+            "first row stays active when fingerprint is None"
+        );
+    }
+
+    #[test]
+    fn premium_count_for_user_only_counts_per_user_not_per_fingerprint() {
+        // CATASTROPHIC-FAILURE REGRESSION. The risk: an attacker rotates
+        // `device_fingerprint` every minute to claim a fresh premium slot
+        // (1 premium per fingerprint, 12 fingerprints per hour = 12
+        // premiums per hour, unlimited ad-free LLM). The
+        // premium_count_for_user function MUST count per acting_user_id
+        // only. This test fails the moment someone refactors the query to
+        // include `device_fingerprint` in the WHERE clause.
+        let (_db, _dir) = test_db();
+        let conn = _db.shared_conn();
+        let mut conn = conn.lock().expect("conn");
+
+        // Six different device fingerprints, all for the same acting user,
+        // all premium bucket, all within the time window.
+        for i in 0..6 {
+            supersede_and_admit(
+                &mut conn,
+                &format!("instance-{i}"),
+                "user-x",
+                "deepseek/deepseek-v4-pro",
+                CoordinationSessionBucket::Premium,
+                ts(1_000 + i).timestamp(),
+                Some(ts(4_000 + i).timestamp()),
+                Some(3_000_000),
+                None,
+                Some(&format!("fingerprint-{i}")),
+                None,
+            )
+            .expect("admit premium slot");
+        }
+
+        let count = premium_count_for_user(&conn, "user-x", ts(0).timestamp())
+            .expect("count succeeds");
+        assert_eq!(
+            count, 6,
+            "premium_count_for_user MUST count across all fingerprints for the \
+             same user, otherwise fingerprint rotation defeats the cap. Got {}.",
+            count
+        );
+
+        // Sanity: a different user shares none of those rows.
+        let other_count = premium_count_for_user(&conn, "user-y", ts(0).timestamp())
+            .expect("count succeeds for other user");
+        assert_eq!(other_count, 0);
     }
 
     #[test]
