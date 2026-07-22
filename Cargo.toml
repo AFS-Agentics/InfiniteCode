@@ -76,6 +76,7 @@ infinitecode-util-paths = { path = "crates/utils/paths" }
 infinitecode-util-process = { path = "crates/utils/process" }
 infinitecode-util-shell-command = { path = "crates/utils/shell-command" }
 diffy = "0.4.2"
+jsonwebtoken = "9.3"
 dirs = "6"
 fs2 = "0.4"
 futures = { version = "0.3", default-features = false }

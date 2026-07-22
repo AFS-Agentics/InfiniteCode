@@ -26,12 +26,15 @@ async-trait = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }
 futures = { workspace = true }
+jsonwebtoken = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+url = { workspace = true }
+webbrowser = { workspace = true }
 
 [features]
 tokio-console = ["infinitecode-arg0/tokio-console"]

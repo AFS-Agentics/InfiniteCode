@@ -31,6 +31,7 @@ infinitecode-util-shell-command = { workspace = true }
 diffy = { workspace = true }
 futures = { workspace = true }
 fs2 = { workspace = true }
+jsonwebtoken = { workspace = true }
 rand = { workspace = true }
 reqwest = { workspace = true }
 rusqlite = { workspace = true }

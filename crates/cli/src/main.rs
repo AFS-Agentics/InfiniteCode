@@ -28,11 +28,13 @@ use infinitecode_util_paths::find_infinitecode_home;
 use tracing_subscriber::filter::LevelFilter;
 
 mod agent_command;
+mod auth_supabase;
 mod doctor_command;
 mod prompt_command;
 mod upgrade_command;
 
 use agent_command::run_agent;
+use auth_supabase::sign_in_via_browser;
 use doctor_command::run_doctor;
 use prompt_command::PromptOutputFormat;
 use prompt_command::run_prompt;
@@ -281,6 +283,13 @@ async fn run_cli() -> Result<()> {
             run_doctor().await
         }
         Some(Command::Upgrade) => run_upgrade(),
+        Some(Command::AuthLogin) => {
+            // `run_cli` is invoked from inside the Tokio runtime
+            // spawned by infinitecode_arg0::run_as_with_early_dispatch,
+            // so plain `.await` is the correct primitive here.
+            // Handle::block_on would panic in this context.
+            sign_in_via_browser().await
+        }
         Some(Command::Resume { session_id }) => {
             maybe_print_startup_update(&cli).await;
             let _logging = install_logging(&cli)?;
@@ -381,6 +390,12 @@ enum Command {
     Doctor,
     /// Upgrade InfiniteCode to the latest released version.
     Upgrade,
+    /// Sign in to <https://tryinfinitecode.vercel.app> via the
+    /// browser, persists the resulting Supabase session to the OS
+    /// keyring, and exits so the next interactive session can pick
+    /// it up via `infinitecode-keyring-store`. Mirrors the desktop
+    /// device-pairing flow.
+    AuthLogin,
     /// Start the runtime server process.
     #[command(hide = true)]
     Server {
