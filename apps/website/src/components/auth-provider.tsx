@@ -47,7 +47,7 @@ interface AuthContextValue {
 		displayName?: string
 		avatarUrl?: string
 	}) => Promise<void>
-	signOut: () => Promise<void>
+	signOut: (scope?: "local" | "global") => Promise<void>
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null)
@@ -183,9 +183,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 				})
 				if (error) throw error
 			},
-			async signOut() {
+			async signOut(scope = "local") {
 				if (!sb) return
-				await sb.auth.signOut()
+				await sb.auth.signOut({ scope })
 			},
 		}),
 		[configured, ready, sb, session, user],

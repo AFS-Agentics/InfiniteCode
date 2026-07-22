@@ -172,7 +172,7 @@ export function UserMenu(_props: UserMenuProps = {}) {
 					className="text-rose-500 focus:text-rose-500"
 				>
 					<LogOutIcon className="size-4" />
-					{busy ? "Signing out…" : "Sign out"}
+					{busy ? "Signing out…" : "Sign out of this browser"}
 				</DropdownMenuItem>
 			</DropdownMenuContent>
 		</DropdownMenu>

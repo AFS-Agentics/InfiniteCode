@@ -13,7 +13,7 @@
  * than fabricating data we don't actually have.
  */
 import * as React from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import {
 	ActivityIcon,
 	CalendarIcon,
@@ -33,6 +33,7 @@ import {
 	SaveIcon,
 	ShieldCheckIcon,
 	SparklesIcon,
+	ShieldAlertIcon,
 	TerminalIcon,
 	Trash2Icon,
 	UserIcon,
@@ -95,6 +96,7 @@ function readCreatedAt(session: Session | null): string | null {
 
 function ProfileBody() {
 	const { user, session, signOut, updateProfile, updatePassword } = useAuth()
+	const navigate = useNavigate()
 	const sb = getSupabase()
 
 	const [editing, setEditing] = React.useState(false)
@@ -196,10 +198,15 @@ function ProfileBody() {
 		}
 	}
 
-	async function handleSignOut() {
+	async function handleSignOut(scope: "local" | "global" = "local") {
 		setBusy(true)
 		try {
-			await signOut()
+			await signOut(scope)
+			// Always navigate home after sign-out. `onAuthStateChange`
+			// also fires `user=null`, which would let ProtectedRoute redirect
+			// to `/login?next=/profile` — that race is confusing. Send the
+			// user straight home unconditionally for both scopes.
+			navigate("/", { replace: true })
 		} finally {
 			setBusy(false)
 		}
@@ -412,16 +419,33 @@ function ProfileBody() {
 							</div>
 						)}
 						<Separator />
-						<Button
-							variant="ghost"
-							size="sm"
-							className="w-full justify-start text-rose-500 hover:bg-rose-500/10 hover:text-rose-500"
-							onClick={() => void handleSignOut()}
-							disabled={busy}
-						>
-							<LogOutIcon className="size-4" />
-							Sign out
-						</Button>
+						<div className="grid gap-1.5">
+							<Button
+								variant="ghost"
+								size="sm"
+								className="w-full justify-start"
+								onClick={() => void handleSignOut("local")}
+								disabled={busy}
+							>
+								<LogOutIcon className="size-4" />
+								Sign out of this browser
+							</Button>
+							<Button
+								variant="ghost"
+								size="sm"
+								className="w-full justify-start text-rose-500 hover:bg-rose-500/10 hover:text-rose-500"
+								onClick={() => void handleSignOut("global")}
+								disabled={busy}
+							>
+								<ShieldAlertIcon className="size-4" />
+								{busy ? "Signing out everywhere…" : "Sign out everywhere"}
+							</Button>
+							<p className="text-[10px] text-muted-foreground">
+								&quot;Sign out everywhere&quot; kills your session across this browser,
+								any connected desktop, and the CLI — useful if a device was lost or
+								stolen.
+							</p>
+						</div>
 						<p className="text-[10px] text-muted-foreground">
 							Want to delete your account and all data? Email{" "}
 							<a className="underline" href="mailto:[email protected]">
