@@ -2615,11 +2615,13 @@ version = "0.1.31"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
  "clap",
  "colored 2.2.0",
  "futures",
  "infinitecode-arg0",
  "infinitecode-core",
+ "infinitecode-keyring-store",
  "infinitecode-mcp",
  "infinitecode-protocol",
  "infinitecode-provider",

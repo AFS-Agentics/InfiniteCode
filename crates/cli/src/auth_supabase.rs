@@ -24,15 +24,36 @@
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, anyhow};
+use infinitecode_keyring_store::{DefaultKeyringStore, KeyringStore};
 use rand::Rng;
 use serde::Deserialize;
 use url::Url;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const POLL_TIMEOUT: Duration = Duration::from_secs(5 * 60);
-const DEFAULT_WEBSITE: &str = "https://tryinfinitecode.vercel.app";
+pub(crate) const DEFAULT_WEBSITE: &str = "https://tryinfinitecode.vercel.app";
 
-const KEYRING_SERVICE: &str = "infinitecode.cli.supabase.session";
+/// Identifier for the OS-keyring entry that stores the persisted
+/// Supabase session for the **Rust CLI binary**.
+///
+/// The Electron desktop stores its session through a different
+/// mechanism (`apps/desktop/src/main/credential-store.ts` —
+/// Electron's `safeStorage` JSON file), so this constant is
+/// CLI-only — it does not need to match the desktop's keychain
+/// entry.
+///
+/// Why a "v1" suffix: the previous identifier was
+/// `infinitecode.cli.supabase.session` (account `v1`). That name
+/// was used only while auth wiring was experimental; we bumped it
+/// to a versioned suffix once auth stabilized.
+///
+/// Old entries still get read by [`read_session_json`] so existing
+/// users don't lose their session on upgrade.
+pub(crate) const KEYRING_SERVICE: &str = "infinitecode.supabase.session.v1";
+/// Legacy key-chain key — read for backwards compatibility, never
+/// written. Lets users who signed in before the rename keep their
+/// session transparently.
+const KEYRING_SERVICE_LEGACY: &str = "infinitecode.cli.supabase.session";
 const KEYRING_ACCOUNT: &str = "v1";
 
 const USER_CODE_ALPHABET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // unambiguous base32
@@ -173,8 +194,41 @@ fn persist_session(
         "user_id": user_id,
     });
     let bytes = serde_json::to_vec(&payload).context("serialise session")?;
-    infinitecode_keyring_store::store_secret(KEYRING_SERVICE, KEYRING_ACCOUNT, &bytes)
-        .context("writing session to OS keyring")
+    let json = std::str::from_utf8(&bytes).context("session JSON is not utf-8")?;
+    DefaultKeyringStore
+        .save(KEYRING_SERVICE, KEYRING_ACCOUNT, json)
+        .map_err(|e| anyhow!("writing session to OS keyring: {}", e.message()))
+}
+
+/// Clear the persisted session on `infinitecode logout` (or similar).
+pub fn sign_out() -> Result<()> {
+    let removed = DefaultKeyringStore
+        .delete(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .map_err(|e| anyhow!("deleting session from OS keyring: {}", e.message()))?;
+    if !removed {
+        tracing::debug!("sign_out: no session was present in the keyring");
+    }
+    Ok(())
+}
+
+/// Return the raw loaded session JSON if a keyring entry exists,
+/// otherwise `Ok(None)`. Callers (e.g. `auth whoami`) do their own
+/// JWT decoding on top of this.
+///
+/// Tries the current key first, then falls back to the legacy key
+/// for users who signed in before the rename. If a legacy entry is
+/// read, it is silently upgraded to the current key so the legacy
+/// entry can be deleted by the OS keychain's normal expiry.
+pub fn read_session_json() -> Result<Option<serde_json::Value>> {
+    let store = DefaultKeyringStore;
+    let raw = store
+        .load(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .or_else(|_| store.load(KEYRING_SERVICE_LEGACY, "v1"))
+        .map_err(|e| anyhow!("reading session from OS keyring: {}", e.message()))?;
+    let Some(raw) = raw else { return Ok(None) };
+    let parsed: serde_json::Value =
+        serde_json::from_str(&raw).context("deserialising session JSON from keyring")?;
+    Ok(Some(parsed))
 }
 
 /// Open the system browser to the website's login page with the
@@ -202,23 +256,6 @@ pub async fn sign_in_via_browser() -> Result<()> {
     persist_session(&access, &refresh, expires_at.as_deref(), user_id.as_deref())?;
     eprintln!("✓ Stored Supabase session in OS keyring (account={KEYRING_ACCOUNT}).");
     Ok(())
-}
-
-/// Clear the persisted session on `infinitecode logout` (or similar).
-pub fn sign_out() -> Result<()> {
-    infinitecode_keyring_store::delete_secret(KEYRING_SERVICE, KEYRING_ACCOUNT)
-        .context("deleting session from OS keyring")
-}
-
-/// Print the current persisted session, if any, as JSON to stdout.
-/// Used by `infinitecode whoami` and tests.
-pub fn read_session_json() -> Result<Option<serde_json::Value>> {
-    let raw = infinitecode_keyring_store::read_secret(KEYRING_SERVICE, KEYRING_ACCOUNT)
-        .context("reading session from OS keyring")?;
-    let Some(raw) = raw else { return Ok(None) };
-    let parsed: serde_json::Value = serde_json::from_slice(&raw)
-        .context("deserialising session JSON from keyring")?;
-    Ok(Some(parsed))
 }
 
 #[cfg(test)]

@@ -239,6 +239,50 @@ contextBridge.exposeInMainWorld("infinitecode", {
 			ipcRenderer.invoke("desktop-folders:create", input),
 	},
 
+	// --- Auth / device-pairing sign in ---
+
+	/**
+	 * Opens the system browser to the website's login page and waits
+	 * for the device-pairing row to be authorized. Resolves once the
+	 * user has signed in (or rejects on timeout / browser error).
+	 *
+	 * Subscribe via `onConnectSuccess` / `onConnectFailed` for granular
+	 * updates that also fire when calling from outside this surface
+	 * (e.g. the system tray menu).
+	 */
+	auth: {
+		startConnect: () => ipcRenderer.invoke("auth:startConnect"),
+		signOut: () => ipcRenderer.invoke("auth:signOut"),
+		/**
+		 * Read the persisted session. Returns ONLY the safe fields —
+		 * user id and email. The access token never crosses the IPC
+		 * boundary into the renderer process.
+		 */
+		getSession: () =>
+			ipcRenderer.invoke("auth:getSession") as Promise<{
+				user: { id: string; email: string | null } | null
+				configured: boolean
+			}>,
+		onConnectSuccess: (callback: () => void) => {
+			const listener = () => callback()
+			ipcRenderer.on("connect:success", listener)
+			return () => ipcRenderer.removeListener("connect:success", listener)
+		},
+		onConnectFailed: (
+			callback: (detail: { user_code?: string; reason?: string }) => void,
+		) => {
+			const listener = (_event: unknown, detail: unknown) =>
+				callback((detail ?? {}) as { user_code?: string; reason?: string })
+			ipcRenderer.on("connect:failed", listener)
+			return () => ipcRenderer.removeListener("connect:failed", listener)
+		},
+		onSignedOut: (callback: () => void) => {
+			const listener = () => callback()
+			ipcRenderer.on("connect:signed_out", listener)
+			return () => ipcRenderer.removeListener("connect:signed_out", listener)
+		},
+	},
+
 	// --- Fetch proxy (bypasses Chromium connection limits) ---
 
 	/**

@@ -28,13 +28,14 @@ use infinitecode_util_paths::find_infinitecode_home;
 use tracing_subscriber::filter::LevelFilter;
 
 mod agent_command;
+mod auth_command;
 mod auth_supabase;
 mod doctor_command;
 mod prompt_command;
 mod upgrade_command;
 
 use agent_command::run_agent;
-use auth_supabase::sign_in_via_browser;
+use auth_command::{run_login as auth_run_login, run_logout as auth_run_logout, run_status as auth_run_status, run_whoami as auth_run_whoami};
 use doctor_command::run_doctor;
 use prompt_command::PromptOutputFormat;
 use prompt_command::run_prompt;
@@ -283,12 +284,16 @@ async fn run_cli() -> Result<()> {
             run_doctor().await
         }
         Some(Command::Upgrade) => run_upgrade(),
-        Some(Command::AuthLogin) => {
-            // `run_cli` is invoked from inside the Tokio runtime
-            // spawned by infinitecode_arg0::run_as_with_early_dispatch,
-            // so plain `.await` is the correct primitive here.
-            // Handle::block_on would panic in this context.
-            sign_in_via_browser().await
+        Some(Command::Auth { action }) => match action {
+            AuthAction::Login => {
+                // `run_cli` is invoked from inside the Tokio runtime
+                // spawned by infinitecode_arg0::run_as_with_early_dispatch,
+                // so plain `.await` is the correct primitive here.
+                auth_run_login().await
+            }
+            AuthAction::Logout => auth_run_logout(),
+            AuthAction::Status => auth_run_status().await,
+            AuthAction::Whoami => auth_run_whoami(),
         }
         Some(Command::Resume { session_id }) => {
             maybe_print_startup_update(&cli).await;
@@ -365,8 +370,28 @@ fn server_process_args_from_cli(cli: &Cli) -> Option<ServerProcessArgs> {
         | Some(Command::Prompt { .. })
         | Some(Command::Doctor)
         | Some(Command::Upgrade)
+        | Some(Command::Auth { .. })
         | None => None,
     }
+}
+
+/// Sub-actions for `infinitecode auth <sub>`. Mirrors `gh auth *` / Vercel CLI.
+///
+/// All four operate against the persistent Supabase session stored in the
+/// OS keyring by `auth_command::run_login`.
+#[derive(Debug, Subcommand)]
+enum AuthAction {
+    /// Open the browser to <https://tryinfinitecode.vercel.app> and start the
+    /// device-pairing flow. The CLI polls every 2s for up to 5 minutes,
+    /// then writes the resulting session to the OS keyring.
+    Login,
+    /// Clear the persisted session from the OS keyring. Idempotent.
+    Logout,
+    /// Print the signed-in identity parsed from the persisted JWT.
+    Whoami,
+    /// Print the signed-in identity plus an authorized-device count
+    /// fetched via Supabase REST under RLS.
+    Status,
 }
 
 #[derive(Debug, Subcommand)]
@@ -390,12 +415,14 @@ enum Command {
     Doctor,
     /// Upgrade InfiniteCode to the latest released version.
     Upgrade,
-    /// Sign in to <https://tryinfinitecode.vercel.app> via the
-    /// browser, persists the resulting Supabase session to the OS
-    /// keyring, and exits so the next interactive session can pick
-    /// it up via `infinitecode-keyring-store`. Mirrors the desktop
-    /// device-pairing flow.
-    AuthLogin,
+    /// Open the browser to sign in to <https://tryinfinitecode.vercel.app>
+    /// via device-pairing (`auth login` — see `AuthAction::Login`) or
+    /// inspect / clear the persisted Supabase session (`auth whoami`,
+    /// `auth status`, `auth logout`).
+    Auth {
+        #[command(subcommand)]
+        action: AuthAction,
+    },
     /// Start the runtime server process.
     #[command(hide = true)]
     Server {

@@ -6,12 +6,17 @@ import {
 	BookmarkIcon,
 	Clock3Icon,
 	FolderPlusIcon,
+	KeyRoundIcon,
 	Loader2Icon,
+	LogInIcon,
+	LogOutIcon,
 	PenLineIcon,
 	SearchIcon,
 	SettingsIcon,
+	UserIcon,
 } from "lucide-react"
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
+import { authAtom, loadAuthFromMain, startSignIn, signOutFromRenderer } from "../../atoms/auth"
 import { activeServerConfigAtom } from "../../atoms/connection"
 import { sandboxMappingsAtom } from "../../atoms/derived/agents"
 import { automationsEnabledAtom } from "../../atoms/feature-flags"
@@ -546,6 +551,7 @@ export function AppSidebarContent({
 			</div>
 
 			<SidebarFooter className="gap-1 px-3 pt-0 pb-3">
+				<AuthMenu />
 				<button
 					type="button"
 					onClick={() => {
@@ -583,5 +589,109 @@ export function AppSidebarContent({
 				onConfirmRemove={() => confirmRemoveProject(missingTarget)}
 			/>
 		</>
+	)
+}
+
+
+/**
+ * AuthMenu — bottom-of-sidebar account surface.
+ *
+ * Mirrors the website's user-menu. Reads state from the `authAtom`
+ * jotai store, which mirrors IPC-driven events from the desktop's
+ * device-pairing flow (`auth:startConnect`, `auth:signOut`,
+ * `connect:success`, `connect:signed_out`).
+ */
+function AuthMenu() {
+	const [state, setState] = useAtom(authAtom)
+
+	useEffect(() => {
+		void loadAuthFromMain(setState)
+		const offSuccess = window.infinitecode?.auth?.onConnectSuccess?.(() => {
+			void loadAuthFromMain(setState)
+		})
+		const offSignedOut = window.infinitecode?.auth?.onSignedOut?.(() => {
+			setState((prev) => ({ ...prev, status: "signed-out", user: null }))
+		})
+		const offFailed = window.infinitecode?.auth?.onConnectFailed?.((detail) => {
+			setState((prev) => ({
+				...prev,
+				status: "error",
+				errorMessage: detail?.reason ?? "Sign-in failed",
+			}))
+		})
+		return () => {
+			offSuccess?.()
+			offSignedOut?.()
+			offFailed?.()
+		}
+	}, [setState])
+
+	const busy = state.status === "loading"
+
+	if (state.status === "signed-in" && state.user) {
+		const initials = (state.user.email ?? state.user.id ?? "?").slice(0, 2).toUpperCase()
+		return (
+			<div className="flex flex-col gap-1.5 px-1 pb-2">
+				<div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/40 px-2 py-1.5">
+					<span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-semibold text-primary">
+						{initials}
+					</span>
+					<div className="min-w-0 flex-1 truncate text-xs">
+						<div className="truncate font-medium text-sidebar-foreground">
+							{state.user.email ?? "Signed in"}
+						</div>
+						<div className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+							Free plan
+						</div>
+					</div>
+				</div>
+				<button
+					type="button"
+					disabled={busy}
+					onClick={() => void signOutFromRenderer(setState)}
+					className="flex h-7 w-full items-center justify-center gap-1.5 rounded-lg text-[11px] text-rose-400 transition-colors hover:bg-rose-500/10 disabled:opacity-50"
+				>
+					<LogOutIcon className={sidebarPrimaryIconClass} />
+					{busy ? "Signing out…" : "Sign out of this desktop"}
+				</button>
+			</div>
+		)
+	}
+
+	// Signed out / not configured / error / loading state.
+	return (
+		<div className="flex flex-col gap-1.5 px-1 pb-2">
+			<button
+				type="button"
+				disabled={busy || state.configured === false}
+				onClick={() => void startSignIn(setState)}
+				className="flex h-8 w-full items-center gap-2 rounded-lg border border-border/60 bg-background px-2 text-left text-sm font-normal text-sidebar-foreground transition-colors hover:bg-black/[0.04] disabled:opacity-50 dark:hover:bg-white/[0.06]"
+				title={
+				state.configured === false
+					? "Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the desktop app's env."
+					: "Sign in via tryinfinitecode.vercel.app"
+				}
+			>
+				{busy ? (
+					<>
+						<Loader2Icon className={`${sidebarPrimaryIconClass} animate-spin`} />
+						Opening browser…
+					</>
+				) : state.configured === false ? (
+					<>
+						<KeyRoundIcon className={sidebarPrimaryIconClass} />
+						Auth unconfigured
+					</>
+				) : (
+					<>
+						<LogInIcon className={sidebarPrimaryIconClass} />
+						Sign in to InfiniteCode
+					</>
+				)}
+			</button>
+			{state.status === "error" && state.errorMessage && (
+				<p className="px-1 text-[10px] text-rose-400">{state.errorMessage}</p>
+			)}
+		</div>
 	)
 }

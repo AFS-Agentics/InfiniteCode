@@ -149,5 +149,33 @@ export async function signOutDesktop(): Promise<void> {
 export function registerConnectIPC() {
   ipcMain.handle("auth:startConnect", async () => startConnect());
   ipcMain.handle("auth:signOut", async () => signOutDesktop());
+  ipcMain.handle("auth:getSession", async () => readPublicSession());
   activeWindow?.webContents.send("auth:ready", {});
+}
+
+/**
+ * Read the persisted session from the desktop keychain and return ONLY
+ * the safe fields (user id + email) — never the access_token. This keeps
+ * the renderer process free of token authority.
+ */
+async function readPublicSession(): Promise<{
+  user: { id: string; email: string | null } | null;
+  configured: boolean;
+}> {
+  // Token may be stale in localStorage; treat presence as "configured"
+  // and let the renderer subscribe to onSignedOut for live updates.
+  const configured = true;
+  try {
+    const session = await loadSession().catch(() => null);
+    if (!session) return { user: null, configured };
+    return {
+      user: {
+        id: session.user?.id ?? "",
+        email: session.user?.email ?? null,
+      },
+      configured,
+    };
+  } catch {
+    return { user: null, configured: false };
+  }
 }

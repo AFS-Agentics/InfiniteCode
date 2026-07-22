@@ -506,6 +506,36 @@ export interface InfiniteCodeAPI {
 		callback: (detail: SessionSupersededDetail) => void,
 	) => () => void
 
+	// Auth / sign-in
+	// Mirrors the Rust binary's `infinitecode auth *` subcommand group on
+	// the CLI surface; the renderer drives the same flow via these
+	// IPC calls. `getSession()` returns ONLY the safe fields
+	// (user id + email) — the access token never leaves the main process.
+
+	auth: {
+		/** Trigger the device-pairing flow. Opens the system browser to
+		 * <https://tryinfinitecode.vercel.app/login?code=ABCD-EFGH> and
+		 * resolves once the user has signed in (or fails on timeout /
+		 * browser error). */
+		startConnect: () => Promise<void>
+		/** Clear the persisted Supabase session from the OS keychain. */
+		signOut: () => Promise<void>
+		/** Read the persisted session. Returns only the displayable
+		 * fields — no access_token. */
+		getSession: () => Promise<{
+			user: { id: string; email: string | null } | null
+			configured: boolean
+		}>
+		/** Subscribe to the `connect:success` event (user just signed in). */
+		onConnectSuccess: (callback: () => void) => () => void
+		/** Subscribe to the `connect:failed` event (timed out / browser error). */
+		onConnectFailed: (
+			callback: (detail: { user_code?: string; reason?: string }) => void,
+		) => () => void
+		/** Subscribe to the `connect:signed_out` event (sign-out succeeded). */
+		onSignedOut: (callback: () => void) => () => void
+	}
+
 	// Ad content moderation (ML pipeline)
 	// Renamed from `adsterra`. The IPC channel is the general
 	// `moderation:check`; the type surface should match so future ad
@@ -514,7 +544,7 @@ export interface InfiniteCodeAPI {
 		checkAdText: (text: string) => Promise<ModerationResult>
 	}
 
-	onTerminalToggle: (callback: () => void) => () => void
+	onTerminalToggle: (callback: () => void) => () => void,
 	acp: {
 		request: (request: {
 			method: string

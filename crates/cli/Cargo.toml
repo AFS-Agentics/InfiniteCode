@@ -20,9 +20,11 @@ infinitecode-tasks = { workspace = true }
 infinitecode-tui = { workspace = true }
 infinitecode-util-paths = { workspace = true }
 infinitecode-arg0 = { workspace = true }
+infinitecode-keyring-store = { workspace = true }
 
 anyhow = { workspace = true }
 async-trait = { workspace = true }
+chrono = { workspace = true }
 clap = { workspace = true }
 colored = { workspace = true }
 futures = { workspace = true }

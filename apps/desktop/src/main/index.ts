@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, session, shell } from "electron"
 import { initAutomations, shutdownAutomations } from "./automation"
 import { initCredentialStore } from "./credential-store"
+import { registerConnectIPC } from "./connect-flow"
 import { getOpaqueWindowsPref, registerIpcHandlers } from "./ipc-handlers"
 import { installLiquidGlass, resolveStartupWindowBackground, resolveWindowChrome } from "./liquid-glass"
 import { createLogger } from "./logger"
@@ -412,6 +413,7 @@ if (!gotLock) {
 		initSettingsStore()
 		initCredentialStore()
 		registerIpcHandlers()
+		registerConnectIPC()
 		// Preload ML model for ad moderation (fire-and-forget).
 		import("./moderation").then((m) => m.preloadClassifier())
 		initAutomations().catch(console.error)
