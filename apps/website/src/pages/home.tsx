@@ -26,6 +26,7 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 } from "@/components/ui/accordion"
+import { UserMenu } from "@/components/user-menu"
 
 // Docs landing page sections (added alongside original content)
 import { ProofSection } from "@/pages/landing/proof-section"
@@ -133,7 +134,7 @@ function Nav() {
 						</a>
 					))}
 				</nav>
-				<Button size="sm">Get Started</Button>
+				<UserMenu />
 			</div>
 		</header>
 	)

@@ -10,5 +10,11 @@
 		"build:docs": "npm --prefix apps/docs run build",
 		"dev:desktop": "bun --cwd apps/desktop run dev",
 		"test:desktop": "bun --cwd apps/desktop run test"
+	},
+	"devDependencies": {
+		"@radix-ui/react-avatar": "^1.2.3",
+		"@radix-ui/react-dropdown-menu": "^2.1.21",
+		"@radix-ui/react-label": "^2.1.12",
+		"@radix-ui/react-separator": "^1.1.12"
 	}
 }
