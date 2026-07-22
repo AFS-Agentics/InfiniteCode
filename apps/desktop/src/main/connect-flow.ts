@@ -168,9 +168,15 @@ async function readPublicSession(): Promise<{
   try {
     const session = await loadSession().catch(() => null);
     if (!session) return { user: null, configured };
+    // Defensive: a session with no user identity (or an empty user id)
+    // should NOT be surfaced as a real user row — normalize to null so
+    // the IPC contract matches the renderer's expectations and any
+    // direct caller of getSession() sees the same shape.
+    const id = session.user?.id;
+    if (!id) return { user: null, configured };
     return {
       user: {
-        id: session.user?.id ?? "",
+        id,
         email: session.user?.email ?? null,
       },
       configured,

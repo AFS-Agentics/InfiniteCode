@@ -201,12 +201,20 @@ fn persist_session(
 }
 
 /// Clear the persisted session on `infinitecode logout` (or similar).
+///
+/// Removes both the current key and the legacy keychain entry (from
+/// the pre-rename layout) so users who upgraded mid-flight don't
+/// resurrect their session via the read-side legacy fallback.
 pub fn sign_out() -> Result<()> {
-    let removed = DefaultKeyringStore
+    let store = DefaultKeyringStore;
+    let removed = store
         .delete(KEYRING_SERVICE, KEYRING_ACCOUNT)
         .map_err(|e| anyhow!("deleting session from OS keyring: {}", e.message()))?;
-    if !removed {
-        tracing::debug!("sign_out: no session was present in the keyring");
+    let removed_legacy = store
+        .delete(KEYRING_SERVICE_LEGACY, "v1")
+        .map_err(|e| anyhow!("deleting legacy session from OS keyring: {}", e.message()))?;
+    if !removed && !removed_legacy {
+        tracing::debug!("sign_out: no session was present in either keyring entry");
     }
     Ok(())
 }
@@ -216,19 +224,33 @@ pub fn sign_out() -> Result<()> {
 /// JWT decoding on top of this.
 ///
 /// Tries the current key first, then falls back to the legacy key
-/// for users who signed in before the rename. If a legacy entry is
-/// read, it is silently upgraded to the current key so the legacy
-/// entry can be deleted by the OS keychain's normal expiry.
+/// for users who signed in before the rename. The fallback runs
+/// whenever the current key is *absent* (`Ok(None)`), not just on
+/// backend errors — `DefaultKeyringStore::load` returns `Ok(None)`
+/// for "no entry", and `Result::or_else` would skip that branch.
 pub fn read_session_json() -> Result<Option<serde_json::Value>> {
-    let store = DefaultKeyringStore;
-    let raw = store
-        .load(KEYRING_SERVICE, KEYRING_ACCOUNT)
-        .or_else(|_| store.load(KEYRING_SERVICE_LEGACY, "v1"))
-        .map_err(|e| anyhow!("reading session from OS keyring: {}", e.message()))?;
+    let raw = load_with_legacy_fallback()?;
     let Some(raw) = raw else { return Ok(None) };
     let parsed: serde_json::Value =
         serde_json::from_str(&raw).context("deserialising session JSON from keyring")?;
     Ok(Some(parsed))
+}
+
+fn load_with_legacy_fallback() -> Result<Option<String>> {
+    let store = DefaultKeyringStore;
+    let current = store
+        .load(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .map_err(|e| anyhow!("reading session from OS keyring: {}", e.message()))?;
+    if let Some(value) = current {
+        return Ok(Some(value));
+    }
+    // Current key absent — try the legacy entry from the
+    // pre-rename layout. Backend errors here go through so callers
+    // learn about keychain corruption instead of silently ignoring
+    // it.
+    store
+        .load(KEYRING_SERVICE_LEGACY, "v1")
+        .map_err(|e| anyhow!("reading legacy session from OS keyring: {}", e.message()))
 }
 
 /// Open the system browser to the website's login page with the
