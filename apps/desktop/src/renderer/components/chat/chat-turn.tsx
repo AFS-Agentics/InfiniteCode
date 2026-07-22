@@ -70,16 +70,26 @@ const log = createLogger("chat-turn");
  * message. Turns with those IDs are "history" and never get ads.
  * Only turns created AFTER the snapshot get ads.
  */
+/**
+ * Tracks which turn IDs were present before the user's first message.
+ * Turns created later get ads; historical turns don't.
+ *
+ * On a fresh start there are no pre-existing turns so all turns are
+ * ad-eligible. On a restored session the ids of turns that existed at
+ * the point the user first interacts are snapshotted by
+ * `enableAdsForSession` (called from chat-view.tsx handleSend).
+ *
+ * Module-level vars reset on HMR / cold boot which is correct: a fresh
+ * session has no history.
+ */
 let historyTurnIds = new Set<string>()
-let adsEnabled = false
 
 export function enableAdsForSession(allTurnIds: string[]) {
 	historyTurnIds = new Set(allTurnIds)
-	adsEnabled = true
 }
 
 function isAdsDisabled(turnId: string): boolean {
-	return !adsEnabled || historyTurnIds.has(turnId)
+	return historyTurnIds.has(turnId)
 }
 
 import {
@@ -1175,17 +1185,16 @@ export const ChatTurnComponent = memo(
 							? `${errorText.slice(0, 300)}...`
 							: errorText}
 					</div>
-				)}{/* Above-response Adsterra primary — sits above the main response area
-			but below the user message. Only on fresh messages this session. */}
-			{!isAdsDisabled(turn.id) && !working && isLast &&
-				finalResponsePart &&
-				responseText &&
-				turnAdMessages.length > 0 && (
-				<>
+				)}
+				{!isAdsDisabled(turn.id) && !working && isLast &&
+					finalResponsePart &&
+					responseText &&
+					turnAdMessages.length > 0 && (
 					<AdsterraAd placement="above_response" />
-				</>
-			)}			{/* Mid-response Adsterra primary — mounted between the
-		    active process timeline and the final response Message bubble.
+				)}
+
+				{/* Mid-response Adsterra primary — mounted between the
+				active process timeline and the final response Message bubble.
 		    Same ready-gate as inline_response / below_response (only after
 		    `!working && finalResponsePart && responseText`) plus the extra
 		    `processTimelineItems.length > 0` requirement so a thought-only

@@ -33,6 +33,7 @@ import {
 	MinusIcon,
 	PlusIcon,
 	SearchIcon,
+	SparklesIcon,
 	SquareCheckIcon,
 	TerminalIcon,
 	WrenchIcon,
@@ -204,6 +205,8 @@ export function getToolInfo(tool: string): {
 		case "question":
 		case "request_user_input":
 			return { icon: BookOpenIcon, title: "Asking" }
+		case "suggest_followups":
+			return { icon: SparklesIcon, title: "Suggesting" }
 		default:
 			// Unknown / MCP: leave the title as the raw tool name so the
 			// monospace pill below the title doesn't duplicate it. The
@@ -368,6 +371,17 @@ export function getToolSubtitle(
 					: `${questions.length} questions`
 			} else {
 				subtitle = title
+			}
+			break
+		}
+		case "suggest_followups": {
+			const followups = input?.followups as Array<{ label?: string }> | undefined
+			if (followups && followups.length > 0) {
+				subtitle = followups.length === 1
+					? followups[0].label ?? "1 suggestion"
+					: `${followups.length} suggestions`
+			} else {
+				subtitle = title ?? "Suggestions"
 			}
 			break
 		}
