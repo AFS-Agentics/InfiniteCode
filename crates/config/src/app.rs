@@ -18,7 +18,7 @@ use infinitecode_util_paths::FileSystemConfigPathResolver;
 use crate::AUTH_CONFIG_FILE_NAME;
 use crate::AppConfigError;
 use crate::ExperimentalConfig;
-use crate::FreebuffBridgeConfig;
+use crate::InfiniteCodeBridgeConfig;
 use crate::HooksConfig;
 use crate::LogRotation;
 use crate::LoggingConfig;
@@ -244,7 +244,7 @@ impl Default for AppConfig {
                 idle_session_timeout_secs: 1800,
                 persist_ephemeral_sessions: false,
                 auth: Default::default(),
-                freebuff_bridge: FreebuffBridgeConfig::default(),
+                infinitecode_bridge: InfiniteCodeBridgeConfig::default(),
             },
             logging: LoggingConfig {
                 level: "info".into(),

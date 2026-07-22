@@ -1,6 +1,6 @@
 //! Search proxy handlers.
 //!
-//! Three endpoints mirror the Freebuff / Codebuff backend semantics:
+//! Three endpoints mirror the InfiniteCode / Codebuff backend semantics:
 //!
 //!   - `POST /api/v1/web-search`    — Serper-shaped upstream search.
 //!   - `POST /api/v1/docs-search`   — Context7-shaped upstream lookup.
@@ -9,7 +9,7 @@
 //!
 //! In a default install (no upstream configured) each handler returns
 //! `501 NOT_IMPLEMENTED` so the bridge wire stays live while the upstream
-//! is intentionally left for operators to plug in. The Freebuff-shape
+//! is intentionally left for operators to plug in. The InfiniteCode-shape
 //! request / response types are accepted and validated so clients can
 //! smoke-test against the bridge without first provisioning a Serper key.
 
@@ -38,11 +38,11 @@ pub async fn web_search(
     let _ = request.depth; // not exercised yet — preserved for the upstream proxy.
     if state.bridge.serper_base_url.is_none() {
         return Err(BridgeError::not_implemented(
-            "freebuff /api/v1/web-search has no configured upstream. Set [freebuff_bridge].serper_base_url.",
+            "infinitecode /api/v1/web-search has no configured upstream. Set [infinitecode_bridge].serper_base_url.",
         ));
     }
     Err(BridgeError::not_implemented(
-        "freebuff /api/v1/web-search upstream proxy is not wired in this build. \
+        "infinitecode /api/v1/web-search upstream proxy is not wired in this build. \
          (Wire shapes accepted; response deferred to your configured Serper instance.)",
     ))
 }
@@ -58,12 +58,12 @@ pub async fn docs_search(
     let _ = request.repo_url;
     if state.bridge.context7_base_url.is_none() {
         return Err(BridgeError::not_implemented(
-            "freebuff /api/v1/docs-search has no configured upstream. \
-             Set [freebuff_bridge].context7_base_url.",
+            "infinitecode /api/v1/docs-search has no configured upstream. \
+             Set [infinitecode_bridge].context7_base_url.",
         ));
     }
     Err(BridgeError::not_implemented(
-        "freebuff /api/v1/docs-search upstream proxy is not wired in this build. \
+        "infinitecode /api/v1/docs-search upstream proxy is not wired in this build. \
          (Wire shapes accepted; response deferred to your configured Context7 instance.)",
     ))
 }
@@ -93,7 +93,7 @@ pub async fn gravity_index(
     // in via a new `gravity_base_url` config key. Until then, return a
     // deterministic 501 so client and server agree on the wire shape.
     Err(BridgeError::not_implemented(
-        "freebuff gravity_index is not wired in this build. The Freebuff-side \
+        "infinitecode gravity_index is not wired in this build. The InfiniteCode-side \
          Gravity implementation is closed-source; clients should consume the \
          upstream gravity.ai APIs directly until the bridge lands a public side \
          of the integration. Wire shape is already validated above.",

@@ -4,7 +4,7 @@
  * Each cell independently tries Adsterra first, then falls back to A-Ads
  * after 35s of nofill (same pattern as adsterra-ad.tsx).
  *
- * Freebuff-inspired: uses the cold-boot wait time to show multiple
+ * InfiniteCode-inspired: uses the cold-boot wait time to show multiple
  * ad creatives instead of a single banner.
  */
 

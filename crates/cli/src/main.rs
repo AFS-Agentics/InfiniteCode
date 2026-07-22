@@ -135,7 +135,7 @@ struct Cli {
 fn main() -> Result<()> {
     // Strict one-session-per-user enforcement. If another infinitecode
     // instance is live, this binary exits 75 with a friendly message before
-    // touching stdin / TUI / stdio transport. Mirrors Freebuff's
+    // touching stdin / TUI / stdio transport. Mirrors InfiniteCode's
     // `cli-engine/src/hooks/helpers/send-message.ts:600-612` UX (a 2nd CLI
     // running while one is already seated).
     infinitecode_core::session_lock::ensure_single_cli_session_or_exit(None);

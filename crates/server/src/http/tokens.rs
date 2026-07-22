@@ -1,6 +1,6 @@
 //! Token-count proxy handler.
 //!
-//! `POST /api/v1/token-count` mirrors the Freebuff-side proxy to Anthropic
+//! `POST /api/v1/token-count` mirrors the InfiniteCode-side proxy to Anthropic
 //! `count_tokens`. The agent normally uses this on the paid Codebuff
 //! tier; in free mode the runtime switches to the local tiktoken-shaped
 //! estimate so the per-step round-trip overhead + 1M+ web services
@@ -33,7 +33,7 @@ pub async fn token_count(
         ));
     }
     Err(BridgeError::not_implemented(
-        "freebuff /api/v1/token-count upstream is not wired in this build. \
+        "infinitecode /api/v1/token-count upstream is not wired in this build. \
          Agents should fall back to the local token estimate (see \
          infinitecode.provider.TokenCountBackend::estimate_local).",
     ))

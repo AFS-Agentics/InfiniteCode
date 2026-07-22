@@ -1247,7 +1247,7 @@ export const ChatTurnComponent = memo(
 		    corruption.
 
 		    Note: the chat carries 2 ads per turn total — Inline footer note
-		    + Below-Response pill — matching freebuff's "Chat Response (Inline)"
+		    + Below-Response pill — matching infinitecode's "Chat Response (Inline)"
 		    + "Chat Response (Below)" pair exactly. */}
 			{!isAdsDisabled(turn.id) && !working && isLast &&
 				finalResponsePart &&

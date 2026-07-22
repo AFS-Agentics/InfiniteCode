@@ -4,7 +4,7 @@ mod bootstrap;
 mod client;
 mod connection;
 pub mod db;
-pub mod db_freebuff;
+pub mod db_infinitecode;
 mod event;
 mod execution;
 pub mod goal;

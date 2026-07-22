@@ -1,16 +1,16 @@
-//! Integration test for the Freebuff-shaped HTTP bridge.
+//! Integration test for the InfiniteCode-shaped HTTP bridge.
 //!
 //! Boots the axum router on a loopback `127.0.0.1:0` listener and exercises
 //! the lifecycle:
 //!
 //!   1. `GET  /api/healthz` — should return 200 (no auth).
 //!   2. `POST /api/v1/auth/login` — exchange password for bearer token.
-//!   3. `POST /api/v1/freebuff/session` — admit a session.
-//!   4. `GET  /api/v1/freebuff/session/:id` — poll and verify shape.
-//!   5. `POST /api/v1/freebuff/session` — admit a *second* session for the
+//!   3. `POST /api/v1/infinitecode/session` — admit a session.
+//!   4. `GET  /api/v1/infinitecode/session/:id` — poll and verify shape.
+//!   5. `POST /api/v1/infinitecode/session` — admit a *second* session for the
 //!      same acting user; the first one should be marked `superseded`.
-//!   6. `GET  /api/v1/freebuff/session/:first_id` — should now 409.
-//!   7. `DELETE /api/v1/freebuff/session/:second_id` — should release.
+//!   6. `GET  /api/v1/infinitecode/session/:first_id` — should now 409.
+//!   7. `DELETE /api/v1/infinitecode/session/:second_id` — should release.
 //!
 //! Each test pre-creates a tempdir + SQLite database, then runs the bridge
 //! against that database. We serialise the test suite so the bridge doesn't
@@ -20,9 +20,9 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use infinitecode_config::FreebuffBridgeConfig;
+use infinitecode_config::InfiniteCodeBridgeConfig;
 use infinitecode_server::db::Database;
-use infinitecode_server::db_freebuff::{migrate_database, supersede_and_admit};
+use infinitecode_server::db_infinitecode::{migrate_database, supersede_and_admit};
 use infinitecode_server::http::{HttpBridgeState, build_router};
 use infinitecode_protocol::{
     AuthLoginRequest, CoordinationSessionBucket, CoordinationSessionRequest,
@@ -34,8 +34,8 @@ use tempfile::TempDir;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
-fn test_bridge_cfg() -> FreebuffBridgeConfig {
-    FreebuffBridgeConfig {
+fn test_bridge_cfg() -> InfiniteCodeBridgeConfig {
+    InfiniteCodeBridgeConfig {
         enabled: true,
         password: Some("test-password".to_string()),
         token_ttl_secs: 60,
@@ -50,7 +50,7 @@ async fn start_test_server() -> (reqwest::Client, String, TempDir, CancellationT
     let dir = TempDir::new().expect("create tempdir");
     let db_path = dir.path().join("infinitecode.db");
     let db = Arc::new(Database::open(db_path).expect("open db"));
-    migrate_database(&db).expect("freebuff migrate");
+    migrate_database(&db).expect("infinitecode migrate");
 
     let state = HttpBridgeState::new(db, test_bridge_cfg(), Instant::now());
     let router = build_router(state);
@@ -134,7 +134,7 @@ async fn login_with_wrong_password_returns_401() {
 async fn protected_route_without_bearer_returns_401() {
     let (client, url, _dir, _shutdown) = start_test_server().await;
     let response = client
-        .post(format!("{url}/api/v1/freebuff/session"))
+        .post(format!("{url}/api/v1/infinitecode/session"))
         .json(&admit_request("inst", "user", "minimax/minimax-m3"))
         .send()
         .await
@@ -149,7 +149,7 @@ async fn admit_poll_release_lifecycle_with_bearer() {
 
     // Admit
     let admit = client
-        .post(format!("{url}/api/v1/freebuff/session"))
+        .post(format!("{url}/api/v1/infinitecode/session"))
         .bearer_auth(&token)
         .json(&admit_request("instance-A", "user-1", "minimax/minimax-m3"))
         .send()
@@ -168,7 +168,7 @@ async fn admit_poll_release_lifecycle_with_bearer() {
 
     // Poll
     let poll = client
-        .get(format!("{url}/api/v1/freebuff/session/instance-A"))
+        .get(format!("{url}/api/v1/infinitecode/session/instance-A"))
         .bearer_auth(&token)
         .send()
         .await
@@ -184,7 +184,7 @@ async fn admit_poll_release_lifecycle_with_bearer() {
 
     // Release
     let release = client
-        .delete(format!("{url}/api/v1/freebuff/session/instance-A"))
+        .delete(format!("{url}/api/v1/infinitecode/session/instance-A"))
         .bearer_auth(&token)
         .send()
         .await
@@ -199,7 +199,7 @@ async fn second_admit_for_same_user_supersedes_first() {
 
     // Admit first.
     let _ = client
-        .post(format!("{url}/api/v1/freebuff/session"))
+        .post(format!("{url}/api/v1/infinitecode/session"))
         .bearer_auth(&token)
         .json(&admit_request("instance-A", "user-1", "minimax/minimax-m3"))
         .send()
@@ -207,7 +207,7 @@ async fn second_admit_for_same_user_supersedes_first() {
         .expect("first admit");
     // Admit second for the same user.
     let _ = client
-        .post(format!("{url}/api/v1/freebuff/session"))
+        .post(format!("{url}/api/v1/infinitecode/session"))
         .bearer_auth(&token)
         .json(&admit_request("instance-B", "user-1", "deepseek/deepseek-v4-pro"))
         .send()
@@ -217,7 +217,7 @@ async fn second_admit_for_same_user_supersedes_first() {
     // Reading the first instance id should now 409 because the rotation
     // marked it superseded.
     let response = client
-        .get(format!("{url}/api/v1/freebuff/session/instance-A"))
+        .get(format!("{url}/api/v1/infinitecode/session/instance-A"))
         .bearer_auth(&token)
         .send()
         .await

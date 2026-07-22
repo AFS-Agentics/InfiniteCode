@@ -7,7 +7,7 @@
 //!   surfaces read `input.followups` directly from the raw tool call to
 //!   draw chip rows.
 //!
-//! Behaviour-equivalent to freebuff's `suggest_followups`. See
+//! Behaviour-equivalent to infinitecode's `suggest_followups`. See
 //! `crates/core/prompts/agent-behavior/suggest-followups.md` for the
 //! agent-side prompt that teaches the model to emit this tool near the
 //! end of non-trivial turns.

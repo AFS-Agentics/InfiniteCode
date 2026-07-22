@@ -180,7 +180,7 @@ impl ChatWidget {
         }
     }
 
-    /// Spawns a background fetch for the pinned-above-input ad (like Freebuff's SingleAdBanner).
+    /// Spawns a background fetch for the pinned-above-input ad (like InfiniteCode's SingleAdBanner).
     /// Rotates every 60 seconds via `maybe_rotate_pinned_ad`. Always visible above the composer.
     pub(crate) fn spawn_pinned_ad_fetch(&self) {
         let Some(model) = self.session.model.as_ref() else {

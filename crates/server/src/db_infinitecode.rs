@@ -1,8 +1,8 @@
-//! SQLite persistence for the Freebuff-shaped coordination API.
+//! SQLite persistence for the InfiniteCode-shaped coordination API.
 //!
 //! The existing `crate::db::Database` owns the schema migration for the
 //! canonical InfiniteCode tables (`sessions`, `session_stats`,
-//! `pending_messages`, ...). This module owns the **adjacent** `freebuff_*`
+//! `pending_messages`, ...). This module owns the **adjacent** `infinitecode_*`
 //! tables, kept in the same database file so the bridge benefits from the
 //! existing `~/.infinitecode/infinitecode.db` path resolution and acquires
 //! locks against the same connection.
@@ -13,13 +13,13 @@
 //!   - `upsert_session` — admit or re-admit a session row keyed by
 //!     `instance_id`.
 //!   - `get_session` — poll by instance id (for `GET
-//!     /api/v1/freebuff/session/:instance_id`).
+//!     /api/v1/infinitecode/session/:instance_id`).
 //!   - `release_session` — mark a session ended (for `DELETE
-//!     /api/v1/freebuff/session/:instance_id`).
+//!     /api/v1/infinitecode/session/:instance_id`).
 //!   - `supersede_existing_sessions_for_user` — atomic rotation that flips
 //!     every active session for an acting-user to `superseded` and returns
 //!     the instance ids that were superseded (for the 409 race we mirror
-//!     from Freebuff).
+//!     from InfiniteCode).
 //!   - bearer-token CRUD (`insert_bearer_token`, `find_bearer_token`,
 //!     `prune_expired_bearer_tokens`).
 //!
@@ -39,7 +39,7 @@ use infinitecode_protocol::{
 
 use crate::db::Database;
 
-/// Idempotent migration for the Freebuff-shaped tables.
+/// Idempotent migration for the InfiniteCode-shaped tables.
 ///
 /// Called from `bootstrap.rs` after `Database::open` (which runs the
 /// canonical migration). The two migrations share the same `Connection`
@@ -47,7 +47,7 @@ use crate::db::Database;
 pub fn migrate(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         r#"
-        CREATE TABLE IF NOT EXISTS freebuff_sessions (
+        CREATE TABLE IF NOT EXISTS infinitecode_sessions (
             instance_id TEXT PRIMARY KEY,
             acting_user_id TEXT NOT NULL,
             model TEXT NOT NULL,
@@ -61,21 +61,21 @@ pub fn migrate(conn: &Connection) -> Result<()> {
             device_fingerprint TEXT,
             app_version TEXT
         );
-        CREATE INDEX IF NOT EXISTS idx_freebuff_sessions_user
-            ON freebuff_sessions(acting_user_id);
-        CREATE INDEX IF NOT EXISTS idx_freebuff_sessions_status
-            ON freebuff_sessions(status);
+        CREATE INDEX IF NOT EXISTS idx_infinitecode_sessions_user
+            ON infinitecode_sessions(acting_user_id);
+        CREATE INDEX IF NOT EXISTS idx_infinitecode_sessions_status
+            ON infinitecode_sessions(status);
 
-        CREATE TABLE IF NOT EXISTS freebuff_bearer_tokens (
+        CREATE TABLE IF NOT EXISTS infinitecode_bearer_tokens (
             token_hash TEXT PRIMARY KEY,
             created_at INTEGER NOT NULL,
             expires_at INTEGER NOT NULL
         );
-        CREATE INDEX IF NOT EXISTS idx_freebuff_bearer_tokens_expires
-            ON freebuff_bearer_tokens(expires_at);
+        CREATE INDEX IF NOT EXISTS idx_infinitecode_bearer_tokens_expires
+            ON infinitecode_bearer_tokens(expires_at);
         "#,
     )
-    .context("failed to migrate freebuff bridge schema")?;
+    .context("failed to migrate infinitecode bridge schema")?;
     Ok(())
 }
 
@@ -87,7 +87,7 @@ pub fn migrate_database(db: &Database) -> Result<()> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FreebuffSessionRow {
+pub struct InfiniteCodeSessionRow {
     pub instance_id: String,
     pub acting_user_id: String,
     pub model: String,
@@ -102,7 +102,7 @@ pub struct FreebuffSessionRow {
     pub app_version: Option<String>,
 }
 
-impl FreebuffSessionRow {
+impl InfiniteCodeSessionRow {
     pub fn into_response(self) -> CoordinationSessionResponse {
         CoordinationSessionResponse {
             instance_id: self.instance_id.into(),
@@ -148,8 +148,8 @@ fn parse_status(value: String) -> rusqlite::Result<CoordinationSessionStatus> {
     }
 }
 
-fn parse_session_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FreebuffSessionRow> {
-    Ok(FreebuffSessionRow {
+fn parse_session_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<InfiniteCodeSessionRow> {
+    Ok(InfiniteCodeSessionRow {
         instance_id: row.get(0)?,
         acting_user_id: row.get(1)?,
         model: row.get(2)?,
@@ -168,7 +168,7 @@ fn parse_session_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FreebuffSessio
 /// Inlined row parser exposed so the HTTP layer can issue standalone
 /// `query_row` calls without going through the `get_session` helper (used
 /// by the GET-without-instance-id poll endpoint).
-pub fn parse_session_row_pub(row: &rusqlite::Row<'_>) -> rusqlite::Result<FreebuffSessionRow> {
+pub fn parse_session_row_pub(row: &rusqlite::Row<'_>) -> rusqlite::Result<InfiniteCodeSessionRow> {
     parse_session_row(row)
 }
 
@@ -188,7 +188,7 @@ fn parse_utc(secs: i64) -> rusqlite::Result<DateTime<Utc>> {
 /// All-or-nothing admit that runs the rotation in a single transaction.
 ///
 /// Steps inside the transaction:
-///   1. For every active row in `freebuff_sessions` with the supplied
+///   1. For every active row in `infinitecode_sessions` with the supplied
 ///      `acting_user_id`, set `status = 'superseded'`, `reason = 'rotated'`.
 ///   2. Insert the new row keyed by `instance_id` with the supplied model
 ///      and bucket.
@@ -211,12 +211,12 @@ pub fn supersede_and_admit(
 ) -> Result<Vec<String>> {
     let tx: Transaction<'_> = (*conn)
         .transaction()
-        .context("failed to begin freebuff session transaction")?;
+        .context("failed to begin infinitecode session transaction")?;
 
     let superseded: Vec<String> = {
         let mut stmt = tx
             .prepare(
-                "UPDATE freebuff_sessions
+                "UPDATE infinitecode_sessions
                  SET status = 'superseded', reason = 'rotated'
                  WHERE acting_user_id = ?1 AND status = 'active'
                  RETURNING instance_id",
@@ -233,7 +233,7 @@ pub fn supersede_and_admit(
     };
 
     tx.execute(
-        "INSERT INTO freebuff_sessions
+        "INSERT INTO infinitecode_sessions
             (instance_id, acting_user_id, model, bucket, status, time_remaining_ms,
              started_at, expires_at, reason, iso_country_code, device_fingerprint, app_version)
          VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?6, ?7, NULL, ?8, ?9, ?10)",
@@ -250,9 +250,9 @@ pub fn supersede_and_admit(
             app_version,
         ],
     )
-    .context("failed to insert new freebuff session")?;
+    .context("failed to insert new infinitecode session")?;
 
-    tx.commit().context("failed to commit freebuff session transaction")?;
+    tx.commit().context("failed to commit infinitecode session transaction")?;
     Ok(superseded)
 }
 
@@ -264,34 +264,34 @@ pub fn touch_time_remaining(
     time_remaining_ms: i64,
 ) -> Result<()> {
     conn.execute(
-        "UPDATE freebuff_sessions SET time_remaining_ms = ?1 WHERE instance_id = ?2",
+        "UPDATE infinitecode_sessions SET time_remaining_ms = ?1 WHERE instance_id = ?2",
         params![time_remaining_ms, instance_id],
     )
-    .context("failed to update freebuff session time_remaining_ms")?;
+    .context("failed to update infinitecode session time_remaining_ms")?;
     Ok(())
 }
 
-pub fn get_session(conn: &Connection, instance_id: &str) -> Result<Option<FreebuffSessionRow>> {
+pub fn get_session(conn: &Connection, instance_id: &str) -> Result<Option<InfiniteCodeSessionRow>> {
     let row = conn
         .query_row(
             "SELECT instance_id, acting_user_id, model, bucket, status, time_remaining_ms,
                     started_at, expires_at, reason, iso_country_code, device_fingerprint, app_version
-             FROM freebuff_sessions WHERE instance_id = ?1",
+             FROM infinitecode_sessions WHERE instance_id = ?1",
             params![instance_id],
             parse_session_row,
         )
         .optional()
-        .context("failed to fetch freebuff session")?;
+        .context("failed to fetch infinitecode session")?;
     Ok(row)
 }
 
 pub fn release_session(conn: &Connection, instance_id: &str) -> Result<bool> {
     let affected = conn
         .execute(
-            "UPDATE freebuff_sessions SET status = 'ended' WHERE instance_id = ?1 AND status = 'active'",
+            "UPDATE infinitecode_sessions SET status = 'ended' WHERE instance_id = ?1 AND status = 'active'",
             params![instance_id],
         )
-        .context("failed to release freebuff session")?;
+        .context("failed to release infinitecode session")?;
     Ok(affected > 0)
 }
 
@@ -317,11 +317,11 @@ pub fn insert_bearer_token(
     expires_at_secs: i64,
 ) -> Result<()> {
     conn.execute(
-        "INSERT OR REPLACE INTO freebuff_bearer_tokens (token_hash, created_at, expires_at)
+        "INSERT OR REPLACE INTO infinitecode_bearer_tokens (token_hash, created_at, expires_at)
          VALUES (?1, ?2, ?3)",
         params![hash_token(token), created_at_secs, expires_at_secs],
     )
-    .context("failed to insert freebuff bearer token")?;
+    .context("failed to insert infinitecode bearer token")?;
     Ok(())
 }
 
@@ -334,7 +334,7 @@ pub struct BearerTokenRecord {
 pub fn find_bearer_token(conn: &Connection, token: &str) -> Result<Option<BearerTokenRecord>> {
     let row = conn
         .query_row(
-            "SELECT created_at, expires_at FROM freebuff_bearer_tokens WHERE token_hash = ?1",
+            "SELECT created_at, expires_at FROM infinitecode_bearer_tokens WHERE token_hash = ?1",
             params![hash_token(token)],
             |row| {
                 Ok(BearerTokenRecord {
@@ -344,17 +344,17 @@ pub fn find_bearer_token(conn: &Connection, token: &str) -> Result<Option<Bearer
             },
         )
         .optional()
-        .context("failed to fetch freebuff bearer token")?;
+        .context("failed to fetch infinitecode bearer token")?;
     Ok(row)
 }
 
 pub fn prune_expired_bearer_tokens(conn: &Connection, before_secs: i64) -> Result<usize> {
     let removed = conn
         .execute(
-            "DELETE FROM freebuff_bearer_tokens WHERE expires_at <= ?1",
+            "DELETE FROM infinitecode_bearer_tokens WHERE expires_at <= ?1",
             params![before_secs],
         )
-        .context("failed to prune freebuff bearer tokens")?;
+        .context("failed to prune infinitecode bearer tokens")?;
     Ok(removed)
 }
 
@@ -370,9 +370,9 @@ mod tests {
 
     fn test_db() -> (Database, TempDir) {
         let dir = TempDir::new().expect("create temp dir");
-        let db_path = dir.path().join("freebuff.db");
+        let db_path = dir.path().join("infinitecode.db");
         let db = Database::open(db_path).expect("open database");
-        migrate_database(&db).expect("migrate freebuff schema");
+        migrate_database(&db).expect("migrate infinitecode schema");
         (db, dir)
     }
 

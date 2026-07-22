@@ -1,9 +1,9 @@
 //! Bearer-token middleware + login.
 //!
-//! The bridge uses a shared-secret `FreebuffBridgeConfig::password` to mint
+//! The bridge uses a shared-secret `InfiniteCodeBridgeConfig::password` to mint
 //! opaque tokens on `POST /api/v1/auth/login`. Tokens are random URL-safe
 //! strings whose SHA-256 hash (lowercase hex) lives in the
-//! `freebuff_bearer_tokens` table with created / expires timestamps.
+//! `infinitecode_bearer_tokens` table with created / expires timestamps.
 //!
 //! Why opaque tokens instead of JWTs: the runtime is a single operator's
 //! binary, not a multi-tenant service. We don't need to verify claims
@@ -30,14 +30,14 @@ use rand::RngCore;
 
 use infinitecode_protocol::{AuthLoginRequest, AuthLoginResponse};
 
-use crate::db_freebuff::{
+use crate::db_infinitecode::{
     find_bearer_token, insert_bearer_token, prune_expired_bearer_tokens,
 };
 use crate::http::error::{BridgeError, BridgeResult};
 use crate::http::HttpBridgeState;
 
 /// True when the supplied `Authorization: Bearer …` header matches a
-/// non-expired token in the freebuff bearer table. Exposed for tests.
+/// non-expired token in the infinitecode bearer table. Exposed for tests.
 pub fn authenticate(header_value: Option<&str>, state: &HttpBridgeState) -> BridgeResult<()> {
     let token = match header_value.and_then(|value| value.strip_prefix("Bearer ")) {
         Some(rest) => rest,
@@ -81,9 +81,9 @@ pub async fn require_bearer(
 
 /// `POST /api/v1/auth/login`.
 ///
-/// Validates the supplied password against `FreebuffBridgeConfig::password`
+/// Validates the supplied password against `InfiniteCodeBridgeConfig::password`
 /// and returns a freshly minted bearer. Operators can monitor
-/// `INSERT INTO freebuff_bearer_tokens` to track issued tokens.
+/// `INSERT INTO infinitecode_bearer_tokens` to track issued tokens.
 pub async fn login(
     State(state): State<Arc<HttpBridgeState>>,
     Json(request): Json<AuthLoginRequest>,
@@ -95,7 +95,7 @@ pub async fn login(
         BridgeError::new(
             StatusCode::SERVICE_UNAVAILABLE,
             infinitecode_protocol::CoordinationErrorBody::INTERNAL,
-            "freebuff bridge is enabled but no password was provisioned (set INFINITECODE_FREEBUFF_BRIDGE_PASSWORD or [freebuff_bridge].password in config.toml).",
+            "infinitecode bridge is enabled but no password was provisioned (set INFINITECODE_BRIDGE_PASSWORD or [infinitecode_bridge].password in config.toml).",
         )
     })?;
     if !constant_time_eq(request.password.as_str(), configured) {

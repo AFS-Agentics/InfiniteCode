@@ -21,7 +21,7 @@ export interface LockRecord {
  * Detail block broadcast to Electron renderers when the host catches a
  * SessionSupersededError on the CLI / desktop boundary. The renderer reads
  * `otherPid`, `otherSurface`, and `lockPath` to populate the supersede
- * banner copy that mirrors Freebuff's "Another freebuff CLI took over this
+ * banner copy that mirrors InfiniteCode's "Another infinitecode CLI took over this
  * account" message.
  */
 export interface SupersedeDetail {

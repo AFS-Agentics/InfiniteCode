@@ -40,17 +40,17 @@ pub enum ToolHandlerKind {
     ReportOutcome,
     /// Best-of-N parallel thinker orchestrator. Spawns N ephemeral
     /// single-turn thinker subagents and a final selector child.
-    /// Mirrors freebuff's `thinker-best-of-n` pattern. Read-only.
+    /// Mirrors infinitecode's `thinker-best-of-n` pattern. Read-only.
     /// See `crates/core/src/tools/handlers/explore_solutions.rs`.
     ExploreSolutions,
     /// Multi-prompt reviewer orchestrator. Spawns N ephemeral
     /// reviewer subagents with different focus prompts and aggregates
-    /// the results. Mirrors freebuff's `code-reviewer-multi-prompt`.
+    /// the results. Mirrors infinitecode's `code-reviewer-multi-prompt`.
     /// Read-only. See `crates/core/src/tools/handlers/audit_changes.rs`.
     AuditChanges,
     /// Best-of-N editing orchestrator. Caller pre-drafts N candidate
     /// implementations (preview_edit / preview_write outputs) and the
-    /// selector picks the best. Mirrors freebuff's
+    /// selector picks the best. Mirrors infinitecode's
     /// `editor-multi-prompt`. Read-only —
     /// `crates/core/src/tools/handlers/select_implementation.rs`.
     SelectImplementation,

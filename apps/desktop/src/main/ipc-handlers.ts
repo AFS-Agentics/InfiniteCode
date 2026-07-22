@@ -255,9 +255,9 @@ export function registerIpcHandlers(): void {
 				// Cross-surface supersede: a separate infinitecode (CLI or
 				// desktop window) already holds the lock. Translate to a
 				// renderer-visible IPC event whose detail matches the copy we
-				// show in `SessionSupersededBanner` — modelled on Freebuff's
-				// "Another freebuff CLI took over this account" message in
-				// `freebuff/cli-engine/src/hooks/helpers/send-message.ts:600-612`.
+				// show in `SessionSupersededBanner` — modelled on InfiniteCode's
+				// "Another infinitecode CLI took over this account" message in
+				// `infinitecode/cli-engine/src/hooks/helpers/send-message.ts:600-612`.
 				const code = (error as { code?: unknown } | null)?.code;
 				if (code === "SESSION_SUPERSEDED") {
 					const detail = (error as {

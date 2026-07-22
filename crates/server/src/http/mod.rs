@@ -1,4 +1,4 @@
-//! Freebuff-compatible HTTP bridge (mounts on `axum`).
+//! InfiniteCode-compatible HTTP bridge (mounts on `axum`).
 //!
 //! [`build_router`] returns a ready-to-serve `axum::Router`. The router is
 //! composed of three sub-routers merged together:
@@ -10,7 +10,7 @@
 //!
 //! Splitting at the sub-router level keeps the auth middleware out of the
 //! unauthenticated paths so an unauthenticated client never even sees a
-//! 401-vs-200 fingerprint, which matches Freebuff's wire behaviour.
+//! 401-vs-200 fingerprint, which matches InfiniteCode's wire behaviour.
 
 mod ads;
 mod auth;
@@ -29,7 +29,7 @@ use axum::routing::{delete, get, post};
 
 pub use state::HttpBridgeState;
 
-/// Assembles the Freebuff-shaped HTTP router.
+/// Assembles the InfiniteCode-shaped HTTP router.
 ///
 /// Idempotent: call as many times as you like to get a fresh router bound
 /// to the same `state`. The bridge's wiring is purely via `axum::extract::State`;
@@ -40,16 +40,16 @@ pub fn build_router(state: Arc<HttpBridgeState>) -> Router {
         .route("/api/v1/auth/login", post(auth::login));
 
     let protected_router = Router::new()
-        // Freebuff-shape session lifecycle. `POST` admits; `GET` with no
+        // InfiniteCode-shape session lifecycle. `POST` admits; `GET` with no
         // path returns the acting-user's current active row (using header
-        // `x-freebuff-acting-user-id`); `GET /:id` polls; `DELETE` releases.
+        // `x-infinitecode-acting-user-id`); `GET /:id` polls; `DELETE` releases.
         .route(
-            "/api/v1/freebuff/session",
+            "/api/v1/infinitecode/session",
             post(session::admit).get(session::poll),
         )
-        .route("/api/v1/freebuff/session/{instance_id}", get(session::read))
+        .route("/api/v1/infinitecode/session/{instance_id}", get(session::read))
         .route(
-            "/api/v1/freebuff/session/{instance_id}",
+            "/api/v1/infinitecode/session/{instance_id}",
             delete(session::release),
         )
         .route("/api/v1/web-search", post(search::web_search))

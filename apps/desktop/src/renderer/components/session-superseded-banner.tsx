@@ -37,9 +37,9 @@ export function SessionSupersededBridge() {
  * `session:superseded` IPC event — meaning a second instance of infinitecode
  * is already active.
  *
- * UX mirrors Freebuff's "Another freebuff CLI took over this account. Close
+ * UX mirrors InfiniteCode's "Another infinitecode CLI took over this account. Close
  * the other instance, then restart." — see
- * `freebuff/cli-engine/src/hooks/helpers/send-message.ts:600-612`.
+ * `infinitecode/cli-engine/src/hooks/helpers/send-message.ts:600-612`.
  *
  * Acknowledge only hides this overlay; the underlying supersede state does
  * NOT clear until the user actually closes other infinitecode instances, so a

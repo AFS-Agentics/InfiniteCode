@@ -1,6 +1,6 @@
 //! `explore_solutions` — Best-of-N parallel thinker orchestrator.
 //!
-//! Mirrors freebuff's `thinker-best-of-n` pattern with two modes:
+//! Mirrors infinitecode's `thinker-best-of-n` pattern with two modes:
 //!
 //! 1. `"operation": "explore"` — spawns N ephemeral single-turn
 //!    "thinker" children in parallel, each focused on the same

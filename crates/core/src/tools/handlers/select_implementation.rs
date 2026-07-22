@@ -1,6 +1,6 @@
 //! `select_implementation` — Best-of-N editing orchestrator.
 //!
-//! Mirrors freebuff's `editor-multi-prompt` pattern. The caller has
+//! Mirrors infinitecode's `editor-multi-prompt` pattern. The caller has
 //! already drafted N candidate implementations (typically by chaining
 //! `preview_edit` / `preview_write` outputs from earlier turns) and
 //! needs to pick the best. This tool spawns exactly one

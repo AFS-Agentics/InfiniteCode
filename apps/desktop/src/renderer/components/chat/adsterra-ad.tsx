@@ -156,7 +156,7 @@ export function AdsterraAd({
 }: {
 	placement: AdPlacement;
 	/** How often to reload the iframe for a fresh ad creative (ms).
-	 *  Default 60_000 (1 min), matching Freebuff's AD_ROTATION_INTERVAL_MS.
+	 *  Default 60_000 (1 min), matching InfiniteCode's AD_ROTATION_INTERVAL_MS.
 	 *  Timer is staggered per placement so slots don't all reload at once. */
 	refreshIntervalMs?: number;
 }): JSX.Element {

@@ -1,10 +1,10 @@
-//! Ad endpoints. Mirrors the Freebuff-side surface (`POST /api/v1/ads`,
+//! Ad endpoints. Mirrors the InfiniteCode-side surface (`POST /api/v1/ads`,
 //! `/impression`, `/click`) so the same client code can target either
 //! backend. Default behaviour is no-op (returns `auction: null`,
-//! `200 OK`, and increments the in-process counters) so a Freebuff-side
+//! `200 OK`, and increments the in-process counters) so a InfiniteCode-side
 //! SDK can talk to the bridge without first wiring a real ad upstream.
 //!
-//! Operators flip `[freebuff_bridge].ads_enabled = true` when they have
+//! Operators flip `[infinitecode_bridge].ads_enabled = true` when they have
 //! configured an ad provider upstream.
 
 use std::sync::Arc;
@@ -40,9 +40,9 @@ pub async fn auction(
         )));
     }
     Err(BridgeError::not_implemented(
-        "freebuff ad upstream is not wired in this build. Set [freebuff_bridge].ads_enabled=false \
+        "infinitecode ad upstream is not wired in this build. Set [infinitecode_bridge].ads_enabled=false \
          to receive default no-op auctions, or supply an upstream service \
-         implementing the Freebuff ad contract.",
+         implementing the InfiniteCode ad contract.",
     ))
 }
 

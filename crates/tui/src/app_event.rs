@@ -191,7 +191,7 @@ pub(crate) enum AppEvent {
     /// Gravity ad fetched asynchronously — bottom-page always-visible banner.
     GravityBottomAdResult(String),
 
-    /// Gravity ad fetched asynchronously — pinned above input, always visible (like Freebuff's SingleAdBanner).
+    /// Gravity ad fetched asynchronously — pinned above input, always visible (like InfiniteCode's SingleAdBanner).
     GravityPinnedAdResult(String),
 }
 

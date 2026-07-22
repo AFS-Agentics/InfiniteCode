@@ -105,7 +105,7 @@ export function StartupOverlay() {
 			{/*
 			 * Startup ad grid: 2×2 grid of AdsterraAd slots above the
 			 * attribution line. Each cell independently loads Adsterra first,
-			 * falls back to A-Ads after 35s of nofill. Freebuff-inspired:
+			 * falls back to A-Ads after 35s of nofill. InfiniteCode-inspired:
 			 * the cold-boot wait time earns impressions on multiple creatives
 			 * instead of a single banner.
 			 */}

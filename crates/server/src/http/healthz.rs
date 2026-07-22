@@ -27,7 +27,7 @@ pub async fn handler(State(state): State<Arc<HttpBridgeState>>) -> Json<HealthzR
     tracing::debug!(
         uptime_secs = response.uptime_secs,
         checked_at = %Utc::now(),
-        "freebuff healthz served",
+        "infinitecode healthz served",
     );
     Json(response)
 }

@@ -390,7 +390,7 @@ if (!gotLock) {
 
 		// Override User-Agent for Adsterra ad requests so the ad network sees a
 		// standard Chrome UA instead of Electron/Chrome (which some networks flag
-		// or don't recognise). Matches Freebuff's getAdUserAgent() pattern.
+		// or don't recognise). Matches InfiniteCode's getAdUserAgent() pattern.
 		const ADSTERRA_UA =
 			process.platform === "darwin"
 				? "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"

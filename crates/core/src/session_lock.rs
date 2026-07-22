@@ -5,8 +5,8 @@
 //! [`SessionLockError::Superseded`] instead of taking over. A stale lock
 //! (PID not alive) is cleared automatically.
 //!
-//! Mirrors the Freebuff pattern in
-//! `common/src/types/freebuff-session.ts:266-271`
+//! Mirrors the upstream Codebuff pattern in
+//! `common/src/types/freebuff-session.ts:266-271`  // upstream Codebuff SaaS, this file path is unchanged there
 //! (`reason: 'concurrent_sessions'` block reason) so an InfiniteCode CLI /
 //! Desktop user cannot run two parallel agent loops on the same machine.
 
@@ -293,9 +293,9 @@ fn write_new_lock_at(
 }
 
 /// CLI-side helper: acquire the lock or exit with a user-friendly message.
-/// Use this in `fn main()` of the `infinitecode` binary. Matches the
-/// Freebuff `cli-engine/src/hooks/helpers/send-message.ts:600-612` UX where a
-/// second CLI prints "Another freebuff CLI took over this account. Close the
+/// Use this in `fn main()` of the `infinitecode` binary. Matches the upstream
+/// Codebuff `cli-engine/src/hooks/helpers/send-message.ts:600-612` UX where a
+/// second CLI prints "Another infinitecode CLI took over this account. Close the
 /// other instance, then restart."
 pub fn ensure_single_cli_session_or_exit(session_id: Option<String>) {
     if let Err(error) = acquire(Surface::Cli, session_id) {

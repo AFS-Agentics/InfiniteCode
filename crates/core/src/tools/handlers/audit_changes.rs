@@ -1,6 +1,6 @@
 //! `audit_changes` — multi-prompt reviewer orchestrator.
 //!
-//! Mirrors freebuff's `code-reviewer-multi-prompt` pattern. Spawns N
+//! Mirrors infinitecode's `code-reviewer-multi-prompt` pattern. Spawns N
 //! ephemeral single-turn reviewer children in parallel, each focused on
 //! a different perspective against the same diff/summary, and
 //! aggregates the responses into a structured

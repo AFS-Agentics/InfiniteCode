@@ -143,7 +143,7 @@ async function startServer(): Promise<InfiniteCodeServer> {
 	// If a CLI or another desktop window already holds it, this throws
 	// SessionSupersededError; the IPC `infinitecode:ensure` handler catches
 	// and broadcasts `session:superseded` to the renderer so the supersede
-	// banner copy from Freebuff's `cli-engine/src/hooks/helpers/send-message.ts:600-612`
+	// banner copy from InfiniteCode's `cli-engine/src/hooks/helpers/send-message.ts:600-612`
 	// is visible immediately.
 	acquireDesktopSessionLock("desktop", null)
 	const client = getOrCreateClient()

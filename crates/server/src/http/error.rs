@@ -3,7 +3,7 @@
 //! Errors return `application/json` with a stable numeric code so clients can
 //! branch on the shape without parsing the human-readable message. Codes
 //! follow `infinitecode_protocol::CoordinationErrorBody` so the same code
-//! path can be reused on the Freebuff-side SDK.
+//! path can be reused on the InfiniteCode-side SDK.
 
 use axum::Json;
 use axum::http::StatusCode;

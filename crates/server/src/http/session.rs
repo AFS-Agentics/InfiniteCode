@@ -1,14 +1,14 @@
 //! Session lifecycle handlers (admit / poll / release).
 //!
-//! Three endpoints model the Freebuff-shaped session lifecycle:
+//! Three endpoints model the InfiniteCode-shaped session lifecycle:
 //!
-//!   - `POST   /api/v1/freebuff/session`         — admit (returns
+//!   - `POST   /api/v1/infinitecode/session`         — admit (returns
 //!     `CoordinationSessionResponse`).
-//!   - `GET    /api/v1/freebuff/session/:id`    — poll (same shape, may be
+//!   - `GET    /api/v1/infinitecode/session/:id`    — poll (same shape, may be
 //!     `superseded` if another acting-user instance rotated us).
-//!   - `DELETE /api/v1/freebuff/session/:id`    — release (returns 204).
+//!   - `DELETE /api/v1/infinitecode/session/:id`    — release (returns 204).
 //!
-//! Bucket resolution (`occupyFreebuffDesktopSlot`-shaped) lives in [`bucket_for`]
+//! Bucket resolution (`occupyInfiniteCodeDesktopSlot`-shaped) lives in [`bucket_for`]
 //! below. We model only the structural coercion because the upstream
 //! server-side admission gate (the real quota / country / ban logic) lives
 //! at codebuff.com in the upstream system and is intentionally not
@@ -29,11 +29,11 @@ use infinitecode_protocol::{
     CoordinationSessionStatus,
 };
 
-use crate::db_freebuff::{self, FreebuffSessionRow, parse_session_row_pub};
+use crate::db_infinitecode::{self, InfiniteCodeSessionRow, parse_session_row_pub};
 use crate::http::error::{BridgeError, BridgeResult};
 use crate::http::HttpBridgeState;
 
-/// `POST /api/v1/freebuff/session`.
+/// `POST /api/v1/infinitecode/session`.
 ///
 /// Admit flow:
 ///   1. Pick a `CoordinationSessionBucket` based on the model +
@@ -55,7 +55,7 @@ pub async fn admit(
     let conn = state.db.shared_conn();
     let mut conn = conn.lock().expect("database mutex poisoned");
 
-    db_freebuff::supersede_and_admit(
+    db_infinitecode::supersede_and_admit(
         &mut conn,
         request.instance_id.as_str(),
         request.acting_user_id.as_str(),
@@ -70,14 +70,14 @@ pub async fn admit(
     )
     .map_err(|error| BridgeError::internal(format!("admit failed: {error}")))?;
 
-    let row = db_freebuff::get_session(&conn, request.instance_id.as_str())
+    let row = db_infinitecode::get_session(&conn, request.instance_id.as_str())
         .map_err(|error| BridgeError::internal(format!("read-after-write failed: {error}")))?
         .ok_or_else(|| BridgeError::internal("admit did not persist in database"))?;
 
     Ok((StatusCode::CREATED, Json(row.into_response())))
 }
 
-/// `GET /api/v1/freebuff/session/:instance_id`.
+/// `GET /api/v1/infinitecode/session/:instance_id`.
 ///
 /// Returns the row as-is. If the caller's instance was rotated out, the
 /// row will be in `superseded` state and we return 409 so the bridge
@@ -101,19 +101,19 @@ pub async fn read(
     Ok(Json(response))
 }
 
-/// `GET /api/v1/freebuff/session` (no instance path).
+/// `GET /api/v1/infinitecode/session` (no instance path).
 ///
-/// Roughly mirrors Freebuff's polling endpoint. We treat it as "current
+/// Roughly mirrors InfiniteCode's polling endpoint. We treat it as "current
 /// active row for the supplied acting user" — the `acting_user_id` comes
-/// from `x-freebuff-acting-user-id`.
+/// from `x-infinitecode-acting-user-id`.
 pub async fn poll(
     State(state): State<Arc<HttpBridgeState>>,
     headers: axum::http::HeaderMap,
 ) -> BridgeResult<Json<CoordinationSessionResponse>> {
     let acting_user_id = headers
-        .get("x-freebuff-acting-user-id")
+        .get("x-infinitecode-acting-user-id")
         .and_then(|h| h.to_str().ok())
-        .ok_or_else(|| BridgeError::bad_request("missing x-freebuff-acting-user-id header"))?;
+        .ok_or_else(|| BridgeError::bad_request("missing x-infinitecode-acting-user-id header"))?;
 
     let conn = state.db.shared_conn();
     let conn = conn.lock().expect("database mutex poisoned");
@@ -121,7 +121,7 @@ pub async fn poll(
         .query_row(
             "SELECT instance_id, acting_user_id, model, bucket, status, time_remaining_ms,
                     started_at, expires_at, reason, iso_country_code, device_fingerprint, app_version
-             FROM freebuff_sessions
+             FROM infinitecode_sessions
              WHERE acting_user_id = ?1 AND status = 'active'
              ORDER BY started_at DESC LIMIT 1",
             rusqlite::params![acting_user_id],
@@ -137,17 +137,17 @@ pub async fn poll(
     Ok(Json(maybe.into_response()))
 }
 
-/// `DELETE /api/v1/freebuff/session/:instance_id`.
+/// `DELETE /api/v1/infinitecode/session/:instance_id`.
 ///
 /// Marks the row ended. Returns 204 on success; 404 if the row does not
-/// exist (no-op, mirrors Freebuff's idempotency).
+/// exist (no-op, mirrors InfiniteCode's idempotency).
 pub async fn release(
     State(state): State<Arc<HttpBridgeState>>,
     Path(instance_id): Path<String>,
 ) -> BridgeResult<axum::response::Response> {
     let conn = state.db.shared_conn();
     let conn = conn.lock().expect("database mutex poisoned");
-    let released = db_freebuff::release_session(&conn, &instance_id)
+    let released = db_infinitecode::release_session(&conn, &instance_id)
         .map_err(|error| BridgeError::internal(format!("release failed: {error}")))?;
     if !released {
         return Err(BridgeError::bad_request(format!(
@@ -157,17 +157,17 @@ pub async fn release(
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
-fn fetch_row(state: &HttpBridgeState, instance_id: &str) -> BridgeResult<FreebuffSessionRow> {
+fn fetch_row(state: &HttpBridgeState, instance_id: &str) -> BridgeResult<InfiniteCodeSessionRow> {
     let conn = state.db.shared_conn();
     let conn = conn.lock().expect("database mutex poisoned");
-    db_freebuff::get_session(&conn, instance_id)
+    db_infinitecode::get_session(&conn, instance_id)
         .map_err(|error| BridgeError::internal(format!("get-session failed: {error}")))?
         .ok_or_else(|| BridgeError::bad_request(format!("no session for instance_id={instance_id}")))
 }
 
 fn bucket_for(
     model: &str,
-    bridge: &infinitecode_config::FreebuffBridgeConfig,
+    bridge: &infinitecode_config::InfiniteCodeBridgeConfig,
 ) -> CoordinationSessionBucket {
     if bridge.default_session_length_secs <= 0 {
         return CoordinationSessionBucket::Limited;

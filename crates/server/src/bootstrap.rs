@@ -261,14 +261,14 @@ pub async fn run_server_process(
     let internal_proxy_control = InternalProxyControl::new(shutdown_signal.clone());
     let external_shutdown = options.external_shutdown.clone();
 
-    // Freebuff-shape HTTP bridge: opt-in by setting
-    // `[freebuff_bridge].enabled = true` (and provisioning
-    // `[freebuff_bridge].password` or the env override) AND adding at least
+    // InfiniteCode-shape HTTP bridge: opt-in by setting
+    // `[infinitecode_bridge].enabled = true` (and provisioning
+    // `[infinitecode_bridge].password` or the env override) AND adding at least
     // one entry to `server.http_listen`. The bridge shares the SQLite
     // connection pool with the canonical runtime and shuts down on the
     // same cancellation token.
-    if config.server.freebuff_bridge.is_operational(&config.server.http_listen) {
-        let bridge = config.server.freebuff_bridge.clone();
+    if config.server.infinitecode_bridge.is_operational(&config.server.http_listen) {
+        let bridge = config.server.infinitecode_bridge.clone();
         let http_listen = config.server.http_listen.clone();
         let db_for_bridge = Arc::clone(&db);
         let http_shutdown = shutdown_signal.clone();
@@ -281,7 +281,7 @@ pub async fn run_server_process(
             )
             .await
             {
-                tracing::error!(error = %error, "freebuff HTTP bridge exited with error");
+                tracing::error!(error = %error, "infinitecode HTTP bridge exited with error");
             }
         });
     }

@@ -826,7 +826,7 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
     plan.push(
         ToolSpec {
             name: "explore_solutions".to_string(),
-            description: "Best-of-N parallel thinker orchestrator (freebuff-style). Use operation 'explore' (default) to spawn N=1..=6 ephemeral thinker subagents in parallel on a single problem, each with a different focus lens; a final selector child picks the best thought. Use operation 'select' to run only the selector over caller-supplied candidate ideas. Both modes are read-only and inherit the parent's provider/reasoning. Mirrors freebuff's `thinker-best-of-n` pattern.".to_string(),
+            description: "Best-of-N parallel thinker orchestrator (infinitecode-style). Use operation 'explore' (default) to spawn N=1..=6 ephemeral thinker subagents in parallel on a single problem, each with a different focus lens; a final selector child picks the best thought. Use operation 'select' to run only the selector over caller-supplied candidate ideas. Both modes are read-only and inherit the parent's provider/reasoning. Mirrors infinitecode's `thinker-best-of-n` pattern.".to_string(),
             input_schema: JsonSchema::object(
                 BTreeMap::from([
                     (
@@ -885,7 +885,7 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
     plan.push(
         ToolSpec {
             name: "audit_changes".to_string(),
-            description: "Multi-prompt reviewer orchestrator (freebuff-style). Spawns N=1..=8 ephemeral reviewer subagents in parallel, each focused on a different lens (correctness, security, performance + maintainability, simplify / reuse / readability, ...), against the same change summary. Aggregates the reviews into a structured {reviews, verdicts, summary} payload. Read-only. Equivalent to freebuff's `code-reviewer-multi-prompt` invoked with a lens array.".to_string(),
+            description: "Multi-prompt reviewer orchestrator (infinitecode-style). Spawns N=1..=8 ephemeral reviewer subagents in parallel, each focused on a different lens (correctness, security, performance + maintainability, simplify / reuse / readability, ...), against the same change summary. Aggregates the reviews into a structured {reviews, verdicts, summary} payload. Read-only. Equivalent to infinitecode's `code-reviewer-multi-prompt` invoked with a lens array.".to_string(),
             input_schema: JsonSchema::object(
                 BTreeMap::from([
                     (
@@ -922,7 +922,7 @@ pub fn build_tool_registry_plan(config: &ToolPlanConfig) -> ToolRegistryPlan {
     plan.push(
         ToolSpec {
             name: "select_implementation".to_string(),
-            description: "Best-of-N editing orchestrator (freebuff-style). Caller pre-drafts N=1..=8 candidate implementations of the same change (typically by chaining preview_edit / preview_write), then spawns a single selector child to pick the best. Returns the chosen strategy + diff + structured tool_calls for the parent model to apply via its own edit / write tool calls. Read-only — never touches the workspace. Equivalent to freebuff's `editor-multi-prompt` invoked as a pure selector.".to_string(),
+            description: "Best-of-N editing orchestrator (infinitecode-style). Caller pre-drafts N=1..=8 candidate implementations of the same change (typically by chaining preview_edit / preview_write), then spawns a single selector child to pick the best. Returns the chosen strategy + diff + structured tool_calls for the parent model to apply via its own edit / write tool calls. Read-only — never touches the workspace. Equivalent to infinitecode's `editor-multi-prompt` invoked as a pure selector.".to_string(),
             input_schema: JsonSchema::object(
                 BTreeMap::from([
                     (

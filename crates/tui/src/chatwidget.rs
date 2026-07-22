@@ -312,7 +312,7 @@ pub(crate) struct ChatWidget {
     // Bottom-page always-visible ad (above composer). Auto-rotates on a timer.
     bottom_ad: Option<infinitecode_core::gravity::GravityAdData>,
     bottom_ad_last_fetch_at: Instant,
-    // Pinned-above-input ad (like Freebuff's SingleAdBanner). Always visible above composer.
+    // Pinned-above-input ad (like InfiniteCode's SingleAdBanner). Always visible above composer.
     pinned_ad: Option<infinitecode_core::gravity::GravityAdData>,
     pinned_ad_last_fetch_at: Instant,
 }

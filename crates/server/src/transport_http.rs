@@ -1,4 +1,4 @@
-//! HTTP listener runner for the Freebuff-shaped coordination bridge.
+//! HTTP listener runner for the InfiniteCode-shaped coordination bridge.
 //!
 //! Owns the `http://host:port` listen-entry parser and the async loop that
 //! serves the bridge. Kept as a sibling of [`crate::transport`] (the JSON-RPC
@@ -40,7 +40,7 @@ pub fn parse(value: &str) -> Result<String> {
         }
         return Ok(addr.to_string());
     }
-    bail!("freebuff http listener entry was not http:// prefixed: {value}")
+    bail!("infinitecode http listener entry was not http:// prefixed: {value}")
 }
 
 /// Indirection: returns `None` when the entry isn't an `http://` value, so
@@ -56,7 +56,7 @@ pub fn parse_optional(value: &str) -> Option<String> {
 pub async fn bind(addr: &str) -> Result<TcpListener> {
     let listener = TcpListener::bind(addr)
         .await
-        .with_context(|| format!("failed to bind freebuff HTTP listener on {addr}"))?;
+        .with_context(|| format!("failed to bind infinitecode HTTP listener on {addr}"))?;
     Ok(listener)
 }
 
@@ -84,10 +84,10 @@ pub async fn spawn(
 
     tokio::spawn(async move {
         if let Err(error) = server.await {
-            tracing::error!(error = %error, "freebuff HTTP bridge exited with error");
+            tracing::error!(error = %error, "infinitecode HTTP bridge exited with error");
             return;
         }
-        tracing::info!("freebuff HTTP bridge shut down cleanly");
+        tracing::info!("infinitecode HTTP bridge shut down cleanly");
     });
 
     Ok(local_addr)
@@ -97,20 +97,20 @@ pub async fn spawn(
 ///
 /// Kept here (not in `http::mod`) so the dependency between the state type
 /// and the runtime types that already live in this crate stays one-way —
-/// `http::mod` doesn't need to know about `Database` or the freebuff
+/// `http::mod` doesn't need to know about `Database` or the infinitecode
 /// itself, it just consumes the readymade state.
 pub fn build_state(
     db: Arc<Database>,
-    bridge: infinitecode_config::FreebuffBridgeConfig,
+    bridge: infinitecode_config::InfiniteCodeBridgeConfig,
     startup_instant: std::time::Instant,
 ) -> Arc<HttpBridgeState> {
     HttpBridgeState::new(db, bridge, startup_instant)
 }
 
-/// Runs the Freebuff-compatible HTTP bridge alongside the JSON-RPC
+/// Runs the InfiniteCode-compatible HTTP bridge alongside the JSON-RPC
 /// listeners. Returns when `shutdown` fires.
 pub async fn run_http_bridge(
-    bridge: infinitecode_config::FreebuffBridgeConfig,
+    bridge: infinitecode_config::InfiniteCodeBridgeConfig,
     http_listen: Vec<String>,
     db: Arc<Database>,
     shutdown: CancellationToken,
@@ -124,14 +124,14 @@ pub async fn run_http_bridge(
         let bind_addr = match parse(entry) {
             Ok(addr) => addr,
             Err(error) => {
-                tracing::warn!(entry = %entry, error = %error, "skipping malformed freebuff http entry");
+                tracing::warn!(entry = %entry, error = %error, "skipping malformed infinitecode http entry");
                 continue;
             }
         };
         let listener = match bind(&bind_addr).await {
             Ok(listener) => listener,
             Err(error) => {
-                tracing::warn!(bind = %bind_addr, error = %error, "freebuff HTTP bind failed; skipping entry");
+                tracing::warn!(bind = %bind_addr, error = %error, "infinitecode HTTP bind failed; skipping entry");
                 continue;
             }
         };
@@ -141,7 +141,7 @@ pub async fn run_http_bridge(
         tracing::info!(
             bind = %bind_addr,
             actual = %local_addr,
-            "freebuff HTTP bridge listening",
+            "infinitecode HTTP bridge listening",
         );
         let router_clone = router.clone();
         let shutdown_clone = shutdown.clone();
@@ -152,12 +152,12 @@ pub async fn run_http_bridge(
                 })
                 .await
             {
-                tracing::error!(bind = %local_addr, error = %error, "freebuff HTTP bridge exited with error");
+                tracing::error!(bind = %local_addr, error = %error, "infinitecode HTTP bridge exited with error");
             }
         });
     }
 
     while tasks.join_next().await.is_some() {}
-    tracing::info!("freebuff HTTP bridge shut down");
+    tracing::info!("infinitecode HTTP bridge shut down");
     Ok(())
 }
