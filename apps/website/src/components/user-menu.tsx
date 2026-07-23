@@ -164,7 +164,7 @@ export function UserMenu(_props: UserMenuProps = {}) {
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
 				<DropdownMenuItem
-					onSelect={(event) => {
+					onSelect={(event: Event) => {
 						event.preventDefault()
 						void handleSignOut()
 					}}
