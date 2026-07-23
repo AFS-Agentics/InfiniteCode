@@ -48,32 +48,35 @@ export default async function handler(
       res.status(400).json({ error: "missing_user_code" });
       return;
     }
-    if (!body.access_token || !body.refresh_token) {
-      // Bare "create pending row" path — the desktop calls this once
-      // before opening the browser. Insert if absent; ignore on conflict
-      // so a re-click from the same desktop is a no-op.
-      const { error } = await sb.from("device_pairing").insert({
-        user_code: code,
-        status: "pending",
-      });
-      if (error && !error.message.includes("duplicate")) {
+    // Authorize path (post-sign-in): upsert the row with tokens and mark
+    // it `authorized`. Both the desktop pre-insert and the website in-page
+    // authorize converge on this endpoint — the server discriminates by
+    // body shape (presence of tokens).
+    if (body.access_token && body.refresh_token) {
+      const { error } = await sb.from("device_pairing").upsert(
+        {
+          user_code: code,
+          access_token: body.access_token,
+          refresh_token: body.refresh_token,
+          status: "authorized",
+        },
+        { onConflict: "user_code" },
+      );
+      if (error) {
         res.status(500).json({ error: error.message });
         return;
       }
       res.status(200).json({ ok: true });
       return;
     }
-    // Authorize path -- UPSERT so a missing pre-insert row from
-    // the desktop (network blip, 503, user opened browser first)
-    // does not silently 0-row UPDATE us into a 5-min timeout.
+    // Pending path (desktop pre-insert): upsert with `ignoreDuplicates: true`
+    // so a repeat pre-insert from the same desktop is a no-op rather than
+    // *overwriting* an already-authorized row back to `status='pending'`
+    // (which would null out the access_token / refresh_token before the
+    // claim-and-return GET had a chance to consume them).
     const { error } = await sb.from("device_pairing").upsert(
-      {
-        user_code: code,
-        access_token: body.access_token,
-        refresh_token: body.refresh_token,
-        status: "authorized",
-      },
-      { onConflict: "user_code" },
+      { user_code: code, status: "pending" },
+      { onConflict: "user_code", ignoreDuplicates: true },
     );
     if (error) {
       res.status(500).json({ error: error.message });

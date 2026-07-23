@@ -1,15 +1,22 @@
 /**
  * Desktop-side Supabase session store.
  *
- * Holds the access + refresh tokens in the OS keychain (via the
- * `keyring-store` crate, surfaced through Tauri's plugin layer) so
- * the Electron renderer can read them via IPC without ever putting
- * them in plain text on disk.
+ * Holds the access + refresh tokens encrypted via Electron's safeStorage
+ * (OS keychain on macOS, DPAPI on Windows, libsecret on Linux) and persisted
+ * to `credentials.json` in the app's userData directory. The renderer talks
+ * to it through `apps/desktop/src/shared/ipc-bridge.ts`, which routes
+ * through the `credential:{get,store,delete}` IPC channels exposed in
+ * `apps/desktop/src/preload/index.ts` and implemented by
+ * `apps/desktop/src/main/credential-store.ts`.
  *
- * The companion `apps/desktop/src/main/connect-flow.ts` opens the
- * system browser to https://tryinfinitecode.vercel.app/login?code=...
- * and reads the Supabase tokens back from /api/connect once the user
- * completes sign-in.
+ * A browser-only dev/SSR fallback writes through to a namespaced
+ * `localStorage` entry. That fallback is intentionally NOT durable —
+ * production must run inside Electron with the preload bridge wired.
+ *
+ * The companion `apps/desktop/src/main/connect-flow.ts` opens the system
+ * browser to https://tryinfinitecode.vercel.app/login?code=... and reads
+ * the Supabase tokens back from /api/connect once the user completes
+ * sign-in.
  */
 import { createClient, type Session } from "@supabase/supabase-js";
 import { ipcBridge } from "./ipc-bridge";

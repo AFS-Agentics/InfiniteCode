@@ -24,7 +24,7 @@
  *      the browser, and notify the renderer.
  */
 import { shell, ipcMain, BrowserWindow } from "electron";
-import { saveSession, clearSession } from "../shared/supabase";
+import { loadSession, saveSession, clearSession } from "../shared/supabase";
 
 const POLL_MS = 2_000;
 const POLL_MAX_MS = 5 * 60_000;

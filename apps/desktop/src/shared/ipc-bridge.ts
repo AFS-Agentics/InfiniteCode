@@ -1,18 +1,25 @@
 /**
- * Desktop IPC bridge — wraps the existing preload-exposed bridge to
- * the Rust keychain plugin + Electron shell APIs. The renderer talks
- * only through this module so the rest of the renderer code stays
- * platform-agnostic.
+ * Desktop IPC bridge — gives the renderer session-safe access to:
+ *   - OS-keychain-backed secret storage via `keychain*` (routes through
+ *     `window.infinitecode.credential.{get,store,delete}` — typed in
+ *     `apps/desktop/src/preload/api.d.ts` and implemented by
+ *     `apps/desktop/src/main/credential-store.ts` using Electron's
+ *     `safeStorage`).
+ *   - System browser opening via `openExternal` (uses
+ *     `window.electronAPI.openExternal` if the preload exposes it,
+ *     plus a `window.open` fallback for the browser-only dev/SSR
+ *     render path).
  *
- * Wiring convention for the preload script (`apps/desktop/src/preload/`):
- *   - Expose `window.electronAPI` with methods `keychain.read|write|delete`
- *     bridging to the `keyring-store` crate's Tauri/Rust commands.
- *   - Expose `window.electronAPI.openExternal(url)` for `shell.openExternal`.
+ * Renderer code calls only this module so it stays platform-agnostic.
+ * The `window.infinitecode` type itself lives in
+ * `apps/desktop/src/preload/api.d.ts` and is intentionally NOT
+ * redeclared here — extending it (e.g. with a new keychain method)
+ * should happen in `api.d.ts` so all consumers stay in sync.
  *
- * If the preload isn't yet wired, the runtime falls back to a
- * localStorage-only store so the file can be imported during local
- * rendering of the desktop SSR shell. Real persistence requires the
- * preload + Rust bridge.
+ * In the browser-only dev/SSR render path (no Electron preload wired),
+ * the keychain calls fall back to namespaced `localStorage` entries;
+ * that fallback is intentionally non-durable and should never run in
+ * production.
  */
 
 export interface IpcBridge {
@@ -24,12 +31,13 @@ export interface IpcBridge {
 
 declare global {
   interface Window {
+    /**
+     * Optional/legacy `electronAPI` window property — only present
+     * when an older preload exposes it. `window.infinitecode`
+     * (the canonical bridge) is declared in
+     * `apps/desktop/src/preload/api.d.ts` and NOT redeclared here.
+     */
     electronAPI?: {
-      keychain?: {
-        read?: (key: string) => Promise<string | null>;
-        write?: (key: string, value: string) => Promise<void>;
-        delete?: (key: string) => Promise<void>;
-      };
       openExternal?: (url: string) => Promise<void>;
     };
   }
@@ -37,50 +45,60 @@ declare global {
 
 const LS_PREFIX = "infinitecode.lsk.";
 
+function ls(): Storage | null {
+  return typeof localStorage !== "undefined" ? localStorage : null;
+}
+
 export const ipcBridge: IpcBridge = {
   async keychainRead(key) {
-    if (typeof window !== "undefined" && window.electronAPI?.keychain?.read) {
+    // Production: Electron preload -> main process credential-store
+    // (safeStorage encryption; macOS Keychain / Windows DPAPI / Linux libsecret).
+    if (typeof window !== "undefined") {
       try {
-        return await window.electronAPI.keychain.read(key);
+        const v = await window.infinitecode?.credential?.get(key);
+        return v ?? null;
       } catch {
-        /* fall through */
+        /* fall through to dev fallback */
       }
     }
-    if (typeof localStorage === "undefined") return null;
-    return localStorage.getItem(LS_PREFIX + key);
+    const storage = ls();
+    if (!storage) return null;
+    return storage.getItem(LS_PREFIX + key);
   },
+
   async keychainWrite(key, value) {
-    if (typeof window !== "undefined" && window.electronAPI?.keychain?.write) {
+    if (typeof window !== "undefined") {
       try {
-        await window.electronAPI.keychain.write(key, value);
+        await window.infinitecode?.credential?.store(key, value);
         return;
       } catch {
         /* fall through */
       }
     }
-    if (typeof localStorage !== "undefined") {
-      localStorage.setItem(LS_PREFIX + key, value);
-    }
+    const storage = ls();
+    if (storage) storage.setItem(LS_PREFIX + key, value);
   },
+
   async keychainDelete(key) {
-    if (typeof window !== "undefined" && window.electronAPI?.keychain?.delete) {
+    if (typeof window !== "undefined") {
       try {
-        await window.electronAPI.keychain.delete(key);
+        await window.infinitecode?.credential?.delete(key);
         return;
       } catch {
         /* fall through */
       }
     }
-    if (typeof localStorage !== "undefined") {
-      localStorage.removeItem(LS_PREFIX + key);
-    }
+    const storage = ls();
+    if (storage) storage.removeItem(LS_PREFIX + key);
   },
+
   async openExternal(url) {
     if (typeof window !== "undefined" && window.electronAPI?.openExternal) {
       await window.electronAPI.openExternal(url);
-    } else if (typeof window !== "undefined") {
-      // Local-dev fallback so dev-mode rendering still opens the URL
-      // in a new tab (Bun/Electron bridge not loaded yet).
+      return;
+    }
+    // Dev-mode fallback (Bun/Electron bridge not loaded yet).
+    if (typeof window !== "undefined") {
       window.open(url, "_blank", "noopener,noreferrer");
     }
   },
