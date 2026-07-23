@@ -69,19 +69,45 @@ export default function Login() {
 		}
 		try {
 			const url = `/api/connect`
-			await fetch(url, {
+			const res = await fetch(url, {
 				method: "POST",
 				headers: { "content-type": "application/json" },
 				body: JSON.stringify({
 					user_code: deviceCode,
-					access_token: session.access_token,
+					// Populate user_id so the desktop can show a real signed-in
+					// user after it polls the row — without this the row's
+					// user_id column stays NULL and the desktop's
+					// `readPublicSession` filters it out as `user: null`,
+					// leaving the sidebar stuck on "Opening browser…".
+				user_id: session.user?.id ?? null,
+				access_token: session.access_token,
 					refresh_token: session.refresh_token,
 				}),
 			})
-			setPaired(true)
-			setInfo("✓ Signed back into your desktop — you can close this window.")
-		} catch {
-			// best-effort; the desktop retries
+			// Mirror the backend's login: the row only flips to "authorized"
+			// if `res.ok`. Without this check, a 4xx/5xx (Vercel rewrite
+			// down, supabase-admin unconfigured, RLS rejection, etc.) still
+			// tells the user "Signed in" while the desktop polls a row that
+			// was never updated — directly causing the "Opening browser…"
+			// hang reported by desktop users.
+			if (res.ok) {
+				setPaired(true)
+				setInfo("✓ Signed back into your desktop — you can close this window.")
+			} else {
+				// A non-OK POST means the row never flipped to "authorized",
+				// so the desktop will keep polling forever. Tell the user to
+				// retry the sign-in — the auto-pair useEffect will fire again
+				// as soon as we have a fresh session.
+				setError(
+					`Desktop didn't pick up the sign-in (HTTP ${res.status}). Try signing in again.`,
+				)
+			}
+		} catch (err) {
+			setError(
+				err instanceof Error
+					? `Couldn't reach the desktop: ${err.message}. Try signing in again.`
+					: "Couldn't reach the desktop. Try signing in again.",
+			)
 		}
 	}
 

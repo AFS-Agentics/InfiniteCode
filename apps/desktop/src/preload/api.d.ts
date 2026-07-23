@@ -534,6 +534,15 @@ export interface InfiniteCodeAPI {
 		) => () => void
 		/** Subscribe to the `connect:signed_out` event (sign-out succeeded). */
 		onSignedOut: (callback: () => void) => () => void
+		/**
+		 * Diagnostic breadcrumbs emitted by the main process's
+		 * `connect-flow.ts`. Each line is also `console.log`'d in the
+		 * terminal where Electron was launched, so this listener is a
+		 * convenience that lets the renderer forward them to the
+		 * DevTools console for one-stop debugging. Returns an
+		 * unsubscribe function.
+		 */
+		onConnectFlowLog: (callback: (line: string) => void) => () => void
 	}
 
 	// Ad content moderation (ML pipeline)

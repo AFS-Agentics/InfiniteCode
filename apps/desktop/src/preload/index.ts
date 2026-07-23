@@ -281,6 +281,18 @@ contextBridge.exposeInMainWorld("infinitecode", {
 			ipcRenderer.on("connect:signed_out", listener)
 			return () => ipcRenderer.removeListener("connect:signed_out", listener)
 		},
+		/**
+		 * Diagnostic breadcrumbs emitted by the main process's
+		 * `connect-flow.ts`. Each line is also `console.log`'d in the
+		 * terminal where Electron was launched, so this listener is a
+		 * convenience that lets the renderer forward them to the
+		 * DevTools console for one-stop debugging.
+		 */
+		onConnectFlowLog: (callback: (line: string) => void) => {
+			const listener = (_event: unknown, line: string) => callback(line)
+			ipcRenderer.on("connect-flow:log", listener)
+			return () => ipcRenderer.removeListener("connect-flow:log", listener)
+		},
 	},
 
 	// --- Fetch proxy (bypasses Chromium connection limits) ---

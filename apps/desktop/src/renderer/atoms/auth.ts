@@ -55,8 +55,10 @@ export const authAtom = atom<AuthState>(INITIAL_STATE)
 export async function loadAuthFromMain(
 	set: (next: AuthState | ((prev: AuthState) => AuthState)) => void,
 ): Promise<void> {
+	console.log("[auth] loadAuthFromMain:start")
 	const declared = window.infinitecode?.auth
 	if (!declared) {
+		console.log("[auth] loadAuthFromMain:no-bridge status=signed-out")
 		set({
 			...INITIAL_STATE,
 			status: "signed-out",
@@ -66,6 +68,10 @@ export async function loadAuthFromMain(
 	}
 	try {
 		const result = await declared.getSession()
+		console.log(
+			"[auth] loadAuthFromMain:result",
+			JSON.stringify({ user: result.user, configured: result.configured }),
+		)
 		set((prev) => ({
 			...prev,
 			configured: result.configured,
@@ -74,6 +80,7 @@ export async function loadAuthFromMain(
 			errorMessage: undefined,
 		}))
 	} catch (err) {
+		console.error("[auth] loadAuthFromMain:threw", err)
 		set({
 			...INITIAL_STATE,
 			status: "error",
@@ -95,8 +102,10 @@ export async function loadAuthFromMain(
 export async function startSignIn(
 	set: (next: AuthState | ((prev: AuthState) => AuthState)) => void,
 ): Promise<void> {
+	console.log("[auth] startSignIn:start")
 	const declared = window.infinitecode?.auth
 	if (!declared) {
+		console.log("[auth] startSignIn:no-bridge status=error")
 		set({
 			...INITIAL_STATE,
 			status: "error",
@@ -104,13 +113,18 @@ export async function startSignIn(
 		})
 		return
 	}
+	console.log("[auth] startSignIn:setting status=loading")
 	set((prev) => ({ ...prev, status: "loading", errorMessage: undefined }))
 	try {
+		console.log("[auth] startSignIn:await declared.startConnect()")
 		await declared.startConnect()
+		console.log("[auth] startSignIn:startConnect resolved")
 		// The main process fires `connect:success` AND we re-read here
 		// so the UI updates even if the renderer missed the event.
 		await loadAuthFromMain(set)
+		console.log("[auth] startSignIn:complete")
 	} catch (err) {
+		console.error("[auth] startSignIn:threw", err)
 		set((prev) => ({
 			...prev,
 			status: "error",

@@ -592,22 +592,34 @@ function AuthMenu() {
 	useEffect(() => {
 		void loadAuthFromMain(setState)
 		const offSuccess = window.infinitecode?.auth?.onConnectSuccess?.(() => {
+			console.log("[auth] event=connect:success")
 			void loadAuthFromMain(setState)
 		})
 		const offSignedOut = window.infinitecode?.auth?.onSignedOut?.(() => {
+			console.log("[auth] event=connect:signed_out")
 			setState((prev) => ({ ...prev, status: "signed-out", user: null }))
 		})
 		const offFailed = window.infinitecode?.auth?.onConnectFailed?.((detail) => {
+			console.log(
+				"[auth] event=connect:failed",
+				JSON.stringify(detail ?? {}),
+			)
 			setState((prev) => ({
 				...prev,
 				status: "error",
 				errorMessage: detail?.reason ?? "Sign-in failed",
 			}))
 		})
+		const offMainLog = window.infinitecode?.auth?.onConnectFlowLog?.(
+			(line) => {
+				console.log(line)
+			},
+		)
 		return () => {
 			offSuccess?.()
 			offSignedOut?.()
 			offFailed?.()
+			offMainLog?.()
 		}
 	}, [setState])
 
