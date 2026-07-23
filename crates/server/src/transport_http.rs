@@ -1,7 +1,7 @@
 //! HTTP listener runner for the InfiniteCode-shaped coordination bridge.
 //!
 //! Owns the `http://host:port` listen-entry parser and the async loop that
-//! serves the bridge. Kept as a sibling of [`crate::transport`] (the JSON-RPC
+//! serves the bridge. Kept as a sibling of `crate::transport` (the JSON-RPC
 //! over WebSocket / stdio listeners) so neither file needs to grow into the
 //! other's territory:
 //!
@@ -77,10 +77,9 @@ pub async fn spawn(
         .local_addr()
         .map_err(|error| anyhow!("failed to read HTTP listener local_addr: {error}"))?;
 
-    let server = axum::serve(listener, router)
-        .with_graceful_shutdown(async move {
-            shutdown.cancelled().await;
-        });
+    let server = axum::serve(listener, router).with_graceful_shutdown(async move {
+        shutdown.cancelled().await;
+    });
 
     tokio::spawn(async move {
         if let Err(error) = server.await {

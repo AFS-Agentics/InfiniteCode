@@ -106,6 +106,8 @@ check_interval_hours = 48
                 idle_session_timeout_secs: 1800,
                 persist_ephemeral_sessions: false,
                 auth: Default::default(),
+                http_listen: Default::default(),
+                infinitecode_bridge: Default::default(),
             },
             logging: LoggingConfig {
                 level: "trace".into(),

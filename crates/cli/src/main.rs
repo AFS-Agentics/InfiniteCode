@@ -35,7 +35,10 @@ mod prompt_command;
 mod upgrade_command;
 
 use agent_command::run_agent;
-use auth_command::{run_login as auth_run_login, run_logout as auth_run_logout, run_status as auth_run_status, run_whoami as auth_run_whoami};
+use auth_command::{
+    run_login as auth_run_login, run_logout as auth_run_logout, run_status as auth_run_status,
+    run_whoami as auth_run_whoami,
+};
 use doctor_command::run_doctor;
 use prompt_command::PromptOutputFormat;
 use prompt_command::run_prompt;
@@ -294,7 +297,7 @@ async fn run_cli() -> Result<()> {
             AuthAction::Logout => auth_run_logout(),
             AuthAction::Status => auth_run_status().await,
             AuthAction::Whoami => auth_run_whoami(),
-        }
+        },
         Some(Command::Resume { session_id }) => {
             maybe_print_startup_update(&cli).await;
             let _logging = install_logging(&cli)?;

@@ -30,8 +30,8 @@ use infinitecode_protocol::{
 };
 
 use crate::db_infinitecode::{self, InfiniteCodeSessionRow, parse_session_row_pub};
-use crate::http::error::{BridgeError, BridgeResult};
 use crate::http::HttpBridgeState;
+use crate::http::error::{BridgeError, BridgeResult};
 
 /// `POST /api/v1/infinitecode/session`.
 ///
@@ -96,7 +96,9 @@ pub async fn read(
         // client can fan-out a flush / re-admit; geographic blocks are
         // also surfaced as 409 because they're terminal-for-session and a
         // naive client would otherwise loop forever.
-        return Err(BridgeError::session_superseded(response.instance_id.clone()));
+        return Err(BridgeError::session_superseded(
+            response.instance_id.clone(),
+        ));
     }
     Ok(Json(response))
 }
@@ -162,7 +164,9 @@ fn fetch_row(state: &HttpBridgeState, instance_id: &str) -> BridgeResult<Infinit
     let conn = conn.lock().expect("database mutex poisoned");
     db_infinitecode::get_session(&conn, instance_id)
         .map_err(|error| BridgeError::internal(format!("get-session failed: {error}")))?
-        .ok_or_else(|| BridgeError::bad_request(format!("no session for instance_id={instance_id}")))
+        .ok_or_else(|| {
+            BridgeError::bad_request(format!("no session for instance_id={instance_id}"))
+        })
 }
 
 fn bucket_for(

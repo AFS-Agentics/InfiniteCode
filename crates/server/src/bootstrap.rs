@@ -17,7 +17,6 @@ use infinitecode_util_paths::FileSystemConfigPathResolver;
 use crate::ListenTarget;
 use crate::ServerRuntime;
 use crate::db::Database;
-use crate::transport_http;
 use crate::execution::ServerRuntimeDependencies;
 use crate::load_server_provider;
 use crate::resolve_listen_targets;
@@ -30,6 +29,7 @@ use crate::singleton::run_stdio_proxy;
 use crate::transport::DEFAULT_WEBSOCKET_BIND_ADDRESS;
 use crate::transport::InternalProxyControl;
 use crate::transport::InternalProxyEndpoint;
+use crate::transport_http;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 pub enum ServerTransportMode {
@@ -267,19 +267,19 @@ pub async fn run_server_process(
     // one entry to `server.http_listen`. The bridge shares the SQLite
     // connection pool with the canonical runtime and shuts down on the
     // same cancellation token.
-    if config.server.infinitecode_bridge.is_operational(&config.server.http_listen) {
+    if config
+        .server
+        .infinitecode_bridge
+        .is_operational(&config.server.http_listen)
+    {
         let bridge = config.server.infinitecode_bridge.clone();
         let http_listen = config.server.http_listen.clone();
         let db_for_bridge = Arc::clone(&db);
         let http_shutdown = shutdown_signal.clone();
         tokio::spawn(async move {
-            if let Err(error) = transport_http::run_http_bridge(
-                bridge,
-                http_listen,
-                db_for_bridge,
-                http_shutdown,
-            )
-            .await
+            if let Err(error) =
+                transport_http::run_http_bridge(bridge, http_listen, db_for_bridge, http_shutdown)
+                    .await
             {
                 tracing::error!(error = %error, "infinitecode HTTP bridge exited with error");
             }

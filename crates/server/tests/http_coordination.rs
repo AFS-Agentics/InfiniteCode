@@ -21,13 +21,10 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use infinitecode_config::InfiniteCodeBridgeConfig;
+use infinitecode_protocol::{AuthLoginRequest, CoordinationSessionRequest};
 use infinitecode_server::db::Database;
-use infinitecode_server::db_infinitecode::{migrate_database, supersede_and_admit};
+use infinitecode_server::db_infinitecode::migrate_database;
 use infinitecode_server::http::{HttpBridgeState, build_router};
-use infinitecode_protocol::{
-    AuthLoginRequest, CoordinationSessionBucket, CoordinationSessionRequest,
-    CoordinationSessionStatus,
-};
 use reqwest::StatusCode;
 use smol_str::SmolStr;
 use tempfile::TempDir;
@@ -55,7 +52,9 @@ async fn start_test_server() -> (reqwest::Client, String, TempDir, CancellationT
     let state = HttpBridgeState::new(db, test_bridge_cfg(), Instant::now());
     let router = build_router(state);
 
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind loopback");
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind loopback");
     let local_addr = listener.local_addr().expect("local_addr");
     let url = format!("http://{local_addr}");
     let shutdown = CancellationToken::new();
@@ -92,13 +91,18 @@ async fn login(client: &reqwest::Client, url: &str, password: &str) -> String {
         .expect("token in body")
 }
 
-fn admit_request(instance: &str, user: &str, model: &str) -> CoordinationSessionRequest {
+fn admit_request(
+    instance: &str,
+    user: &str,
+    model: &str,
+    device_fingerprint: Option<&str>,
+) -> CoordinationSessionRequest {
     CoordinationSessionRequest {
         instance_id: SmolStr::new(instance),
         acting_user_id: SmolStr::new(user),
         model: SmolStr::new(model),
         iso_country_code: None,
-        device_fingerprint: None,
+        device_fingerprint: device_fingerprint.map(SmolStr::new),
         app_version: Some(SmolStr::new("infinitecode-test")),
     }
 }
@@ -135,7 +139,7 @@ async fn protected_route_without_bearer_returns_401() {
     let (client, url, _dir, _shutdown) = start_test_server().await;
     let response = client
         .post(format!("{url}/api/v1/infinitecode/session"))
-        .json(&admit_request("inst", "user", "minimax/minimax-m3"))
+        .json(&admit_request("inst", "user", "minimax/minimax-m3", None))
         .send()
         .await
         .expect("post without bearer");
@@ -151,16 +155,18 @@ async fn admit_poll_release_lifecycle_with_bearer() {
     let admit = client
         .post(format!("{url}/api/v1/infinitecode/session"))
         .bearer_auth(&token)
-        .json(&admit_request("instance-A", "user-1", "minimax/minimax-m3"))
+        .json(&admit_request(
+            "instance-A",
+            "user-1",
+            "minimax/minimax-m3",
+            None,
+        ))
         .send()
         .await
         .expect("admit");
     assert_eq!(admit.status(), StatusCode::CREATED);
     let body: serde_json::Value = admit.json().await.expect("admit body");
-    assert_eq!(
-        body.get("status").and_then(|v| v.as_str()),
-        Some("active"),
-    );
+    assert_eq!(body.get("status").and_then(|v| v.as_str()), Some("active"),);
     assert_eq!(
         body.get("instance_id").and_then(|v| v.as_str()),
         Some("instance-A"),
@@ -175,12 +181,12 @@ async fn admit_poll_release_lifecycle_with_bearer() {
         .expect("poll");
     assert_eq!(poll.status(), StatusCode::OK);
     let body: serde_json::Value = poll.json().await.expect("poll body");
-    assert_eq!(
-        body.get("status").and_then(|v| v.as_str()),
-        Some("active"),
-    );
+    assert_eq!(body.get("status").and_then(|v| v.as_str()), Some("active"),);
     let bucket = body.get("bucket").and_then(|v| v.as_str()).unwrap_or("");
-    assert!(bucket == "premium" || bucket == "unlimited", "bucket should be valid; got {bucket}");
+    assert!(
+        bucket == "premium" || bucket == "unlimited",
+        "bucket should be valid; got {bucket}"
+    );
 
     // Release
     let release = client
@@ -193,36 +199,101 @@ async fn admit_poll_release_lifecycle_with_bearer() {
 }
 
 #[tokio::test]
-async fn second_admit_for_same_user_supersedes_first() {
+async fn same_user_different_device_fingerprints_both_stay_active() {
+    // Per-(user, device) active-session rule: opening a second session
+    // for the SAME Supabase user on a DIFFERENT device_fingerprint does
+    // NOT supersede the first session. Both stay Active.
+    // (Prior strict-per-user rule would have rotated the first; we
+    // deliberately replaced that with this test on commit 1e071a6.)
     let (client, url, _dir, _shutdown) = start_test_server().await;
     let token = login(&client, &url, "test-password").await;
 
-    // Admit first.
     let _ = client
         .post(format!("{url}/api/v1/infinitecode/session"))
         .bearer_auth(&token)
-        .json(&admit_request("instance-A", "user-1", "minimax/minimax-m3"))
+        .json(&admit_request(
+            "instance-A",
+            "user-1",
+            "minimax/minimax-m3",
+            Some("device-1"),
+        ))
         .send()
         .await
-        .expect("first admit");
-    // Admit second for the same user.
+        .expect("first admit on device-1");
     let _ = client
         .post(format!("{url}/api/v1/infinitecode/session"))
         .bearer_auth(&token)
-        .json(&admit_request("instance-B", "user-1", "deepseek/deepseek-v4-pro"))
+        .json(&admit_request(
+            "instance-B",
+            "user-1",
+            "deepseek/deepseek-v4-pro",
+            Some("device-2"),
+        ))
         .send()
         .await
-        .expect("second admit");
+        .expect("second admit on device-2 same user");
 
-    // Reading the first instance id should now 409 because the rotation
-    // marked it superseded.
+    // Both instances stay Active; the GET on the first one returns 200.
     let response = client
         .get(format!("{url}/api/v1/infinitecode/session/instance-A"))
         .bearer_auth(&token)
         .send()
         .await
-        .expect("poll superseded");
-    assert_eq!(response.status(), StatusCode::CONFLICT);
+        .expect("poll first instance");
+    assert_eq!(
+        response.status(),
+        StatusCode::OK,
+        "same user across two devices must both stay Active under per-(user, device)"
+    );
+}
+
+#[tokio::test]
+async fn different_user_same_device_fingerprint_supersedes_first() {
+    // Per-device collision rule: a different Supabase user signing in on
+    // the SAME physical device ends the prior user's row. The new user
+    // becomes Active; the prior row flips to Superseded and a follow-up
+    // GET on its instance id responds 409 CONFLICT.
+    let (client, url, _dir, _shutdown) = start_test_server().await;
+    let token = login(&client, &url, "test-password").await;
+
+    let _ = client
+        .post(format!("{url}/api/v1/infinitecode/session"))
+        .bearer_auth(&token)
+        .json(&admit_request(
+            "instance-A",
+            "user-1",
+            "minimax/minimax-m3",
+            Some("shared-device"),
+        ))
+        .send()
+        .await
+        .expect("user-1 admit on shared-device");
+    let _ = client
+        .post(format!("{url}/api/v1/infinitecode/session"))
+        .bearer_auth(&token)
+        .json(&admit_request(
+            "instance-B",
+            "user-2",
+            "deepseek/deepseek-v4-pro",
+            Some("shared-device"),
+        ))
+        .send()
+        .await
+        .expect("user-2 admit on shared-device");
+
+    // user-1's row was flipped to Superseded (reason:
+    // `different_account_on_device`). GET on instance-A returns 409.
+    let response = client
+        .get(format!("{url}/api/v1/infinitecode/session/instance-A"))
+        .bearer_auth(&token)
+        .send()
+        .await
+        .expect("poll superseded prior-user row");
+    assert_eq!(
+        response.status(),
+        StatusCode::CONFLICT,
+        "different account on same device must end the prior user's session"
+    );
 }
 
 #[tokio::test]
@@ -247,4 +318,3 @@ async fn ads_auction_returns_empty_default() {
         "auction should be null when ads_enabled=false; got {body}",
     );
 }
-

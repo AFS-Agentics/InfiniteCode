@@ -23,8 +23,8 @@ use infinitecode_protocol::{
     WebSearchDepth, WebSearchRequest, WebSearchResponse,
 };
 
-use crate::http::error::{BridgeError, BridgeResult};
 use crate::http::HttpBridgeState;
+use crate::http::error::{BridgeError, BridgeResult};
 
 /// `POST /api/v1/web-search`. Proxies to a Serper-shaped upstream.
 ///

@@ -82,7 +82,9 @@ impl BridgeError {
             message: SmolStr::new(
                 "A different account has signed in on this device; your session has ended.",
             ),
-            status: Some(coordination_status_str(CoordinationSessionStatus::Superseded)),
+            status: Some(coordination_status_str(
+                CoordinationSessionStatus::Superseded,
+            )),
             reason: Some(instance_id.into()),
         };
         Self {
@@ -95,8 +97,12 @@ impl BridgeError {
     pub fn session_rate_limited() -> Self {
         let body = CoordinationErrorBody {
             code: CoordinationErrorBody::SESSION_RATE_LIMITED,
-            message: SmolStr::new("Acting user has exhausted the shared daily quota for this model."),
-            status: Some(coordination_status_str(CoordinationSessionStatus::RateLimited)),
+            message: SmolStr::new(
+                "Acting user has exhausted the shared daily quota for this model.",
+            ),
+            status: Some(coordination_status_str(
+                CoordinationSessionStatus::RateLimited,
+            )),
             reason: None,
         };
         Self {
@@ -110,7 +116,9 @@ impl BridgeError {
         let body = CoordinationErrorBody {
             code: CoordinationErrorBody::SESSION_COUNTRY_BLOCKED,
             message: SmolStr::new("Sessions are not available in this region."),
-            status: Some(coordination_status_str(CoordinationSessionStatus::CountryBlocked)),
+            status: Some(coordination_status_str(
+                CoordinationSessionStatus::CountryBlocked,
+            )),
             reason: None,
         };
         Self {

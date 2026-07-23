@@ -47,7 +47,10 @@ pub fn build_router(state: Arc<HttpBridgeState>) -> Router {
             "/api/v1/infinitecode/session",
             post(session::admit).get(session::poll),
         )
-        .route("/api/v1/infinitecode/session/{instance_id}", get(session::read))
+        .route(
+            "/api/v1/infinitecode/session/{instance_id}",
+            get(session::read),
+        )
         .route(
             "/api/v1/infinitecode/session/{instance_id}",
             delete(session::release),
@@ -61,7 +64,5 @@ pub fn build_router(state: Arc<HttpBridgeState>) -> Router {
         .route("/api/v1/ads/click", post(ads::click))
         .layer(from_fn_with_state(state.clone(), auth::require_bearer));
 
-    public_router
-        .merge(protected_router)
-        .with_state(state)
+    public_router.merge(protected_router).with_state(state)
 }

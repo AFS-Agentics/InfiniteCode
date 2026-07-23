@@ -138,8 +138,6 @@ impl InfiniteCodeBridgeConfig {
     /// `http_listen` entry. The HTTP listener can't register routes
     /// without all three.
     pub fn is_operational(&self, http_listen: &[String]) -> bool {
-        self.enabled
-            && self.password.is_some()
-            && !http_listen.is_empty()
+        self.enabled && self.password.is_some() && !http_listen.is_empty()
     }
 }

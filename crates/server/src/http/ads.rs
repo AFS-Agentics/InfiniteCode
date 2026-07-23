@@ -18,8 +18,8 @@ use infinitecode_protocol::{
     AdAuctionRequest, AdAuctionResponse, AdClickRequest, AdImpressionRequest, AdPlacement,
 };
 
-use crate::http::error::{BridgeError, BridgeResult};
 use crate::http::HttpBridgeState;
+use crate::http::error::{BridgeError, BridgeResult};
 
 pub async fn auction(
     State(state): State<Arc<HttpBridgeState>>,

@@ -16,8 +16,8 @@ use axum::extract::State;
 
 use infinitecode_protocol::{TokenCountRequest, TokenCountResponse};
 
-use crate::http::error::{BridgeError, BridgeResult};
 use crate::http::HttpBridgeState;
+use crate::http::error::{BridgeError, BridgeResult};
 
 pub async fn token_count(
     State(_state): State<Arc<HttpBridgeState>>,

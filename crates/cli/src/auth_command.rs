@@ -16,7 +16,7 @@
 //! into `infinitecode doctor`.
 use anyhow::{Context, Result, anyhow};
 use chrono::{TimeZone, Utc};
-use jsonwebtoken::TokenData;
+use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation, decode};
 use serde::Deserialize;
 
 use crate::auth_supabase::{self, DEFAULT_WEBSITE, sign_in_via_browser};
@@ -41,7 +41,10 @@ pub fn run_logout() -> Result<()> {
 pub fn run_whoami() -> Result<()> {
     let session = load_session()?;
     let claims = decode_claims(&session.access_token)?;
-    print_session(&claims, Err("not fetched (run `auth status` for live count)".to_string()));
+    print_session(
+        &claims,
+        &Err("not fetched (run `auth status` for live count)".to_string()),
+    );
     Ok(())
 }
 
@@ -53,7 +56,7 @@ pub async fn run_status() -> Result<()> {
         Ok(n) => Ok(n),
         Err(err) => Err(format!("{err}")),
     };
-    print_session(&claims, device_count.as_ref());
+    print_session(&claims, &device_count);
     Ok(())
 }
 
@@ -62,6 +65,7 @@ pub async fn run_status() -> Result<()> {
 // -----------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // refresh_token / expires_at: reserved for future refresh
 struct PersistedSession {
     /// Currently only the access token is consumed; refresh_token and
     /// expires_at are still written here for future refresh support.
@@ -86,7 +90,11 @@ struct JwtClaims {
     user_metadata: Option<serde_json::Value>,
     #[serde(default)]
     exp: Option<i64>,
+    /// JWT issued-at timestamp. Recorded for future refresh support but
+    /// not consumed by the current CLI surfaces (`whoami`, `status`),
+    /// so the dead-code warning is silenced under `RUSTFLAGS=-Dwarnings`.
     #[serde(default)]
+    #[allow(dead_code)]
     iat: Option<i64>,
 }
 
@@ -102,13 +110,20 @@ fn load_session() -> Result<PersistedSession> {
 }
 
 fn decode_claims(access_token: &str) -> Result<JwtClaims> {
-    // `dangerous_insecure_decode` — we don't have the Supabase JWT
-    // secret here and don't need it: whoami/status are identity-printing
-    // paths, not authorization paths. If you ever use claims for AZ
-    // decisions, switch to `jsonwebtoken::decode` with the project
-    // secret.
+    // We use `jsonwebtoken::decode` with `insecure_disable_signature_validation`
+    // because we don't have the Supabase JWT secret here and don't
+    // need it: whoami/status are identity-printing paths, not authorization
+    // paths. If you ever use these claims for AZ decisions, switch to
+    // `jsonwebtoken::decode` with the project secret.
+    //
+    // Note: `jsonwebtoken` v9 removed the `dangerous_insecure_decode` helper.
+    // The replacement is a regular `decode` call against an empty
+    // `DecodingKey` with `Validation::insecure_disable_signature_validation()`.
+    let mut validation = Validation::new(Algorithm::HS256);
+    validation.insecure_disable_signature_validation();
+    validation.validate_exp = false;
     let TokenData { claims, .. } =
-        jsonwebtoken::dangerous_insecure_decode::<JwtClaims>(access_token)
+        decode::<JwtClaims>(access_token, &DecodingKey::from_secret(&[]), &validation)
             .context("decoding signed-in JWT (token may be malformed / expired)")?;
     Ok(claims)
 }
@@ -140,7 +155,7 @@ fn format_exp(exp_unix_secs: i64) -> String {
     }
 }
 
-fn print_session(claims: &JwtClaims, device_count: Result<u64, String>) {
+fn print_session(claims: &JwtClaims, device_count: &Result<u64, String>) {
     let name = display_name(claims);
     println!("Logged in to {DEFAULT_WEBSITE}");
     println!("  user id : {}", claims.sub);

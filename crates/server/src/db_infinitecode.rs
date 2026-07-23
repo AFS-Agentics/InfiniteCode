@@ -296,7 +296,8 @@ pub fn supersede_and_admit(
     )
     .context("failed to insert new infinitecode session")?;
 
-    tx.commit().context("failed to commit infinitecode session transaction")?;
+    tx.commit()
+        .context("failed to commit infinitecode session transaction")?;
     Ok(superseded)
 }
 
@@ -521,14 +522,18 @@ mod tests {
             superseded_b
         );
 
-        let a = get_session(&conn, "instance-A").expect("get A").expect("A exists");
+        let a = get_session(&conn, "instance-A")
+            .expect("get A")
+            .expect("A exists");
         assert_eq!(
             a.status,
             CoordinationSessionStatus::Active,
             "first row stays active under per-(user, device)"
         );
 
-        let b = get_session(&conn, "instance-B").expect("get B").expect("B exists");
+        let b = get_session(&conn, "instance-B")
+            .expect("get B")
+            .expect("B exists");
         assert_eq!(b.status, CoordinationSessionStatus::Active);
         assert_eq!(b.acting_user_id, "user-1");
         assert_eq!(b.device_fingerprint.as_deref(), Some("device-2"));
@@ -580,11 +585,15 @@ mod tests {
             "user-1's row should have been superseded as the per-device collision"
         );
 
-        let a = get_session(&conn, "instance-A").expect("get A").expect("A exists");
+        let a = get_session(&conn, "instance-A")
+            .expect("get A")
+            .expect("A exists");
         assert_eq!(a.status, CoordinationSessionStatus::Superseded);
         assert_eq!(a.reason.as_deref(), Some("different_account_on_device"));
 
-        let b = get_session(&conn, "instance-B").expect("get B").expect("B exists");
+        let b = get_session(&conn, "instance-B")
+            .expect("get B")
+            .expect("B exists");
         assert_eq!(b.status, CoordinationSessionStatus::Active);
         assert_eq!(b.acting_user_id, "user-2");
     }
@@ -638,7 +647,9 @@ mod tests {
             superseded
         );
 
-        let a = get_session(&conn, "instance-A").expect("get A").expect("A exists");
+        let a = get_session(&conn, "instance-A")
+            .expect("get A")
+            .expect("A exists");
         assert_eq!(
             a.status,
             CoordinationSessionStatus::Active,
@@ -678,8 +689,8 @@ mod tests {
             .expect("admit premium slot");
         }
 
-        let count = premium_count_for_user(&conn, "user-x", ts(0).timestamp())
-            .expect("count succeeds");
+        let count =
+            premium_count_for_user(&conn, "user-x", ts(0).timestamp()).expect("count succeeds");
         assert_eq!(
             count, 6,
             "premium_count_for_user MUST count across all fingerprints for the \
@@ -727,7 +738,9 @@ mod tests {
         let conn = conn.lock().expect("conn");
 
         insert_bearer_token(&conn, "secret", 1_000, 2_000).expect("insert");
-        let found = find_bearer_token(&conn, "secret").expect("find").expect("hit");
+        let found = find_bearer_token(&conn, "secret")
+            .expect("find")
+            .expect("hit");
         assert_eq!(found.created_at.timestamp(), 1_000);
         assert_eq!(found.expires_at.timestamp(), 2_000);
 
@@ -736,6 +749,10 @@ mod tests {
 
         let removed = prune_expired_bearer_tokens(&conn, 2_000).expect("prune");
         assert_eq!(removed, 1);
-        assert!(find_bearer_token(&conn, "secret").expect("post-prune").is_none());
+        assert!(
+            find_bearer_token(&conn, "secret")
+                .expect("post-prune")
+                .is_none()
+        );
     }
 }

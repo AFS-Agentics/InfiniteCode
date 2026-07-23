@@ -30,11 +30,9 @@ use rand::RngCore;
 
 use infinitecode_protocol::{AuthLoginRequest, AuthLoginResponse};
 
-use crate::db_infinitecode::{
-    find_bearer_token, insert_bearer_token, prune_expired_bearer_tokens,
-};
-use crate::http::error::{BridgeError, BridgeResult};
+use crate::db_infinitecode::{find_bearer_token, insert_bearer_token, prune_expired_bearer_tokens};
 use crate::http::HttpBridgeState;
+use crate::http::error::{BridgeError, BridgeResult};
 
 /// True when the supplied `Authorization: Bearer …` header matches a
 /// non-expired token in the infinitecode bearer table. Exposed for tests.
@@ -104,10 +102,7 @@ pub async fn login(
 
     let mut buf = [0u8; 32];
     rand::rng().fill_bytes(&mut buf);
-    let token = base64::Engine::encode(
-        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-        buf,
-    );
+    let token = base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, buf);
 
     let now = Utc::now();
     let expires_at = now + Duration::seconds(state.bridge.token_ttl_secs as i64);

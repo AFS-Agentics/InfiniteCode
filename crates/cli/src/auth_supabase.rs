@@ -12,8 +12,12 @@
 //!   5. Persist `{ access, refresh, expires_at, user_id }` to the
 //!      OS keyring via `infinitecode_keyring_store`.
 //!
-//! Entry point: [`sign_in_via_browser`]. Use [`SupabaseAuthenticator`]
-//! for downstream JWT verification.
+//! Entry point: [`sign_in_via_browser`]. Downstream JWT verification
+//! stays in the bridge via `jsonwebtoken::decode` (see
+//! `auth_command::decode_claims` for the in-process decoding helper
+//! that does NOT verify the signature because the Supabase JWT secret
+//! is not bundled into the CLI binary).
+//!
 //!
 //! Environment variables (read by [`sign_in_via_browser`]):
 //! - `INFINITECODE_WEBSITE_URL` — defaults to `https://tryinfinitecode.vercel.app`.
@@ -26,7 +30,6 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result, anyhow};
 use infinitecode_keyring_store::{DefaultKeyringStore, KeyringStore};
 use rand::Rng;
-use serde::Deserialize;
 use url::Url;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
@@ -58,27 +61,12 @@ const KEYRING_ACCOUNT: &str = "v1";
 
 const USER_CODE_ALPHABET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // unambiguous base32
 
-#[derive(Debug, Deserialize)]
-struct PollOk {
-    #[serde(default)]
-    status: Option<String>,
-    access_token: Option<String>,
-    refresh_token: Option<String>,
-    expires_at: Option<String>,
-    user_id: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct PollErr {
-    error: String,
-}
-
 /// Generate an 8-char user code rendered as `XXXX-XXXX`.
 fn generate_user_code() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut s = String::with_capacity(8);
     for _ in 0..8 {
-        let idx = rng.gen_range(0..USER_CODE_ALPHABET.len());
+        let idx = rng.random_range(0..USER_CODE_ALPHABET.len());
         s.push(USER_CODE_ALPHABET[idx] as char);
     }
     format!("{}-{}", &s[..4], &s[4..])
@@ -261,17 +249,14 @@ pub async fn sign_in_via_browser() -> Result<()> {
     let user_code = generate_user_code();
     pre_insert_pending(&website, &user_code).await?;
 
-    let mut login_url = website
-        .join("/login")
-        .context("invalid /login URL")?;
-    login_url
-        .query_pairs_mut()
-        .append_pair("code", &user_code);
+    let mut login_url = website.join("/login").context("invalid /login URL")?;
+    login_url.query_pairs_mut().append_pair("code", &user_code);
 
     webbrowser::open(login_url.as_str()).context("opening system browser")?;
     eprintln!(
         "Sign in at {} — CLI is polling every {}s for the device-pairing row.",
-        login_url, POLL_INTERVAL.as_secs()
+        login_url,
+        POLL_INTERVAL.as_secs()
     );
 
     let (access, refresh, expires_at, user_id) = poll_for_tokens(&website, &user_code).await?;
@@ -289,9 +274,10 @@ mod tests {
         let code = generate_user_code();
         assert_eq!(code.len(), 9);
         assert_eq!(code.chars().nth(4), Some('-'));
-        assert!(code
-            .chars()
-            .all(|c| USER_CODE_ALPHABET.contains(&(c as u8)) || c == '-'));
+        assert!(
+            code.chars()
+                .all(|c| USER_CODE_ALPHABET.contains(&(c as u8)) || c == '-')
+        );
     }
 
     #[test]
