@@ -8,7 +8,7 @@
 //!   - The runtime's main listener list (parsed in `transport.rs`) keeps its
 //!     `ListenTarget` enum focused on the JSON-RPC ACP transports.
 //!   - The HTTP bridge parses its entries with [`parse`] and spawns an
-//!     axum [`axum::serve`] loop alongside the JSON-RPC listeners from
+//!     axum [`axum::serve()`] loop alongside the JSON-RPC listeners from
 //!     `bootstrap.rs::run_listeners_with_internal_proxy`.
 //!
 //! Liveness model: the HTTP listener shares the same `CancellationToken` as
