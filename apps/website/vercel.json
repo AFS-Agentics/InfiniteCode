@@ -1,10 +1,17 @@
 {
-	"github": {
-		"silent": true,
-		"autoJobCancelation": true
-	},
-	"ignoreCommand": "git diff --quiet HEAD~1 HEAD -- apps/website/",
-	"rewrites": [
-		{ "source": "/(.*)", "destination": "/index.html" }
-	]
+  "github": {
+    "silent": true,
+    "autoJobCancelation": true
+  },
+  "ignoreCommand": "git diff --quiet HEAD~1 HEAD -- apps/website/",
+  "rewrites": [
+    {
+      "source": "/api/connect",
+      "destination": "https://infinitecode-admin.vercel.app/api/connect"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
 }
