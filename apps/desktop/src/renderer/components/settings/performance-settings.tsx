@@ -60,6 +60,7 @@ const THRESHOLD_DESCRIPTION =
 
 const DEFAULT_PERFORMANCE: PerformanceSettings = {
 	selfVerify: false,
+	suggestFollowups: true,
 	compactStrategy: "auto",
 	compactThresholdPercent: 80,
 }

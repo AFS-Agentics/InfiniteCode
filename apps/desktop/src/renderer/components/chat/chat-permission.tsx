@@ -9,7 +9,6 @@ import { useAtomValue } from "jotai"
 import {
 	ChevronDownIcon,
 	Loader2Icon,
-	ShieldCheckIcon,
 	ZapIcon,
 } from "lucide-react"
 import { memo, useMemo, useState } from "react"

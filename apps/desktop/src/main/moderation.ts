@@ -80,7 +80,7 @@ export async function checkAdText(text: string): Promise<ModerationResult> {
 			return { flagged: false, reason: "Model unavailable", score: 0 }
 		}
 
-		const result = await classifier(text, ALL_LABELS) as {
+		const result = await (classifier as any)(text, ALL_LABELS) as {
 			labels: string[]
 			scores: number[]
 		}
@@ -88,7 +88,7 @@ export async function checkAdText(text: string): Promise<ModerationResult> {
 		let topBad = { label: "", score: 0 }
 		let sumBad = 0
 		for (let i = 0; i < result.labels.length; i++) {
-			if (BAD_LABELS.includes(result.labels[i])) {
+			if (BAD_LABELS.indexOf(result.labels[i]) !== -1) {
 				if (result.scores[i] > topBad.score) {
 					topBad = { label: result.labels[i], score: result.scores[i] }
 				}

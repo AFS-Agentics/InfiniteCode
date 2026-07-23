@@ -13,7 +13,6 @@ import {
 	PenLineIcon,
 	SearchIcon,
 	SettingsIcon,
-	UserIcon,
 } from "lucide-react"
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { authAtom, loadAuthFromMain, startSignIn, signOutFromRenderer } from "../../atoms/auth"
@@ -326,20 +325,6 @@ export function AppSidebarContent({
 			preferences,
 			stableProjectOrder,
 		],
-	)
-
-	// Stable ambient context for the sidebar Ad banner. Memoize so the
-	// hook's content-derived key stays stable across AppSidebarContent
-	// re-renders (the banner would otherwise fetch a new auction every
-	// time the sidebar re-renders for any unrelated reason).
-	const sidebarBannerMessages = useMemo<{ role: string; content: string }[]>(
-		() => [
-			{
-				role: "user",
-				content: projects.map((project) => project.name).join(", "),
-			},
-		],
-		[projects],
 	)
 
 	const hasContent = sidebarItems.length > 0

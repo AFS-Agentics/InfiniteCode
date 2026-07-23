@@ -139,7 +139,7 @@ export async function signOutFromRenderer(
 	set((prev) => ({ ...prev, status: "loading", errorMessage: undefined }))
 	try {
 		await declared.signOut()
-		set({ ...INITIAL_STATE, status: "signed-out", configured: prev.configured ?? true })
+		set((prev) => ({ ...INITIAL_STATE, status: "signed-out", configured: prev.configured ?? true }))
 	} catch (err) {
 		set((prev) => ({
 			...prev,

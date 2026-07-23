@@ -1068,40 +1068,6 @@ export function ChatView({
 	// none". Single source of truth is the per-turn structure, not a chat-view
 	// window.
 
-	// Ambient context for the always-on bottom-page ad. We use the most recent
-	// user turn's text (or a fallback ambient identifier when there are no
-	// turns yet) so Ad has something concrete to match on while still
-	// letting the rotation counter inside Ad drive fresh
-	// auctions on its timer. Keeping this stable across token churn — we
-	// intentionally sample user text content rather than reference the live
-	// turns atom — means a new turn's response stream never refires the
-	// bottom-page auction. The auction refreshes:
-	//   1. when the user sends a NEW message (lastTurn.userMessage changes)
-	//   2. once per `refreshIntervalMs` (rotation counter ticks)
-	// Both are intentional and complementary.
-	const bottomAdMessages = useMemo<{ role: string; content: string }[]>(
-		() => {
-			const lastTurn = turns.at(-1)
-			const userText = lastTurn
-				? lastTurn.userMessage.parts
-						.filter((p) => p.type === "text" || p.type === "reasoning")
-						.map((p) => p.text)
-						.join(" ")
-						.trim()
-						.slice(0, 800)
-				: ""
-			if (userText) {
-				return [{ role: "user", content: userText }]
-			}
-			// No turns yet — fall back to ambient identifiers so Ad has
-			// a stable, non-empty context to anchor the auction on. The
-			// directory is the most project-shaped signal we have pre-conversation.
-			const fallback = agent.directory ?? agent.sessionId ?? "infinitecode"
-			return [{ role: "user", content: fallback }]
-		},
-		[turns.at(-1)?.id, agent.directory, agent.sessionId],
-	)
-
 	return (
 		<div
 			className="relative flex h-full min-w-0 flex-col overflow-hidden"

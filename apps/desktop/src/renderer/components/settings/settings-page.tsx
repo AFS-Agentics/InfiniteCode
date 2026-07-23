@@ -47,12 +47,6 @@ import { useSetSidebarSlot } from "../sidebar-slot-context"
 // All four offsets are pairwise co-prime with their sync-against neighbor,
 // so practically no auction stacking fires within any reasonable session.
 
-const SETTINGS_FOOTER_MESSAGES = [
-	{ role: "user", content: "Settings page footer" },
-]
-const SETTINGS_SIDEBAR_MESSAGES = [
-	{ role: "user", content: "Settings sidebar" },
-]
 
 // ============================================================
 // Tab definitions

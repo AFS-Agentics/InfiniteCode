@@ -1,5 +1,5 @@
 import { atom } from "jotai"
-import type { Agent } from "../lib/types"
+
 
 // ============================================================
 // Types

@@ -70,16 +70,6 @@ WITH CHECK (auth.uid() = id);
 -- ────────────────────────────────────────────────────────────────────────────
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-
--- Drop the orphan `public.handle_new_user()` function. Earlier drafts
--- of this migration created/replaced the function with a `DO UPDATE`
--- body that differed from the Backend migration's canonical version;
--- with the duplicate trigger dropped above, the canonical
--- `trg_handle_new_user` (Backend migration) is the only caller. Use
--- `CASCADE` so any other leftover triggers / policies that may depend
--- on the function are cleaned up too.
-DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
-
 -- ────────────────────────────────────────────────────────────────────────────
 -- `public.device_pairing` self-row SELECT policy. Lets the website's
 -- Profile page list recent device-pairing rows whose user_id matches the

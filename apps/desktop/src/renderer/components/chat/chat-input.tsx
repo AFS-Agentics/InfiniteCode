@@ -24,7 +24,7 @@ import type { Agent, FileAttachment } from "../../lib/types"
 import { createLogger } from "../../lib/logger"
 import { detectLanguage } from "../../lib/language"
 import { storeArtifact } from "../../services/artifact-service"
-import type { ArtifactInput, ArtifactKind } from "../../preload/api"
+import type { ArtifactInput, ArtifactKind } from "../../../preload/api"
 
 import { ContextItems } from "./context-items"
 import { MicButton } from "./mic-button"
