@@ -7,8 +7,7 @@
  *
  * Behaviour:
  *  - Google OAuth (redirects through Supabase and comes back here)
- *  - Email magic-link sign-in (no account required)
- *  - Email + password sign-in for users who already created an account
+ *  - Email + password sign-in / sign-up for users with an account
  *  - Device-pairing auto-link when ?code=ABCD-EFGH is present
  *  - Successful login → /profile (preserves `?code=…` so the pairing
  *    useEffect can run after the nav transition)
@@ -25,7 +24,6 @@ import {
 	KeyRoundIcon,
 	Loader2Icon,
 	LogInIcon,
-	MailIcon,
 	MonitorIcon,
 	UserPlusIcon,
 } from "lucide-react"
@@ -38,11 +36,10 @@ import { Label } from "@/components/ui/label"
 
 const DEVICE_CODE_PARAM = "code"
 
-type Mode = "google" | "password" | "magic"
+type Mode = "google" | "password"
 
 export default function Login() {
-	const { configured, user, ready, signInWithGoogle, signInWithPassword, sendMagicLink } =
-		useAuth()
+	const { configured, user, ready, signInWithGoogle, signInWithPassword } = useAuth()
 	const navigate = useNavigate()
 	const [mode, setMode] = React.useState<Mode>("google")
 	const [email, setEmail] = React.useState("")
@@ -129,22 +126,6 @@ export default function Login() {
 		}
 	}
 
-	async function runMagic(e: React.FormEvent) {
-		e.preventDefault()
-		if (!email) return
-		setBusy(true)
-		setError(null)
-		setInfo(null)
-		try {
-			await sendMagicLink(email.trim(), "/login")
-			setInfo("Check your inbox — we sent a one-time sign-in link.")
-		} catch (e) {
-			setError(e instanceof Error ? e.message : String(e))
-		} finally {
-			setBusy(false)
-		}
-	}
-
 	if (!configured) {
 		return (
 			<main className="grid min-h-screen place-items-center bg-background p-6">
@@ -224,12 +205,11 @@ export default function Login() {
 					</p>
 				)}
 
-				{/* Mode tabs */}
-				<div className="mb-4 grid grid-cols-3 gap-2 text-xs">
-					<ModeTab active={mode === "google"} onClick={() => setMode("google")} label="Google" />
-					<ModeTab active={mode === "password"} onClick={() => setMode("password")} label="Email" />
-					<ModeTab active={mode === "magic"} onClick={() => setMode("magic")} label="Magic link" />
-				</div>
+			{/* Mode tabs */}
+			<div className="mb-4 grid grid-cols-2 gap-2 text-xs">
+				<ModeTab active={mode === "google"} onClick={() => setMode("google")} label="Google" />
+				<ModeTab active={mode === "password"} onClick={() => setMode("password")} label="Email" />
+			</div>
 
 				{mode === "google" && (
 					<Button
@@ -247,82 +227,58 @@ export default function Login() {
 					</Button>
 				)}
 
-				{mode === "password" && (
-					<form className="space-y-3" onSubmit={runPassword}>
-						<div className="grid gap-1.5">
-							<Label htmlFor="login-email-pw">Email</Label>
+			{mode === "password" && (
+				<form className="space-y-3" onSubmit={runPassword}>
+					<div className="grid gap-1.5">
+						<Label htmlFor="login-email-pw">Email</Label>
+						<Input
+							id="login-email-pw"
+							type="email"
+							autoComplete="email"
+							value={email}
+							onChange={(e) => setEmail(e.target.value)}
+							required
+						/>
+					</div>
+					<div className="grid gap-1.5">
+						<div className="flex items-baseline justify-between">
+							<Label htmlFor="login-password">Password</Label>
+							<Link
+								to="/forgot-password"
+								className="text-[11px] text-muted-foreground hover:text-foreground"
+							>
+								Forgot?
+							</Link>
+						</div>
+						<div className="relative">
 							<Input
-								id="login-email-pw"
-								type="email"
-								autoComplete="email"
-								value={email}
-								onChange={(e) => setEmail(e.target.value)}
+								id="login-password"
+								type={showPwd ? "text" : "password"}
+								autoComplete="current-password"
+								value={password}
+								onChange={(e) => setPassword(e.target.value)}
 								required
 							/>
+							<button
+								type="button"
+								onClick={() => setShowPwd((s) => !s)}
+								className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+								aria-label={showPwd ? "Hide password" : "Show password"}
+							>
+								{showPwd ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+							</button>
 						</div>
-						<div className="grid gap-1.5">
-							<div className="flex items-baseline justify-between">
-								<Label htmlFor="login-password">Password</Label>
-								<Link
-									to="/forgot-password"
-									className="text-[11px] text-muted-foreground hover:text-foreground"
-								>
-									Forgot?
-								</Link>
-							</div>
-							<div className="relative">
-								<Input
-									id="login-password"
-									type={showPwd ? "text" : "password"}
-									autoComplete="current-password"
-									value={password}
-									onChange={(e) => setPassword(e.target.value)}
-									required
-								/>
-								<button
-									type="button"
-									onClick={() => setShowPwd((s) => !s)}
-									className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-									aria-label={showPwd ? "Hide password" : "Show password"}
-								>
-									{showPwd ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
-								</button>
-							</div>
-						</div>
-						<Button type="submit" className="w-full" disabled={busy}>
-							{busy ? (
-								<Loader2Icon className="mr-2 size-4 animate-spin" />
-							) : (
-								<KeyRoundIcon className="mr-2 size-4" />
-							)}
-							Sign in
-						</Button>
-					</form>
-				)}
-
-				{mode === "magic" && (
-					<form className="space-y-3" onSubmit={runMagic}>
-						<div className="grid gap-1.5">
-							<Label htmlFor="login-email-magic">Email</Label>
-							<Input
-								id="login-email-magic"
-								type="email"
-								autoComplete="email"
-								value={email}
-								onChange={(e) => setEmail(e.target.value)}
-								required
-							/>
-						</div>
-						<Button type="submit" className="w-full" disabled={busy}>
-							{busy ? (
-								<Loader2Icon className="mr-2 size-4 animate-spin" />
-							) : (
-								<MailIcon className="mr-2 size-4" />
-							)}
-							Send sign-in link
-						</Button>
-					</form>
-				)}
+					</div>
+					<Button type="submit" className="w-full" disabled={busy}>
+						{busy ? (
+							<Loader2Icon className="mr-2 size-4 animate-spin" />
+						) : (
+							<KeyRoundIcon className="mr-2 size-4" />
+						)}
+						Sign in
+					</Button>
+				</form>
+			)}
 
 				<div className="mt-6 border-t border-border/40 pt-4 text-center text-xs">
 					New here?{" "}

@@ -40,7 +40,6 @@ interface AuthContextValue {
 	signInWithGoogle: (redirectPath?: string) => Promise<void>
 	signInWithPassword: (email: string, password: string) => Promise<void>
 	signUpWithPassword: (email: string, password: string, displayName: string) => Promise<void>
-	sendMagicLink: (email: string, redirectPath?: string) => Promise<void>
 	resetPassword: (email: string) => Promise<void>
 	updatePassword: (newPassword: string) => Promise<void>
 	updateProfile: (patch: {
@@ -150,14 +149,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 						data: { full_name: displayName },
 						emailRedirectTo: buildRedirect("/profile"),
 					},
-				})
-				if (error) throw error
-			},
-			async sendMagicLink(email, redirectPath) {
-				if (!sb) throw new Error("Supabase not configured")
-				const { error } = await sb.auth.signInWithOtp({
-					email,
-					options: { emailRedirectTo: buildRedirect(redirectPath ?? "/profile") },
 				})
 				if (error) throw error
 			},
